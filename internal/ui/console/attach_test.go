@@ -12,7 +12,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
@@ -120,8 +119,8 @@ func stoppedMateTree() query.Snapshot {
 		Name:      "docs-site",
 		Mate: query.MateNode{
 			Designated: query.KnownField(query.MateIdentity{
-				MateID: "mate_01J9M7S3T5U7V9W1X3Y5Z7A9BC", HarnessKind: domain.HarnessClaude,
-				Status: domain.MateStopped, IsDefault: true,
+				MateID: "mate_01J9M7S3T5U7V9W1X3Y5Z7A9BC", HarnessKind: query.HarnessClaude,
+				Status: query.MateStopped, IsDefault: true,
 			}),
 			AgentName: query.KnownField("mate-docs-site"),
 			Binding:   query.AbsentField[query.BindingValue]("the Mate was stopped and its binding released"),
@@ -933,8 +932,8 @@ func TestEveryAttachMessageFitsAnEightyColumnFrame(t *testing.T) {
 	mutations := map[string]func(*query.Snapshot){
 		"mate-unknown":  func(s *query.Snapshot) { s.Projects[0].Mate = unknownMate("designation lookup failed") },
 		"mate-absent":   func(s *query.Snapshot) { s.Projects[0].Mate = absentMate("this project has no designated Mate") },
-		"mate-stopped":  func(s *query.Snapshot) { s.Projects[0].Mate.Designated.Value.Status = domain.MateStopped },
-		"mate-starting": func(s *query.Snapshot) { s.Projects[0].Mate.Designated.Value.Status = domain.MateCreated },
+		"mate-stopped":  func(s *query.Snapshot) { s.Projects[0].Mate.Designated.Value.Status = query.MateStopped },
+		"mate-starting": func(s *query.Snapshot) { s.Projects[0].Mate.Designated.Value.Status = query.MateCreated },
 		"binding-absent": func(s *query.Snapshot) {
 			s.Projects[0].Mate.Binding = query.AbsentField[query.BindingValue]("no binding is held")
 		},

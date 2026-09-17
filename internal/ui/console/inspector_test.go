@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -31,7 +30,7 @@ func oneCrewTree(c query.CrewNode) query.Snapshot {
 			Mate: absentMate("this project has no designated Mate"),
 			Tasks: []query.TaskNode{{
 				TaskID: "task_1", Title: "a task",
-				Status: domain.TaskRunning,
+				Status: query.TaskRunning,
 				Error:  query.AbsentField[query.ErrorReason](notErrorState),
 				Crews:  []query.CrewNode{c},
 			}},
@@ -58,7 +57,7 @@ func intoFirstCrew(t *testing.T, m Model) Model {
 func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 	const reason = "lookup timed out (2s)"
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: domain.CrewNeedsRebase,
+		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
 		RetryOf:  query.AbsentField[query.RetryValue]("first attempt"),
 		Worktree: query.UnknownField[query.WorktreeValue](reason),
 		Error:    query.AbsentField[query.ErrorReason](notErrorState),
@@ -89,7 +88,7 @@ func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 // attempt it retries plus the crew id a reader would look up.
 func TestRetryOfRendersFirstAttemptAndLinkedAttempt(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_2", Attempt: 2, Status: domain.CrewRunning,
+		CrewID: "crew_2", Attempt: 2, Status: query.CrewRunning,
 		RetryOf: query.KnownField(query.RetryValue{CrewID: "crew_1", Attempt: 1}),
 		Error:   query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -103,7 +102,7 @@ func TestRetryOfRendersFirstAttemptAndLinkedAttempt(t *testing.T) {
 	}
 
 	first := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: domain.CrewRunning,
+		CrewID: "crew_1", Attempt: 1, Status: query.CrewRunning,
 		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
 		Error:   query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -122,7 +121,7 @@ func TestRetryOfRendersFirstAttemptAndLinkedAttempt(t *testing.T) {
 // and not the same sentence as Absent's "not an error state".
 func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: domain.CrewNeedsRebase,
+		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
 		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
 		Error:   query.KnownField(query.ErrorReason("")),
 	})
@@ -145,7 +144,7 @@ func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 // labels that do not apply.
 func TestBindingAbsentShowsOneFieldNoRuntimeOrBoundSince(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: domain.CrewNeedsRebase,
+		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
 		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
 		Binding: query.AbsentField[query.BindingValue]("session ended when rebase was required"),
 		Error:   query.AbsentField[query.ErrorReason](notErrorState),
@@ -176,7 +175,7 @@ func TestTaskAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
 			Tasks: []query.TaskNode{{
-				TaskID: "task_1", Title: "Add refund audit trail", Status: domain.TaskAwaitingReview,
+				TaskID: "task_1", Title: "Add refund audit trail", Status: query.TaskAwaitingReview,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
 				Attention: query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "attempt 1 is recorded awaiting_review and waits on a person"}),
 			}},
@@ -198,7 +197,7 @@ func TestTaskAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
 			Tasks: []query.TaskNode{{
-				TaskID: "task_1", Title: "Add refund audit trail", Status: domain.TaskReady,
+				TaskID: "task_1", Title: "Add refund audit trail", Status: query.TaskReady,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
 				Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
 			}},

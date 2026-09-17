@@ -58,33 +58,11 @@ func (m Model) hasInspectorColumn(l frameLayout) bool {
 func (m Model) headerLine(l frameLayout) *line {
 	left := newLine().add(" mate console", m.p.Bold)
 	if m.phase == phaseReady {
-		// The open-incident count (ADR 0019 G7-04a2 part 3) is visible from
-		// every screen, not only the incidents overlay itself, so a captain
-		// looking at an unrelated Project still sees that something needs
-		// attention. It costs nothing on a healthy workspace: the badge is
-		// absent, not zero.
-		if n := len(m.health.Incidents); n > 0 {
-			word := "incidents"
-			if n == 1 {
-				word = "incident"
-			}
-			left.add(fmt.Sprintf("  ! %d %s", n, word), m.p.Amber)
-		}
-		// A failing health pipeline must render as visibly not-current, not
-		// as silence (PR 92 counter-review B2 - ADR 0019's own limit: "Không
-		// có UI nào được biến các khoảng trống đó thành khẳng định 'Crew
-		// khỏe'"). Persistent in the header, not the footer message line:
-		// the footer is cleared by almost any other interaction, and an
-		// ongoing outage needs to stay visible across navigation, not flash
-		// once and vanish on the next keystroke. It clears itself the
-		// instant a cycle succeeds again (onHealthResult, health.go). Short
-		// on purpose - the header already cuts long content at the terminal
-		// edge with no truncation marker (frame.go's own leftRight/cut
-		// contract) - the full error text is in the Incidents overlay
-		// (incidents.go's incidentsLines), which has the room for it.
-		if m.healthErr != "" {
-			left.add("  ? monitoring error", m.p.Amber)
-		}
+		// TODO(task 18): the open-incident badge and the "? monitoring
+		// error" marker lived here. Both read the health observer, which
+		// mvp.md defers to task 18 (internal/watch), so the header says
+		// nothing about runtime health rather than asserting silence is
+		// good news.
 		left.add("   workspace ", m.p.Dim)
 		if l.Cols >= 100 {
 			left.add(m.workspaceDisplayName(), m.p.Fg)
@@ -177,10 +155,6 @@ func (m Model) crumbLabel(i int) string {
 		if p, ok := m.projectByID(f.id); ok {
 			return p.Name
 		}
-	case frameTask:
-		if t, ok := m.taskByID(m.parentProjectID(i), f.id); ok {
-			return t.Title
-		}
 	}
 	return f.id
 }
@@ -205,9 +179,7 @@ func (m Model) breadcrumbCount() string {
 	f := m.cur()
 	switch f.kind {
 	case frameProject:
-		return "Project " + m.g.Dot + " " + plural(len(m.currentProject().Tasks), "task", "tasks")
-	case frameTask:
-		return "Task " + m.g.Dot + " " + plural(len(m.currentTask().Crews), "attempt", "attempts")
+		return "Project " + m.g.Dot + " " + plural(len(m.currentProject().Crews), "crew", "crews")
 	default:
 		return "Workspace " + m.g.Dot + " " + plural(len(m.tree.Projects), "project", "projects")
 	}
@@ -249,10 +221,6 @@ func (m Model) pushBody(s *screen, l frameLayout) {
 	// keyboard first, so none of them can be open at the same time as it.
 	if m.failureDetail {
 		pushAll(s, fitLines(m.openFailureDetail(l), l.Body))
-		return
-	}
-	if m.incidents.open {
-		pushAll(s, fitLines(m.incidentsLines(l.Cols, l.Body), l.Body))
 		return
 	}
 	if m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {

@@ -2,8 +2,6 @@ package console
 
 import (
 	"testing"
-
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 )
 
 func TestParseTranscriptClaudeCodeRecognizesRealMarkers(t *testing.T) {
@@ -12,7 +10,7 @@ func TestParseTranscriptClaudeCodeRecognizesRealMarkers(t *testing.T) {
 		"\n" +
 		"✻ Waiting for the completion report (esc to interrupt)\n"
 
-	got := ParseTranscript(domain.HarnessClaude, raw)
+	got := ParseTranscript(query.HarnessClaude, raw)
 	if got.Status != SessionTranscriptParsed {
 		t.Fatalf("Status = %v, want Parsed", got.Status)
 	}
@@ -37,7 +35,7 @@ func TestParseTranscriptClaudeCodeRecognizesRealMarkers(t *testing.T) {
 
 func TestParseTranscriptClaudeCodeJoinsContinuationLines(t *testing.T) {
 	raw := "⏺ This turn wraps across\n  two lines of real terminal output.\n"
-	got := ParseTranscript(domain.HarnessClaude, raw)
+	got := ParseTranscript(query.HarnessClaude, raw)
 	if got.Status != SessionTranscriptParsed {
 		t.Fatalf("Status = %v, want Parsed", got.Status)
 	}
@@ -51,7 +49,7 @@ func TestParseTranscriptClaudeCodeJoinsContinuationLines(t *testing.T) {
 }
 
 func TestParseTranscriptClaudeCodeFallsBackOnUnrecognizedOutput(t *testing.T) {
-	got := ParseTranscript(domain.HarnessClaude, "$ some shell prompt\nwith no markers at all\n")
+	got := ParseTranscript(query.HarnessClaude, "$ some shell prompt\nwith no markers at all\n")
 	if got.Status != SessionTranscriptUnknown {
 		t.Fatalf("Status = %v, want Unknown for output with no claude-code marker", got.Status)
 	}
@@ -64,14 +62,14 @@ func TestParseTranscriptClaudeCodeFallsBackOnUnrecognizedOutput(t *testing.T) {
 }
 
 func TestParseTranscriptNonClaudeHarnessHasNoProfileYet(t *testing.T) {
-	got := ParseTranscript(domain.HarnessCodex, "⏺ this looks like claude-code output but the harness is codex\n")
+	got := ParseTranscript(query.HarnessCodex, "⏺ this looks like claude-code output but the harness is codex\n")
 	if got.Status != SessionTranscriptUnknown {
 		t.Fatalf("Status = %v, want Unknown: no profile exists for Codex yet", got.Status)
 	}
 }
 
 func TestParseTranscriptTrimsTrailingGaps(t *testing.T) {
-	got := ParseTranscript(domain.HarnessClaude, "⏺ one turn\n\n\n")
+	got := ParseTranscript(query.HarnessClaude, "⏺ one turn\n\n\n")
 	if len(got.Entries) != 1 {
 		t.Fatalf("Entries = %#v, want trailing blank lines dropped", got.Entries)
 	}

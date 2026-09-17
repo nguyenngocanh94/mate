@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -32,7 +31,7 @@ func mateTree(mate query.MateNode, actions []query.ActionAvailability) query.Sna
 	return tree
 }
 
-func knownMate(status domain.MateStatus, kind domain.HarnessKind) query.MateNode {
+func knownMate(status query.MateStatus, kind query.HarnessKind) query.MateNode {
 	return query.MateNode{
 		Designated: query.KnownField(query.MateIdentity{MateID: "mate_1", HarnessKind: kind, Status: status}),
 		AgentName:  query.AbsentField[string]("no binding"),
@@ -70,13 +69,13 @@ func TestTheStartKeyLabelFollowsTheRecordedMateStatus(t *testing.T) {
 		},
 		{
 			name: "created",
-			mate: knownMate(domain.MateCreated, domain.HarnessClaude),
+			mate: knownMate(query.MateCreated, query.HarnessClaude),
 			caps: mateCaps(false, true, false, true),
 			want: "s Start mate",
 		},
 		{
 			name: "stopped",
-			mate: knownMate(domain.MateStopped, domain.HarnessClaude),
+			mate: knownMate(query.MateStopped, query.HarnessClaude),
 			caps: mateCaps(false, false, true, true),
 			want: "s Resume mate",
 		},
@@ -123,7 +122,7 @@ func TestCreatingAMateAsksWhichAgentToUse(t *testing.T) {
 		t.Fatalf("runner calls = %d, want one", len(*got))
 	}
 	req := (*got)[0]
-	if req.Action != ActionOnboard || req.Harness != domain.HarnessCodex {
+	if req.Action != ActionOnboard || req.Harness != query.HarnessCodex {
 		t.Fatalf("request = %+v, want an onboard carrying codex", req)
 	}
 	if req.TargetKind != "project-mate" {
@@ -141,8 +140,8 @@ func TestStartAndResumeDoNotAskForAnAgent(t *testing.T) {
 		caps   []query.ActionAvailability
 		action Action
 	}{
-		{"created", knownMate(domain.MateCreated, domain.HarnessClaude), mateCaps(false, true, false, true), ActionStart},
-		{"stopped", knownMate(domain.MateStopped, domain.HarnessClaude), mateCaps(false, false, true, true), ActionResume},
+		{"created", knownMate(query.MateCreated, query.HarnessClaude), mateCaps(false, true, false, true), ActionStart},
+		{"stopped", knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true, true), ActionResume},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -196,7 +195,7 @@ func TestSwitchingHarnessAsksThenConfirmsBeforeDestroyingThePanel(t *testing.T) 
 	if len(*got) != 1 {
 		t.Fatalf("runner calls = %d, want one", len(*got))
 	}
-	if (*got)[0].Action != ActionSwitchHarness || (*got)[0].Harness != domain.HarnessCodex {
+	if (*got)[0].Action != ActionSwitchHarness || (*got)[0].Harness != query.HarnessCodex {
 		t.Fatalf("request = %+v, want a switch_harness carrying codex", (*got)[0])
 	}
 }
@@ -205,7 +204,7 @@ func TestSwitchingHarnessAsksThenConfirmsBeforeDestroyingThePanel(t *testing.T) 
 // package's standing rule: never assert more than the recorded state says.
 func TestSwitchingHarnessOnAStoppedMateDoesNotClaimAPanelWillBeDestroyed(t *testing.T) {
 	t.Parallel()
-	m := projectFrame(t, mateTree(knownMate(domain.MateStopped, domain.HarnessClaude), mateCaps(false, false, true, true)))
+	m := projectFrame(t, mateTree(knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true, true)))
 	m, _ = send(t, m, key("h"))
 	m, _ = send(t, m, key("enter")) // claude, same kind: still a restart
 	flat := flattenWrap(renderFrame(t, m))

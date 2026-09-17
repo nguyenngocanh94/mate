@@ -10,7 +10,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
@@ -564,7 +563,7 @@ func TestKeyLineNamesWhatEnterDoesForAMateRow(t *testing.T) {
 
 	t.Run("the view cannot open: Enter falls back and the label says so", func(t *testing.T) {
 		tree := sampleTree()
-		tree.Projects[0].Mate.Designated.Value.Status = domain.MateStopped
+		tree.Projects[0].Mate.Designated.Value.Status = query.MateStopped
 		m := build(t, tree)
 		r, ok := m.selectedRow()
 		if !ok || r.kind != rowMate {

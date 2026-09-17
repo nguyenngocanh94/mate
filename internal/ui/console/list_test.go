@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -67,7 +66,7 @@ func noTasksTree() query.Snapshot {
 			ProjectID: "proj_docs",
 			Name:      "docs-site",
 			Mate: query.MateNode{
-				Designated: query.KnownField(query.MateIdentity{MateID: "mate_docs", HarnessKind: domain.HarnessClaude, Status: domain.MateStopped}),
+				Designated: query.KnownField(query.MateIdentity{MateID: "mate_docs", HarnessKind: query.HarnessClaude, Status: query.MateStopped}),
 				AgentName:  query.KnownField("mate-docs-site"),
 				Binding:    query.AbsentField[query.BindingValue]("no runtime binding is held"),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),
@@ -253,7 +252,7 @@ func manyTasksTree(n int) query.Snapshot {
 		tasks = append(tasks, query.TaskNode{
 			TaskID:    fmt.Sprintf("task_%03d", i),
 			Title:     fmt.Sprintf("task-%03d", i),
-			Status:    domain.TaskReady,
+			Status:    query.TaskReady,
 			Error:     query.AbsentField[query.ErrorReason](notErrorState),
 			Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
 		})
@@ -264,7 +263,7 @@ func manyTasksTree(n int) query.Snapshot {
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_big", Name: "big-project",
 			Mate: query.MateNode{
-				Designated: query.KnownField(query.MateIdentity{MateID: "mate_big", HarnessKind: domain.HarnessClaude, Status: domain.MateRunning}),
+				Designated: query.KnownField(query.MateIdentity{MateID: "mate_big", HarnessKind: query.HarnessClaude, Status: query.MateRunning}),
 				AgentName:  query.KnownField("mate-big"),
 				Binding:    query.KnownField(query.BindingValue{Status: query.BindingActive}),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),
@@ -281,8 +280,8 @@ func manyCrewsTree(n int) query.Snapshot {
 		crews = append(crews, query.CrewNode{
 			CrewID:      fmt.Sprintf("crew_%03d", i),
 			Attempt:     i + 1,
-			Status:      domain.CrewRunning,
-			HarnessKind: domain.HarnessClaude,
+			Status:      query.CrewRunning,
+			HarnessKind: query.HarnessClaude,
 			RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 			Error:       query.AbsentField[query.ErrorReason](notErrorState),
 			Attention:   query.AbsentField[query.Attention]("nothing about it needs attention"),
@@ -294,13 +293,13 @@ func manyCrewsTree(n int) query.Snapshot {
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_big", Name: "big-project",
 			Mate: query.MateNode{
-				Designated: query.KnownField(query.MateIdentity{MateID: "mate_big", HarnessKind: domain.HarnessClaude, Status: domain.MateRunning}),
+				Designated: query.KnownField(query.MateIdentity{MateID: "mate_big", HarnessKind: query.HarnessClaude, Status: query.MateRunning}),
 				AgentName:  query.KnownField("mate-big"),
 				Binding:    query.KnownField(query.BindingValue{Status: query.BindingActive}),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),
 			},
 			Tasks: []query.TaskNode{{
-				TaskID: "task_big", Title: "big-task", Status: domain.TaskRunning,
+				TaskID: "task_big", Title: "big-task", Status: query.TaskRunning,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
 				Attention: query.AbsentField[query.Attention]("nothing about it needs attention"),
 				Crews:     crews,
@@ -547,7 +546,7 @@ func TestUnknownMateBindingRendersHonestlyInTheProjectList(t *testing.T) {
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_1", Name: "acme",
 			Mate: query.MateNode{
-				Designated: query.KnownField(query.MateIdentity{MateID: "mate_1", HarnessKind: domain.HarnessClaude, Status: domain.MateRunning}),
+				Designated: query.KnownField(query.MateIdentity{MateID: "mate_1", HarnessKind: query.HarnessClaude, Status: query.MateRunning}),
 				AgentName:  query.KnownField("mate-acme"),
 				Binding:    query.UnknownField[query.BindingValue]("lookup timed out (2s)"),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),

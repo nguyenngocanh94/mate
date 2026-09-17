@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -29,10 +28,10 @@ func sessionTestTarget(kind SessionTargetKind) SessionTarget {
 	switch kind {
 	case SessionTargetMate:
 		return SessionTarget{Kind: SessionTargetMate, ID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", ProjectID: "proj_1",
-			HarnessKind: domain.HarnessClaude, AgentName: sessionTestMateAgent}
+			HarnessKind: query.HarnessClaude, AgentName: sessionTestMateAgent}
 	default:
 		return SessionTarget{Kind: SessionTargetCrew, ID: "crew_01J9P6Q6W0E5V8XK2M4B8DT", ProjectID: "proj_1",
-			HarnessKind: domain.HarnessClaude, AgentName: sessionTestCrewAgent, Worktree: sessionTestCrewWorkdir}
+			HarnessKind: query.HarnessClaude, AgentName: sessionTestCrewAgent, Worktree: sessionTestCrewWorkdir}
 	}
 }
 
@@ -46,23 +45,23 @@ func sessionTestClock(h, m int) time.Time {
 // digest goldens were built from.
 func sessionTestInbox() []SessionInboxEntry {
 	return []SessionInboxEntry{
-		{InteractionID: "i1", Status: domain.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(14, 1),
+		{InteractionID: "i1", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(14, 1),
 			Attempt: "attempt 2", Task: "Fix webhook idempotency",
 			Question: "Migration for idempotency_keys, or key off stripe_events directly?"},
-		{InteractionID: "i2", Status: domain.InteractionBlocked, Awaiting: false, SentAt: sessionTestClock(13, 52),
+		{InteractionID: "i2", Status: query.InteractionBlocked, Awaiting: false, SentAt: sessionTestClock(13, 52),
 			Attempt: "attempt 2", Task: "Fix webhook idempotency",
 			Question: "Re-running go test ./... after a flaky failure on the first pass."},
-		{InteractionID: "i3", Status: domain.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(13, 41),
+		{InteractionID: "i3", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(13, 41),
 			Attempt: "attempt 1", Task: "Fix webhook idempotency",
 			Question: "Rebase conflict on Upgrade database adapter: keep the pool wrapper, or drop it?"},
-		{InteractionID: "i4", Status: domain.InteractionAnswered, Awaiting: false, SentAt: sessionTestClock(12, 58),
+		{InteractionID: "i4", Status: query.InteractionAnswered, Awaiting: false, SentAt: sessionTestClock(12, 58),
 			Attempt: "attempt 1", Task: "Fix webhook idempotency",
 			Question: "Reported failed: harness exited 1 before reporting.",
 			Note:     "reply was recorded before the crew stopped"},
-		{InteractionID: "i5", Status: domain.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(11, 30),
+		{InteractionID: "i5", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(11, 30),
 			Attempt: "attempt 1", Task: "Add idempotency-key index",
 			Question: "Composite index on (event_id, received_at), or event_id alone?"},
-		{InteractionID: "i6", Status: domain.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(9, 5),
+		{InteractionID: "i6", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(9, 5),
 			Attempt: "attempt 1", Task: "Add idempotency-key index",
 			Question: "Backfill existing rows before or after the index build finishes?"},
 	}
@@ -88,7 +87,7 @@ func sessionTestMateTranscript(g glyphSet) SessionTranscript {
 		{Kind: SessionTranscriptEntryGap},
 		{Kind: SessionTranscriptEntryStatus, Text: "Waiting for the completion report from " + sessionTestCrewAgent, Hint: " (esc to interrupt)"},
 	}
-	return SessionTranscript{Source: SessionTranscriptPolled, HarnessKind: domain.HarnessClaude, Status: SessionTranscriptParsed, Entries: entries}
+	return SessionTranscript{Source: SessionTranscriptPolled, HarnessKind: query.HarnessClaude, Status: SessionTranscriptParsed, Entries: entries}
 }
 
 // sessionTestCrewTranscript is the Crew sample transcript: narrating the
@@ -112,7 +111,7 @@ func sessionTestCrewTranscript(g glyphSet) SessionTranscript {
 		{Kind: SessionTranscriptEntryGap},
 		{Kind: SessionTranscriptEntryStatus, Text: "Running go test ./...", Hint: " (esc to interrupt)"},
 	}
-	return SessionTranscript{Source: SessionTranscriptPolled, HarnessKind: domain.HarnessClaude, Status: SessionTranscriptParsed, Entries: entries}
+	return SessionTranscript{Source: SessionTranscriptPolled, HarnessKind: query.HarnessClaude, Status: SessionTranscriptParsed, Entries: entries}
 }
 
 // sessionTestSnapshot assembles the full SessionSnapshot the golden fixtures
@@ -237,7 +236,7 @@ func TestSessionTranscriptUnknownRendersRawBoundedText(t *testing.T) {
 	target := sessionTestTarget(SessionTargetCrew)
 	snap := sessionTestSnapshot(SessionTargetCrew, unicodeGlyphs)
 	snap.Transcript = SessionTranscript{
-		Source: SessionTranscriptPolled, HarnessKind: domain.HarnessCodex,
+		Source: SessionTranscriptPolled, HarnessKind: query.HarnessCodex,
 		Status: SessionTranscriptUnknown, Raw: "some codex output\nsecond line of it",
 	}
 	fc.Seed(target, snap)

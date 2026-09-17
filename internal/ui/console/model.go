@@ -8,7 +8,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -30,23 +29,16 @@ type AttachCmdFunc func(target string) *exec.Cmd
 type Action string
 
 const (
-	ActionStart   Action = "start"
-	ActionStop    Action = "stop"
-	ActionResume  Action = "resume"
-	ActionRetry   Action = "retry"
-	ActionRepair  Action = "repair"
-	ActionDiscard Action = "discard"
+	ActionStart  Action = "start"
+	ActionStop   Action = "stop"
+	ActionResume Action = "resume"
+	ActionRepair Action = "repair"
+	// ActionOnboard adds a Project to the workspace, or creates and starts
+	// a Project's Mate.
 	ActionOnboard Action = "onboard"
-	// ActionSwitchHarness restarts a Project's Mate under a different
-	// harness, keeping its Mate id. It is destructive: the old panel and its
-	// harness session are destroyed (domain.md's RestartMateWithHarness).
-	ActionSwitchHarness Action = "switch_harness"
-	// ActionAcknowledgeIncident marks an ADR 0019 health_incident as seen
-	// (application.AcknowledgeHealthIncident). It has no lifecycle side
-	// effect - acknowledging is not recovery - so unlike every other Action
-	// here it needs no confirmation and is not offered through the ordinary
-	// per-row action menu; incidents.go's own overlay calls it directly.
-	ActionAcknowledgeIncident Action = "acknowledge_incident"
+	// TODO(task 21/22): v1 also had retry, discard and switch_harness.
+	// matev2 has no retry (a Crew runs once), and discard/merge belong to
+	// mvp.md's task 21 and 22.
 )
 
 // ActionRequest is the identity selected from the snapshot. TargetKind is
@@ -59,10 +51,9 @@ type ActionRequest struct {
 	TargetKind string
 	Input      string // project name for workspace onboarding
 	// Harness is the agent chosen for this request: on an onboard it is the
-	// harness the new Mate is created with, on a switch_harness the one it
-	// restarts under. Empty everywhere else - an existing Mate keeps its
-	// recorded harness unless a switch changes it.
-	Harness domain.HarnessKind
+	// harness the new Mate is created with. Empty everywhere else - an
+	// existing Mate keeps its recorded harness.
+	Harness query.HarnessKind
 }
 
 // ActionFunc is the application-service seam. A nil function keeps the
@@ -86,16 +77,17 @@ type frameKind int
 
 const (
 	frameWorkspace frameKind = iota // the Workspace: its Projects
-	frameProject                    // one Project: its Mate row and its Tasks
-	frameTask                       // one Task: its Crew attempts
+	frameProject                    // one Project: its Mate row and its Crews
 )
+
+// TODO(task 21): v1 had a third level, frameTask, listing one Task's Crew
+// attempts. matev2 has no Task and a Crew runs once, so the Project frame
+// lists Crews directly.
 
 func (k frameKind) String() string {
 	switch k {
 	case frameProject:
 		return "project"
-	case frameTask:
-		return "task"
 	default:
 		return "workspace"
 	}
@@ -205,9 +197,9 @@ type Model struct {
 	focus  pane
 	detail bool // < 100 cols: the inspector takes the whole main region
 	// completedOpen records which Completed groups the reader has expanded,
-	// keyed by the parent entity id (a Task id on a Crew list, a Project id
-	// on a Task list). Presentation only: expanding does not change the
-	// snapshot. A missing key is collapsed, which is the default view.
+	// keyed by the parent Project id. Presentation only: expanding does not
+	// change the snapshot. A missing key is collapsed, which is the default
+	// view.
 	completedOpen map[string]bool
 	// inspTop is the inspector's scroll offset. The inspector body itself
 	// is a separate task's surface; the offset lives here because Tab, Esc
@@ -270,25 +262,9 @@ type Model struct {
 	g               glyphSet
 	p               palette
 
-	// healthCycle, health, healthErr and healthLastAttempt are the ADR 0019
-	// G7-04a2 health pipeline (health.go): a tick chain independent of the
-	// tree Snapshot above, started once in Init and never torn down.
-	// healthErr holds the last cycle's error without discarding the last
-	// good health (rendered in the header - see headerLine), so a transient
-	// failure degrades what the incidents view/row markers show rather than
-	// blanking it. healthLastAttempt is stamped on every result, success or
-	// failure (unlike health.AsOf, which only advances on success): it is
-	// what healthNow() reports, so a frozen sample genuinely ages into stale
-	// during an outage instead of comparing two timestamps from the same
-	// last-good read (PR 92 counter-review B2).
-	healthCycle       HealthCycleFunc
-	health            HealthView
-	healthErr         string
-	healthLastAttempt time.Time
-	// incidents is the ADR 0019 G7-04a2 workspace-level incident list
-	// overlay (incidents.go): open regardless of which Project/Task is on
-	// screen, so a captain sees the count even while looking elsewhere.
-	incidents incidentsFlow
+	// TODO(task 18): the health tick chain and the workspace incident
+	// overlay lived on the Model here. mvp.md defers the observer that
+	// feeds them (internal/watch) to task 18.
 
 	// ctx is the context the program itself was started with (cmd/mate's
 	// handleConsole, via WithContext) - not context.Background(), so an
@@ -369,13 +345,8 @@ func New(load LoadFunc, attachCmd AttachCmdFunc, action ...ActionFunc) Model {
 	}
 }
 
-// Init kicks off the first tree load and, if a health port is wired, the
-// ADR 0019 G7-04a2 health tick chain - started here rather than lazily on
-// first use, since it must run regardless of which screen the reader opens.
+// Init kicks off the first tree load.
 func (m Model) Init() tea.Cmd {
-	if cmd := m.beginHealth(); cmd != nil {
-		return tea.Batch(loadCmd(m.load), cmd)
-	}
 	return loadCmd(m.load)
 }
 
@@ -455,52 +426,15 @@ func (m Model) projectByID(id string) (query.ProjectNode, bool) {
 	return query.ProjectNode{}, false
 }
 
-func (m Model) taskByID(projectID, taskID string) (query.TaskNode, bool) {
-	p, ok := m.projectByID(projectID)
-	if !ok {
-		return query.TaskNode{}, false
-	}
-	for _, t := range p.Tasks {
-		if t.TaskID == taskID {
-			return t, true
-		}
-	}
-	return query.TaskNode{}, false
-}
-
-// parentProjectID is the Project id a Task frame hangs under: the id of the
-// frame below it on the stack.
-func (m Model) parentProjectID(i int) string {
-	if i-1 < 0 || i-1 >= len(m.stack) {
-		return ""
-	}
-	return m.stack[i-1].id
-}
-
-// currentProject is the Project of the innermost Project or Task frame.
+// currentProject is the Project of the innermost Project frame.
 func (m Model) currentProject() query.ProjectNode {
 	for i := len(m.stack) - 1; i >= 0; i-- {
-		switch m.stack[i].kind {
-		case frameProject:
+		if m.stack[i].kind == frameProject {
 			p, _ := m.projectByID(m.stack[i].id)
-			return p
-		case frameTask:
-			p, _ := m.projectByID(m.parentProjectID(i))
 			return p
 		}
 	}
 	return query.ProjectNode{}
-}
-
-// currentTask is the Task of the innermost Task frame.
-func (m Model) currentTask() query.TaskNode {
-	for i := len(m.stack) - 1; i >= 0; i-- {
-		if m.stack[i].kind == frameTask {
-			t, _ := m.taskByID(m.parentProjectID(i), m.stack[i].id)
-			return t
-		}
-	}
-	return query.TaskNode{}
 }
 
 // rowsFor computes the rows one frame lists, against the tree as it stands
@@ -521,12 +455,6 @@ func (m Model) rowsFor(i int) []row {
 			return nil
 		}
 		return projectDetailRows(p, m.completedOpen[p.ProjectID])
-	case frameTask:
-		t, ok := m.taskByID(m.parentProjectID(i), f.id)
-		if !ok {
-			return nil
-		}
-		return crewRows(t, m.completedOpen[t.TaskID])
 	default:
 		return nil
 	}
@@ -652,9 +580,6 @@ func (m Model) frameEntityExists(i int) bool {
 	case frameProject:
 		_, ok := m.projectByID(f.id)
 		return ok
-	case frameTask:
-		_, ok := m.taskByID(m.parentProjectID(i), f.id)
-		return ok
 	default:
 		return true
 	}
@@ -671,28 +596,17 @@ func (m Model) revealCompletedIfSelHidden(i int, selID string) {
 	if m.completedOpen[f.id] {
 		return
 	}
-	switch f.kind {
-	case frameTask:
-		t, ok := m.taskByID(m.parentProjectID(i), f.id)
-		if !ok {
+	if f.kind != frameProject {
+		return
+	}
+	p, ok := m.projectByID(f.id)
+	if !ok {
+		return
+	}
+	for _, c := range p.Crews {
+		if c.CrewID == selID && c.Status.IsFinished() {
+			m.completedOpen[f.id] = true
 			return
-		}
-		for _, c := range t.Crews {
-			if c.CrewID == selID && crewIsFinished(c.Status) {
-				m.completedOpen[f.id] = true
-				return
-			}
-		}
-	case frameProject:
-		p, ok := m.projectByID(f.id)
-		if !ok {
-			return
-		}
-		for _, t := range p.Tasks {
-			if t.TaskID == selID && taskIsFinished(t.Status) {
-				m.completedOpen[f.id] = true
-				return
-			}
 		}
 	}
 }

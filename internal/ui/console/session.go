@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -62,7 +61,7 @@ type SessionTarget struct {
 	// can select the right rendering profile without a second lookup. There
 	// is no common parser forcing Claude and Codex into one style (ADR
 	// 0025); this is the value that selects between them.
-	HarnessKind domain.HarnessKind
+	HarnessKind query.HarnessKind
 	// AgentName is the live Herdr agent name (query.MateIdentity/AgentName
 	// field, query.CrewNode.AgentName) - what the session header actually
 	// names, since the frame-shape contract's header shows the agent a
@@ -99,7 +98,7 @@ type SessionTarget struct {
 //   - Absent:  InspectAgent most recently reported agent_not_found. Renders
 //     as "runtime_missing" and must never be upgraded by a
 //     renderer into a lifecycle value such as
-//     domain.MateStatusStopped, needs_repair, or a CrewStatus
+//     query.MateStatusStopped, needs_repair, or a CrewStatus
 //     failure - that upgrade is a separate reconcile use case,
 //     never a side effect of displaying this snapshot (ADR 0025
 //     "Runtime disappearance không tự mutate lifecycle").
@@ -187,7 +186,7 @@ type SessionTranscriptEntry struct {
 // "messages" list.
 type SessionTranscript struct {
 	Source      SessionTranscriptSource
-	HarnessKind domain.HarnessKind
+	HarnessKind query.HarnessKind
 	Status      SessionTranscriptStatus
 	// Entries are the harness-parsed units, populated only when
 	// Status == SessionTranscriptParsed.
@@ -209,12 +208,12 @@ type SessionTranscript struct {
 type SessionInboxEntry struct {
 	Kind          query.InboxEntryKind
 	InteractionID string
-	Status        domain.InteractionStatus
+	Status        query.InteractionStatus
 	Question      string
 	Reply         string
 	SentAt        time.Time
 	// Awaiting reports whether this entry currently awaits a reply, per
-	// domain.InteractionStatus.AwaitsReply - carried here rather than
+	// query.InteractionStatus.AwaitsReply - carried here rather than
 	// recomputed so the rail and the status agree on the same read.
 	Awaiting bool
 	// Attempt and Task are the interaction's owning Crew attempt label
@@ -229,7 +228,7 @@ type SessionInboxEntry struct {
 	// same way query.Field.Reason is - this package only displays it.
 	Note             string
 	CompletionID     string
-	CompletionStatus domain.CrewStatus
+	CompletionStatus query.CrewStatus
 	Outcome          string
 	ReportPath       string
 	ReportRevision   string
@@ -249,7 +248,7 @@ type SessionSnapshot struct {
 	// status and never transcript content.
 	ControllerNotice string
 	// RecordedStatus is the durable lifecycle status
-	// (domain.MateStatus/domain.CrewStatus, rendered as text by the
+	// (query.MateStatus/query.CrewStatus, rendered as text by the
 	// caller) as already established by query.Snapshot/application -
 	// never inferred here from Runtime, Transcript, or a successful poll
 	// (ADR 0025: "Recorded status: lifecycle trong SQLite, không được suy

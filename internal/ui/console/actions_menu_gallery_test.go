@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -38,8 +37,8 @@ type actionsMenuGalleryState struct {
 func blockedRetryTree() query.Snapshot {
 	tree := sampleTree()
 	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: domain.CrewFailed},
-		{CrewID: "crew_sibling", Status: domain.CrewNeedsRepair},
+		{CrewID: "crew_target", Status: query.CrewFailed},
+		{CrewID: "crew_sibling", Status: query.CrewNeedsRepair},
 	}
 	return tree
 }
@@ -50,7 +49,7 @@ func blockedRetryTree() query.Snapshot {
 func unknownBindingRepairTree() query.Snapshot {
 	tree := sampleTree()
 	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: domain.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
+		{CrewID: "crew_target", Status: query.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	return tree
 }
@@ -157,7 +156,7 @@ func actionsMenuGallery() []actionsMenuGalleryState {
 		// warning, or the warning that matters stops meaning anything.
 		name: "harness-switch-confirm-stopped-mate",
 		build: func(t *testing.T) string {
-			m := projectFrame(t, mateTree(knownMate(domain.MateStopped, domain.HarnessClaude), mateCaps(false, false, true, true)))
+			m := projectFrame(t, mateTree(knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true, true)))
 			m, _ = send(t, m, key("h"))
 			m, _ = send(t, m, key("down"))
 			m, _ = send(t, m, key("enter"))
@@ -185,12 +184,12 @@ func actionsMenuGallery() []actionsMenuGalleryState {
 func openMergeDiscardTree() query.Snapshot {
 	tree := sampleTree()
 	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{{
-		CrewID: "crew_target", Status: domain.CrewFailed,
+		CrewID: "crew_target", Status: query.CrewFailed,
 		Worktree: query.KnownField(query.WorktreeValue{
 			Path: "/w", Branch: "crew/x", Status: query.WorktreeRecordedCreated,
 		}),
 		OpenMerge: query.KnownField(query.OpenMergeValue{
-			RequestID: "mr_1", Status: domain.MergePendingConfirmation,
+			RequestID: "mr_1", Status: query.MergePendingConfirmation,
 		}),
 		Attention: query.KnownField(query.Attention{Kind: query.AttentionFailed, Why: "failed"}),
 	}}

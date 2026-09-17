@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -74,7 +73,7 @@ func hostileTree() query.Snapshot {
 				Name:      "支払いのべき等性を修正する é " + long + "\nsecond line\u0085third line",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{
-						MateID: "mate_" + strings.Repeat("B", 40), HarnessKind: domain.HarnessCodex, Status: domain.MateUnknown,
+						MateID: "mate_" + strings.Repeat("B", 40), HarnessKind: query.HarnessCodex, Status: query.MateUnknown,
 					}),
 					AgentName: query.KnownField("mate_" + strings.Repeat("B", 40)),
 					Binding:   query.KnownField(query.BindingValue{Status: query.BindingActive, AgentName: "mate_" + strings.Repeat("B", 40)}),
@@ -84,13 +83,13 @@ func hostileTree() query.Snapshot {
 					{
 						TaskID: "task_" + strings.Repeat("C", 40),
 						Title:  "修正\t" + long + " ‼️ tail",
-						Status: domain.TaskAwaitingReview,
+						Status: query.TaskAwaitingReview,
 						Error:  query.UnknownField[query.ErrorReason]("event read failed"),
 						Crews: []query.CrewNode{
 							{
 								CrewID:    "crew_" + strings.Repeat("D", 40),
 								Attempt:   1,
-								Status:    domain.CrewNeedsRepair,
+								Status:    query.CrewNeedsRepair,
 								RetryOf:   query.UnknownField[query.RetryValue]("attempt lookup failed"),
 								Worktree:  query.UnknownField[query.WorktreeValue]("worktree lookup failed"),
 								AgentName: query.UnknownField[string]("binding lookup failed"),
@@ -100,7 +99,7 @@ func hostileTree() query.Snapshot {
 							{
 								CrewID:    "",
 								Attempt:   2,
-								Status:    domain.CrewBlocked,
+								Status:    query.CrewBlocked,
 								RetryOf:   query.AbsentField[query.RetryValue]("first attempt"),
 								Worktree:  query.KnownField(query.WorktreeValue{Path: "", Branch: "", Status: ""}),
 								AgentName: query.KnownField(""),
@@ -110,7 +109,7 @@ func hostileTree() query.Snapshot {
 							{
 								CrewID:  "crew_" + strings.Repeat("E", 40),
 								Attempt: 3,
-								Status:  domain.CrewFailed,
+								Status:  query.CrewFailed,
 								RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
 								Worktree: query.KnownField(query.WorktreeValue{
 									Path:   "/repos/payments-api/.worktrees/crew_evil\nname/a1",

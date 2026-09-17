@@ -2,8 +2,6 @@ package query
 
 import (
 	"time"
-
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 )
 
 // Snapshot is the Console's navigation tree in one read: Workspace ->
@@ -48,19 +46,26 @@ type WorkspaceValue struct {
 	DatabasePath string
 }
 
-// ProjectNode is one Project row plus its designated Mate, its registered
-// repos and its Tasks.
+// ProjectNode is one registered Project plus its designated Mate, its
+// registered repos and its Crews.
+//
+// v1 hung Crews off a Task and a Task off the Project, so a Crew was one
+// numbered attempt at a Task. matev2 has no Task: mvp.md's model is
+// Project -> {Mate, Crew}, where a Crew is spawned for one job, runs once
+// and is torn down (mvp.md sections 1 and 3). The attempts level went with
+// it.
 type ProjectNode struct {
 	ProjectID string
 	Actions   []ActionAvailability
 	Name      string
 	Mate      MateNode
-	// Repos are the Project's registered repos (application.ListRepos), read
-	// once per Project. A Task's or Crew's own Repo field is resolved against
-	// this list rather than through a per-row GetRepo, so a Project with many
-	// Tasks still costs one repo read.
-	Repos     Field[[]RepoValue]
-	Tasks     []TaskNode
+	// Repos are the Project's registered repos, read once per Project. A
+	// Crew's own Repo field is resolved against this list rather than
+	// through a per-row read, so a Project with many Crews still costs one
+	// repo read.
+	Repos Field[[]RepoValue]
+	// Crews are the Project's Crews, oldest first.
+	Crews     []CrewNode
 	Attention Field[ProjectAttention]
 }
 
@@ -86,58 +91,31 @@ type MateNode struct {
 }
 
 // MateIdentity is the designated Mate row itself. Status is the durable
-// Mate lifecycle (domain.MateStatus); it is not a live Herdr liveness check
+// Mate lifecycle (MateStatus); it is not a live Herdr liveness check
 // - see CrewNode.
 type MateIdentity struct {
 	MateID      string
-	HarnessKind domain.HarnessKind
-	Status      domain.MateStatus
+	HarnessKind HarnessKind
+	Status      MateStatus
 	IsDefault   bool
 }
 
-// TaskNode is one Task row plus its Crew attempts.
-type TaskNode struct {
-	TaskID    string
-	ProjectID string
-	RepoID    string
-	Title     string
-	Brief     string
-	Status    domain.TaskStatus
-	CreatedAt time.Time
-	// Repo is the Task's repo resolved against its Project's Repos: Absent
-	// when the Task has no repo yet (a draft Task) or names one that is not
-	// registered in the Project, Unknown when the repo list read failed.
-	Repo      Field[RepoValue]
-	LastEvent Field[EventValue]
-	Error     Field[ErrorReason]
-	Attention Field[Attention]
-	// Crews are the Task's attempts in attempt order (ListCrews orders by
-	// created_at, attempt), so the latest attempt is the last element and
-	// len(Crews) is the attempts count the list's ATTEMPTS column shows.
-	Crews []CrewNode
-}
-
-// CrewNode is one Crew attempt row. Status is the durable, database-tracked
-// lifecycle state (reserved/preparing/running/awaiting_review/succeeded/
-// failed/blocked/needs_rebase/needs_repair). It is not live Herdr-observed
-// liveness or staleness: that classification is the ADR 0019 G7-04 health
-// observer's, read separately through LoadHealthView/HealthView (its own
-// pipeline, refreshed far more often than this Snapshot) rather than
-// duplicated or approximated here - a Crew can honestly be Status: running
-// and its HealthView entry Liveness: absent at the same time.
+// CrewNode is one Crew. Status is what the backend recorded, never a live
+// Herdr observation: mvp.md section 2 decision 8 keeps Herdr's
+// screen-scraped idle/blocked/done out of any conclusion about whether work
+// is finished. The store-backed loader fills it from the last line of
+// crews/<id>.status, which is why CrewStatus is a string type and an
+// unrecognised word renders as itself rather than as a blank cell.
 type CrewNode struct {
 	CrewID    string
 	Actions   []ActionAvailability
-	TaskID    string
 	ProjectID string
 	RepoID    string
-	Attempt   int
-	// RetryOf is the attempt this one retries (crew.retry_of_crew_id, set
-	// automatically by application.ReserveCrewAttempt): Absent on a first
-	// attempt.
-	RetryOf     Field[RetryValue]
-	HarnessKind domain.HarnessKind
-	Status      domain.CrewStatus
+	// Task is the one-line job this Crew was spawned for (crews/<id>.meta's
+	// `task=`). It is the Crew row's title.
+	Task        string
+	HarnessKind HarnessKind
+	Status      CrewStatus
 	CreatedAt   time.Time
 	Repo        Field[RepoValue]
 	Worktree    Field[WorktreeValue]
@@ -149,20 +127,6 @@ type CrewNode struct {
 	LastEvent Field[EventValue]
 	Error     Field[ErrorReason]
 	Attention Field[Attention]
-	// OpenMerge is the Crew's currently open merge request, if any. Known
-	// when ListMergeRequests found a pending_confirmation or executing
-	// request (domain.MergeRequestStatus.IsOpen); Absent when the list
-	// succeeded and none are open; Unknown when the list itself failed.
-	// DiscardCrew refuses an open request, so this field is how
-	// crewActions can tell that without reaching orchestration.
-	OpenMerge Field[OpenMergeValue]
-}
-
-// OpenMergeValue is the identity of one open merge request. Status is the
-// durable merge_request row, not a live Git observation.
-type OpenMergeValue struct {
-	RequestID string
-	Status    domain.MergeRequestStatus
 }
 
 // RepoValue is one registered repo as the inspector renders it.
@@ -171,18 +135,6 @@ type RepoValue struct {
 	DisplayName   string
 	Path          string
 	DefaultBranch string
-}
-
-// RetryValue links an attempt to the one it retries. Attempt is the
-// previous attempt's number, resolved from the Task's own attempts that
-// were already read - no extra read. When the recorded retry_of_crew_id is
-// not among them, the whole Field[RetryValue] is Absent rather than Known
-// with Attempt left at its zero value: a resolved link and an unresolved
-// one must not share one FieldState with only a Reason telling them apart
-// (see retryOf). The unresolved crew id is carried in that Field's Reason.
-type RetryValue struct {
-	CrewID  string
-	Attempt int
 }
 
 // WorktreeValue is the Crew's worktree row (StateStore.GetWorktree). Path,

@@ -10,7 +10,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -229,7 +228,7 @@ func TestAttachFinishedSetsMessageAndRereadsWithoutMovingTheStack(t *testing.T) 
 // retain the old row or infer state from the attach process returning.
 func TestAttachReturnRendersTheFreshRecordedMateStatus(t *testing.T) {
 	fresh := sampleTree()
-	fresh.Projects[0].Mate.Designated.Value.Status = domain.MateStopped
+	fresh.Projects[0].Mate.Designated.Value.Status = query.MateStopped
 	fresh.Projects[0].Mate.Binding = query.AbsentField[query.BindingValue]("the Mate was stopped and its binding released")
 	spy := &attachSpy{tree: func(n int) (query.Snapshot, error) {
 		if n > 1 {
@@ -251,7 +250,7 @@ func TestAttachReturnRendersTheFreshRecordedMateStatus(t *testing.T) {
 		t.Fatal("attach return did not schedule its one re-read")
 	}
 	m, _ = send(t, m, cmd())
-	if got := m.currentProject().Mate.Designated.Value.Status; got != domain.MateStopped {
+	if got := m.currentProject().Mate.Designated.Value.Status; got != query.MateStopped {
 		t.Fatalf("Mate status after re-read = %q, want the fresh recorded stopped status", got)
 	}
 	if view := renderFrame(t, m); !strings.Contains(view, "stopped") {
@@ -559,14 +558,14 @@ func TestAFailedRefreshKeepsTheSnapshotAndSaysSo(t *testing.T) {
 // fail.
 func TestAMateThatIsNotRunningRefusesAttachFromTheSnapshotAlone(t *testing.T) {
 	for _, tc := range []struct {
-		status      domain.MateStatus
+		status      query.MateStatus
 		wantRefusal bool
 	}{
-		{domain.MateCreated, true},
-		{domain.MateStopped, true},
-		{domain.MateRunning, false},
-		{domain.MateStarting, false},
-		{domain.MateUnknown, false}, // holds the active slot; the subprocess decides
+		{query.MateCreated, true},
+		{query.MateStopped, true},
+		{query.MateRunning, false},
+		{query.MateStarting, false},
+		{query.MateUnknown, false}, // holds the active slot; the subprocess decides
 	} {
 		tree := sampleTree()
 		tree.Projects[0].Mate.Designated.Value.Status = tc.status
@@ -638,7 +637,7 @@ func TestOneUnreadableFieldDoesNotTakeTheWholeScreenToAnErrorPage(t *testing.T) 
 	}
 	m = toFailedAttempt(t, m)
 	view := renderFrame(t, m)
-	if !strings.Contains(view, string(domain.CrewFailed)) {
+	if !strings.Contains(view, string(query.CrewFailed)) {
 		t.Fatalf("view = %q, want the recorded status of a crew whose other fields failed to read", view)
 	}
 	if !strings.Contains(view, "unknown") {

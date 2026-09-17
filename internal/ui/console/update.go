@@ -50,12 +50,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.onSessionPromptSent(msg), nil
 	case sessionCloseSentMsg:
 		return m, nil
-	case healthResultMsg:
-		return m.onHealthResult(msg)
-	case healthTickMsg:
-		return m.onHealthTick(msg)
-	case incidentAckDoneMsg:
-		return m.onIncidentAckDone(msg), nil
 	case tea.KeyMsg:
 		return m.onKey(msg)
 	case tea.MouseMsg:
@@ -240,9 +234,6 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	if m.incidents.open {
-		return m.onIncidentsKey(msg)
-	}
 	if m.actions {
 		switch key {
 		case "esc", "backspace":
@@ -296,10 +287,6 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginNewProject(), nil
 	case "s":
 		return m.beginMateStart()
-	case "h":
-		return m.beginSwitchHarness(), nil
-	case "i":
-		return m.beginIncidents(), nil
 	case "r":
 		m.msg = footerMsg{}
 		return m, loadCmd(m.load)
@@ -427,8 +414,6 @@ func (m Model) onEnter() (tea.Model, tea.Cmd) {
 	switch r.kind {
 	case rowProject:
 		return m.open(frame{kind: frameProject, id: r.id}), nil
-	case rowTask:
-		return m.open(frame{kind: frameTask, id: r.id}), nil
 	case rowCompletedGroup:
 		parent := m.cur().id
 		if m.completedOpen == nil {

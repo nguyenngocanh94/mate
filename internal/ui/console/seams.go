@@ -6,7 +6,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -98,8 +97,6 @@ func (m Model) inspectorContent(valueWidth int, focused bool) []*line {
 		out = append(out, m.projectFields(r, valueWidth)...)
 	case rowMate:
 		out = append(out, m.mateFields(valueWidth)...)
-	case rowTask:
-		out = append(out, m.taskFields(r, valueWidth)...)
 	case rowCrew:
 		out = append(out, m.crewFields(r, valueWidth)...)
 	case rowCompletedGroup:
@@ -112,11 +109,9 @@ func (m Model) inspectorTitle(r row) string {
 	switch r.kind {
 	case rowMate:
 		return "MATE  " + m.currentProject().Name
-	case rowTask:
-		return "TASK"
 	case rowCrew:
 		if c, ok := m.crewByID(r.id); ok {
-			return fmt.Sprintf("CREW  attempt %d of %d", c.Attempt, len(m.currentTask().Crews))
+			return "CREW  " + c.CrewID
 		}
 		return "CREW"
 	case rowCompletedGroup:
@@ -129,7 +124,7 @@ func (m Model) inspectorTitle(r row) string {
 // ---------- inspector: Project ----------
 
 // projectFields: identity (ID, Name) - the designated Mate summarized on
-// one field, the registered Repos and a note per repo, Tasks with the
+// one field, the registered Repos and a note per repo, Crews with the
 // Project's own attention count folded in - the Mate's own last event,
 // which is the closest thing a Project has to "what last happened here".
 func (m Model) projectFields(r row, valueWidth int) []*line {
@@ -151,7 +146,7 @@ func (m Model) projectFields(r row, valueWidth int) []*line {
 			}, valueWidth)...)
 		}
 	}
-	out = append(out, m.field("Tasks", tasksCountSpans(p, m.g, m.p), valueWidth)...)
+	out = append(out, m.field("Crews", crewsCountSpans(p, m.g, m.p), valueWidth)...)
 	out = append(out, newLine())
 	out = append(out, m.field("Last event", m.eventSpans(p.Mate.LastEvent), valueWidth)...)
 	return out
@@ -199,15 +194,15 @@ func mateSummarySpans(mate query.MateNode, g glyphSet, p palette) []span {
 	}
 }
 
-// tasksCountSpans is the Project block's Tasks field: the count, plus the
+// crewsCountSpans is the Project block's Crews field: the count, plus the
 // Project's own rollup of how many of them need attention - the one place
-// ProjectAttention.TasksNeedingAttention surfaces in the inspector, since
-// each Task's own inspector already answers "why" for itself.
-func tasksCountSpans(p query.ProjectNode, g glyphSet, pal palette) []span {
-	out := []span{{text: fmt.Sprint(len(p.Tasks)), style: pal.Fg}}
-	if p.Attention.State == query.Known && p.Attention.Value.TasksNeedingAttention > 0 {
+// ProjectAttention.CrewsNeedingAttention surfaces in the inspector, since
+// each Crew's own inspector already answers "why" for itself.
+func crewsCountSpans(p query.ProjectNode, g glyphSet, pal palette) []span {
+	out := []span{{text: fmt.Sprint(len(p.Crews)), style: pal.Fg}}
+	if p.Attention.State == query.Known && p.Attention.Value.CrewsNeedingAttention > 0 {
 		out = append(out, span{
-			text:  " " + g.Dot + " " + plural(p.Attention.Value.TasksNeedingAttention, "task", "tasks") + " need attention",
+			text:  " " + g.Dot + " " + plural(p.Attention.Value.CrewsNeedingAttention, "crew", "crews") + " need attention",
 			style: pal.Amber,
 		})
 	}
@@ -245,7 +240,9 @@ func (m Model) mateFields(valueWidth int) []*line {
 	return out
 }
 
-// ---------- inspector: Task ----------
+// TODO(task 21): the Task inspector block lived here, between the Project
+// and Crew blocks. matev2 has no Task, so a Crew's own one-line job is on
+// the Crew block instead.
 
 // taskFields: identity (ID, Title), the Task's own recorded status, its
 // repo, its attempts (rolled up from the Crews already in the snapshot -
@@ -253,42 +250,6 @@ func (m Model) mateFields(valueWidth int) []*line {
 // says the inspector answers the ATTENTION column's "why" in full
 // ("Trong pane": cột ATTENTION một từ, inspector đầy đủ) - then its last
 // event and error reason.
-func (m Model) taskFields(r row, valueWidth int) []*line {
-	t, ok := m.taskByID(m.currentProject().ProjectID, r.id)
-	if !ok {
-		return nil
-	}
-	var out []*line
-	out = append(out, m.textField("ID", t.TaskID, m.p.Fg, valueWidth)...)
-	out = append(out, m.textField("Title", t.Title, m.p.Fg, valueWidth)...)
-	out = append(out, newLine())
-	out = append(out, m.field("Recorded status", []span{statusSpan(string(t.Status), m.p)}, valueWidth)...)
-	out = append(out, m.field("Repo", m.repoSpans(t.Repo, true), valueWidth)...)
-	out = append(out, m.field("Attempts", attemptsSpans(t, m.g, m.p), valueWidth)...)
-	out = append(out, m.field("Attention", attentionFieldSpans(t.Attention, m.g, m.p), valueWidth)...)
-	out = append(out, newLine())
-	out = append(out, m.field("Last event", m.eventSpans(t.LastEvent), valueWidth)...)
-	out = append(out, m.field("Reason", errorReasonSpans(t.Error, t.Status == domain.TaskFailed, m.g, m.p), valueWidth)...)
-	return out
-}
-
-// attemptsSpans is the Task block's Attempts field: the count, plus (when
-// there is at least one) the latest attempt's own number, status and
-// harness - the summary a reader needs before drilling into the Crew list.
-func attemptsSpans(t query.TaskNode, g glyphSet, p palette) []span {
-	n := len(t.Crews)
-	if n == 0 {
-		return []span{{text: "0", style: p.Fg}, {text: " " + g.Dot + " no crew started", style: p.Dim}}
-	}
-	latest := t.Crews[n-1]
-	return []span{
-		{text: fmt.Sprint(n), style: p.Fg},
-		{text: " " + g.Dot + " latest #" + fmt.Sprint(latest.Attempt) + " ", style: p.Dim},
-		statusSpan(string(latest.Status), p),
-		{text: " (" + string(latest.HarnessKind) + ")", style: p.Dim},
-	}
-}
-
 // attentionFieldSpans renders a Field[query.Attention]: the one-word Kind
 // in amber plus the full Why sentence when the row needs attention, or
 // "none" with the recorded reason it does not - never blank, and an
@@ -310,9 +271,8 @@ func attentionFieldSpans(f query.Field[query.Attention], g glyphSet, p palette) 
 
 // ---------- inspector: Crew ----------
 
-// crewFields: identity (ID, the Task it belongs to, and Retry of - the
-// attempt this one retries, or "none - first attempt"), then Recorded
-// status, Harness, Agent and the full Binding block, then Repo/Repo
+// crewFields: identity (ID and the one-line Task it was spawned for), then
+// Recorded status, Harness, Agent and the full Binding block, then Repo/Repo
 // ID/Branch/Worktree/Worktree status (Branch and Worktree share Worktree's
 // own Field, per query.WorktreeValue's own doc: they come from one read),
 // then Last event and Reason.
@@ -323,8 +283,7 @@ func (m Model) crewFields(r row, valueWidth int) []*line {
 	}
 	var out []*line
 	out = append(out, m.textField("ID", c.CrewID, m.p.Fg, valueWidth)...)
-	out = append(out, m.textField("Task", m.currentTask().Title, m.p.Fg, valueWidth)...)
-	out = append(out, m.field("Retry of", retryOfSpans(c.RetryOf, m.g, m.p), valueWidth)...)
+	out = append(out, m.textField("Task", c.Task, m.p.Fg, valueWidth)...)
 	out = append(out, newLine())
 	out = append(out, m.field("Recorded status", []span{statusSpan(string(c.Status), m.p)}, valueWidth)...)
 	out = append(out, m.textField("Harness", string(c.HarnessKind), m.p.Fg, valueWidth)...)
@@ -341,20 +300,9 @@ func (m Model) crewFields(r row, valueWidth int) []*line {
 		valueWidth)...)
 	out = append(out, newLine())
 	out = append(out, m.field("Last event", m.eventSpans(c.LastEvent), valueWidth)...)
-	out = append(out, m.field("Reason", errorReasonSpans(c.Error, c.Status == domain.CrewFailed, m.g, m.p), valueWidth)...)
-	// The Runtime health block (ADR 0019 G7-04a2) only appears when a health
-	// port is actually wired: a Console built without one (every inspector
-	// fixture that predates this feature, and any future read-only,
-	// navigation-only Console) has nothing to show here but "not yet
-	// checked" on every single Crew forever, which is not information - it
-	// would just add three permanently-empty lines to every inspector.
-	if m.healthCycle != nil {
-		out = append(out, newLine())
-		health := m.crewHealth(c.CrewID)
-		out = append(out, m.field("Runtime health", runtimeHealthValueSpans(m.healthNow(), health, m.g, m.p), valueWidth)...)
-		out = append(out, m.field("Runtime last check", runtimeHealthLastCheckSpans(health, m.p), valueWidth)...)
-		out = append(out, m.field("Runtime reason", runtimeHealthReasonSpans(health, m.p), valueWidth)...)
-	}
+	out = append(out, m.field("Reason", errorReasonSpans(c.Error, c.Status == query.CrewFailed, m.g, m.p), valueWidth)...)
+	// TODO(task 18): the Runtime health / last check / reason block went
+	// here. It read the health observer, which mvp.md defers to task 18.
 	return out
 }
 
@@ -369,26 +317,6 @@ func worktreeStatusWord(status query.WorktreeStatus) string {
 		return "missing"
 	}
 	return string(status)
-}
-
-// retryOfSpans renders a Field[query.RetryValue]: "attempt N · <crew id>"
-// when known (plus the field's own Reason as a trailing caveat when the
-// recorded link did not resolve to attempt 0 - a recorded inconsistency,
-// not a read failure), or "none · first attempt" when this is the first.
-func retryOfSpans(f query.Field[query.RetryValue], g glyphSet, p palette) []span {
-	switch f.State {
-	case query.Known:
-		out := []span{
-			{text: fmt.Sprintf("attempt %d", f.Value.Attempt), style: p.Fg},
-			{text: " " + g.Dot + " " + f.Value.CrewID, style: p.Dim},
-		}
-		out = append(out, reasonSpan(f.Reason, g, p)...)
-		return out
-	case query.Absent:
-		return append([]span{{text: "none", style: p.Dim}}, reasonSpan(f.Reason, g, p)...)
-	default:
-		return append(append([]span{{text: "unknown", style: p.Amber}}, reasonSpan(f.Reason, g, p)...), rereadsSpan(g, p))
-	}
 }
 
 // ---------- inspector: shared field builders ----------
@@ -540,39 +468,27 @@ func windowContent(content []*line, top, h int, g glyphSet, p palette) []*line {
 }
 
 func (m Model) completedGroupFields(valueWidth int) []*line {
+	if m.cur().kind != frameProject {
+		return nil
+	}
 	var out []*line
-	switch m.cur().kind {
-	case frameTask:
-		t := m.currentTask()
-		finished := finishedCrews(t)
-		out = append(out, m.textField("Finished", fmt.Sprintf("%d of %d attempts", len(finished), len(t.Crews)), m.p.Fg, valueWidth)...)
-		out = append(out, m.note([]span{{
-			text:  "Finished attempts stay in the snapshot. Enter shows or hides them in this list.",
-			style: m.p.Dim,
-		}}, valueWidth)...)
-		if s := m.completedCrewNoteSpans(finished, valueWidth); len(s) > 0 {
-			out = append(out, newLine())
-			out = append(out, m.field("Needs attention", s, valueWidth)...)
-		}
-	case frameProject:
-		p := m.currentProject()
-		finished := finishedTasks(p)
-		out = append(out, m.textField("Finished", fmt.Sprintf("%d of %d tasks", len(finished), len(p.Tasks)), m.p.Fg, valueWidth)...)
-		out = append(out, m.note([]span{{
-			text:  "Finished tasks stay in the snapshot. Enter shows or hides them in this list.",
-			style: m.p.Dim,
-		}}, valueWidth)...)
-		if s := completedTaskAttentionSpans(finished, m.p); len(s) > 0 {
-			out = append(out, newLine())
-			out = append(out, m.field("Needs attention", s, valueWidth)...)
-		}
+	p := m.currentProject()
+	finished := finishedCrews(p)
+	out = append(out, m.textField("Finished", fmt.Sprintf("%d of %d crews", len(finished), len(p.Crews)), m.p.Fg, valueWidth)...)
+	out = append(out, m.note([]span{{
+		text:  "Finished crews stay in the snapshot. Enter shows or hides them in this list.",
+		style: m.p.Dim,
+	}}, valueWidth)...)
+	if s := m.completedCrewNoteSpans(finished, valueWidth); len(s) > 0 {
+		out = append(out, newLine())
+		out = append(out, m.field("Needs attention", s, valueWidth)...)
 	}
 	return out
 }
 
-// crewByID resolves a Crew row against the Task frame it belongs to.
+// crewByID resolves a Crew row against the Project frame it belongs to.
 func (m Model) crewByID(id string) (query.CrewNode, bool) {
-	for _, c := range m.currentTask().Crews {
+	for _, c := range m.currentProject().Crews {
 		if c.CrewID == id {
 			return c, true
 		}
@@ -728,15 +644,6 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 	if m.confirm != nil {
 		return []keyHint{{key: "Enter", desc: string(m.confirm.choice.action) + " " + actionObject(m.confirm.choice), sacrifice: keyAction}, {key: "Esc", desc: "Cancel", sacrifice: keyBack}, {key: "q", desc: "Quit", sacrifice: keyQuit}}
 	}
-	if m.incidents.open {
-		return []keyHint{
-			{key: m.g.UpDown, desc: "Move", sacrifice: keyMovement},
-			{key: "Enter", desc: "Go to crew", sacrifice: keyAction},
-			{key: "a", desc: "Acknowledge", optional: true, sacrifice: keyAction},
-			{key: "Esc", desc: "Close", sacrifice: keyBack},
-			{key: "q", desc: "Quit", sacrifice: keyQuit},
-		}
-	}
 	if m.actions {
 		return []keyHint{{key: m.g.UpDown, desc: "Move", sacrifice: keyMovement}, {key: "Enter", desc: "Run", sacrifice: keyAction}, {key: "Esc", desc: "Close", sacrifice: keyBack}, {key: "q", desc: "Quit", sacrifice: keyQuit}}
 	}
@@ -804,13 +711,8 @@ func (m Model) actionHints() []keyHint {
 		if label, ok := m.mateStartLabel(r); ok {
 			out = append(out, keyHint{key: "s", desc: label, sacrifice: keyAction})
 		}
-		mate, _ := m.mateForRow(r)
-		// h is optional: changing harness is deliberate and occasional, and
-		// the `a` menu still carries it, so it yields the line before the
-		// keys a reader needs to move, act and get back out.
-		if m.switchHarnessChoice(r, mate).enabled {
-			out = append(out, keyHint{key: "h", desc: "Change harness", optional: true, sacrifice: keyAction})
-		}
+		// TODO(task 10): the 'h' Change harness hint went here. Restarting
+		// a Mate under another harness is task 10's surface.
 	}
 	if r, ok := m.selectedRow(); ok {
 		out = append(out, keyHint{key: "Enter", desc: m.enterLabel(r), sacrifice: keyAction})
@@ -829,9 +731,6 @@ func (m Model) actionHints() []keyHint {
 			out = append(out, keyHint{key: "Tab", desc: desc, optional: true})
 		}
 	}
-	if m.incidentsAvailable() {
-		out = append(out, keyHint{key: "i", desc: "Incidents", optional: true, sacrifice: keyAction})
-	}
 	return append(out,
 		keyHint{key: "r", desc: "Refresh", sacrifice: keyRefresh},
 		keyHint{key: "q", desc: "Quit", sacrifice: keyQuit})
@@ -841,8 +740,6 @@ func (m Model) enterLabel(r row) string {
 	switch r.kind {
 	case rowProject:
 		return "Open project"
-	case rowTask:
-		return "Open task"
 	case rowCompletedGroup:
 		if m.completedOpen[m.cur().id] {
 			return "Hide completed"

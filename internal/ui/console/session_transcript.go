@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
+	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 // ADR 0025: "Mate/Crew dùng harness_kind đã ghi nhận để chọn parser/
@@ -29,18 +29,18 @@ const (
 )
 
 // ParseTranscript is the harness_kind -> parsing profile dispatch. Only
-// domain.HarnessClaude has a profile today; every other kind - Codex
+// query.HarnessClaude has a profile today; every other kind - Codex
 // included, whose plainer prompt-and-log shape is deliberately out of scope
 // (session-view-contract.md) - falls back to SessionTranscriptUnknown, so
 // its Raw is rendered as plain bounded text rather than guessed at.
-func ParseTranscript(kind domain.HarnessKind, raw string) SessionTranscript {
+func ParseTranscript(kind query.HarnessKind, raw string) SessionTranscript {
 	t := SessionTranscript{
 		Source:      SessionTranscriptPolled,
 		HarnessKind: kind,
 		Raw:         raw,
 		Status:      SessionTranscriptUnknown,
 	}
-	if kind != domain.HarnessClaude {
+	if kind != query.HarnessClaude {
 		return t
 	}
 	entries, ok := parseClaudeCodeTranscript(raw)

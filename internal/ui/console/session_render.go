@@ -6,7 +6,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -163,14 +162,14 @@ func StreamTranscriptCapacity(kind SessionTargetKind, w, h int) int {
 
 // harnessDisplayLabel names the harness in the header the way the harness's
 // own product does ("claude-code"), not the shorter internal
-// domain.HarnessKind value ("claude") list.go and the inspector already
+// query.HarnessKind value ("claude") list.go and the inspector already
 // render elsewhere - the header is naming a product to the reader, not a
 // database column.
-func harnessDisplayLabel(k domain.HarnessKind) string {
+func harnessDisplayLabel(k query.HarnessKind) string {
 	switch k {
-	case domain.HarnessClaude:
+	case query.HarnessClaude:
 		return "claude-code"
-	case domain.HarnessCodex:
+	case query.HarnessCodex:
 		return "codex"
 	default:
 		return string(k)
@@ -231,7 +230,7 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 // ---------- rail (Mate, >=100 cols) and digest (Mate, <100 cols) ----------
 
 // sessionInboxKind classifies one inbox entry into the rail's three labels.
-// Awaiting (domain.InteractionStatus.AwaitsReply, carried on the entry) is
+// Awaiting (query.InteractionStatus.AwaitsReply, carried on the entry) is
 // "awaiting reply"; a non-awaiting entry recorded blocked needs the same
 // attention emphasis without itself awaiting a reply; every other -
 // terminal - status is "recorded", the plain rest of the entry's history.
@@ -239,7 +238,7 @@ func sessionInboxKind(e SessionInboxEntry) (label string, amber bool) {
 	switch {
 	case e.Awaiting:
 		return "awaiting reply", true
-	case e.Status == domain.InteractionBlocked:
+	case e.Status == query.InteractionBlocked:
 		return "attention", true
 	default:
 		return "recorded", false

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -58,7 +57,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 				Tasks: []query.TaskNode{{
 					TaskID: "task_01J9N3N4T8C3J0Q5G9P2A7Z6BR",
 					Title:  "Migrate email delivery to SES",
-					Status: domain.TaskReady,
+					Status: query.TaskReady,
 					Error:  query.AbsentField[query.ErrorReason](notErrorState),
 				}},
 			}},
@@ -78,7 +77,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 				Name:      "docs-site",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{
-						MateID: "mate_01J9M2H0P4Y9E6K1C5J8W3V2XM", HarnessKind: domain.HarnessClaude, Status: domain.MateStopped,
+						MateID: "mate_01J9M2H0P4Y9E6K1C5J8W3V2XM", HarnessKind: query.HarnessClaude, Status: query.MateStopped,
 					}),
 					AgentName: query.KnownField("mate-docs-site"),
 					Binding:   query.AbsentField[query.BindingValue]("stopped at 2026-09-09 18:02; binding kept in audit only"),

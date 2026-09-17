@@ -9,7 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -43,17 +42,16 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 	if !ok {
 		choices := []actionChoice{
 			unavailable(ActionStart, "no row selected"), unavailable(ActionStop, "no row selected"),
-			unavailable(ActionResume, "no row selected"), unavailable(ActionRetry, "no row selected"),
-			unavailable(ActionRepair, "no row selected"), unavailable(ActionDiscard, "no row selected"),
+			unavailable(ActionResume, "no row selected"), unavailable(ActionRepair, "no row selected"),
 			unavailable(ActionOnboard, "select a Project or the workspace"),
 		}
 		if m.cur().kind == frameWorkspace {
-			choices[6] = actionChoice{action: ActionOnboard, desc: "Add a Project to this workspace", enabled: true, req: ActionRequest{Action: ActionOnboard, TargetKind: "workspace"}}
+			choices[4] = actionChoice{action: ActionOnboard, desc: "Add a Project to this workspace", enabled: true, req: ActionRequest{Action: ActionOnboard, TargetKind: "workspace"}}
 		}
 		return choices
 	}
-	choices := make([]actionChoice, 0, 7)
-	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.retryChoice(selected), m.repairChoice(selected), m.discardChoice(selected), m.onboardChoice(selected))
+	choices := make([]actionChoice, 0, 5)
+	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.repairChoice(selected), m.onboardChoice(selected))
 	// Capability is authored by query.LoadSnapshot. The local builders above
 	// only supply row-specific wording and target identity; availability is
 	// replaced from the DTO so this surface cannot drift from other clients.
@@ -104,10 +102,6 @@ func (m Model) queryAction(r row, name Action) (bool, string, bool) {
 			if p, ok := m.projectByID(r.id); ok {
 				actions = p.Actions
 			}
-		case rowTask:
-			// Task actions are not part of G6-04; do not inherit the
-			// containing Project's onboarding capability.
-			actions = nil
 		default:
 			actions = nil
 		}
@@ -134,7 +128,7 @@ func (m Model) startChoice(r row) actionChoice {
 		c.desc = "unavailable · this Project has no Mate; use onboard"
 		return c
 	}
-	if mate.Designated.Value.Status != domain.MateCreated {
+	if mate.Designated.Value.Status != query.MateCreated {
 		c.desc = "unavailable · Mate is recorded " + string(mate.Designated.Value.Status)
 		return c
 	}
@@ -172,35 +166,11 @@ func (m Model) resumeChoice(r row) actionChoice {
 		c.desc = "unavailable · this Project has no Mate; use onboard"
 		return c
 	}
-	if mate.Designated.Value.Status != domain.MateStopped {
+	if mate.Designated.Value.Status != query.MateStopped {
 		c.desc = "unavailable · Mate is recorded " + string(mate.Designated.Value.Status)
 		return c
 	}
 	c.enabled, c.desc = true, "Resume the Project Mate"
-	return c
-}
-
-func (m Model) retryChoice(r row) actionChoice {
-	c := actionChoice{action: ActionRetry, dangerous: true, desc: "unavailable · applies to a failed Crew attempt", req: m.actionRequest(ActionRetry, r)}
-	if r.kind != rowCrew {
-		return c
-	}
-	crew, ok := m.crewByID(r.id)
-	if !ok {
-		c.desc = "unavailable · attempt is not in the snapshot"
-		return c
-	}
-	if crew.Status != domain.CrewFailed && crew.Status != domain.CrewNeedsRepair {
-		c.desc = "unavailable · recorded status is " + string(crew.Status)
-		return c
-	}
-	for _, other := range m.currentTask().Crews {
-		if other.CrewID != crew.CrewID && other.Status.OccupiesRepoSlot() {
-			c.desc = "unavailable · another attempt is active"
-			return c
-		}
-	}
-	c.enabled, c.desc = true, "Start a new attempt and keep this history"
 	return c
 }
 
@@ -222,49 +192,10 @@ func (m Model) repairChoice(r row) actionChoice {
 		c.desc = "unavailable · binding is unknown; refresh before repair"
 		return c
 	}
-	if crew.Status == domain.CrewNeedsRepair {
+	if crew.Status == query.CrewNeedsRepair {
 		c.desc = "unavailable · no stale binding is recorded; inspect worktree state before repair"
 	}
 	return c
-}
-
-func (m Model) discardChoice(r row) actionChoice {
-	c := actionChoice{action: ActionDiscard, dangerous: true, desc: "unavailable · applies to a Crew with a known-created worktree", req: m.actionRequest(ActionDiscard, r)}
-	if r.kind != rowCrew {
-		return c
-	}
-	crew, ok := m.crewByID(r.id)
-	if !ok {
-		c.desc = "unavailable · attempt is not in the snapshot"
-		return c
-	}
-	if crew.OpenMerge.State == query.Known {
-		c.desc = "unavailable · crew has an open merge request; refusing discard"
-		return c
-	}
-	if crew.OpenMerge.State == query.Unknown {
-		c.desc = "unavailable · merge requests could not be read; refresh before discard"
-		return c
-	}
-	switch crew.Worktree.State {
-	case query.Known:
-		if crew.Worktree.Value.Status == query.WorktreeRecordedCreated {
-			c.enabled, c.desc = true, "Remove this Crew's worktree and branch"
-			return c
-		}
-		c.desc = "unavailable · worktree is recorded " + string(crew.Worktree.Value.Status) + "; discard needs a known-created worktree"
-		return c
-	case query.Absent:
-		reason := crew.Worktree.Reason
-		if reason == "" {
-			reason = "no worktree is recorded"
-		}
-		c.desc = "unavailable · " + reason
-		return c
-	default:
-		c.desc = "unavailable · worktree is unknown; refresh before discard"
-		return c
-	}
 }
 
 func (m Model) onboardChoice(r row) actionChoice {
@@ -295,8 +226,6 @@ func (m Model) actionRequest(a Action, r row) ActionRequest {
 		}
 	case rowMate:
 		req.Target, req.TargetKind = m.currentProject().ProjectID, "mate"
-	case rowTask:
-		req.Target, req.TargetKind = r.id, "task"
 	case rowCrew:
 		req.Target, req.TargetKind = r.id, "crew"
 	default:
@@ -538,43 +467,13 @@ func (m Model) actionObjectDescription(c actionChoice) (string, string, string) 
 	effect := "The snapshot will be re-read after the application service returns."
 	switch c.req.Action {
 	case ActionStop:
-		scope = "The recorded runtime agent only; the Crew/Task worktree and branch are untouched."
+		scope = "The recorded runtime agent only; the Crew's worktree and branch are untouched."
 		effect = "The runtime binding is released only after the service confirms its outcome."
-	case ActionRetry:
-		scope = "Creates one new Crew attempt; existing attempt history is kept."
-		effect = "A new worktree and agent may be created; this confirmation is required before starting them."
 	case ActionRepair:
 		scope = "The recorded binding/worktree metadata only; no live agent is assumed."
 		effect = "A stale binding may be cleared. Unknown state is never treated as proof of safe cleanup."
-	case ActionDiscard:
-		scope = "This Crew's worktree and branch. Unmerged work is force-removed after a confirmed runtime stop."
-		effect = "The worktree and branch are deleted. Unmerged work is lost. This cannot be undone from the Console."
-	case ActionSwitchHarness:
-		scope = "This Project's Mate only, restarted under " + string(c.req.Harness) +
-			". It keeps its Mate id; Tasks, Crews and worktrees are untouched."
-		effect = m.switchHarnessEffect()
 	}
 	return object, scope, effect
-}
-
-// switchHarnessEffect tells the truth about what this switch destroys, read
-// from the recorded binding and nothing else. A Mate with an active binding
-// loses its panel and the harness session in it, which is the warning the
-// reader needs before they lose unsaved work. A Mate with no live binding
-// loses nothing, and saying otherwise would train readers to ignore the
-// warning that matters. A failed read is neither: it is unknown.
-func (m Model) switchHarnessEffect() string {
-	const restart = " The Mate is then started again under the chosen harness."
-	binding := m.currentProject().Mate.Binding
-	switch {
-	case binding.State == query.Unknown:
-		return "The binding could not be read, so whether a live panel will be destroyed is unknown." + restart
-	case binding.State == query.Known && binding.Value.Status == query.BindingActive:
-		return "The current panel is destroyed and the harness session in it is gone." +
-			" Anything unsaved there is lost - save it first if you need it." + restart
-	default:
-		return "No live panel is recorded, so nothing is destroyed." + restart
-	}
 }
 
 func (m Model) actionLines(w, h int) []*line {
@@ -674,13 +573,12 @@ func (m Model) onboardInputLines(w, h int) []*line {
 
 // harnessOrder is the picker's order, and claude is first because it is the
 // configured default for a new Mate (config.DefaultMateHarness).
-var harnessOrder = []domain.HarnessKind{domain.HarnessClaude, domain.HarnessCodex}
+var harnessOrder = []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}
 
 // beginMateStart is the 's' key. One key covers create, start and resume
 // because they are one thing to the reader - "get this Project's Mate
 // running" - and because the service behind them is one call. Only a create
-// asks which agent to use: an existing Mate already records its harness, and
-// changing that is a switch (beginSwitchHarness), not a start.
+// asks which agent to use: an existing Mate already records its harness.
 func (m Model) beginMateStart() (Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -698,25 +596,6 @@ func (m Model) beginMateStart() (Model, tea.Cmd) {
 		return m.beginHarnessPick(choice), nil
 	}
 	return m.runPending(choice)
-}
-
-// beginSwitchHarness is the 'h' key: pick the agent, then confirm, then
-// restart. It is dangerous by construction - the old panel and its harness
-// session are destroyed - so it can never run on one keystroke.
-func (m Model) beginSwitchHarness() Model {
-	r, ok := m.selectedRow()
-	if !ok {
-		return m.refuseMateKey("no row is selected")
-	}
-	mate, ok := m.mateForRow(r)
-	if !ok {
-		return m.refuseMateKey("this applies to a Project's Mate row")
-	}
-	choice := m.switchHarnessChoice(r, mate)
-	if !choice.enabled {
-		return m.refuseMateKey(strings.TrimPrefix(choice.desc, "unavailable · "))
-	}
-	return m.beginHarnessPick(choice)
 }
 
 func (m Model) refuseMateKey(reason string) Model {
@@ -738,9 +617,9 @@ func (m Model) mateStartChoice(r row, mate query.MateNode) actionChoice {
 		c = m.onboardChoice(r)
 		c.req.Target, c.req.TargetKind = m.currentProject().ProjectID, "project-mate"
 		c.enabled, c.desc = true, "Create and start this Project's Mate"
-	case mate.Designated.Value.Status == domain.MateStopped:
+	case mate.Designated.Value.Status == query.MateStopped:
 		c = actionChoice{action: ActionResume, enabled: true, desc: "Resume the Project Mate", req: m.actionRequest(ActionResume, r)}
-	case mate.Designated.Value.Status == domain.MateCreated:
+	case mate.Designated.Value.Status == query.MateCreated:
 		c = actionChoice{action: ActionStart, enabled: true, desc: "Start the Project Mate", req: m.actionRequest(ActionStart, r)}
 	default:
 		c.desc = "unavailable · Mate is recorded " + string(mate.Designated.Value.Status)
@@ -777,28 +656,6 @@ func (m Model) mateStartLabel(r row) (string, bool) {
 	}
 }
 
-func (m Model) switchHarnessChoice(r row, mate query.MateNode) actionChoice {
-	c := actionChoice{
-		action: ActionSwitchHarness, dangerous: true,
-		desc: "unavailable · this Project has no Mate; press s to create one",
-		req:  m.actionRequest(ActionSwitchHarness, r),
-	}
-	c.req.Target, c.req.TargetKind = m.currentProject().ProjectID, "mate"
-	switch {
-	case mate.Designated.State == query.Unknown:
-		c.desc = "unavailable · the Mate could not be read; r re-reads"
-	case mate.Designated.State == query.Known && mate.Designated.Value.MateID != "":
-		c.enabled, c.desc = true, "Restart this Mate under a different harness"
-	}
-	if available, reason, found := m.actionCapability(r, c); found {
-		c.enabled = available
-		if !available {
-			c.desc = "unavailable · " + reason
-		}
-	}
-	return c
-}
-
 // beginHarnessPick opens the agent chooser for an already-built choice. Like
 // beginNewProject it leaves the menu closed, so Esc returns to the list
 // rather than a menu the reader never opened.
@@ -816,8 +673,8 @@ func (m Model) beginHarnessPick(choice actionChoice) Model {
 }
 
 // recordedHarnessIndex starts the cursor on the harness the Mate already
-// records, so a switch begins from what is true rather than from the top of
-// the list. A Mate with no readable harness starts at the default.
+// records, so the picker begins from what is true rather than from the top
+// of the list. A Mate with no readable harness starts at the default.
 func (m Model) recordedHarnessIndex() int {
 	mate := m.currentProject().Mate
 	if !mate.Designated.IsKnown() {
@@ -876,10 +733,10 @@ func (m Model) runPending(choice actionChoice) (Model, tea.Cmd) {
 }
 
 func (m Model) harnessPickerLines(w, h int) []*line {
-	title := "CHOOSE AN AGENT"
-	if m.pendingChoice.action == ActionSwitchHarness {
-		title = "CHANGE HARNESS"
-	}
+	// TODO(task 10): a switch_harness pending choice retitled this
+	// "CHANGE HARNESS". Restarting a Mate under another harness is task
+	// 10's surface.
+	const title = "CHOOSE AN AGENT"
 	out := []*line{
 		newLine().pad(2).add(title, m.p.Bold),
 		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
@@ -902,11 +759,7 @@ func (m Model) harnessPickerLines(w, h int) []*line {
 		out = append(out, l)
 	}
 	out = append(out, newLine())
-	if m.pendingChoice.action == ActionSwitchHarness {
-		out = append(out, newLine().pad(2).add("Restarts this Mate; you confirm before anything is destroyed.", m.p.Dim))
-	} else {
-		out = append(out, newLine().pad(2).add("The new Mate is created and started with this agent.", m.p.Dim))
-	}
+	out = append(out, newLine().pad(2).add("The new Mate is created and started with this agent.", m.p.Dim))
 	out = append(out,
 		newLine(),
 		newLine().pad(2).add("Enter ", m.p.Fg).add("Use "+string(harnessOrder[m.harnessIndex]), m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
@@ -916,7 +769,7 @@ func (m Model) harnessPickerLines(w, h int) []*line {
 
 // recordedHarness is the harness the selected Project's Mate records, or ""
 // when there is none or it could not be read - never a guess.
-func (m Model) recordedHarness() domain.HarnessKind {
+func (m Model) recordedHarness() query.HarnessKind {
 	mate := m.currentProject().Mate
 	if !mate.Designated.IsKnown() {
 		return ""

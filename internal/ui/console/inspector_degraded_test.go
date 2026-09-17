@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -27,8 +26,8 @@ import (
 func galleryRepairTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
 		CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS", Attempt: 1,
-		Status:      domain.CrewNeedsRepair,
-		HarnessKind: domain.HarnessCodex,
+		Status:      query.CrewNeedsRepair,
+		HarnessKind: query.HarnessCodex,
 		RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
@@ -58,8 +57,8 @@ func galleryRepairTree() query.Snapshot {
 func galleryAbsentTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
 		CrewID: "crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB", Attempt: 1,
-		Status:      domain.CrewAwaitingReview,
-		HarnessKind: domain.HarnessClaude,
+		Status:      query.CrewAwaitingReview,
+		HarnessKind: query.HarnessClaude,
 		RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",

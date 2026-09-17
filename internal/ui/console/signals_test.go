@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -133,9 +132,9 @@ func TestOnlyOnePaneIsAccentAtATime(t *testing.T) {
 func TestStatusIsAlwaysTheDomainWordNeverColourAlone(t *testing.T) {
 	plain := plainPalette()
 	statuses := []string{
-		string(domain.CrewReserved), string(domain.CrewPreparing), string(domain.CrewRunning),
-		string(domain.CrewAwaitingReview), string(domain.CrewSucceeded), string(domain.CrewFailed),
-		string(domain.CrewBlocked), string(domain.CrewNeedsRebase), string(domain.CrewNeedsRepair),
+		string(query.CrewReserved), string(query.CrewPreparing), string(query.CrewRunning),
+		string(query.CrewAwaitingReview), string(query.CrewSucceeded), string(query.CrewFailed),
+		string(query.CrewBlocked), string(query.CrewNeedsRebase), string(query.CrewNeedsRepair),
 	}
 	seen := map[string]string{}
 	for _, s := range statuses {
@@ -195,11 +194,11 @@ func TestTheAmberAndRedVocabulariesAreDisjoint(t *testing.T) {
 	coloured := ansiPalette()
 	amber, red := map[string]bool{}, map[string]bool{}
 	for _, word := range []string{
-		string(domain.CrewReserved), string(domain.CrewPreparing), string(domain.CrewRunning),
-		string(domain.CrewAwaitingReview), string(domain.CrewSucceeded), string(domain.CrewFailed),
-		string(domain.CrewBlocked), string(domain.CrewNeedsRebase), string(domain.CrewNeedsRepair),
-		string(domain.MateCreated), string(domain.MateStarting), string(domain.MateStopping),
-		string(domain.MateStopped), string(domain.MateUnknown),
+		string(query.CrewReserved), string(query.CrewPreparing), string(query.CrewRunning),
+		string(query.CrewAwaitingReview), string(query.CrewSucceeded), string(query.CrewFailed),
+		string(query.CrewBlocked), string(query.CrewNeedsRebase), string(query.CrewNeedsRepair),
+		string(query.MateCreated), string(query.MateStarting), string(query.MateStopping),
+		string(query.MateStopped), string(query.MateUnknown),
 		string(query.BindingReserved), string(query.BindingActive), string(query.BindingStale),
 		"none", "unknown", "missing", "present (clean)", "present (dirty)",
 	} {

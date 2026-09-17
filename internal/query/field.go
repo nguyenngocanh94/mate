@@ -12,7 +12,7 @@ import (
 // must never be defaulted to its Go zero value and rendered as fact: a
 // worktree path of "" and a worktree that could not be read are different
 // things, and the Console needs to tell them apart. This mirrors
-// domain.TokenUsage's Known convention (ADR 0016 "no fake numbers") for
+// TokenUsage's Known convention (ADR 0016 "no fake numbers") for
 // every field that can fail.
 //
 // It is a string, not the design notes' `uint8` iota, for one reason: with

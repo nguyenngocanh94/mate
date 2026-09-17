@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 func TestFakeSessionControllerUnseededTargetIsUnknownNotFabricated(t *testing.T) {
 	f := NewFakeSessionController()
-	target := SessionTarget{Kind: SessionTargetMate, ID: "mate_1", HarnessKind: domain.HarnessClaude}
+	target := SessionTarget{Kind: SessionTargetMate, ID: "mate_1", HarnessKind: query.HarnessClaude}
 
 	snap, err := f.Reader()(context.Background(), target)
 	if err != nil {
@@ -33,13 +32,13 @@ func TestFakeSessionControllerSeedRoundTrips(t *testing.T) {
 	fixed := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 	f.Now = func() time.Time { return fixed }
 
-	target := SessionTarget{Kind: SessionTargetCrew, ID: "crew_1", HarnessKind: domain.HarnessCodex}
+	target := SessionTarget{Kind: SessionTargetCrew, ID: "crew_1", HarnessKind: query.HarnessCodex}
 	f.Seed(target, SessionSnapshot{
 		RecordedStatus: query.KnownField("running"),
 		Runtime:        SessionRuntime{Status: query.Known, ObservedAt: fixed},
 		Transcript: SessionTranscript{
 			Source:      SessionTranscriptPolled,
-			HarnessKind: domain.HarnessCodex,
+			HarnessKind: query.HarnessCodex,
 			Status:      SessionTranscriptParsed,
 			Entries: []SessionTranscriptEntry{
 				{Kind: SessionTranscriptEntryPlain, Text: "hello"},
@@ -47,7 +46,7 @@ func TestFakeSessionControllerSeedRoundTrips(t *testing.T) {
 			Raw: "hello",
 		},
 		Inbox: []SessionInboxEntry{
-			{InteractionID: "ix_1", Status: domain.InteractionQueued, Question: "ok?", Awaiting: true},
+			{InteractionID: "ix_1", Status: query.InteractionQueued, Question: "ok?", Awaiting: true},
 		},
 	})
 
@@ -76,7 +75,7 @@ func TestFakeSessionControllerRuntimeMissingIsNeverALifecycleValue(t *testing.T)
 	f := NewFakeSessionController()
 	target := SessionTarget{Kind: SessionTargetMate, ID: "mate_2"}
 	f.Seed(target, SessionSnapshot{
-		RecordedStatus: query.KnownField(string(domain.MateRunning)),
+		RecordedStatus: query.KnownField(string(query.MateRunning)),
 		Runtime:        SessionRuntime{Status: query.Absent, Reason: "agent_not_found"},
 	})
 
@@ -86,8 +85,8 @@ func TestFakeSessionControllerRuntimeMissingIsNeverALifecycleValue(t *testing.T)
 	}
 	// The recorded lifecycle stays "running" even though the runtime is
 	// missing - a renderer must read the two separately (ADR 0025).
-	if snap.RecordedStatus.Value != string(domain.MateRunning) {
-		t.Fatalf("RecordedStatus.Value = %q, want %q", snap.RecordedStatus.Value, domain.MateRunning)
+	if snap.RecordedStatus.Value != string(query.MateRunning) {
+		t.Fatalf("RecordedStatus.Value = %q, want %q", snap.RecordedStatus.Value, query.MateRunning)
 	}
 	if snap.Runtime.Status != query.Absent {
 		t.Fatalf("Runtime.Status = %v, want Absent (renders runtime_missing)", snap.Runtime.Status)

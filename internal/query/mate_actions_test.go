@@ -2,8 +2,6 @@ package query
 
 import (
 	"testing"
-
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 )
 
 func findAction(t *testing.T, actions []ActionAvailability, name string) ActionAvailability {
@@ -17,47 +15,47 @@ func findAction(t *testing.T, actions []ActionAvailability, name string) ActionA
 	return ActionAvailability{}
 }
 
-// TestMateActionsAuthorOnboardAndSwitchHarness. Before this, mateActions
-// emitted only start/stop/resume, so the Console's create-Mate entry was the
-// one action on a Project frame whose enablement was NOT authored here - the
-// drift this package exists to prevent.
-func TestMateActionsAuthorOnboardAndSwitchHarness(t *testing.T) {
+// TestMateActionsAuthorOnboard. Before this, mateActions emitted only
+// start/stop/resume, so the Console's create-Mate entry was the one action
+// on a Project frame whose enablement was NOT authored here - the drift
+// this package exists to prevent.
+func TestMateActionsAuthorOnboard(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name             string
-		mate             MateNode
-		onboard, switchH bool
+		name    string
+		mate    MateNode
+		onboard bool
 	}{
 		{
 			name:    "no mate yet",
 			mate:    MateNode{Designated: AbsentField[MateIdentity]("this Project has no Mate")},
-			onboard: true, switchH: false,
+			onboard: true,
 		},
 		{
 			name: "created mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: domain.HarnessClaude, Status: domain.MateCreated,
+				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateCreated,
 			})},
-			onboard: false, switchH: true,
+			onboard: false,
 		},
 		{
 			name: "stopped mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: domain.HarnessClaude, Status: domain.MateStopped,
+				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateStopped,
 			})},
-			onboard: false, switchH: true,
+			onboard: false,
 		},
 		{
 			name: "running mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: domain.HarnessClaude, Status: domain.MateRunning,
+				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateRunning,
 			})},
-			onboard: false, switchH: true,
+			onboard: false,
 		},
 		{
 			name:    "unreadable designation",
 			mate:    MateNode{Designated: UnknownField[MateIdentity]("mate lookup timed out (2s)")},
-			onboard: false, switchH: false,
+			onboard: false,
 		},
 	}
 	for _, tc := range cases {
@@ -66,9 +64,6 @@ func TestMateActionsAuthorOnboardAndSwitchHarness(t *testing.T) {
 			actions := mateActions(tc.mate)
 			if got := findAction(t, actions, "onboard"); got.Available != tc.onboard {
 				t.Fatalf("onboard = %+v, want available=%v", got, tc.onboard)
-			}
-			if got := findAction(t, actions, "switch_harness"); got.Available != tc.switchH {
-				t.Fatalf("switch_harness = %+v, want available=%v", got, tc.switchH)
 			}
 		})
 	}
@@ -80,7 +75,7 @@ func TestMateActionsAuthorOnboardAndSwitchHarness(t *testing.T) {
 func TestUnreadableMateNeverReportsAFactItDidNotRead(t *testing.T) {
 	t.Parallel()
 	actions := mateActions(MateNode{Designated: UnknownField[MateIdentity]("mate lookup timed out (2s)")})
-	for _, name := range []string{"onboard", "switch_harness"} {
+	for _, name := range []string{"onboard"} {
 		got := findAction(t, actions, name)
 		if got.Available {
 			t.Fatalf("%s was offered on an unreadable Mate: %+v", name, got)

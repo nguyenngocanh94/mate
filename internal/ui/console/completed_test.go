@@ -7,25 +7,24 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 func TestCrewIsFinishedIsTheComplementOfOccupiesRepoSlot(t *testing.T) {
-	statuses := []domain.CrewStatus{
-		domain.CrewReserved, domain.CrewPreparing, domain.CrewRunning,
-		domain.CrewAwaitingReview, domain.CrewSucceeded, domain.CrewFailed,
-		domain.CrewBlocked, domain.CrewNeedsRebase, domain.CrewNeedsRepair,
+	statuses := []query.CrewStatus{
+		query.CrewReserved, query.CrewPreparing, query.CrewRunning,
+		query.CrewAwaitingReview, query.CrewSucceeded, query.CrewFailed,
+		query.CrewBlocked, query.CrewNeedsRebase, query.CrewNeedsRepair,
 	}
 	for _, s := range statuses {
 		if crewIsFinished(s) == s.OccupiesRepoSlot() {
 			t.Fatalf("%s: finished=%v occupies=%v, they must not agree", s, crewIsFinished(s), s.OccupiesRepoSlot())
 		}
 	}
-	if crewIsFinished(domain.CrewAwaitingReview) {
+	if crewIsFinished(query.CrewAwaitingReview) {
 		t.Fatal("awaiting_review must stay in the active list; the captain still has to review it")
 	}
-	if !crewIsFinished(domain.CrewSucceeded) || !crewIsFinished(domain.CrewFailed) {
+	if !crewIsFinished(query.CrewSucceeded) || !crewIsFinished(query.CrewFailed) {
 		t.Fatal("succeeded and failed are the finished statuses the Completed group holds")
 	}
 }
@@ -100,7 +99,7 @@ func TestJumpToFinishedCrewExpandsCompletedGroup(t *testing.T) {
 
 func TestAwaitingReviewStaysInTheActiveCrewList(t *testing.T) {
 	tree := sampleTree()
-	tree.Projects[0].Tasks[0].Crews[0].Status = domain.CrewAwaitingReview
+	tree.Projects[0].Tasks[0].Crews[0].Status = query.CrewAwaitingReview
 	tree.Projects[0].Tasks[0].Crews[0].Attention = query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "review"})
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter"))
@@ -161,7 +160,7 @@ func TestCompletedGroupOfSucceededCrewsDoesNotClaimUnknownAttention(t *testing.T
 		{
 			CrewID:    "crew_succeeded",
 			Attempt:   1,
-			Status:    domain.CrewSucceeded,
+			Status:    query.CrewSucceeded,
 			Attention: query.AbsentField[query.Attention]("attempt succeeded and nothing about it needs attention"),
 		},
 		tree.Projects[0].Tasks[0].Crews[1],
@@ -182,7 +181,7 @@ func TestCompletedGroupOfSucceededCrewsDoesNotClaimUnknownAttention(t *testing.T
 
 func TestFinishedTaskHidesBehindCompletedGroupOnProjectList(t *testing.T) {
 	tree := sampleTree()
-	tree.Projects[0].Tasks[1].Status = domain.TaskSucceeded
+	tree.Projects[0].Tasks[1].Status = query.TaskSucceeded
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter"))
 	rows := m.currentRows()

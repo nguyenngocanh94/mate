@@ -10,25 +10,23 @@ import (
 )
 
 // The list pane: the left-hand region showing Projects, then a Project's
-// Mate row plus its Tasks, then a Task's Crew attempts. Columns are fixed
-// widths (design/mate-console-design-notes.html, "Trong pane"); the Title
-// (and, at the Project level, the Agent) column takes whatever is left.
+// Mate row plus its Crews. Columns are fixed widths
+// (design/mate-console-design-notes.html, "Trong pane"); the Title (and, at
+// the Project level, the Agent) column takes whatever is left.
 //
-// A pane title ("PROJECTS 3", "MATE", "TASKS 3", "CREW ATTEMPTS 2") carries
+// A pane title ("PROJECTS 3", "MATE", "CREWS 2") carries
 // the same focus signal as the inspector's own title (paneTitleSpan): accent
 // when the list has focus, dim otherwise. Every other column header is a
 // plain columnHeaderSpan - dim regardless of focus, and never selectable.
 const (
 	colMateSummary = 24 // Workspace level: this Project's Mate, harness + recorded status, or "none"
-	colTasksCount  = 7  // Workspace level: this Project's Task count
+	colCrewsCount  = 7  // Workspace level: this Project's Crew count
 	colAttention   = 14
 	colUpdated     = 10
 	colHarness     = 13
 	colMateStatus  = 15 // the Project's Mate row: recorded status
 	colBinding     = 18 // the Project's Mate row: binding status
-	colStatus      = 17 // Task and Crew rows: recorded status
-	colAttempts    = 10 // a Task row: its own Crew count
-	colCrewMark    = 4  // a Crew row: "#N"
+	colStatus      = 17 // a Crew row: recorded status
 	colCrewID      = 18 // a Crew row: abbreviated id
 
 	// listWideMin is the list pane's own width (not the terminal's), at or
@@ -195,8 +193,6 @@ func (m Model) buildListItems(rows []row, w int) []listLine {
 	switch m.cur().kind {
 	case frameProject:
 		return m.projectListItems(rows, w)
-	case frameTask:
-		return m.taskListItems(rows, w)
 	default:
 		return m.workspaceListItems(rows, w)
 	}
@@ -208,7 +204,7 @@ func (m Model) workspaceListItems(rows []row, w int) []listLine {
 	g, p := m.g, m.p
 	wide := wideList(w)
 	iw := w - 2
-	fixed := colMateSummary + colTasksCount + colAttention
+	fixed := colMateSummary + colCrewsCount + colAttention
 	if wide {
 		fixed += colUpdated
 	}
@@ -218,7 +214,7 @@ func (m Model) workspaceListItems(rows []row, w int) []listLine {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("PROJECTS  %d", len(rows)), focused, p)}, titleW)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("MATE", p)}, colMateSummary)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("TASKS", p)}, colTasksCount)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("CREWS", p)}, colCrewsCount)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("ATTENTION", p)}, colAttention)...)
 		if wide {
 			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
@@ -232,7 +228,7 @@ func (m Model) workspaceListItems(rows []row, w int) []listLine {
 			return newLine().pad(2).add("No projects recorded in workspace "+m.workspaceDisplayName()+".", p.Fg)
 		}))
 		items = append(items, headerListLine(func(bool) *line {
-			return newLine().pad(2).add("Press n to add a Project, then a to onboard its Mate.", p.Dim)
+			return newLine().pad(2).add("Press n to add a Project, then s to create its Mate.", p.Dim)
 		}))
 		return items
 	}
@@ -248,7 +244,7 @@ func (m Model) workspaceListItems(rows []row, w int) []listLine {
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
 			l.addSpans(titleCell(proj.Name, titleW, p.Fg, g)...)
 			l.addSpans(fitCell(workspaceMateSummarySpans(proj.Mate, g, p), colMateSummary)...)
-			l.addSpans(fitCell([]span{{text: fmt.Sprint(len(proj.Tasks)), style: p.Fg}}, colTasksCount)...)
+			l.addSpans(fitCell([]span{{text: fmt.Sprint(len(proj.Crews)), style: p.Fg}}, colCrewsCount)...)
 			l.addSpans(fitCell(projectAttentionSpans(proj.Attention, p), colAttention)...)
 			if wide {
 				l.addSpans(fitCell(updatedSpans(proj.Mate.LastEvent, p), colUpdated)...)
@@ -283,7 +279,7 @@ func workspaceMateSummarySpans(mate query.MateNode, g glyphSet, p palette) []spa
 
 // projectAttentionSpans renders a Field[ProjectAttention]: the Project's own
 // Kind when it needs attention itself (no Mate, a stale Mate binding, an
-// unreadable Mate), otherwise a Task count when one or more Tasks need
+// unreadable Mate), otherwise a Crew count when one or more Crews need
 // attention, otherwise nothing - Absent draws a blank cell, never "none".
 func projectAttentionSpans(a query.Field[query.ProjectAttention], p palette) []span {
 	switch a.State {
@@ -294,8 +290,8 @@ func projectAttentionSpans(a query.Field[query.ProjectAttention], p palette) []s
 			return []span{unknownMarkSpan(string(v.Kind), p)}
 		case v.Kind != "":
 			return []span{attentionSpan(string(v.Kind), p)}
-		case v.TasksNeedingAttention > 0:
-			return []span{attentionSpan(plural(v.TasksNeedingAttention, "task", "tasks"), p)}
+		case v.CrewsNeedingAttention > 0:
+			return []span{attentionSpan(plural(v.CrewsNeedingAttention, "crew", "crews"), p)}
 		default:
 			return nil
 		}
@@ -306,7 +302,7 @@ func projectAttentionSpans(a query.Field[query.ProjectAttention], p palette) []s
 	}
 }
 
-// attentionSpans is projectAttentionSpans' Task/Crew twin: a plain
+// attentionSpans is projectAttentionSpans' per-Crew twin: a plain
 // Field[Attention] carries one Kind directly rather than a count, and a
 // Crew's own worst fact (crewAttention, internal/query/attention.go) can be
 // a failure rather than merely something to look at, so that one Kind is
@@ -346,7 +342,7 @@ func updatedSpans(e query.Field[query.EventValue], p palette) []span {
 	}
 }
 
-// ---------- level 2: Project -> Mate row, then Tasks ----------
+// ---------- level 2: Project -> Mate row, then Crews ----------
 
 func (m Model) projectListItems(rows []row, w int) []listLine {
 	g, p := m.g, m.p
@@ -375,113 +371,83 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 
 	items = append(items, blankListLine())
 
-	taskStart := 0
+	crewStart := 0
 	if hasMateRow {
-		taskStart = 1
+		crewStart = 1
 	}
-	taskRows := rows[taskStart:]
-	wide := wideList(w)
-	tFixed := colStatus + colAttempts + colAttention
-	if wide {
-		tFixed += colUpdated
-	}
-	titleW := iw - tFixed
+	crewRowsOnScreen := rows[crewStart:]
+	noteW := iw - colCrewID - colStatus - colHarness
 
-	activeTasks := 0
-	for _, t := range proj.Tasks {
-		if !taskIsFinished(t.Status) {
-			activeTasks++
+	activeCrews := 0
+	for _, c := range proj.Crews {
+		if !c.Status.IsFinished() {
+			activeCrews++
 		}
 	}
 	items = append(items, headerListLine(func(focused bool) *line {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
-		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("TASKS  %d", activeTasks), focused, p)}, titleW)...)
+		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREWS  %d", activeCrews), focused, p)}, colCrewID)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colStatus)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("ATTEMPTS", p)}, colAttempts)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("ATTENTION", p)}, colAttention)...)
-		if wide {
-			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
-		}
+		l.addSpans(fitCell([]span{columnHeaderSpan("HARNESS", p)}, colHarness)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("TASK", p)}, noteW)...)
 		return l
 	}))
 
-	if len(taskRows) == 0 {
+	if len(crewRowsOnScreen) == 0 {
 		items = append(items, blankListLine())
 		items = append(items, headerListLine(func(bool) *line {
-			return newLine().pad(2).add("No tasks recorded for "+proj.Name+".", p.Fg)
+			return newLine().pad(2).add("No crews recorded for "+proj.Name+".", p.Fg)
 		}))
 		items = append(items, headerListLine(func(bool) *line {
-			return newLine().pad(2).add("Tasks are created by the Mate or the mate CLI; press r to re-read.", p.Dim)
+			return newLine().pad(2).add("Crews are spawned by the Mate; press r to re-read.", p.Dim)
 		}))
 		return items
 	}
 
-	for i, r := range taskRows {
-		idx := i + taskStart
+	for i, r := range crewRowsOnScreen {
+		idx := i + crewStart
 		if r.kind == rowCompletedGroup {
-			finished := finishedTasks(proj)
+			finished := finishedCrews(proj)
 			items = append(items, rowListLine(idx, func(selected, focused bool) *line {
 				l := selectRow(newLine(), selected, p)
 				l.addSpans(rowPrefix(selected, focused, g, p)...)
-				l.addSpans(titleCell(completedGroupTitle(len(finished), m.completedOpen[proj.ProjectID], g), titleW, p.Fg, g)...)
+				l.addSpans(fitCell([]span{{text: completedGroupTitle(len(finished), m.completedOpen[proj.ProjectID], g), style: p.Fg}}, colCrewID)...)
 				l.addSpans(fitCell(nil, colStatus)...)
-				l.addSpans(fitCell([]span{{text: fmt.Sprint(len(finished)), style: p.Dim}}, colAttempts)...)
-				l.addSpans(fitCell(completedTaskAttentionSpans(finished, p), colAttention)...)
-				if wide {
-					l.addSpans(fitCell(nil, colUpdated)...)
-				}
+				l.addSpans(fitCell(nil, colHarness)...)
+				l.addSpans(fitCell(m.completedCrewNoteSpans(finished, noteW), noteW)...)
 				return l
 			}))
 			continue
 		}
-		if r.idx < 0 || r.idx >= len(proj.Tasks) {
+		if r.idx < 0 || r.idx >= len(proj.Crews) {
 			continue
 		}
-		t := proj.Tasks[r.idx]
+		c := proj.Crews[r.idx]
 		// idx must be the row's position in currentRows() (what f.sel
-		// indexes), not r.idx (the task's position in proj.Tasks): the Mate
-		// row occupies position 0, so a Task's currentRows() position is
-		// taskStart ahead of its offset in the displayed rows (B1, PR 49
-		// counter-review). Filtering finished Tasks into a Completed group
-		// makes r.idx != that position, so we use the loop offset.
+		// indexes), not r.idx (the Crew's position in proj.Crews): the Mate
+		// row occupies position 0, and filtering finished Crews into a
+		// Completed group makes r.idx differ from the displayed position.
 		items = append(items, rowListLine(idx, func(selected, focused bool) *line {
 			l := selectRow(newLine(), selected, p)
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
-			l.addSpans(titleCell(t.Title, titleW, p.Fg, g)...)
-			l.addSpans(fitCell([]span{statusSpan(string(t.Status), p)}, colStatus)...)
-			l.addSpans(fitCell([]span{{text: fmt.Sprint(len(t.Crews)), style: p.Fg}}, colAttempts)...)
-			l.addSpans(fitCell(attentionSpans(t.Attention, p), colAttention)...)
-			if wide {
-				l.addSpans(fitCell(updatedSpans(latestCrewLastEvent(t), p), colUpdated)...)
-			}
+			l.addSpans(fitCell([]span{{text: shortID(c.CrewID, g), style: p.Fg}}, colCrewID)...)
+			l.addSpans(fitCell([]span{statusSpan(string(c.Status), p)}, colStatus)...)
+			l.addSpans(fitCell([]span{{text: string(c.HarnessKind), style: p.Fg}}, colHarness)...)
+			l.addSpans(fitCell(m.crewRowNoteSpans(c, noteW), noteW)...)
 			return l
 		}))
 	}
 	return items
 }
 
-func finishedTasks(p query.ProjectNode) []query.TaskNode {
-	out := make([]query.TaskNode, 0)
-	for _, t := range p.Tasks {
-		if taskIsFinished(t.Status) {
-			out = append(out, t)
+func finishedCrews(p query.ProjectNode) []query.CrewNode {
+	out := make([]query.CrewNode, 0)
+	for _, c := range p.Crews {
+		if c.Status.IsFinished() {
+			out = append(out, c)
 		}
 	}
 	return out
-}
-
-func completedTaskAttentionSpans(tasks []query.TaskNode, p palette) []span {
-	for _, t := range tasks {
-		if t.Attention.State == query.Known && t.Attention.Value.Kind == query.AttentionFailed {
-			return attentionSpans(t.Attention, p)
-		}
-	}
-	for _, t := range tasks {
-		if s := attentionSpans(t.Attention, p); len(s) > 0 {
-			return s
-		}
-	}
-	return nil
 }
 
 func completedGroupTitle(n int, open bool, g glyphSet) string {
@@ -549,92 +515,6 @@ func bindingSpans(b query.Field[query.BindingValue], p palette) []span {
 	}
 }
 
-// latestCrewLastEvent is the Task row's UPDATED value: its latest attempt's
-// last event, or Absent when the Task has no attempts yet.
-func latestCrewLastEvent(t query.TaskNode) query.Field[query.EventValue] {
-	if len(t.Crews) == 0 {
-		return query.Field[query.EventValue]{State: query.Absent}
-	}
-	return t.Crews[len(t.Crews)-1].LastEvent
-}
-
-// ---------- level 3: Task -> Crew attempts ----------
-
-func (m Model) taskListItems(rows []row, w int) []listLine {
-	g, p := m.g, m.p
-	t := m.currentTask()
-	iw := w - 2
-	fixed := colCrewMark + colCrewID + colStatus + colHarness
-	noteW := iw - fixed
-
-	activeCrews := 0
-	for _, r := range rows {
-		if r.kind == rowCrew && r.idx >= 0 && r.idx < len(t.Crews) && !crewIsFinished(t.Crews[r.idx].Status) {
-			activeCrews++
-		}
-	}
-	items := []listLine{headerListLine(func(focused bool) *line {
-		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
-		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREW ATTEMPTS  %d", activeCrews), focused, p)}, colCrewMark+colCrewID)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colStatus)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("HARNESS", p)}, colHarness)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("NOTE", p)}, noteW)...)
-		return l
-	})}
-
-	if len(rows) == 0 {
-		items = append(items, blankListLine())
-		items = append(items, headerListLine(func(bool) *line {
-			return newLine().pad(2).add("No crew attempts recorded for this task.", p.Fg)
-		}))
-		items = append(items, headerListLine(func(bool) *line {
-			return newLine().pad(2).add("Task status "+string(t.Status)+" "+g.Dot+" a Mate starts the first attempt.", p.Dim)
-		}))
-		return items
-	}
-
-	for i, r := range rows {
-		if r.kind == rowCompletedGroup {
-			finished := finishedCrews(t)
-			items = append(items, rowListLine(i, func(selected, focused bool) *line {
-				l := selectRow(newLine(), selected, p)
-				l.addSpans(rowPrefix(selected, focused, g, p)...)
-				l.addSpans(fitCell([]span{{text: completedGroupTitle(len(finished), m.completedOpen[t.TaskID], g), style: p.Fg}}, colCrewMark+colCrewID)...)
-				l.addSpans(fitCell(nil, colStatus)...)
-				l.addSpans(fitCell(nil, colHarness)...)
-				l.addSpans(fitCell(m.completedCrewNoteSpans(finished, noteW), noteW)...)
-				return l
-			}))
-			continue
-		}
-		if r.idx < 0 || r.idx >= len(t.Crews) {
-			continue
-		}
-		c := t.Crews[r.idx]
-		items = append(items, rowListLine(i, func(selected, focused bool) *line {
-			l := selectRow(newLine(), selected, p)
-			l.addSpans(rowPrefix(selected, focused, g, p)...)
-			l.addSpans(fitCell([]span{{text: fmt.Sprintf("#%d", c.Attempt), style: p.Fg}}, colCrewMark)...)
-			l.addSpans(fitCell([]span{{text: shortID(c.CrewID, g), style: p.Fg}}, colCrewID)...)
-			l.addSpans(fitCell([]span{statusSpan(string(c.Status), p)}, colStatus)...)
-			l.addSpans(fitCell([]span{{text: string(c.HarnessKind), style: p.Fg}}, colHarness)...)
-			l.addSpans(fitCell(m.crewRowNoteSpans(c, noteW), noteW)...)
-			return l
-		}))
-	}
-	return items
-}
-
-func finishedCrews(t query.TaskNode) []query.CrewNode {
-	out := make([]query.CrewNode, 0)
-	for _, c := range t.Crews {
-		if crewIsFinished(c.Status) {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
 func (m Model) completedCrewNoteSpans(crews []query.CrewNode, w int) []span {
 	var items [][]span
 	var attn query.Field[query.Attention]
@@ -654,18 +534,13 @@ func (m Model) completedCrewNoteSpans(crews []query.CrewNode, w int) []span {
 			items = append(items, s)
 		}
 	}
-	for _, c := range crews {
-		if s := crewHealthWarningSpan(m.healthNow(), m.crewHealth(c.CrewID), m.g, m.p); len(s) > 0 {
-			items = append(items, s)
-			break
-		}
-	}
 	return packNoteItems(items, w)
 }
 
-// crewNoteItems is the Crew row's own NOTE cell items, in priority order,
-// before width packing: the query layer's derived Attention, the worktree's
-// own recorded removal, then "retry of #N" from the RetryOf field. Split out
+// crewNoteItems is the Crew row's own TASK cell items, in priority order,
+// before width packing: the one-line task the Crew was spawned for, the
+// query layer's derived Attention, then the worktree's own recorded
+// removal. Split out
 // (rather than a single crewNoteSpans free function, which PR 92's
 // counter-review found had drifted to zero production callers while its own
 // regression tests stayed green against it - B3) so m.crewRowNoteSpans
@@ -676,6 +551,9 @@ func (m Model) completedCrewNoteSpans(crews []query.CrewNode, w int) []span {
 // function's own behaviour exactly.
 func crewNoteItems(c query.CrewNode, p palette) [][]span {
 	var items [][]span
+	if c.Task != "" {
+		items = append(items, []span{{text: c.Task, style: p.Fg}})
+	}
 	if s := attentionSpans(c.Attention, p); len(s) > 0 {
 		items = append(items, s)
 	}
@@ -690,35 +568,17 @@ func crewNoteItems(c query.CrewNode, p palette) [][]span {
 	if c.Worktree.State == query.Known && c.Worktree.Value.Status == query.WorktreeRecordedRemoved {
 		items = append(items, []span{{text: "worktree missing", style: p.Red}})
 	}
-	if c.RetryOf.State == query.Known {
-		items = append(items, []span{{text: fmt.Sprintf("retry of #%d", c.RetryOf.Value.Attempt), style: p.Dim}})
-	}
 	return items
 }
 
 // crewRowNoteSpans is the Crew row's NOTE cell: crewNoteItems' work-outcome
-// items, packed, plus - LAST in the priority list - the ADR 0019 G7-04a2
-// runtime health warning (part 2: "the Crew row carries a short warning").
-// A Model method, not a free function, because it needs m.health; this is
-// the cell's one production entry point (list.go's taskListItems) and the
-// one rows_test.go exercises.
+// items, packed.
 //
-// Health is last, not first: work outcome (Attention, a recorded-removed
-// worktree, retry provenance) is what crewNoteItems already existed to show,
-// and the separate STATUS column already carries the recorded lifecycle
-// status regardless of what this cell drops - so at a narrow width an
-// operator who loses the health warning still has STATUS, while one who
-// lost "! failed" or "worktree missing" from this cell has lost a fact nowhere
-// else on the row says (PR 92 counter-review B3: putting health first let it
-// evict every work-outcome item at 80 columns, inverting the "present health
-// separately from work outcome" requirement into "health always wins the
-// one shared cell").
+// TODO(task 18): a runtime health warning was appended here, last in the
+// priority list so a narrow terminal drops it before it drops a work
+// outcome. mvp.md defers the health observer to task 18.
 func (m Model) crewRowNoteSpans(c query.CrewNode, w int) []span {
-	items := crewNoteItems(c, m.p)
-	if s := crewHealthWarningSpan(m.healthNow(), m.crewHealth(c.CrewID), m.g, m.p); len(s) > 0 {
-		items = append(items, s)
-	}
-	return packNoteItems(items, w)
+	return packNoteItems(crewNoteItems(c, m.p), w)
 }
 
 // packNoteItems packs a priority-ordered list of note items into w cells,

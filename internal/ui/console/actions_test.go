@@ -8,7 +8,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -71,7 +70,7 @@ func TestProjectRowStartDispatchesForEmptyAndPopulatedProjects(t *testing.T) {
 			tree.Projects[0].Repos = tc.repos
 			tree.Projects[0].Tasks = tc.tasks
 			tree.Projects[0].Mate.Designated = query.KnownField(query.MateIdentity{
-				MateID: "mate_created", HarnessKind: domain.HarnessClaude, Status: domain.MateCreated, IsDefault: true,
+				MateID: "mate_created", HarnessKind: query.HarnessClaude, Status: query.MateCreated, IsDefault: true,
 			})
 			tree.Projects[0].Actions = []query.ActionAvailability{
 				{Action: "start", Available: true, Reason: "Mate is recorded created"},
@@ -235,8 +234,8 @@ func TestConfirmationFrameSanitizesHostileRecordedIdentity(t *testing.T) {
 func TestRetryMenuEntryIsRefusedByNonTerminalSiblingBeyondPreparingOrRunning(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: domain.CrewFailed},
-		{CrewID: "crew_sibling", Status: domain.CrewNeedsRepair},
+		{CrewID: "crew_target", Status: query.CrewFailed},
+		{CrewID: "crew_sibling", Status: query.CrewNeedsRepair},
 	}
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter")) // the one Project
@@ -265,7 +264,7 @@ func TestRetryMenuEntryIsRefusedByNonTerminalSiblingBeyondPreparingOrRunning(t *
 func TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: domain.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
+		{CrewID: "crew_target", Status: query.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter")) // the one Project

@@ -45,7 +45,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/nguyenngocanh94/matev2/internal/domain"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -337,8 +336,8 @@ func sampleTree() query.Snapshot {
 				Name:      "payments-api",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{
-						MateID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", HarnessKind: domain.HarnessClaude,
-						Status: domain.MateRunning, IsDefault: true,
+						MateID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", HarnessKind: query.HarnessClaude,
+						Status: query.MateRunning, IsDefault: true,
 					}),
 					AgentName: query.KnownField("mate-payments-api"),
 					Binding: query.KnownNote(query.BindingValue{
@@ -359,7 +358,7 @@ func sampleTree() query.Snapshot {
 						TaskID: "task_01J9P2B4C6D8E0F2G4H6J8K0LM",
 						RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
 						Title:  "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
-						Status: domain.TaskRunning,
+						Status: query.TaskRunning,
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
 							Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
@@ -371,8 +370,8 @@ func sampleTree() query.Snapshot {
 								CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
 								RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
 								Attempt:     1,
-								Status:      domain.CrewFailed,
-								HarnessKind: domain.HarnessCodex,
+								Status:      query.CrewFailed,
+								HarnessKind: query.HarnessCodex,
 								RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 								Repo: query.KnownField(query.RepoValue{
 									RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
@@ -401,8 +400,8 @@ func sampleTree() query.Snapshot {
 								CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
 								RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
 								Attempt:     2,
-								Status:      domain.CrewRunning,
-								HarnessKind: domain.HarnessClaude,
+								Status:      query.CrewRunning,
+								HarnessKind: query.HarnessClaude,
 								RetryOf: query.KnownField(query.RetryValue{
 									CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS", Attempt: 1,
 								}),
@@ -432,7 +431,7 @@ func sampleTree() query.Snapshot {
 					{
 						TaskID:    "task_01J9P7N8P9Q0R1S2T3U4V5W6XY",
 						Title:     "Add idempotency-key index",
-						Status:    domain.TaskReady,
+						Status:    query.TaskReady,
 						Error:     query.AbsentField[query.ErrorReason](notErrorState),
 						Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
 					},
