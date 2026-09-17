@@ -34,10 +34,10 @@ vet:
 	$(GO) vet ./...
 
 fmt:
-	$(GOFMT) -w .
+	$(GOFMT) -w cmd internal scripts assets
 
 check-fmt:
-	@unformatted=$$($(GOFMT) -l .); \
+	@unformatted=$$($(GOFMT) -l cmd internal scripts assets); \
 	if [ -n "$$unformatted" ]; then \
 		echo "files not formatted with gofmt:"; \
 		echo "$$unformatted"; \
