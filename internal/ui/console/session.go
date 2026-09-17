@@ -67,6 +67,12 @@ type SessionTarget struct {
 	// names, since the frame-shape contract's header shows the agent a
 	// reader would attach to, not this struct's own internal ID.
 	AgentName string
+	// Mode is the Project's communication mode (query.ProjectNode.Mode),
+	// carried on the target so the session header can name it without this
+	// package reading state. Empty means the caller did not populate it
+	// (tests, the fake controller) and the header omits it rather than
+	// guessing "supervised".
+	Mode query.Mode
 	// Worktree is the Crew's worktree path (query.CrewNode.Worktree), shown
 	// in the session header alongside the agent name - the contract's frame
 	// shape pins a header "naming harness, agent and (for a Crew)

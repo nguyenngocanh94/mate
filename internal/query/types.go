@@ -57,7 +57,13 @@ type ProjectNode struct {
 	ProjectID string
 	Actions   []ActionAvailability
 	Name      string
-	Mate      MateNode
+	// Mode is the Project's communication mode (mvp.md section 5): the
+	// presence of `mate/.auto`. It is a Project-level fact rather than a
+	// Mate-level one because the flag exists whether or not a Mate has ever
+	// been started, and the daemon that acts on it (mvp.md task 19) is the
+	// Console's, not the Mate's.
+	Mode Mode
+	Mate MateNode
 	// Repos are the Project's registered repos, read once per Project. A
 	// Crew's own Repo field is resolved against this list rather than
 	// through a per-row read, so a Project with many Crews still costs one

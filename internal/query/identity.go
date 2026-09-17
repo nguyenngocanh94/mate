@@ -50,6 +50,28 @@ func ParseHarnessKind(s string) (HarnessKind, error) {
 
 func (k HarnessKind) String() string { return string(k) }
 
+// Mode is a Project's communication mode (mvp.md section 5). Supervised is
+// the default and means no byte is ever sent to the Mate's pane without the
+// reader pressing a key; auto means the Console's digest daemon may. The
+// durable form of this is the presence of `mate/.auto`; this type is only
+// how the two are named on screen.
+type Mode string
+
+const (
+	ModeSupervised Mode = "supervised"
+	ModeAuto       Mode = "auto"
+)
+
+func (m Mode) String() string { return string(m) }
+
+// ModeFor names the mode the `.auto` flag's presence selects.
+func ModeFor(auto bool) Mode {
+	if auto {
+		return ModeAuto
+	}
+	return ModeSupervised
+}
+
 // MateStatus is the Mate lifecycle. Herdr's blocked/idle/done are runtime
 // observations, not Mate statuses (mvp.md §2 decision 8).
 type MateStatus string

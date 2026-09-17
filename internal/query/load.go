@@ -71,7 +71,10 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 
 func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) ProjectNode {
 	row := RowRef{Kind: RowProject, ID: ref.Name, Label: ref.Name}
-	p := ProjectNode{ProjectID: ref.Name, Name: ref.Name}
+	// The mode is the presence of `mate/.auto` and nothing else: there is no
+	// separate record of it, so a project whose flag file cannot be read at
+	// all reads as supervised, which is the mode that sends nothing.
+	p := ProjectNode{ProjectID: ref.Name, Name: ref.Name, Mode: ModeFor(ws.Auto(ref.Name))}
 
 	cfg, err := ws.LoadProject(ref.Name)
 	switch {

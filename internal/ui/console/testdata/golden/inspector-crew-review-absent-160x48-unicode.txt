@@ -1,8 +1,8 @@
  matev2 console   workspace ws_1                                                                                              Recorded snapshot  As of 14:02:11 
  ws_1 › acme                                                                                                                                   Project · 1 crew 
 ───────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────
-  MATE                                               HARNESS      STATUS         BINDING           │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB                      
-  none assigned                                                                  ! no mate         │                                                            
+  MATE                                               HARNESS    STATUS     MODE        BINDING     │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB                      
+  none assigned                                                                        ! no mate   │                                                            
                                                                                                    │ ID               crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB           
   CREWS  1          TASK                                  STATUS           NOTE          UPDATED   │ Task                                                       
 ▌ crew_01J9P8…Z0AB                                        awaiting_review  ? unknown     12:05:33  │                                                            
@@ -45,4 +45,4 @@
                                                                                                    │                                                            
 ───────────────────────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
                                                                                                                                                                 
- ↑↓ Move  a Actions  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                                                                
+ ↑↓ Move  a Actions  m Mode  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                                                        

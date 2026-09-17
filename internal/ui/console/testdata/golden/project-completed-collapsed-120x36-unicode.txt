@@ -1,8 +1,8 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  MATE                 HARNESS      STATUS         BINDING           │ COMPLETED                                        
-  mate-payments-api    claude       running        active            │                                                  
+  MATE                 HARNESS    STATUS     MODE        BINDING     │ COMPLETED                                        
+  mate-payments-api    claude     running    supervised  active      │                                                  
                                                                      │ Finished         1 of 2 crews                    
   CREWS  1          TASK              STATUS           NOTE          │                  Finished crews stay in the      
   crew_01J9P6…B8DT  Add idempotency-k…running                        │                  snapshot. Enter shows or hides  
@@ -33,4 +33,4 @@
                                                                      │                                                  
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
- ↑↓ Move  a Actions  Enter Show completed  Esc Back  Tab Inspector  r Refresh  q Quit                                   
+ ↑↓ Move  a Actions  m Mode  Enter Show completed  Esc Back  Tab Inspector  r Refresh  q Quit                           

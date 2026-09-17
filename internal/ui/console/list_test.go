@@ -136,7 +136,7 @@ func TestProjectLevelSelectionMarksTheRightRow(t *testing.T) {
 // ---------- column widths ----------
 
 // TestFixedColumnWidthsHoldAcrossLevels checks the design's own numbers
-// (HARNESS 13, STATUS 15/17, BINDING 18, ATTENTION 14) directly against the
+// (HARNESS 11, STATUS 11/17, MODE 12, ATTENTION 14) directly against the
 // rendered header line, by locating each header word and measuring the gap
 // to the next one - not by re-deriving the constants list.go already uses,
 // which would just check the code against itself. The expected widths below
@@ -153,12 +153,13 @@ func TestFixedColumnWidthsHoldAcrossLevels(t *testing.T) {
 	requireColumnGap(t, wsHeader, "CREWS", "ATTENTION", 7)
 	requireColumnGap(t, wsHeader, "ATTENTION", "UPDATED", 14)
 
-	// Project level: HARNESS 13, STATUS 15, BINDING 18 (its own Mate-row
+	// Project level: HARNESS 11, STATUS 11, MODE 12 (its own Mate-row
 	// table), then blank, then the Crew table's STATUS 17, NOTE 14.
 	proj, _ := send(t, m, key("enter"))
 	header := proj.listLines(l.List, l.Body)[0].render(l.List)
-	requireColumnGap(t, header, "HARNESS", "STATUS", 13)
-	requireColumnGap(t, header, "STATUS", "BINDING", 15)
+	requireColumnGap(t, header, "HARNESS", "STATUS", 11)
+	requireColumnGap(t, header, "STATUS", "MODE", 11)
+	requireColumnGap(t, header, "MODE", "BINDING", 12)
 
 	// items: [0] mate header, [1] mate row, [2] blank separator, [3] crews header.
 	crewHeader := proj.listLines(l.List, l.Body)[3].render(l.List)

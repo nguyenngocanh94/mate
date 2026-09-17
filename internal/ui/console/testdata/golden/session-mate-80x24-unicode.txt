@@ -1,4 +1,4 @@
- claude-code · mate-payments-api                                                
+ claude-code · mate-payments-api · supervised                                   
 ────────────────────────────────────────────────────────────────────────────────
  CREW › MATE                                      4 awaiting reply · 6 recorded 
  14:01  attempt 2 · Migration for idempotency_keys, or key off stripe_events d… 

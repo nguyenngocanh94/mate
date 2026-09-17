@@ -1,8 +1,8 @@
  matev2 console   workspace ws_acme                              As of 14:02:11 
  ws_acme › payments-api                                       Project · 2 crews 
 ────────────────────────────────────────────────────────────────────────────────
-  MATE                            HARNESS      STATUS         BINDING           
-  mate-payments-api               claude       running        active            
+  MATE                            HARNESS    STATUS     MODE        BINDING     
+  mate-payments-api               claude     running    supervised  active      
                                                                                 
   CREWS  1          TASK                         STATUS           NOTE          
 ▌ crew_01J9P6…B8DT  Add idempotency-key index    running                        

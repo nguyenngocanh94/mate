@@ -598,6 +598,36 @@ func (m Model) beginMateStart() (Model, tea.Cmd) {
 	return m.runPending(choice)
 }
 
+// beginModeToggle is the 'm' key: flip one Project's communication mode
+// (mvp.md section 5). It runs through the same ActionFunc seam every other
+// action does - this package never writes the `.auto` flag itself - and the
+// refreshed label comes back on the re-read onActionDone schedules, never
+// from optimistically flipping a local copy.
+//
+// project is passed in rather than read from the selection because the two
+// call sites name it differently: the project frame's selected row belongs
+// to m.currentProject(), while the session view has left the navigation
+// stack behind and knows only its target's ProjectID.
+func (m Model) beginModeToggle(project string) (Model, tea.Cmd) {
+	if project == "" {
+		return m.refuseModeKey("no Project is selected"), nil
+	}
+	if m.action == nil {
+		return m.refuseModeKey("Console actions are not wired"), nil
+	}
+	return m.runAction(actionChoice{
+		action:  ActionMode,
+		enabled: true,
+		desc:    "Toggle the communication mode",
+		req:     ActionRequest{Action: ActionMode, Target: project, TargetKind: "project"},
+	})
+}
+
+func (m Model) refuseModeKey(reason string) Model {
+	m.msg = errMsg("Action refused: " + reason + " " + m.g.Dot + " mode unchanged")
+	return m
+}
+
 func (m Model) refuseMateKey(reason string) Model {
 	m.msg = errMsg("Action refused: " + reason + " · nothing started")
 	return m

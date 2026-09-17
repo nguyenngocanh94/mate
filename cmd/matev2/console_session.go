@@ -1,0 +1,137 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/matev2/internal/ui/console"
+)
+
+// consoleSessionStream is the runtime/UI boundary for the embedded session
+// view (ADR 0026). The Console receives only its own SessionChannel
+// closure; runtime.SessionStream and runtime.TerminalSize never cross into
+// internal/ui/console.
+//
+// A nil stream yields a nil factory, which the Console reads as "no stream
+// transport" rather than as a failure at open time. The transport is passed
+// in rather than type-asserted out of spawn.Deps so a test can supply
+// runtime.FakeSessionStream beside the fake Adapter, which is a separate
+// double.
+func consoleSessionStream(ws *store.Workspace, stream runtime.SessionStream) console.SessionStreamFactory {
+	if stream == nil {
+		return nil
+	}
+	return func(ctx context.Context, target console.SessionTarget, size console.TerminalSize) (console.SessionChannel, error) {
+		ref, err := mateSessionRef(ws, target)
+		if err != nil {
+			return nil, err
+		}
+		channel, err := stream.Open(ctx, ref, runtime.TerminalSize{Cols: size.Cols, Rows: size.Rows})
+		if err != nil {
+			return nil, err
+		}
+		return consoleSessionChannel{channel: channel}, nil
+	}
+}
+
+// mateSessionRef resolves the Herdr identity of a Project's Mate out of
+// `mate.meta`, which is the only record there is (internal/spawn/doc.go).
+// The meta is re-read on every open rather than captured from the
+// Console's snapshot: the snapshot can be a refresh old, and opening a PTY
+// against a pane nobody owns is exactly the failure that record is a hint
+// about, not proof of.
+func mateSessionRef(ws *store.Workspace, target console.SessionTarget) (runtime.AgentSessionRef, error) {
+	if target.Kind != console.SessionTargetMate {
+		return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
+			"the live session view is wired for a Mate; Crews arrive in mvp.md task 11")
+	}
+	if target.ProjectID == "" {
+		return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
+			"the session target names no Project")
+	}
+	meta, err := ws.ReadMateMeta(target.ProjectID)
+	if err != nil {
+		return runtime.AgentSessionRef{}, err
+	}
+	if meta[spawn.MetaAgent] == "" {
+		return runtime.AgentSessionRef{}, errMateStopped(target.ProjectID)
+	}
+	if meta[spawn.MetaPane] == "" {
+		// An agent with no pane is the same stopped record seen from the
+		// other side: StopMate drops both keys together, so one without the
+		// other is a half-written meta, and neither is something to open a
+		// PTY against.
+		return runtime.AgentSessionRef{}, errMateStopped(target.ProjectID)
+	}
+	session := meta[spawn.MetaSession]
+	if session == "" {
+		session = ws.Session()
+	}
+	return runtime.AgentSessionRef{HerdrSession: session, AgentName: meta[spawn.MetaAgent]}, nil
+}
+
+// errMateStopped is the stopped state, not a failure: a Project whose Mate
+// has never been started (or has been stopped) has nothing to stream, and
+// the reader's next move is the 's' key. It is coded CodeStateConflict
+// rather than CodeUnknown so nothing downstream treats it as a transport
+// fault.
+func errMateStopped(project string) error {
+	return observability.NewError(observability.CodeStateConflict,
+		fmt.Sprintf("the Mate of %s is stopped; press s to start it", project))
+}
+
+// consoleSessionChannel adapts the runtime transport without exposing any
+// runtime type to internal/ui/console.
+type consoleSessionChannel struct{ channel runtime.SessionChannel }
+
+func (c consoleSessionChannel) Read(ctx context.Context) ([]byte, error) {
+	return c.channel.Read(ctx)
+}
+
+func (c consoleSessionChannel) Write(ctx context.Context, input []byte) error {
+	return c.channel.Write(ctx, input)
+}
+
+func (c consoleSessionChannel) Resize(ctx context.Context, size console.TerminalSize) error {
+	return c.channel.Resize(ctx, runtime.TerminalSize{Cols: size.Cols, Rows: size.Rows})
+}
+
+func (c consoleSessionChannel) Close(ctx context.Context) error {
+	return c.channel.Close(ctx)
+}
+
+// consoleSessionMetadata is the stream's slow side channel: recorded
+// lifecycle and one runtime observation per tick. It never reads the pane's
+// contents - the PTY bytes are the sole source of the live frame - and it
+// never rewrites `mate.meta`, so a Mate that disappears from Herdr while
+// the view is open is reported as an absent runtime, not promoted into a
+// lifecycle change (ADR 0025).
+func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.SessionMetadataReader {
+	return func(ctx context.Context, target console.SessionTarget) (console.SessionSnapshot, error) {
+		snap := console.SessionSnapshot{Target: target, AsOf: time.Now().UTC()}
+		if target.Kind != console.SessionTargetMate || target.ProjectID == "" {
+			return snap, observability.NewError(observability.CodeUsage,
+				"session metadata is wired for a Mate; Crews arrive in mvp.md task 11")
+		}
+		status, err := spawn.MateStatus(ctx, ws, deps, target.ProjectID)
+		if err != nil {
+			return snap, err
+		}
+		snap.RecordedStatus = query.KnownField(string(status.State))
+		switch status.State {
+		case spawn.StateRunning:
+			snap.Runtime = console.SessionRuntime{Status: query.Known, ObservedAt: time.Now().UTC()}
+		default:
+			// Stale and stopped are both "Herdr does not have this agent".
+			// Absent, never Unknown: the poll itself succeeded.
+			snap.Runtime = console.SessionRuntime{Status: query.Absent, Reason: status.Detail}
+		}
+		return snap, nil
+	}
+}

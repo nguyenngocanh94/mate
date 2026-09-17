@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
@@ -41,10 +41,26 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
 		return query.Load(loadCtx, ws)
 	}
-	model := console.New(load, notWiredAttachCmd, notWiredAction).WithContext(ctx)
+	// One set of live dependencies for the whole Console run: the Herdr
+	// adapter and the agent-name registry it shares, so a Mate started from
+	// the action menu and the stream opened on it a keystroke later agree
+	// about which names are reserved.
+	deps := spawn.LiveDeps()
+	var stream runtime.SessionStream
+	if s, ok := deps.Runtime.(runtime.SessionStream); ok {
+		stream = s
+	}
+	model := console.New(load, notWiredAttachCmd, consoleAction(ws, deps)).
+		WithContext(ctx).
+		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps))
 
+	// tea.WithMouseCellMotion is a Program-level terminal mode, so it is on
+	// for the Console's whole run rather than only while a stream is open
+	// (console.Model.onMouse drops every event outside stream mode). Cell
+	// motion, not all motion: all-motion reports every idle mouse move, and
+	// each report would redraw the frame and enqueue a PTY write.
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx),
-		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile))
+		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseCellMotion())
 	final, err := program.Run()
 	if err != nil {
 		return fmt.Errorf("console exited with an error: %w", err)
@@ -64,25 +80,6 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 // TODO(task 09): build `matev2 attach <target>` here once the session view
 // is wired to a real pane.
 func notWiredAttachCmd(string) *exec.Cmd { return nil }
-
-// notWiredAction is the ActionFunc seam before tasks 07 and 09. Every action
-// the Console can reach needs a live Herdr agent, and nothing in matev2
-// starts one yet, so each one fails with the task that will.
-//
-// TODO(task 07): start/resume a Mate. TODO(task 09): stop, and the session
-// view's own attach.
-func notWiredAction(_ context.Context, req console.ActionRequest) (string, error) {
-	switch req.Action {
-	case console.ActionStart, console.ActionResume:
-		return "", errors.New("starting a Mate is not wired until mvp.md task 07")
-	case console.ActionStop:
-		return "", errors.New("stopping an agent is not wired until mvp.md task 07")
-	case console.ActionOnboard:
-		return "", errors.New("use `matev2 project add <name> <repo>`; console onboarding is not wired yet")
-	default:
-		return "", fmt.Errorf("%s is not wired in this build", req.Action)
-	}
-}
 
 // consoleTerminalFiles requires the caller's own stdout to be a real
 // *os.File, which an in-process test harness writing to a bytes.Buffer is

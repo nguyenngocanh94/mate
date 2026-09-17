@@ -33,6 +33,11 @@ const (
 	ActionStop   Action = "stop"
 	ActionResume Action = "resume"
 	ActionRepair Action = "repair"
+	// ActionMode flips a Project's communication mode (mvp.md section 5).
+	// Today it only moves the flag and the label: the daemon that acts on
+	// auto mode is mvp.md task 19, which is why the key line says "Mode"
+	// and not "Auto reply".
+	ActionMode Action = "mode"
 	// ActionOnboard adds a Project to the workspace, or creates and starts
 	// a Project's Mate.
 	ActionOnboard Action = "onboard"
