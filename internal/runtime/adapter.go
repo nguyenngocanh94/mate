@@ -46,6 +46,14 @@ type Adapter interface {
 	// answers a recognised directory-trust dialog (ADR 0028) - and is not a
 	// general typing primitive: PromptAgent is how text reaches a harness.
 	SendKeys(ctx context.Context, handle AgentHandle, keys []string) error
+	// SendText types one line of literal text into the pane the agent
+	// currently occupies, without submitting it. It is the typing half of
+	// the verified send in internal/send: PromptAgent (`herdr agent
+	// prompt`) reports success while the prompt is concatenated onto a
+	// half-typed line or swallowed by a modal (docs/mvp.md section 7), so
+	// mate types the text itself, re-reads the composer, and presses enter
+	// separately.
+	SendText(ctx context.Context, handle AgentHandle, text string) error
 	AttachAgent(ctx context.Context, handle AgentHandle, target AttachTarget) (AttachedTo, error)
 	StopAgent(ctx context.Context, handle AgentHandle, mode StopMode) error
 	RemoveTab(ctx context.Context, handle TabHandle) error
