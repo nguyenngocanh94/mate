@@ -29,7 +29,7 @@ func newUsageErrorf(format string, a ...any) error { return &usageError{fmt.Erro
 // func(args []string, stdout, stderr io.Writer) error.
 func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: matev2 <init|project|--version> ...")
+		return newUsageError("usage: matev2 <init|project|mate|--version> ...")
 	}
 	switch args[0] {
 	case "--version", "-V":
@@ -38,6 +38,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdInit(args[1:], stdout, stderr)
 	case "project":
 		return cmdProject(args[1:], stdout, stderr)
+	case "mate":
+		return cmdMate(args[1:], stdout, stderr)
 	default:
 		return newUsageErrorf("unknown command %q", args[0])
 	}
