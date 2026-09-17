@@ -24,6 +24,10 @@ const (
 	MetaSessionID = "session_id"
 	MetaStartedAt = "started_at"
 	MetaStoppedAt = "stopped_at"
+	// MetaTranscript is the Claude transcript path the Stop hook reports
+	// (docs/mvp.md decision 9: ".meta ghi transcript= và session_id= từ
+	// ngày đầu"). Task 08's mate-stop hook writes it; StartMate does not.
+	MetaTranscript = "transcript"
 )
 
 // AgentNamePrefix is the first half of a Mate's live Herdr agent name; the

@@ -40,6 +40,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdProject(args[1:], stdout, stderr)
 	case "mate":
 		return cmdMate(args[1:], stdout, stderr)
+	case "hook":
+		return cmdHook(args[1:], os.Stdin, stdout, stderr)
 	default:
 		return newUsageErrorf("unknown command %q", args[0])
 	}

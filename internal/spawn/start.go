@@ -18,8 +18,9 @@ import (
 )
 
 // ClaudeSettingsDir and ClaudeSettingsFile are the Claude settings the Mate
-// launches with. Task 08 fills the hooks; start only guarantees the file
-// exists, and never overwrites one that does.
+// launches with: ClaudeSettings wires its two hooks to the matev2 binary.
+// Start only ever creates the file; it never overwrites one that already
+// exists, whether that is the user's own or one a previous start wrote.
 const (
 	ClaudeSettingsDir  = ".claude"
 	ClaudeSettingsFile = "settings.json"
@@ -267,7 +268,7 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 	}); err != nil {
 		return "", err
 	}
-	if err := ensureClaudeSettings(mateDir); err != nil {
+	if err := ensureClaudeSettings(mateDir, binary); err != nil {
 		return "", err
 	}
 	if kind == harness.KindCodex {
@@ -288,9 +289,10 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 }
 
 // ensureClaudeSettings creates `<mate>/.claude/settings.json` if it is not
-// there. An existing file - the user's, or the hooks task 08 writes - is
-// never touched.
-func ensureClaudeSettings(mateDir string) error {
+// there, wired to binary's `hook mate-prompt`/`hook mate-stop` (ClaudeSettings).
+// An existing file - the user's own, or one a previous start already wrote -
+// is never touched.
+func ensureClaudeSettings(mateDir, binary string) error {
 	dir := filepath.Join(mateDir, ClaudeSettingsDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -301,7 +303,11 @@ func ensureClaudeSettings(mateDir string) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	return os.WriteFile(path, []byte("{}\n"), 0o644)
+	data, err := ClaudeSettings(binary)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 // writeCodexOverride copies the rendered manual to the name Codex reads.
