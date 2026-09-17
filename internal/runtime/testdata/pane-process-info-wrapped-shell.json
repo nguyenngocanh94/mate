@@ -1,0 +1,1 @@
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":28908,"foreground_processes":[{"argv":["zsh (kiro-cli-term)"],"argv0":"zsh (kiro-cli-term)","cmdline":"zsh (kiro-cli-term)","cwd":"/Users/anh/Workspace/matetest2","name":"zsh (kiro-cli-t","pid":28908}],"pane_id":"w1:p2","shell_pid":28908},"type":"pane_process_info"}}

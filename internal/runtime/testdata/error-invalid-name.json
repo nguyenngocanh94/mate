@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "invalid_agent_name",
+    "message": "agent name must start with a lowercase letter and contain only lowercase letters, digits, '-' or '_' (1-32 characters)"
+  },
+  "id": "cli:agent:start"
+}

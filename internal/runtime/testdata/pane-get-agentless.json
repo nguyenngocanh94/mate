@@ -1,0 +1,24 @@
+{
+    "id": "cli:pane:get",
+    "result": {
+        "pane": {
+            "agent_status": "unknown",
+            "cwd": "/tmp/g4-07-lab/proj",
+            "focused": false,
+            "foreground_cwd": "/tmp/g4-07-lab/proj",
+            "pane_id": "w1:p2",
+            "revision": 1,
+            "scroll": {
+                "max_offset_from_bottom": 0,
+                "offset_from_bottom": 0,
+                "viewport_rows": 40
+            },
+            "tab_id": "w1:t2",
+            "terminal_id": "term_65ac171f1de702",
+            "terminal_title": "anh@Mac:/tmp/g4-07-lab/proj",
+            "terminal_title_stripped": "anh@Mac:/tmp/g4-07-lab/proj",
+            "workspace_id": "w1"
+        },
+        "type": "pane_info"
+    }
+}

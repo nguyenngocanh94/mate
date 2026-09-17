@@ -1,0 +1,40 @@
+{
+  "id": "cli:pane:list",
+  "result": {
+    "panes": [
+      {
+        "agent_status": "unknown",
+        "cwd": "/private/tmp/g4-s3-a.PNMlVy",
+        "focused": true,
+        "foreground_cwd": "/private/tmp/g4-s3-a.PNMlVy",
+        "pane_id": "w1:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 39
+        },
+        "tab_id": "w1:t1",
+        "terminal_id": "term_65ac07f1e72bd1",
+        "workspace_id": "w1"
+      },
+      {
+        "agent_status": "unknown",
+        "cwd": "/private/tmp/g4-s3-b.FcSlxA",
+        "focused": false,
+        "foreground_cwd": "/private/tmp/g4-s3-b.FcSlxA",
+        "pane_id": "w2:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 39
+        },
+        "tab_id": "w2:t1",
+        "terminal_id": "term_65ac07f1f57672",
+        "workspace_id": "w2"
+      }
+    ],
+    "type": "pane_list"
+  }
+}

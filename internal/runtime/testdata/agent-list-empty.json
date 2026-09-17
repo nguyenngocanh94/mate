@@ -1,0 +1,7 @@
+{
+  "id": "cli:agent:list",
+  "result": {
+    "agents": [],
+    "type": "agent_list"
+  }
+}

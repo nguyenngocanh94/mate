@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "agent_not_ready",
+    "message": "agent mate-g4-01 is blocked during startup and is not ready for prompts"
+  },
+  "id": "cli:agent:start"
+}

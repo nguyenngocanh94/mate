@@ -1,0 +1,7 @@
+{
+    "error": {
+        "code": "agent_not_found",
+        "message": "agent target nope-g407 not found"
+    },
+    "id": "cli:agent:attach:resolve"
+}

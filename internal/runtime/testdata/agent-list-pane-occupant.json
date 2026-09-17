@@ -1,0 +1,25 @@
+{
+    "id": "cli:agent:list",
+    "result": {
+        "agents": [
+            {
+                "agent": "claude",
+                "agent_status": "blocked",
+                "cwd": "/tmp/g4-07-lab/proj",
+                "focused": false,
+                "foreground_cwd": "/tmp/g4-07-lab/proj",
+                "launch_pending": true,
+                "name": "occupant-agent",
+                "pane_id": "w1:p2",
+                "revision": 2,
+                "state_change_seq": 1,
+                "tab_id": "w1:t2",
+                "terminal_id": "term_65ac22be8feef2",
+                "terminal_title": "claude",
+                "terminal_title_stripped": "claude",
+                "workspace_id": "w1"
+            }
+        ],
+        "type": "agent_list"
+    }
+}

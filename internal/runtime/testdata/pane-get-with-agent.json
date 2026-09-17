@@ -1,0 +1,25 @@
+{
+    "id": "cli:pane:get",
+    "result": {
+        "pane": {
+            "agent": "claude",
+            "agent_status": "blocked",
+            "cwd": "/tmp/g4-07-lab/proj",
+            "focused": false,
+            "foreground_cwd": "/tmp/g4-07-lab/proj",
+            "pane_id": "w1:p2",
+            "revision": 2,
+            "scroll": {
+                "max_offset_from_bottom": 0,
+                "offset_from_bottom": 0,
+                "viewport_rows": 39
+            },
+            "tab_id": "w1:t2",
+            "terminal_id": "term_65ac22be8feef2",
+            "terminal_title": "claude",
+            "terminal_title_stripped": "claude",
+            "workspace_id": "w1"
+        },
+        "type": "pane_info"
+    }
+}
