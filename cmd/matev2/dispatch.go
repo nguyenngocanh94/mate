@@ -1,0 +1,135 @@
+package main
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/nguyenngocanh94/matev2/internal/store"
+)
+
+// usageError marks an error as a CLI usage mistake: bad flags, wrong number
+// of arguments, an unknown subcommand. mainRun exits 2 for these and 1 for
+// everything else.
+type usageError struct{ err error }
+
+func (e *usageError) Error() string { return e.err.Error() }
+func (e *usageError) Unwrap() error { return e.err }
+
+func newUsageError(msg string) error { return &usageError{errors.New(msg)} }
+
+func newUsageErrorf(format string, a ...any) error { return &usageError{fmt.Errorf(format, a...)} }
+
+// run dispatches the top-level subcommand. Each subcommand is a small,
+// independently testable function of the form
+// func(args []string, stdout, stderr io.Writer) error.
+func run(args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return newUsageError("usage: matev2 <init|project|--version> ...")
+	}
+	switch args[0] {
+	case "--version", "-V":
+		return cmdVersion(args[1:], stdout, stderr)
+	case "init":
+		return cmdInit(args[1:], stdout, stderr)
+	case "project":
+		return cmdProject(args[1:], stdout, stderr)
+	default:
+		return newUsageErrorf("unknown command %q", args[0])
+	}
+}
+
+// cmdProject dispatches `matev2 project <add|list|remove>`.
+func cmdProject(args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return newUsageError("usage: matev2 project <add|list|remove> ...")
+	}
+	switch args[0] {
+	case "add":
+		return cmdProjectAdd(args[1:], stdout, stderr)
+	case "list":
+		return cmdProjectList(args[1:], stdout, stderr)
+	case "remove":
+		return cmdProjectRemove(args[1:], stdout, stderr)
+	default:
+		return newUsageErrorf("unknown project subcommand %q", args[0])
+	}
+}
+
+// reorderArgs moves every flag (and its value, if it takes one) in front of
+// the positional arguments, in the order the caller wrote them, so a
+// subcommand accepts its flags before, after, or interspersed with its
+// positional arguments. The standard flag package otherwise stops parsing at
+// the first non-flag token, which would make `matev2 project add <name>
+// <repo-path> --workspace <dir>` silently ignore --workspace.
+func reorderArgs(fs *flag.FlagSet, args []string) []string {
+	var flags, positional []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			positional = append(positional, args[i+1:]...)
+			break
+		}
+		if len(a) < 2 || a[0] != '-' {
+			positional = append(positional, a)
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if strings.Contains(name, "=") {
+			continue // value is already part of this token
+		}
+		fl := fs.Lookup(name)
+		if fl != nil {
+			if bf, ok := fl.Value.(interface{ IsBoolFlag() bool }); ok && bf.IsBoolFlag() {
+				continue // boolean flags take no separate value
+			}
+		}
+		if i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	return append(flags, positional...)
+}
+
+// resolveWorkspace opens the workspace named by flagVal, or, if flagVal is
+// empty, the one found by findWorkspaceDir.
+func resolveWorkspace(flagVal string) (*store.Workspace, error) {
+	dir, err := findWorkspaceDir(flagVal)
+	if err != nil {
+		return nil, err
+	}
+	return store.Open(dir)
+}
+
+// findWorkspaceDir resolves the workspace directory per docs/mvp.md task 04:
+// the --workspace flag if given, else MATEV2_WORKSPACE, else the nearest
+// ancestor of the current directory that contains `.matev2/`.
+func findWorkspaceDir(flagVal string) (string, error) {
+	if flagVal != "" {
+		return flagVal, nil
+	}
+	if env := os.Getenv("MATEV2_WORKSPACE"); env != "" {
+		return env, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dir := cwd
+	for {
+		if fi, statErr := os.Stat(filepath.Join(dir, store.StateDirName)); statErr == nil && fi.IsDir() {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("no %s workspace found in %s or any parent directory (use --workspace or set MATEV2_WORKSPACE)", store.StateDirName, cwd)
+		}
+		dir = parent
+	}
+}
