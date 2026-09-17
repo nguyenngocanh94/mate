@@ -51,7 +51,7 @@ func sessionTestBox() query.Field[query.BoxView] {
 				Seq: 0, At: sessionTestClock(13, 41), Kind: query.BoxStatus,
 				Source: "crew", Target: "crew:k3", Crew: "k3",
 				Verb: "working", Text: "reading the ticket",
-				Signal: query.BoxStatusSignal("k3"),
+				Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
 			},
 			{
 				Seq: 1, At: sessionTestClock(13, 52), Kind: query.BoxMessage,
@@ -62,7 +62,7 @@ func sessionTestBox() query.Field[query.BoxView] {
 				Seq: 2, At: sessionTestClock(14, 1), Kind: query.BoxStatus,
 				Source: "crew", Target: "crew:k3", Crew: "k3",
 				Verb: "needs-decision", Text: "migration for idempotency_keys, or key off stripe_events?",
-				Attention: true, Signal: query.BoxStatusSignal("k3"),
+				Attention: true, Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
 			},
 		},
 		Crews: 1, Awaiting: 1, LastAt: sessionTestClock(14, 1),

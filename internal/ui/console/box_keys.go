@@ -11,7 +11,8 @@ import (
 // The three box keys (mvp.md section 5, task 15) and the peek overlay.
 //
 //	Enter  hand the selected entry to the Mate - one verified line into its
-//	       composer, `signal: crews/<id>.status` or `signal: incident ...`.
+//	       composer, `signal: <absolute status file path>` or
+//	       `signal: incident ...`.
 //	r      reply to the crew directly, through the same send path
 //	       `matev2 send` uses, recorded in sent.log with Source: user.
 //	p      peek: the crew's own pane, 40 lines, in a scrollable overlay.

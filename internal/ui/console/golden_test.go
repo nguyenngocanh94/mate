@@ -446,7 +446,7 @@ func sampleBox() query.Field[query.BoxView] {
 			{
 				Seq: 0, At: at(13, 41), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
 				Crew: "k3", Verb: "working", Text: "reading the ticket",
-				Signal: query.BoxStatusSignal("k3"),
+				Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
 			},
 			{
 				Seq: 1, At: at(13, 52), Kind: query.BoxMessage, Source: "user", Target: "mate",
@@ -456,11 +456,11 @@ func sampleBox() query.Field[query.BoxView] {
 				Seq: 2, At: at(14, 1), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
 				Crew: "k3", Verb: "needs-decision",
 				Text:      "migration for idempotency_keys, or key off stripe_events?",
-				Attention: true, Signal: query.BoxStatusSignal("k3"),
+				Attention: true, Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
 			},
 			{
 				Seq: 3, At: at(14, 2), Kind: query.BoxMessage, Source: "app", Target: "mate",
-				Text: query.BoxStatusSignal("k3"),
+				Text: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
 			},
 		},
 		Crews: 1, Awaiting: 1, LastAt: at(14, 2),

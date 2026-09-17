@@ -34,12 +34,14 @@ const peekLines = 40
 
 // boxForwardAction is Enter: hand one box entry to the Mate.
 //
-// Only the signal line goes in - `signal: crews/<id>.status`, never the
-// status text itself - so the Mate reads the file rather than trusting a
-// copy the console made (mvp.md section 5). It carries the from-app marker
-// byte, which is what lets the Mate tell an app-generated line from
-// something its human typed, and what the Mate's UserPromptSubmit hook
-// checks before clearing `.auto`.
+// Only the signal line goes in - `signal: <absolute status file path>`,
+// never the status text itself - so the Mate reads the file rather than
+// trusting a copy the console made (mvp.md section 5). The path is
+// absolute because the Mate's cwd is its own workspace directory, not the
+// project's, so a path relative to the project resolves to nothing there.
+// The line carries the from-app marker sentinel, which is what lets the
+// Mate tell an app-generated line from something its human typed, and what
+// the Mate's UserPromptSubmit hook checks before clearing `.auto`.
 //
 // A refused send is returned as it came back. internal/send already names
 // which composer state it observed and quotes the screen it read that from,

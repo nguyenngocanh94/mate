@@ -114,10 +114,10 @@ func LoadBox(ws *store.Workspace, project string) Field[BoxView] {
 	if err != nil {
 		return UnknownField[BoxView](readFailureReason(err))
 	}
-	return KnownField(boxView(v))
+	return KnownField(boxView(ws, project, v))
 }
 
-func boxView(v box.View) BoxView {
+func boxView(ws *store.Workspace, project string, v box.View) BoxView {
 	sum := box.Summarize(v)
 	out := BoxView{
 		Entries:  make([]BoxEntry, 0, len(v.Entries)),
@@ -126,12 +126,12 @@ func boxView(v box.View) BoxView {
 		LastAt:   sum.LastAt,
 	}
 	for _, e := range v.Entries {
-		out.Entries = append(out.Entries, boxEntry(e))
+		out.Entries = append(out.Entries, boxEntry(ws, project, e))
 	}
 	return out
 }
 
-func boxEntry(e box.Entry) BoxEntry {
+func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 	out := BoxEntry{
 		Seq:    e.Seq,
 		At:     e.At,
@@ -148,10 +148,13 @@ func boxEntry(e box.Entry) BoxEntry {
 		out.Text = st.Text
 		out.Attention = box.Attention(st.State)
 		// The status file is the pointer, not the line: mvp.md section 5
-		// says Enter sends `signal: crews/<id>.status`, so the Mate reads
-		// the file itself rather than trusting a line the console copied.
+		// says Enter sends `signal: <absolute status file path>`, so the
+		// Mate reads the file itself rather than trusting a line the
+		// console copied. The path must be absolute: the Mate's cwd is its
+		// own workspace directory, not the project's, so a path relative to
+		// the project (`crews/<id>.status`) resolves to nothing there.
 		if e.Crew != "" {
-			out.Signal = BoxStatusSignal(e.Crew)
+			out.Signal = BoxStatusSignal(ws.CrewStatus(project, e.Crew))
 		}
 	case box.KindIncident:
 		kind, text := box.ParseIncidentText(e.Text)
@@ -169,8 +172,13 @@ func boxEntry(e box.Entry) BoxEntry {
 // BoxStatusSignal and BoxIncidentSignal are the two lines mvp.md section 5
 // pins for the Enter key. They are spelled once, here, so the console, the
 // action that sends them and any test asserting on `sent.log` all agree.
-func BoxStatusSignal(crew string) string {
-	return fmt.Sprintf("signal: crews/%s.status", crew)
+//
+// BoxStatusSignal takes the crew's status file path, already resolved to an
+// absolute path by the caller (ws.CrewStatus(project, crew)): the Mate's cwd
+// is its own workspace directory, not the project's, so a path relative to
+// the project never resolves there.
+func BoxStatusSignal(statusPath string) string {
+	return fmt.Sprintf("signal: %s", statusPath)
 }
 
 func BoxIncidentSignal(kind, crew string) string {

@@ -131,16 +131,17 @@ func sentLines(t *testing.T, ws *store.Workspace) []store.SentEntry {
 // file the signal points at.
 func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
 	f := newBoxFixture(t)
+	wantSignal := query.BoxStatusSignal(f.ws.CrewStatus("shop", "k3"))
 	req := f.forwardRequest(t)
-	if req.Input != "signal: crews/k3.status" {
-		t.Fatalf("signal = %q, want signal: crews/k3.status", req.Input)
+	if req.Input != wantSignal {
+		t.Fatalf("signal = %q, want %q", req.Input, wantSignal)
 	}
 
 	out, err := f.action(context.Background(), req)
 	if err != nil {
 		t.Fatalf("forward: %v", err)
 	}
-	if !strings.Contains(out, "signal: crews/k3.status") {
+	if !strings.Contains(out, wantSignal) {
 		t.Errorf("outcome = %q, want it to name the line it delivered", out)
 	}
 
@@ -153,8 +154,8 @@ func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
 	if len(typed) != 1 {
 		t.Fatalf("text typed into the Mate = %q, want exactly one line", typed)
 	}
-	if typed[0] != send.Marker+"signal: crews/k3.status" {
-		t.Errorf("typed %q, want the 0x1f marker then the signal line", typed[0])
+	if typed[0] != send.Marker+wantSignal {
+		t.Errorf("typed %q, want the marker then the signal line", typed[0])
 	}
 
 	sent := sentLines(t, f.ws)
@@ -164,8 +165,14 @@ func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
 	if sent[0].Source != store.SourceApp || sent[0].Target != store.TargetMate {
 		t.Errorf("sent.log line = %+v, want app -> mate", sent[0])
 	}
-	if sent[0].Text != "signal: crews/k3.status" {
-		t.Errorf("sent.log text = %q, want the signal line without the marker byte", sent[0].Text)
+	if sent[0].Text != wantSignal {
+		t.Errorf("sent.log text = %q, want the signal line without the marker", sent[0].Text)
+	}
+	// The signal must be an absolute path: the Mate's cwd is its own
+	// workspace directory, not the project's, so `crews/k3.status` (relative
+	// to the project) resolves to nothing there.
+	if !strings.HasPrefix(wantSignal, "signal: "+f.ws.Root()) {
+		t.Fatalf("signal %q is not rooted at the workspace (%s)", wantSignal, f.ws.Root())
 	}
 }
 
