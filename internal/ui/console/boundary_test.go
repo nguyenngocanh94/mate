@@ -25,6 +25,13 @@ var forbiddenImports = []string{
 	"github.com/nguyenngocanh94/matev2/internal/runtime",
 	"github.com/nguyenngocanh94/matev2/internal/harness",
 	"github.com/nguyenngocanh94/matev2/internal/process",
+	// internal/box merges the message box over internal/store, and
+	// internal/send types into a pane. The Console draws the box and offers
+	// the three keys, but it sees only query.BoxView and reaches the pane
+	// only through ActionFunc (mvp.md task 15).
+	"github.com/nguyenngocanh94/matev2/internal/box",
+	"github.com/nguyenngocanh94/matev2/internal/send",
+	"github.com/nguyenngocanh94/matev2/internal/spawn",
 }
 
 func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {

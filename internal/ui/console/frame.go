@@ -40,7 +40,15 @@ func (m Model) render() string {
 	s.push(m.breadcrumbLine(l))
 	s.push(m.ruleLine(l, m.g.TeeDown))
 	m.pushBody(s, l)
-	s.push(m.ruleLine(l, m.g.TeeUp))
+	// The bottom rule joins the inspector's divider only when the divider
+	// actually reaches it. The box region (mvp.md task 15) is full width and
+	// sits between them, so with one drawn the tee would point at a column
+	// where nothing is.
+	if boxH, _ := m.boxRegion(l); boxH > 0 {
+		s.push(newLine().add(strings.Repeat(m.g.HRule, l.Cols), m.p.Faint))
+	} else {
+		s.push(m.ruleLine(l, m.g.TeeUp))
+	}
 	s.push(m.messageLine(l))
 	s.push(m.keysLine(l))
 	return s.String()
@@ -213,6 +221,38 @@ func (m Model) ruleLine(l frameLayout, joint string) *line {
 // pushBody fills exactly l.Body lines. Which surface fills them is the
 // only decision here; what they contain belongs to the other tasks.
 func (m Model) pushBody(s *screen, l frameLayout) {
+	if l.Body <= 0 {
+		return
+	}
+	// The peek overlay ('p', box_keys.go) owns the whole region: it is a
+	// crew's own terminal screen, and cropping it into a pane would misalign
+	// every line the harness drew.
+	if m.peek.open {
+		pushAll(s, fitLines(m.peekLines(l.Cols, l.Body), l.Body))
+		return
+	}
+	// The box panel is the project frame's third region (mvp.md task 15): it
+	// sits below the list/inspector split rather than beside it, so attention
+	// is visible without entering the session view. It is subtracted from the
+	// body here and drawn after, which keeps every pane above it unaware of
+	// it.
+	if boxH, panel := m.boxRegion(l); boxH > 0 {
+		inner := l
+		inner.Body = l.Body - boxH
+		m.pushMainRegion(s, inner)
+		if panel {
+			pushAll(s, m.boxPanelLines(l, boxH))
+		} else {
+			pushAll(s, fitLines([]*line{boxDigestLine(m.currentProject().Box, m.g, m.p)}, boxH))
+		}
+		return
+	}
+	m.pushMainRegion(s, l)
+}
+
+// pushMainRegion fills exactly l.Body lines with whichever surface owns
+// them, with no knowledge of anything drawn below it.
+func (m Model) pushMainRegion(s *screen, l frameLayout) {
 	if l.Body <= 0 {
 		return
 	}

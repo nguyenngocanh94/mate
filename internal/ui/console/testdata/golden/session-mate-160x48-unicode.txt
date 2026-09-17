@@ -1,48 +1,48 @@
  claude-code · mate-payments-api · supervised                                                                                                                   
 ──────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  CREW › MATE                              │                                                                                                                     
- 4 awaiting reply · 6 recorded            │                                                                                                                     
+ 1 attention · 3 entries                  │                                                                                                                     
 ──────────────────────────────────────────│                                                                                                                     
- 14:01                     awaiting reply │                                                                                                                     
-  attempt 2 · Fix webhook idempotency     │                                                                                                                     
-  Migration for idempotency_keys, or key  │                                                                                                                     
-  off stripe_events directly?             │                                                                                                                     
                                           │                                                                                                                     
- 13:52                          attention │                                                                                                                     
-  attempt 2 · Fix webhook idempotency     │                                                                                                                     
-  Re-running go test ./... after a flaky  │                                                                                                                     
-  failure on the first pass.              │                                                                                                                     
                                           │                                                                                                                     
- 13:41                     awaiting reply │                                                                                                                     
-  attempt 1 · Fix webhook idempotency     │                                                                                                                     
-  Rebase conflict on Upgrade database     │                                                                                                                     
-  adapter: keep the pool wrapper, or drop │                                                                                                                     
-  it?                                     │                                                                                                                     
                                           │                                                                                                                     
- 12:58                           recorded │                                                                                                                     
-  attempt 1 · Fix webhook idempotency     │                                                                                                                     
-  Reported failed: harness exited 1       │                                                                                                                     
-  before reporting.                       │                                                                                                                     
-  · reply was recorded before the crew    │                                                                                                                     
-  stopped                                 │                                                                                                                     
                                           │                                                                                                                     
- 11:30                     awaiting reply │                                                                                                                     
-  attempt 1 · Add idempotency-key index   │                                                                                                                     
-  Composite index on (event_id,           │                                                                                                                     
-  received_at), or event_id alone?        │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
+                                          │                                                                                                                     
                                           │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. Reading its report before reviewing  
- 09:05                     awaiting reply │  attempt 2.                                                                                                         
-  attempt 1 · Add idempotency-key index   │                                                                                                                     
-  Backfill existing rows before or after  │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                                                       
-  the index build finishes?               │  ⎟  Read 84 lines (ctrl+o to expand)                                                                                
+                                          │  attempt 2.                                                                                                         
+                                          │                                                                                                                     
+                                          │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                                                       
+                                          │  ⎟  Read 84 lines (ctrl+o to expand)                                                                                
                                           │                                                                                                                     
                                           │⏺ Reply(a1 · Upgrade database adapter)                                                                               
                                           │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."                                        
                                           │                                                                                                                     
                                           │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on "Upgrade database adapter".            
-                                          │                                                                                                                     
-                                          │✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)                                      
-                                          │╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                                          ││ >                                                                                                                 │
-──────────────────────────────────────────│╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- Ctrl+b then q  detach                    │? for shortcuts                                                                                    ⏵⏵ accept edits on
+   13:41  k3  working  reading the ticket │                                                                                                                     
+   13:52  user->mate  spawn a crew for th…│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)                                      
+ ! 14:01  k3  needs-decision  migration f…│╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+──────────────────────────────────────────││ >                                                                                                                 │
+ Enter send  r reply  p peek              │╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ j/k move  Esc detach                     │? for shortcuts                                                                                    ⏵⏵ accept edits on

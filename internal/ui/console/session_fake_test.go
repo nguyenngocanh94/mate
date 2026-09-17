@@ -45,9 +45,10 @@ func TestFakeSessionControllerSeedRoundTrips(t *testing.T) {
 			},
 			Raw: "hello",
 		},
-		Inbox: []SessionInboxEntry{
-			{InteractionID: "ix_1", Status: query.InteractionQueued, Question: "ok?", Awaiting: true},
-		},
+		Box: query.KnownField(query.BoxView{Entries: []query.BoxEntry{{
+			Kind: query.BoxStatus, Crew: "k3", Source: "crew", Verb: "needs-decision",
+			Text: "pick A or B", Attention: true, Signal: query.BoxStatusSignal("k3"),
+		}}, Crews: 1, Awaiting: 1}),
 	})
 
 	snap, err := f.Reader()(context.Background(), target)
@@ -63,8 +64,8 @@ func TestFakeSessionControllerSeedRoundTrips(t *testing.T) {
 	if snap.Transcript.Status != SessionTranscriptParsed || len(snap.Transcript.Entries) != 1 {
 		t.Fatalf("Transcript = %+v, want one parsed entry", snap.Transcript)
 	}
-	if len(snap.Inbox) != 1 || !snap.Inbox[0].Awaiting {
-		t.Fatalf("Inbox = %+v, want one awaiting entry", snap.Inbox)
+	if len(snap.Box.Value.Entries) != 1 || !snap.Box.Value.Entries[0].Attention {
+		t.Fatalf("Box = %+v, want one attention entry", snap.Box)
 	}
 	if !snap.AsOf.Equal(fixed) {
 		t.Fatalf("AsOf = %v, want %v", snap.AsOf, fixed)

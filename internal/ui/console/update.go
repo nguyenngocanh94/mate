@@ -134,6 +134,17 @@ func (m Model) applyActionAfterRead() Model {
 
 func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	// The peek overlay ('p', box_keys.go) is modal at every phase: it is
+	// somebody else's terminal screen on the frame, and a key that moved a
+	// selection behind it would be invisible. Ctrl+C is the one exception,
+	// and it closes the overlay and then takes whatever path it already
+	// takes here - in stream mode, to the agent; otherwise, to quit.
+	if m.peek.open {
+		if key != "ctrl+c" {
+			return m.onPeekKey(key), nil
+		}
+		m.peek = peekFlow{}
+	}
 	// Stream mode owns the whole keyboard except its own Ctrl+b q detach
 	// (onSessionStreamKey): Esc and Ctrl+C are forwarded to the agent's PTY
 	// instead of leaving session mode or quitting the Console - the two
@@ -170,7 +181,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.sess.stream != nil {
 				_ = m.sess.stream.close(context.Background())
 			}
-			m.sess = sessionFlow{gen: m.sess.gen + 1}
+			m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1}
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -216,7 +227,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// be able to leave.
 		return m, nil
 	}
-	l := layout(m.w, m.h)
+	l := m.listLayout()
 	if l.TooSmall {
 		// Nothing else is drawn, so nothing else responds: a key that moved
 		// a selection nobody can see would silently change where the reader
@@ -237,6 +248,13 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.harnessPick {
 		return m.onHarnessKey(msg)
+	}
+	if m.focus == paneBox {
+		// The box panel owns the keyboard while Tab has focused it
+		// (box_keys.go): Enter, r and p act on the selected entry instead of
+		// on the list row, and Esc or Tab hands focus back.
+		model, cmd := m.onProjectBoxKey(msg)
+		return model, cmd
 	}
 	if m.confirm != nil {
 		switch key {
@@ -376,12 +394,27 @@ func (m Model) onBusyQuit() Model {
 func (m Model) onTab(l frameLayout) Model {
 	m.msg = footerMsg{}
 	m.inspTop = 0
+	// The box panel joins the cycle when it is drawn (mvp.md task 15): its
+	// three keys are bare, so they need a focus of their own or they would
+	// have to take Enter and `r` away from the list.
+	_, panel := m.boxRegion(layout(m.w, m.h))
 	if l.Inspector > 0 {
-		if m.focus == paneList {
+		switch {
+		case m.focus == paneList:
 			m.focus = paneInspector
-		} else {
+		case m.focus == paneInspector && panel:
+			m.focus = paneBox
+		default:
 			m.focus = paneList
 		}
+		return m
+	}
+	if panel && !m.detail {
+		if m.focus == paneBox {
+			m.focus = paneList
+			return m
+		}
+		m.focus = paneBox
 		return m
 	}
 	m.detail = !m.detail

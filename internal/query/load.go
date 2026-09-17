@@ -95,6 +95,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 		p.Crews[i].Attention = crewAttention(p.Crews[i])
 	}
 	p.Attention = projectAttention(p)
+	p.Box = LoadBox(ws, ref.Name)
 	return p
 }
 

@@ -41,6 +41,19 @@ const (
 	// ActionOnboard adds a Project to the workspace, or creates and starts
 	// a Project's Mate.
 	ActionOnboard Action = "onboard"
+	// The three message-box actions (mvp.md task 15, section 5). Each acts
+	// on a box entry rather than on a snapshot row, which is why
+	// ActionRequest carries a Crew of its own: the entry names a crew, and
+	// the Project frame's selected row usually does not.
+	//
+	// ActionForward hands one entry to the Mate as a `signal:` line, typed
+	// into its composer with the from-app marker byte. ActionReply types one
+	// line into the crew's own composer. ActionPeek reads the crew's pane
+	// and returns it as text for the overlay - the only one of the three
+	// that writes nothing.
+	ActionForward Action = "forward"
+	ActionReply   Action = "reply"
+	ActionPeek    Action = "peek"
 	// TODO(task 21/22): v1 also had retry, discard and switch_harness.
 	// matev2 has no retry (a Crew runs once), and discard/merge belong to
 	// mvp.md's task 21 and 22.
@@ -54,7 +67,12 @@ type ActionRequest struct {
 	Action     Action
 	Target     string
 	TargetKind string
-	Input      string // project name for workspace onboarding
+	Input      string // project name for onboarding; the line to send for forward/reply
+	// Crew is the crew a box action names (mvp.md task 15). It is separate
+	// from Target because those actions are addressed to a Project *and* one
+	// of its crews, and folding the two into one string would make the
+	// bridge guess which it had been given.
+	Crew string
 	// Harness is the agent chosen for this request: on an onboard it is the
 	// harness the new Mate is created with. Empty everywhere else - an
 	// existing Mate keeps its recorded harness.
@@ -119,6 +137,11 @@ type pane int
 const (
 	paneList pane = iota
 	paneInspector
+	// paneBox is the project frame's message-box panel (box.go). It is only
+	// a legal focus while that panel is drawn; relayout sends focus back to
+	// the list as soon as it is not, the same rule paneInspector follows
+	// when the inspector column disappears.
+	paneBox
 )
 
 // footerTone selects the message line's word-and-colour pairing. The tone
@@ -228,6 +251,29 @@ type Model struct {
 	// expanded. failureTop is its scroll offset.
 	failureDetail bool
 	failureTop    int
+
+	// peek is the box's `p` overlay (box_keys.go). It lives on the Model
+	// rather than in sessionFlow because both the session view and the
+	// project frame's box panel open it, and leaving session mode must not
+	// silently drop a pane the reader is still reading.
+	peek peekFlow
+	// boxSel is the project frame's own box-panel selection, the panel's
+	// counterpart to sessionFlow.boxSel; -1 follows the newest entry.
+	boxSel int
+	// The one-line reply input ('r'). It lives on the Model rather than in
+	// sessionFlow because both box surfaces open it, and because it is a
+	// Console-drawn field with a visible caret: while it is open every
+	// keystroke belongs to it, including in stream mode, where every other
+	// unprefixed key goes to the agent's PTY.
+	// boxMsg is the outcome of the last box action, kept apart from msg
+	// because the session frame gives it a row of its own: folding it into
+	// msg would let any unrelated Console message (a stream fallback notice,
+	// a refresh failure) steal a row from the agent's own terminal.
+	boxMsg          footerMsg
+	boxReply        bool
+	boxReplyCrew    string
+	boxReplyProject string
+	boxReplyText    string
 
 	actions         bool
 	actionChoices   []actionChoice
@@ -345,8 +391,12 @@ func New(load LoadFunc, attachCmd AttachCmdFunc, action ...ActionFunc) Model {
 		stack:         []frame{{kind: frameWorkspace}},
 		focus:         paneList,
 		completedOpen: map[string]bool{},
-		g:             glyphsFor(os.Getenv),
-		p:             defaultPalette(),
+		// -1 is "follow the newest box entry" on both box surfaces; see
+		// sessionFlow.boxSel.
+		boxSel: -1,
+		sess:   sessionFlow{boxSel: -1},
+		g:      glyphsFor(os.Getenv),
+		p:      defaultPalette(),
 	}
 }
 
@@ -526,11 +576,16 @@ func (m Model) selectedRow() (row, bool) {
 // below the minimum and growing it back returns to the same place, because
 // the too-small screen is a rendering decision and not a state transition.
 func (m Model) relayout() Model {
-	l := layout(m.w, m.h)
+	l := m.listLayout()
 	if l.Inspector > 0 && m.detail {
 		m.detail = false
 	}
 	if l.Inspector == 0 && m.focus == paneInspector {
+		m.focus = paneList
+	}
+	if _, panel := m.boxRegion(layout(m.w, m.h)); !panel && m.focus == paneBox {
+		// Same rule as the inspector's above: focus names a pane the keys act
+		// on, and a pane that is not drawn is not an answer to that.
 		m.focus = paneList
 	}
 	f := m.cur()
@@ -658,7 +713,7 @@ func (m Model) moveSelection(delta int) Model {
 	if len(rows) == 0 {
 		return m
 	}
-	l := layout(m.w, m.h)
+	l := m.listLayout()
 	f := m.cur()
 	f.sel = clampInt(f.sel+delta, 0, len(rows)-1)
 	f.selID = rows[f.sel].id

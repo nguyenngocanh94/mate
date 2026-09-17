@@ -625,6 +625,36 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 	if hints, ok := m.attachKeyHints(); ok {
 		return hints
 	}
+	// The peek overlay and the box's reply input each own the keyboard
+	// outright while open (box_keys.go), so the line names only their own
+	// keys - and, for the reply input, not q, which is a character there.
+	if m.peek.open {
+		return []keyHint{
+			{key: m.g.UpDown, desc: "Scroll", sacrifice: keyMovement},
+			{key: "Esc", desc: "Close peek", sacrifice: keyBack},
+			{key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit},
+		}
+	}
+	if m.boxReply {
+		return []keyHint{
+			{key: "Enter", desc: "Send reply to " + m.boxReplyCrew, sacrifice: keyAction},
+			{key: "Esc", desc: "Cancel", sacrifice: keyBack},
+			{key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit},
+		}
+	}
+	if m.focus == paneBox {
+		// The box keys are bare on this frame: the Console owns the keyboard
+		// here, unlike the session view's stream mode, where the same three
+		// keys sit behind Ctrl+b (sessionRailKeyLines).
+		return []keyHint{
+			{key: m.g.UpDown, desc: "Move", sacrifice: keyMovement},
+			{key: "Enter", desc: "Send to Mate", sacrifice: keyAction},
+			{key: "r", desc: "Reply", sacrifice: keyAction},
+			{key: "p", desc: "Peek", sacrifice: keyAction},
+			{key: "Esc", desc: "List", sacrifice: keyBack},
+			{key: "q", desc: "Quit", sacrifice: keyQuit},
+		}
+	}
 	// The failure detail overlay owns the keyboard while it is open: its keys
 	// are scroll and close, and q still quits (handled before any of this, in
 	// onKey). Nothing here advertises a key that the overlay would swallow.
@@ -742,6 +772,12 @@ func (m Model) actionHints() []keyHint {
 			desc := "Detail"
 			if l := layout(m.w, m.h); l.Inspector > 0 {
 				desc = "Inspector"
+			}
+			// Tab reaches the box panel too when one is drawn, and the hint
+			// has to name it: the panel's three keys exist nowhere else on
+			// this frame, and a panel nobody can focus is decoration.
+			if _, panel := m.boxRegion(layout(m.w, m.h)); panel {
+				desc += "/Box"
 			}
 			out = append(out, keyHint{key: "Tab", desc: desc, optional: true})
 		}

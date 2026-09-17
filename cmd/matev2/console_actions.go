@@ -60,6 +60,12 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return status.Line(), nil
 		case console.ActionMode:
 			return toggleModeAction(ws, req.Target)
+		case console.ActionForward:
+			return boxForwardAction(ctx, ws, deps, req)
+		case console.ActionReply:
+			return boxReplyAction(ctx, ws, deps, req)
+		case console.ActionPeek:
+			return boxPeekAction(ctx, ws, deps, req)
 		default:
 			return "", observability.NewError(observability.CodeUsage,
 				fmt.Sprintf("%s is not wired in this build", req.Action))

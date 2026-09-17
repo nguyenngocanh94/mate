@@ -22,15 +22,15 @@
                                                                      │                  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
                                                                      │                  /a1                             
                                                                      │ Worktree status  missing                         
-                                                                     │                                                  
-                                                                     │ Last event       11:30:44  crew.needs_repair     
-                                                                     │ Reason           worktree path missing on disk;  
-                                                                     │                  branch mate/                    
-                                                                     │                  upgrade-database-adapter/a1     
-                                                                     │                  still exists. Cleanup not       
-                                                                     │                  authorized while observed       
-                                                                     │                  state is uncertain.             
-                                                                     │ Attention        unknown · r re-reads            
-─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                     │  ↓ 9 more                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ BOX                                                                                                            unknown 
+ unknown                                                                                                                
                                                                                                                         
- ↑↓ Move  a Actions  m Mode  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  a Actions  m Mode  Enter Attach crew (unavailable)  Esc Back  Tab Inspector/Box  r Refresh  q Quit            

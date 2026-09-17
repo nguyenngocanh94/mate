@@ -18,7 +18,7 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
+ BOX  unknown                                                                   
 ────────────────────────────────────────────────────────────────────────────────
                                                                                 
  ↑↓ Move  s Resume mate  Enter Attach mate (n/a)  Esc Back  r Refresh  q Quit   

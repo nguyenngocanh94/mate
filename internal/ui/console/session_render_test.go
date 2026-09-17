@@ -40,32 +40,33 @@ func sessionTestClock(h, m int) time.Time {
 	return time.Date(2026, 9, 10, h, m, 0, 0, time.UTC)
 }
 
-// sessionTestInbox mirrors session-view-contract.md's pinned six-entry
-// sample: four still awaiting a reply, one recorded blocked (attention),
-// one recorded terminal with a caveat note - the same shape the rail and
-// digest goldens were built from.
-func sessionTestInbox() []SessionInboxEntry {
-	return []SessionInboxEntry{
-		{InteractionID: "i1", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(14, 1),
-			Attempt: "attempt 2", Task: "Fix webhook idempotency",
-			Question: "Migration for idempotency_keys, or key off stripe_events directly?"},
-		{InteractionID: "i2", Status: query.InteractionBlocked, Awaiting: false, SentAt: sessionTestClock(13, 52),
-			Attempt: "attempt 2", Task: "Fix webhook idempotency",
-			Question: "Re-running go test ./... after a flaky failure on the first pass."},
-		{InteractionID: "i3", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(13, 41),
-			Attempt: "attempt 1", Task: "Fix webhook idempotency",
-			Question: "Rebase conflict on Upgrade database adapter: keep the pool wrapper, or drop it?"},
-		{InteractionID: "i4", Status: query.InteractionAnswered, Awaiting: false, SentAt: sessionTestClock(12, 58),
-			Attempt: "attempt 1", Task: "Fix webhook idempotency",
-			Question: "Reported failed: harness exited 1 before reporting.",
-			Note:     "reply was recorded before the crew stopped"},
-		{InteractionID: "i5", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(11, 30),
-			Attempt: "attempt 1", Task: "Add idempotency-key index",
-			Question: "Composite index on (event_id, received_at), or event_id alone?"},
-		{InteractionID: "i6", Status: query.InteractionQueued, Awaiting: true, SentAt: sessionTestClock(9, 5),
-			Attempt: "attempt 1", Task: "Add idempotency-key index",
-			Question: "Backfill existing rows before or after the index build finishes?"},
-	}
+// sessionTestBox is task 15's pinned rail fixture, and the one mvp.md's
+// task row asks for: two crew status lines - one of them the needs-decision
+// that has to be visibly highlighted - and one message, which is the entry
+// Enter must refuse to forward. Oldest first, the order the rail draws.
+func sessionTestBox() query.Field[query.BoxView] {
+	return query.KnownField(query.BoxView{
+		Entries: []query.BoxEntry{
+			{
+				Seq: 0, At: sessionTestClock(13, 41), Kind: query.BoxStatus,
+				Source: "crew", Target: "crew:k3", Crew: "k3",
+				Verb: "working", Text: "reading the ticket",
+				Signal: query.BoxStatusSignal("k3"),
+			},
+			{
+				Seq: 1, At: sessionTestClock(13, 52), Kind: query.BoxMessage,
+				Source: "user", Target: "mate",
+				Text: "spawn a crew for the webhook fix",
+			},
+			{
+				Seq: 2, At: sessionTestClock(14, 1), Kind: query.BoxStatus,
+				Source: "crew", Target: "crew:k3", Crew: "k3",
+				Verb: "needs-decision", Text: "migration for idempotency_keys, or key off stripe_events?",
+				Attention: true, Signal: query.BoxStatusSignal("k3"),
+			},
+		},
+		Crews: 1, Awaiting: 1, LastAt: sessionTestClock(14, 1),
+	})
 }
 
 // sessionTestMateTranscript is the Mate sample transcript: attempt 2
@@ -131,7 +132,7 @@ func sessionTestSnapshot(kind SessionTargetKind, g glyphSet) SessionSnapshot {
 		RecordedStatus: query.KnownField("running"),
 		Runtime:        SessionRuntime{Status: query.Known, ObservedAt: sessionTestClock(14, 2)},
 		Transcript:     transcript,
-		Inbox:          sessionTestInbox(),
+		Box:            sessionTestBox(),
 		AsOf:           sessionTestClock(14, 2),
 	}
 }
@@ -163,7 +164,7 @@ func TestSessionViewGoldens(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Read: %v", err)
 					}
-					got := RenderSessionFrame(snap, "", sz.w, sz.h, gs, plainPalette())
+					got := RenderSessionFrame(snap, "", boxRail{sel: -1}, sz.w, sz.h, gs, plainPalette())
 					assertFrameShape(t, got, sz.w, sz.h)
 					assertGolden(t, name, got)
 				})
@@ -189,7 +190,7 @@ func TestSessionRuntimeMissingRendersRuntimeMissingNotLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	frame := RenderSessionFrame(got, "", 160, 48, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(got, "", boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 160, 48)
 
 	banner := frameLine(frame, 2) // first pane line, right of the rail split rule
@@ -222,7 +223,7 @@ func TestSessionRuntimeUnknownRendersUnknownNotAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	frame := RenderSessionFrame(got, "", 120, 36, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(got, "", boxRail{sel: -1}, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	if !containsLine(frame, "unknown") {
 		t.Fatalf("frame does not show unknown for a failed poll:\n%s", frame)
@@ -246,7 +247,7 @@ func TestSessionTranscriptUnknownRendersRawBoundedText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	frame := RenderSessionFrame(got, "", 120, 36, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(got, "", boxRail{sel: -1}, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	if !containsLine(frame, "unknown") {
 		t.Fatalf("an unparsed transcript must render the unknown marker:\n%s", frame)
@@ -372,7 +373,7 @@ func TestSessionRecordedStatusUnknownIsDistinctFromAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	frame := RenderSessionFrame(got, "", 160, 48, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(got, "", boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
 	if !containsLine(frame, "unknown") || !containsLine(frame, "lookup timed out") {
 		t.Fatalf("header must surface the RecordedStatus read failure and its reason:\n%s", frame)
 	}

@@ -23,14 +23,14 @@
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ BOX                                                                                            1 attention · 4 entries 
+                                                                                                                        
+                                                                                                                        
+   13:41  k3  working  reading the ticket                                                                               
+   13:52  user->mate  spawn a crew for the webhook fix                                                                  
+ ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe_events?                                 
+▏  14:02  app->mate  signal: crews/k3.status                                                                            
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ! Action refused: a Project is created at the workspace level; Esc goes back there · nothing started                   
- ↑↓ Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector  r Refresh  q Quit                              
+ ↑↓ Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

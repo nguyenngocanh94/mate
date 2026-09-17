@@ -414,16 +414,55 @@ func sampleTree() query.Snapshot {
 					},
 				},
 				Attention: query.KnownField(query.ProjectAttention{CrewsNeedingAttention: 1}),
+				Box:       sampleBox(),
 			},
 			{
 				ProjectID: "proj_01J9M4H7K9L1M3N5P7Q9R1S3TU",
 				Mode:      query.ModeAuto,
 				Name:      "ledger-worker",
 				Mate:      absentMate("this project has no designated Mate"),
+				// A project whose crews directory is empty still reads
+				// successfully: box.Load returns an empty view, which is Known
+				// and not Absent - "nothing has been written yet" is a fact,
+				// not a failed read.
+				Box: query.KnownField(query.BoxView{}),
 				Attention: query.KnownField(query.ProjectAttention{
 					Kind: query.AttentionNoMate, Why: "the project has no designated Mate, so no crew can be spawned",
 				}),
 			},
 		},
 	}
+}
+
+// sampleBox is the fixture project's message box (mvp.md task 15): two crew
+// status lines - one of them the needs-decision the rail must highlight -
+// and two messages, one of which is the app's own forwarded signal. It is
+// the same vocabulary internal/box produces, already flattened by
+// internal/query, so a fixture cannot render a combination the merge cannot.
+func sampleBox() query.Field[query.BoxView] {
+	at := func(h, m int) time.Time { return time.Date(2026, 9, 10, h, m, 0, 0, time.UTC) }
+	return query.KnownField(query.BoxView{
+		Entries: []query.BoxEntry{
+			{
+				Seq: 0, At: at(13, 41), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
+				Crew: "k3", Verb: "working", Text: "reading the ticket",
+				Signal: query.BoxStatusSignal("k3"),
+			},
+			{
+				Seq: 1, At: at(13, 52), Kind: query.BoxMessage, Source: "user", Target: "mate",
+				Text: "spawn a crew for the webhook fix",
+			},
+			{
+				Seq: 2, At: at(14, 1), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
+				Crew: "k3", Verb: "needs-decision",
+				Text:      "migration for idempotency_keys, or key off stripe_events?",
+				Attention: true, Signal: query.BoxStatusSignal("k3"),
+			},
+			{
+				Seq: 3, At: at(14, 2), Kind: query.BoxMessage, Source: "app", Target: "mate",
+				Text: query.BoxStatusSignal("k3"),
+			},
+		},
+		Crews: 1, Awaiting: 1, LastAt: at(14, 2),
+	})
 }
