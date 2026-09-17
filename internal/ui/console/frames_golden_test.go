@@ -44,17 +44,21 @@ func TestGoldenFramesLoadingAndFailed(t *testing.T) {
 	assertGolden(t, "refresh-failed-120x36-unicode", renderFrame(t, stale))
 }
 
-func TestGoldenFramesDrilledIntoATask(t *testing.T) {
+// TestGoldenFramesDrilledIntoAProject is the Project frame with a Crew
+// selected, the deepest level matev2 has.
+//
+// TODO(task 21): v1 drilled one level further, into a Task's Crew
+// attempts; those attempts-*.txt fixtures went with the Task level.
+func TestGoldenFramesDrilledIntoAProject(t *testing.T) {
 	m := newFixture(t, sampleTree(), 140, 40, unicodeGlyphs)
 	m, _ = send(t, m, key("enter")) // the payments-api Project
-	m, _ = send(t, m, key("down"))  // its first Task
-	m, _ = send(t, m, key("enter")) // that Task's attempts (running + Completed group)
-	assertGolden(t, "attempts-140x40-unicode", renderFrame(t, m))
+	m, _ = send(t, m, key("down"))  // its one active Crew
+	assertGolden(t, "project-crew-140x40-unicode", renderFrame(t, m))
 
-	m, _ = send(t, m, key("tab")) // focus the inspector on the running attempt
-	assertGolden(t, "attempts-inspector-focused-140x40-unicode", renderFrame(t, m))
+	m, _ = send(t, m, key("tab")) // focus the inspector on that Crew
+	assertGolden(t, "project-crew-inspector-focused-140x40-unicode", renderFrame(t, m))
 
 	narrow, _ := send(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	narrow, _ = send(t, narrow, key("tab")) // Detail over the main region
-	assertGolden(t, "attempts-detail-80x24-unicode", renderFrame(t, narrow))
+	assertGolden(t, "project-crew-detail-80x24-unicode", renderFrame(t, narrow))
 }

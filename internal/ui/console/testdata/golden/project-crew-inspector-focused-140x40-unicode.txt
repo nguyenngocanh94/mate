@@ -5,7 +5,7 @@
   mate-payments-api              claude       running        active            │                                                            
                                                                                │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT              
   CREWS  1          TASK                        STATUS           NOTE          │ Task             Add idempotency-key index                 
-▌ crew_01J9P6…B8DT  Add idempotency-key index   running                        │                                                            
+▏ crew_01J9P6…B8DT  Add idempotency-key index   running                        │                                                            
   ↓ Completed (1)                                                ! failed      │ Recorded status  running                                   
                                                                                │ Harness          claude                                    
                                                                                │ Agent            crew-payments-api-2                       
@@ -36,5 +36,5 @@
                                                                                │                                                            
                                                                                │                                                            
 ───────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
- Attaching to crew-payments-api-2 via matev2 attach · detach: Ctrl+b then q                                                                 
- Ctrl+b q Detach; does not stop the agent                                                                                                   
+                                                                                                                                            
+ ↑↓ Scroll  Tab List  Esc List  r Refresh  q Quit                                                                                           
