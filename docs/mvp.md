@@ -198,7 +198,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 | # | Task | Xong khi |
 | --- | --- | --- |
 | 11 | Brief template, skill `brief-writing`, `matev2 crew spawn`: worktree, tab, launch, trust, brief làm prompt đầu, ghi `.meta`. | Live test: crew Codex nhận brief. |
-| 12 ∥ | `internal/send`: phân loại composer `empty/pending/unknown`, gõ một lần, retry Enter, settle cho slash command, prefix `0x1f` tuỳ chọn. | Live test ba case: trống, text dở, popup slash. |
+| 12 ∥ | `internal/send`: phân loại composer `empty/pending/unknown`, gõ một lần, retry Enter, settle cho slash command, prefix `0x1f` tuỳ chọn. | Live test ba case: trống, text dở, popup slash. Đã xong 2026-09-17. |
 | 13 ∥ | `matev2 send`, `matev2 peek`, `matev2 state`. | Unit với pane giả, live với crew thật. |
 | 14 | `internal/box`: gộp thành view, phân loại verb. | Unit trên fixture. |
 | 15 | Box rail trong console: Enter, `r`, `p`. | Live vòng: crew hỏi, người dùng `r`, crew tiếp tục. |
