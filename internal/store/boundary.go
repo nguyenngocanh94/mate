@@ -75,3 +75,10 @@ func within(root, path string) bool {
 	}
 	return strings.HasPrefix(path, root+string(filepath.Separator))
 }
+
+// Resolve is the exported form of the boundary check: it returns the
+// canonical location of an absolute path and a *BoundaryError when that
+// location is outside the workspace. Callers that accept a path from a user
+// or an agent - `crew spawn --brief <file>` is the first - use it to refuse
+// a file outside the workspace before reading it.
+func (w *Workspace) Resolve(path string) (string, error) { return w.resolve(path) }
