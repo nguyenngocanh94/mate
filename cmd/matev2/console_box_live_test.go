@@ -23,17 +23,19 @@ import (
 // TestLiveConsoleBoxRoundTrip is the mvp.md task 15 proof, and it is the
 // loop the task row asks for: a crew asks, the reader answers with `r`, the
 // crew continues, and the reader hands the result to the Mate with Enter.
+// TestLiveConsoleInboxResolve is the other half - the Mate answering a crew
+// on its own - and this one deliberately keeps the human in the loop.
 //
 //  1. a real Claude Mate and a real Codex crew
 //  2. the crew writes `needs-decision:` and stops its turn
 //  3. the box - the same query.BoxView the rail draws - shows that entry
 //  4. the reply action types "A" into the crew's own pane
 //  5. the crew continues and writes `done: chose A`
-//  6. the forward action hands `signal: <absolute status file path>` to the
-//     Mate
+//  6. the resolve action hands the `resolve:` line - the question, the
+//     status file and the `matev2 send` that answers the crew - to the Mate
 //  7. sent.log carries app -> mate, and the Mate's own Stop hook then
 //     records a mate line - which it only can after reading the file the
-//     signal pointed it at
+//     resolve line pointed it at
 //
 // Everything runs through the seams cmdConsole wires (consoleAction over the
 // real Herdr adapter). The Bubble Tea Program is not run - it needs a
