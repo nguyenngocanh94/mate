@@ -26,10 +26,20 @@ import (
 // script is the optional -in flag: a semicolon-separated list of
 // `<delay-ms>:<bytes>` steps typed into the pty before the frame is taken.
 // The bytes go through strconv.Unquote, so an escape is written the way Go
-// writes it: `\r` for Enter, `\x02` for Ctrl+b, `\x1b` for Esc. Without it
-// ptysmoke keeps its original behaviour - wait a moment, capture, quit.
+// writes it: `\r` for Enter, `\x1b` for Esc. Without it ptysmoke keeps its
+// original behaviour - wait a moment, capture, quit.
+//
+// A step whose byte half starts with `@` is a mouse gesture instead, written
+// `@<verb>:<col>,<row>` in 0-based cell coordinates - the same coordinates
+// Bubble Tea reports on a tea.MouseMsg, so a step can be written straight
+// from a frame ptysmoke itself printed. The verbs are click, dblclick,
+// press, release, move, drag, wheelup and wheeldown, and each expands to the
+// SGR sequences (`ESC [ < Cb ; Cx ; Cy M`, trailing `m` for a release) a
+// real terminal in SGR mouse mode sends. Writing those by hand is possible
+// but unreadable, and a driver that has to spell out `\x1b[<0;41;7M` twice
+// per click is a driver nobody will keep in step with the layout.
 var (
-	script = flag.String("in", "", "keystroke script: `<ms>:<bytes>[;<ms>:<bytes>...]`, bytes Go-quoted (\\r, \\x02)")
+	script = flag.String("in", "", "input script: `<ms>:<bytes>|@<verb>:<col>,<row>[;...]`, bytes Go-quoted (\\r, \\x1b)")
 	settle = flag.Duration("settle", 1500*time.Millisecond, "how long to wait after the last step before capturing")
 	noQuit = flag.Bool("no-quit", false, "do not send q after the capture; kill the child instead")
 )
@@ -150,11 +160,63 @@ func parseScript(s string) ([]step, error) {
 		if err != nil {
 			return nil, fmt.Errorf("step %q: %w", raw, err)
 		}
-		unquoted, err := strconv.Unquote(`"` + bytes + `"`)
+		payload := ""
+		if strings.HasPrefix(bytes, "@") {
+			payload, err = mouseSequence(bytes[1:])
+		} else {
+			payload, err = strconv.Unquote(`"` + bytes + `"`)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("step %q: %w", raw, err)
 		}
-		out = append(out, step{delay: time.Duration(d) * time.Millisecond, bytes: unquoted})
+		out = append(out, step{delay: time.Duration(d) * time.Millisecond, bytes: payload})
 	}
 	return out, nil
+}
+
+// mouseSequence expands one `@<verb>:<col>,<row>` gesture into the SGR
+// bytes a terminal in mouse mode would have sent for it. Coordinates are
+// 0-based cells on the way in and 1-based in the wire format, which is the
+// one off-by-one this whole encoding has.
+func mouseSequence(spec string) (string, error) {
+	verb, where, ok := strings.Cut(spec, ":")
+	if !ok {
+		return "", fmt.Errorf("mouse step %q is not <verb>:<col>,<row>", spec)
+	}
+	colText, rowText, ok := strings.Cut(where, ",")
+	if !ok {
+		return "", fmt.Errorf("mouse step %q names no <col>,<row>", spec)
+	}
+	col, err := strconv.Atoi(strings.TrimSpace(colText))
+	if err != nil {
+		return "", fmt.Errorf("mouse step %q: %w", spec, err)
+	}
+	row, err := strconv.Atoi(strings.TrimSpace(rowText))
+	if err != nil {
+		return "", fmt.Errorf("mouse step %q: %w", spec, err)
+	}
+	press := fmt.Sprintf("\x1b[<0;%d;%dM", col+1, row+1)
+	release := fmt.Sprintf("\x1b[<0;%d;%dm", col+1, row+1)
+	switch strings.TrimSpace(verb) {
+	case "click":
+		return press + release, nil
+	case "dblclick":
+		return press + release + press + release, nil
+	case "press":
+		return press, nil
+	case "release":
+		return release, nil
+	case "move":
+		// Button field 3 is "no button held", the bare-motion report.
+		return fmt.Sprintf("\x1b[<35;%d;%dM", col+1, row+1), nil
+	case "drag":
+		// The motion bit (32) with the left button still held.
+		return fmt.Sprintf("\x1b[<32;%d;%dM", col+1, row+1), nil
+	case "wheelup":
+		return fmt.Sprintf("\x1b[<64;%d;%dM", col+1, row+1), nil
+	case "wheeldown":
+		return fmt.Sprintf("\x1b[<65;%d;%dM", col+1, row+1), nil
+	default:
+		return "", fmt.Errorf("mouse step %q: unknown verb %q", spec, verb)
+	}
 }
