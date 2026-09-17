@@ -16,7 +16,6 @@
                                     │                                                                                   
                                     │                                                                                   
                                     │                                                                                   
-                                    │                                                                                   
                                     │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook.    
                                     │  Reading its report before reviewing attempt 2.                                   
                                     │                                                                                   
@@ -26,11 +25,12 @@
                                     │⏺ Reply(a1 · Upgrade database adapter)                                             
                                     │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."      
                                     │                                                                                   
-   13:41  k3  working  reading the …│⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
-   13:52  user->mate  spawn a crew …│  "Upgrade database adapter".                                                      
-▌! 14:01  k3  needs-decision  migra…│                                                                                   
-────────────────────────────────────│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
- ! Send refused: composer holds uns…│╭─────────────────────────────────────────────────────────────────────────────────╮
+                                    │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
+   13:41  k3  working  reading the …│  "Upgrade database adapter".                                                      
+   13:52  user->mate  spawn a crew …│                                                                                   
+▌! 14:01  k3  needs-decision  migra…│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
+────────────────────────────────────│╭─────────────────────────────────────────────────────────────────────────────────╮
  reply k3 > A_                      ││ >                                                                               │
  Enter send reply  Esc cancel       │╰─────────────────────────────────────────────────────────────────────────────────╯
                                     │? for shortcuts                                                  ⏵⏵ accept edits on
+ ! Send refused: composer holds unsubmitted text · nothing was sent                                                     

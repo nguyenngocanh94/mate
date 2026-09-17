@@ -587,7 +587,7 @@ func (m Model) endSession() (Model, tea.Cmd) {
 		return m, sessionStreamCloseCmd(stream, gen)
 	}
 	m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1}
-	m.msg = footerMsg{}
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	if closer == nil {
 		return m, nil
 	}

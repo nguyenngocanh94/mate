@@ -411,6 +411,9 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 	m.actionBusy = true
 	m.actionRunningDesc = string(choice.action) + " " + actionObject(choice)
 	m.msg = infoMsg("Running " + m.actionRunningDesc + " " + m.g.Ellipsis)
+	if boxAction(choice.action) {
+		m.boxMsg = m.msg
+	}
 	// The context is a child of the program's own (baseCtx), not
 	// context.Background(): cancel is stored so quitting mid-action (see
 	// onKey's actionBusy branch) has a real signal to send the goroutine
@@ -447,7 +450,7 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	// ordinary failure path below - there is no screen to show then.
 	if msg.choice.action == ActionPeek && msg.err == nil {
 		m.peek = peekFlow{open: true, crew: msg.choice.req.Crew, text: msg.text}
-		m.msg = footerMsg{}
+		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 		return m, nil
 	}
 	var result footerMsg
@@ -468,6 +471,7 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 		// the reader pressed Enter on a line in the rail, and what they need
 		// back is whether that line reached the Mate and why not.
 		result = boxOutcome(msg, m.g)
+		m.boxMsg = result
 	}
 	m.actionAfterRead = &result
 	m.msg = result

@@ -74,7 +74,7 @@ func (m Model) sessionRailState() boxRail {
 	}
 	return boxRail{
 		sel:       sel,
-		outcome:   m.msg,
+		outcome:   m.boxMsg,
 		reply:     m.boxReply,
 		replyCrew: m.boxReplyCrew,
 		replyText: m.boxReplyText,
@@ -98,11 +98,11 @@ func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "j", "down":
 		m.sess.boxSel = clampInt(rail.sel+1, 0, len(v.Value.Entries)-1)
-		m.msg = footerMsg{}
+		m.boxMsg = footerMsg{}
 		return m, nil, true
 	case "k", "up":
 		m.sess.boxSel = clampInt(rail.sel-1, 0, len(v.Value.Entries)-1)
-		m.msg = footerMsg{}
+		m.boxMsg = footerMsg{}
 		return m, nil, true
 	case "enter":
 		model, cmd := m.beginBoxForward(m.sess.target.ProjectID, v, rail.sel)
@@ -133,7 +133,7 @@ func (m Model) onBoxReplyKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		crew, project, text := m.boxReplyCrew, m.boxReplyProject, strings.TrimSpace(m.boxReplyText)
 		m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
 		if text == "" {
-			m.msg = errMsg("Reply refused: a reply is one non-empty line " + m.g.Dot + " nothing was sent")
+			m.boxMsg = errMsg("Reply refused: a reply is one non-empty line " + m.g.Dot + " nothing was sent")
 			return m, nil
 		}
 		return m.runAction(boxReplyChoice(project, crew, text))
@@ -154,7 +154,7 @@ func (m Model) beginBoxForward(project string, v query.Field[query.BoxView], sel
 		return m, nil
 	}
 	if !e.Forwardable() {
-		m.msg = errMsg("Send refused: a " + string(e.Kind) + " entry is not forwardable; only a crew status or an incident is " +
+		m.boxMsg = errMsg("Send refused: a " + string(e.Kind) + " entry is not forwardable; only a crew status or an incident is " +
 			m.g.Dot + " nothing was sent")
 		return m, nil
 	}
@@ -173,11 +173,11 @@ func (m Model) beginBoxReply(project string, v query.Field[query.BoxView], sel i
 		return m
 	}
 	if e.Crew == "" {
-		m.msg = errMsg("Reply refused: this entry names no crew " + m.g.Dot + " nothing was sent")
+		m.boxMsg = errMsg("Reply refused: this entry names no crew " + m.g.Dot + " nothing was sent")
 		return m
 	}
 	m.boxReply, m.boxReplyCrew, m.boxReplyProject, m.boxReplyText = true, e.Crew, project, ""
-	m.msg = footerMsg{}
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	return m
 }
 
@@ -188,7 +188,7 @@ func (m Model) beginBoxPeek(project string, v query.Field[query.BoxView], sel in
 		return m, nil
 	}
 	if e.Crew == "" {
-		m.msg = errMsg("Peek refused: this entry names no crew " + m.g.Dot + " nothing was read")
+		m.boxMsg = errMsg("Peek refused: this entry names no crew " + m.g.Dot + " nothing was read")
 		return m, nil
 	}
 	if m.actionBusy {
@@ -350,10 +350,10 @@ func (m Model) onProjectBoxKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
 		m.boxSel = clampInt(sel+1, 0, len(v.Value.Entries)-1)
-		m.msg = footerMsg{}
+		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	case "k", "up":
 		m.boxSel = clampInt(sel-1, 0, len(v.Value.Entries)-1)
-		m.msg = footerMsg{}
+		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	case "enter":
 		return m.beginBoxForward(project, v, sel)
 	case "r":

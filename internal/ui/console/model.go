@@ -265,6 +265,11 @@ type Model struct {
 	// Console-drawn field with a visible caret: while it is open every
 	// keystroke belongs to it, including in stream mode, where every other
 	// unprefixed key goes to the agent's PTY.
+	// boxMsg is the outcome of the last box action, kept apart from msg
+	// because the session frame gives it a row of its own: folding it into
+	// msg would let any unrelated Console message (a stream fallback notice,
+	// a refresh failure) steal a row from the agent's own terminal.
+	boxMsg          footerMsg
 	boxReply        bool
 	boxReplyCrew    string
 	boxReplyProject string

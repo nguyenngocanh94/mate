@@ -67,6 +67,16 @@ func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, fr
 	s.push(sessionHeaderLine(snapshot.Target, snapshot.RecordedStatus, g, p))
 	rest := h - 1
 
+	// The outcome line takes the frame's full width, not the rail's: a
+	// refusal from internal/send quotes the composer state and the text it
+	// refused to overwrite, and 36 columns of that is a sentence cut before
+	// it says anything. It is the session frame's equivalent of frame.go's
+	// message line, which is why it sits on the bottom edge the same way.
+	outcome := rail.outcome.tone != toneNone && rail.outcome.text != ""
+	if outcome {
+		rest--
+	}
+
 	rw := sessionRailWidth(snapshot.Target.Kind, w)
 	switch {
 	case snapshot.Target.Kind == SessionTargetMate && rw > 0:
@@ -77,6 +87,9 @@ func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, fr
 		divider := span{text: g.VRule, style: p.Faint}
 		for i := 0; i < rest; i++ {
 			s.pushSplit(railLines[i], rw, divider, pane[i], w-rw-1)
+		}
+		if outcome {
+			s.push(boxOutcomeLine(rail.outcome, g, p, w))
 		}
 	case snapshot.Target.Kind == SessionTargetMate:
 		s.push(sessionFullRule(w, g, p))
@@ -91,11 +104,17 @@ func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, fr
 		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, rest) {
 			s.push(l)
 		}
+		if outcome {
+			s.push(boxOutcomeLine(rail.outcome, g, p, w))
+		}
 	default: // Crew: no rail, no digest, at any width.
 		s.push(newLine())
 		rest--
 		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, rest) {
 			s.push(l)
+		}
+		if outcome {
+			s.push(boxOutcomeLine(rail.outcome, g, p, w))
 		}
 	}
 	return s.String()
@@ -251,10 +270,11 @@ type boxRail struct {
 	// sel is the index into BoxView.Entries the keys act on, -1 for none.
 	sel int
 	// outcome is the one line the last box action left behind: the Model's
-	// own footer message, drawn in the rail because the session frame has no
-	// message line of its own (it is not built from frame.go's six-line
-	// chrome). It is where a refused send - a composer holding someone
-	// else's text, a mid-turn agent - is reported.
+	// own footer message. The session frame is not built from frame.go's
+	// six-line chrome and so has no message line of its own, so
+	// renderSessionFrame reserves the bottom row of the whole frame for it -
+	// full width, because a refused send quotes the screen it was refused
+	// from and the rail's 36 columns would cut that mid-sentence.
 	outcome footerMsg
 	// reply is true while the one-line reply input is open, replyCrew names
 	// the crew it will go to, and replyText is what has been typed.
@@ -275,9 +295,6 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, p 
 		sessionFullRule(w, g, p),
 	}
 	footer := []*line{sessionFullRule(w, g, p)}
-	if rail.outcome.tone != toneNone && rail.outcome.text != "" {
-		footer = append(footer, boxOutcomeLine(rail.outcome, g, p, w))
-	}
 	if rail.reply {
 		footer = append(footer, boxReplyInputLine(rail, p, w))
 	}
