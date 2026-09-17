@@ -198,6 +198,95 @@ func TestHeadCommitReadsTheWorktreeBranch(t *testing.T) {
 	}
 }
 
+func TestIsAncestorAheadCountAndIsDirtyAnswerFromRealHistory(t *testing.T) {
+	repo := newRepo(t)
+	g := gitx.New()
+	ctx := context.Background()
+	wt := filepath.Join(t.TempDir(), "shop-k3")
+	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A brand new branch is trivially contained in its base: no commits,
+	// no dirt.
+	isAnc, err := g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatalf("IsAncestor: %v", err)
+	}
+	if !isAnc {
+		t.Fatal("a freshly branched worktree must be an ancestor of its base")
+	}
+	ahead, err := g.AheadCount(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatalf("AheadCount: %v", err)
+	}
+	if ahead != 0 {
+		t.Fatalf("AheadCount = %d, want 0 before any commit", ahead)
+	}
+	dirty, err := g.IsDirty(ctx, wt)
+	if err != nil {
+		t.Fatalf("IsDirty: %v", err)
+	}
+	if dirty != 0 {
+		t.Fatalf("IsDirty = %d, want 0 for a clean checkout", dirty)
+	}
+
+	// An uncommitted change makes the worktree dirty without moving the
+	// branch at all.
+	if err := os.WriteFile(filepath.Join(wt, "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirty, err = g.IsDirty(ctx, wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirty != 1 {
+		t.Fatalf("IsDirty = %d, want 1 for one untracked file", dirty)
+	}
+	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isAnc {
+		t.Fatal("an uncommitted change must not move the branch's ancestor status")
+	}
+
+	// A real commit on the branch makes it strictly ahead of base.
+	run(t, wt, "add", "scratch.txt")
+	run(t, wt, "commit", "-m", "wip")
+	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isAnc {
+		t.Fatal("a branch with a commit base lacks must not be an ancestor")
+	}
+	ahead, err = g.AheadCount(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ahead != 1 {
+		t.Fatalf("AheadCount = %d, want 1", ahead)
+	}
+	dirty, err = g.IsDirty(ctx, wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirty != 0 {
+		t.Fatalf("IsDirty = %d, want 0 once the change is committed", dirty)
+	}
+
+	// Fast-forwarding base to the branch makes it an ancestor again.
+	run(t, repo, "merge", "--ff-only", "matev2/k3")
+	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !isAnc {
+		t.Fatal("a merged branch must be an ancestor of the base it was merged into")
+	}
+}
+
 // fakeRunner is the seam the crew saga's compensation tests use: git is not
 // run at all, the scripted answer is.
 type fakeRunner struct {

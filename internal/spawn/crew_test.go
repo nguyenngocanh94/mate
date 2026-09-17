@@ -486,7 +486,80 @@ func TestListCrewsReportsTheRecordedCrews(t *testing.T) {
 	}
 }
 
-func TestStopCrewStopsTheAgentAndKeepsTheWork(t *testing.T) {
+// TestListCrewsStatusReflectsTeardownMeta is task 16's contract for the CLI
+// STATUS column: once a crew has been stopped, the column reports what the
+// meta says happened to the worktree and branch, not the status log.
+func TestListCrewsStatusReflectsTeardownMeta(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: "work",
+	}); err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	if err := w.AppendStatus("shop", "k3", "done: ready in branch matev2/k3"); err != nil {
+		t.Fatal(err)
+	}
+
+	row := func() spawn.CrewSummary {
+		crews, err := spawn.ListCrews(w, "shop")
+		if err != nil {
+			t.Fatalf("ListCrews: %v", err)
+		}
+		if len(crews) != 1 {
+			t.Fatalf("crews = %v, want one", crews)
+		}
+		return crews[0]
+	}
+
+	if got := row().Status; got != "done: ready in branch matev2/k3" {
+		t.Fatalf("status before any stop = %q, want the status log line", got)
+	}
+
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k4", BriefText: "work",
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew k4: %v", err)
+	}
+	commitInWorktree(t, res.Worktree, "unlanded.txt", "wip\n")
+	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k4", false); !errors.Is(err, spawn.ErrUnlandedWork) {
+		t.Fatalf("StopCrew k4: err = %v, want ErrUnlandedWork", err)
+	}
+	crews, err := spawn.ListCrews(w, "shop")
+	if err != nil {
+		t.Fatalf("ListCrews: %v", err)
+	}
+	var k4Status string
+	for _, c := range crews {
+		if c.Crew == "k4" {
+			k4Status = c.Status
+		}
+	}
+	if k4Status != "stopped (unlanded)" {
+		t.Fatalf("k4 status = %q, want %q", k4Status, "stopped (unlanded)")
+	}
+
+	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k4", true); err != nil {
+		t.Fatalf("StopCrew k4 --discard: %v", err)
+	}
+	crews, err = spawn.ListCrews(w, "shop")
+	if err != nil {
+		t.Fatalf("ListCrews: %v", err)
+	}
+	for _, c := range crews {
+		if c.Crew == "k4" && c.Status != "torn down" {
+			t.Fatalf("k4 status after discard = %q, want %q", c.Status, "torn down")
+		}
+	}
+}
+
+// TestStopCrewTearsDownCleanlyWhenLanded is task 16's default path: a crew
+// that never committed anything (its branch is trivially an ancestor of
+// default, its worktree is clean) is fully torn down without --discard, and
+// the brief survives.
+func TestStopCrewTearsDownCleanlyWhenLanded(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
@@ -497,23 +570,28 @@ func TestStopCrewStopsTheAgentAndKeepsTheWork(t *testing.T) {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
 
-	stopped, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3")
+	stopped, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false)
 	if err != nil {
 		t.Fatalf("StopCrew: %v", err)
 	}
 	if stopped.Agent != res.Agent || !stopped.TabClosed {
 		t.Fatalf("stop = %+v", stopped)
 	}
+	if stopped.Teardown != spawn.TeardownClean || !stopped.WorktreeRemoved || !stopped.BranchRemoved {
+		t.Fatalf("stop = %+v, want a clean teardown", stopped)
+	}
+	if stopped.Unlanded {
+		t.Fatal("a crew with no commits and no dirty files must not be unlanded")
+	}
 	if _, ok := rt.Tabs[res.Pane]; ok {
 		t.Fatal("the crew pane survived the stop")
 	}
-	// Task 16 owns teardown: the work stays.
-	if _, statErr := os.Stat(res.Worktree); statErr != nil {
-		t.Fatalf("StopCrew removed the worktree: %v", statErr)
+	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
+		t.Fatalf("the worktree survived a clean teardown: %v", statErr)
 	}
 	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
-	if err != nil || !exists {
-		t.Fatalf("StopCrew removed the branch: %v, %v", exists, err)
+	if err != nil || exists {
+		t.Fatalf("the branch survived a clean teardown: %v, %v", exists, err)
 	}
 	meta, err := w.ReadCrewMeta("shop", "k3")
 	if err != nil {
@@ -523,10 +601,169 @@ func TestStopCrewStopsTheAgentAndKeepsTheWork(t *testing.T) {
 		t.Fatalf("a stopped crew must not keep naming a pane: %v", meta)
 	}
 	if meta[spawn.MetaBranch] != "matev2/k3" || meta[spawn.MetaWorktree] != ".worktrees/shop-k3" {
-		t.Fatalf("a stopped crew must keep its branch and worktree: %v", meta)
+		t.Fatalf("a torn-down crew must still record which branch and worktree it had: %v", meta)
 	}
 	if meta[spawn.MetaStoppedAt] == "" {
 		t.Fatal("a stopped crew must record stopped_at")
+	}
+	if meta[spawn.MetaTeardown] != spawn.TeardownClean {
+		t.Fatalf("meta teardown = %q, want %q", meta[spawn.MetaTeardown], spawn.TeardownClean)
+	}
+	// crews/<id>/ is never touched by a stop.
+	if _, statErr := os.Stat(w.CrewBrief("shop", "k3")); statErr != nil {
+		t.Fatalf("brief.md did not survive teardown: %v", statErr)
+	}
+}
+
+// commitInWorktree makes one real commit on the crew's branch, so the
+// branch is strictly ahead of the project's default branch.
+func commitInWorktree(t *testing.T, worktree, file, contents string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(worktree, file), []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, worktree, "add", file)
+	git(t, worktree, "commit", "-m", "crew commit")
+}
+
+func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: "work",
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	commitInWorktree(t, res.Worktree, "new.txt", "unlanded\n")
+
+	_, err = spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false)
+	if !errors.Is(err, spawn.ErrUnlandedWork) {
+		t.Fatalf("err = %v, want ErrUnlandedWork", err)
+	}
+	if _, statErr := os.Stat(res.Worktree); statErr != nil {
+		t.Fatalf("a refused stop must keep the worktree: %v", statErr)
+	}
+	exists, existsErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	if existsErr != nil || !exists {
+		t.Fatalf("a refused stop must keep the branch: %v, %v", exists, existsErr)
+	}
+	// The agent is stopped and the tab closed even though the teardown was
+	// refused.
+	if _, ok := rt.Tabs[res.Pane]; ok {
+		t.Fatal("a refused teardown must still close the crew's tab")
+	}
+	meta, err := w.ReadCrewMeta("shop", "k3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta[spawn.MetaTeardown] != spawn.TeardownRefusedUnlanded {
+		t.Fatalf("meta teardown = %q, want %q", meta[spawn.MetaTeardown], spawn.TeardownRefusedUnlanded)
+	}
+	if meta[spawn.MetaStoppedAt] == "" {
+		t.Fatal("a refused stop must still record stopped_at")
+	}
+	if meta[spawn.MetaAgent] != "" {
+		t.Fatal("a refused stop must still drop the live agent from the meta")
+	}
+
+	// A rerun with --discard finishes the job.
+	discarded, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true)
+	if err != nil {
+		t.Fatalf("StopCrew with --discard: %v", err)
+	}
+	if discarded.Teardown != spawn.TeardownDiscarded || discarded.Ahead != 1 {
+		t.Fatalf("discarded stop = %+v", discarded)
+	}
+	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
+		t.Fatal("--discard must remove the worktree")
+	}
+	exists, existsErr = gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	if existsErr != nil || exists {
+		t.Fatal("--discard must remove the branch")
+	}
+	if _, statErr := os.Stat(w.CrewBrief("shop", "k3")); statErr != nil {
+		t.Fatalf("brief.md did not survive a discarded teardown: %v", statErr)
+	}
+}
+
+func TestStopCrewRefusesWhenOnlyTheWorktreeIsDirty(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: "work",
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	// Uncommitted, so the branch itself is still an ancestor of default.
+	if err := os.WriteFile(filepath.Join(res.Worktree, "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stopped, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false)
+	if !errors.Is(err, spawn.ErrUnlandedWork) {
+		t.Fatalf("err = %v, want ErrUnlandedWork", err)
+	}
+	if stopped.DirtyFiles != 1 {
+		t.Fatalf("stop = %+v, want DirtyFiles=1", stopped)
+	}
+	if _, statErr := os.Stat(res.Worktree); statErr != nil {
+		t.Fatalf("a refused stop must keep the dirty worktree: %v", statErr)
+	}
+
+	discarded, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true)
+	if err != nil {
+		t.Fatalf("StopCrew with --discard: %v", err)
+	}
+	if discarded.Teardown != spawn.TeardownDiscarded {
+		t.Fatalf("teardown = %q, want discarded", discarded.Teardown)
+	}
+	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
+		t.Fatal("--discard must remove the dirty worktree")
+	}
+}
+
+// TestStopCrewTearsDownAfterTheAgentIsAlreadyGone covers a crew whose Herdr
+// record did not survive a crash: the meta names an agent Herdr has never
+// heard of, and the tab is gone too. Neither is an error; the teardown
+// still runs.
+func TestStopCrewTearsDownAfterTheAgentIsAlreadyGone(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: "work",
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	// tab_not_found (ADR 0028): Herdr no longer has the pane either.
+	rt.ClosePane(res.Pane)
+
+	stopped, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false)
+	if err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	if !stopped.AlreadyGone || !stopped.TabClosed {
+		t.Fatalf("stop = %+v, want AlreadyGone and TabClosed", stopped)
+	}
+	if stopped.Teardown != spawn.TeardownClean {
+		t.Fatalf("teardown = %q, want clean", stopped.Teardown)
+	}
+	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
+		t.Fatal("teardown must still run when the agent was already gone")
+	}
+}
+
+func TestStopCrewWithoutARecordedCrewIsAnError(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	_, err := spawn.StopCrew(context.Background(), w, fakeDeps(t, rt), "shop", "nope", false)
+	if err == nil {
+		t.Fatal("stopping an unrecorded crew must be an error")
 	}
 }
 

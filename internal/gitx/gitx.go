@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/nguyenngocanh94/matev2/internal/observability"
@@ -201,6 +202,46 @@ func (g Git) HeadCommit(ctx context.Context, dir, rev string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+// IsAncestor reports whether branch's tip is already contained in base's
+// history: `git merge-base --is-ancestor <branch> <base>`. True means
+// branch carries no commit base does not already have, so a teardown may
+// delete it without `--discard`. It is a probe: a non-zero exit (the normal
+// "no" answer) is not an error.
+func (g Git) IsAncestor(ctx context.Context, dir, branch, base string) (bool, error) {
+	return g.probe(ctx, dir, "merge-base", "--is-ancestor", branch, base)
+}
+
+// AheadCount is the number of commits reachable from branch but not from
+// base: `git rev-list --count <base>..<branch>`. It is the number a crew
+// teardown refusal reports as "commits ahead".
+func (g Git) AheadCount(ctx context.Context, dir, branch, base string) (int, error) {
+	out, err := g.run(ctx, dir, "rev-list", "--count", base+".."+branch)
+	if err != nil {
+		return 0, err
+	}
+	n, convErr := strconv.Atoi(strings.TrimSpace(out))
+	if convErr != nil {
+		return 0, observability.WrapError(observability.CodeUnknown,
+			fmt.Sprintf("git rev-list --count did not print a number: %q", out), convErr)
+	}
+	return n, nil
+}
+
+// IsDirty is the number of entries `git -C worktree status --porcelain`
+// lists: uncommitted changes a teardown would otherwise discard silently.
+// 0 means the worktree is clean.
+func (g Git) IsDirty(ctx context.Context, worktree string) (int, error) {
+	out, err := g.run(ctx, worktree, "status", "--porcelain")
+	if err != nil {
+		return 0, err
+	}
+	trimmed := strings.TrimRight(out, "\n")
+	if trimmed == "" {
+		return 0, nil
+	}
+	return len(strings.Split(trimmed, "\n")), nil
 }
 
 // SamePath reports whether a and b name the same location, resolving

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -134,15 +135,18 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	return tw.Flush()
 }
 
-// cmdCrewStop implements `matev2 crew stop <project> <id>`. It stops the
-// agent and closes the tab; the worktree and the branch stay (task 16).
+// cmdCrewStop implements `matev2 crew stop <project> <id> [--discard]`. It
+// stops the agent, closes the tab, and then tears down the worktree and
+// branch unless they carry unlanded work and --discard was not given
+// (task 16).
 func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew stop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: matev2 crew stop <project> <id> [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: matev2 crew stop <project> <id> [--discard] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	discardFlag := fs.Bool("discard", false, "remove the worktree and branch even if the branch is unlanded or the worktree is dirty")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -154,14 +158,43 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := spawn.StopCrew(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), fs.Arg(1))
-	if err != nil {
+	project, crew := fs.Arg(0), fs.Arg(1)
+	res, err := spawn.StopCrew(context.Background(), w, spawn.LiveDeps(), project, crew, *discardFlag)
+	if err != nil && !errors.Is(err, spawn.ErrUnlandedWork) {
 		return err
 	}
-	what := "stopped"
-	if res.AlreadyGone {
-		what = "already gone"
+	fmt.Fprintln(stdout, crewStopReport(project, crew, res))
+	return err
+}
+
+// crewStopReport is the one line `matev2 crew stop` prints describing
+// exactly what happened and what was kept, whether the stop succeeded,
+// tore down cleanly, discarded unlanded work, or refused to.
+func crewStopReport(project, crew string, res spawn.StopResult) string {
+	agent := res.Agent
+	if agent == "" {
+		agent = "(none recorded)"
 	}
-	fmt.Fprintf(stdout, "%s/%s: %s (agent %s; worktree and branch kept)\n", fs.Arg(0), fs.Arg(1), what, res.Agent)
-	return nil
+	stopped := "stopped"
+	if res.AlreadyGone {
+		stopped = "already gone"
+	}
+	tab := "closed"
+	if !res.TabClosed {
+		tab = "not confirmed closed"
+	}
+	switch res.Teardown {
+	case spawn.TeardownRefusedUnlanded:
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch KEPT: branch %s is %d commit(s) ahead of default and the worktree has %d dirty file(s); rerun with --discard to remove them",
+			project, crew, agent, stopped, tab, res.Branch, res.Ahead, res.DirtyFiles)
+	case spawn.TeardownClean:
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed (%s was already landed in default)",
+			project, crew, agent, stopped, tab, res.Branch)
+	case spawn.TeardownDiscarded:
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed with --discard (%d commit(s) ahead, %d dirty file(s) discarded)",
+			project, crew, agent, stopped, tab, res.Ahead, res.DirtyFiles)
+	default:
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch kept",
+			project, crew, agent, stopped, tab)
+	}
 }
