@@ -44,5 +44,5 @@
                                                                                                    │                                                            
                                                                                                    │                                                            
 ───────────────────────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
- Attaching to crew-payments-api-2 via matev2 attach · detach: Ctrl+b then q                                                                                     
- Ctrl+b q Detach; does not stop the agent                                                                                                                       
+                                                                                                                                                                
+ ↑↓ Move  a Actions  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                                                                              

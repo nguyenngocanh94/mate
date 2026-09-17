@@ -6,7 +6,7 @@ import (
 )
 
 // TestGoldenFramesInspectorPerNodeKind is the inspector task's own golden
-// coverage: each node kind's block (Project, Mate, Task, Crew), at both
+// coverage: each node kind's block (Project, Mate, Crew), at both
 // required breakpoints (160x48, 120x36), matching design/mate-console-
 // states.html.
 //
@@ -26,13 +26,13 @@ func TestGoldenFramesInspectorPerNodeKind(t *testing.T) {
 		m, _ = send(t, m, key("enter")) // payments-api; Mate row selected by default
 		assertGolden(t, "inspector-mate-"+suffix, renderFrame(t, m))
 
-		// Task block: the Project's second row.
+		// Crew block: the Project's second row. The failed Crew is in the
+		// Completed group, so the one active Crew sits directly under the
+		// Mate row.
+		//
+		// TODO(task 21): a Task block sat between the Mate and Crew blocks
+		// in v1. matev2 has no Task.
 		m, _ = send(t, m, key("down"))
-		assertGolden(t, "inspector-task-"+suffix, renderFrame(t, m))
-
-		// Crew block: the running attempt. The failed first attempt is in
-		// the Completed group, so Enter on the Task lands on this row.
-		m, _ = send(t, m, key("enter"))
 		assertGolden(t, "inspector-crew-"+suffix, renderFrame(t, m))
 	}
 }
