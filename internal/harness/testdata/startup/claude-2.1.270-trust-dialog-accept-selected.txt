@@ -1,0 +1,20 @@
+  /private/tm/cl/-Users-anh--treehouse-gomate-dd5648-8/9/s/l/control   main ❯ claude
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /private/tmp/claude-501/-Users-anh--treehouse-gomate-dd5648-8-gomate/9d909400-bbef-4b86-8ee1
+ -7519b4c2c4d4/scratchpad/lab/control
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+ well-known open source project, or work from your team). If not, take a moment to review
+ what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+   No, exit
+ ❯ Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel

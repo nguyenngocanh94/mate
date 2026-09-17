@@ -1,0 +1,15 @@
+
+╭──────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.154.0)                       │
+│                                                  │
+│ model:     lab-model   /model to change          │
+│ directory: /private/tmp/claude-501/…/lab/control │
+╰──────────────────────────────────────────────────╯
+
+  Tip: New Build faster with the Desktop app. Run 'codex app' or visit
+  https://chatgpt.com/codex?app-landing-page=true
+
+
+› Ask Codex to do anything
+
+  lab-model default · /private/tmp/claude-501/-Users-anh--treehouse-gomate-dd5648-8-gomate/9d…

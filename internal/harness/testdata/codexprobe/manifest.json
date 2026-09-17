@@ -1,0 +1,6 @@
+{
+  "codex_version": "codex-cli 0.151.0",
+  "generated_at": "2026-09-02T08:53:35+00:00",
+  "command": "codex [-c project_doc_max_bytes=N] debug prompt-input x (cwd per scenario, CODEX_HOME per scenario)",
+  "extraction": "JSON-decode the prompt string starting with '# AGENTS.md instructions', keep text between '<INSTRUCTIONS>\\n' and the final '\\n</INSTRUCTIONS>'"
+}

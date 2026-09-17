@@ -1,0 +1,101 @@
+{
+  "scenarios": [
+    {
+      "id": "joiner-no-global",
+      "note": "three project files, no global doc, no cap: pins the \\n\\n per-file joiner",
+      "cwd": "proj/sub/deep",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "ROOTHEAD_alpha_body_ROOTTAIL",
+        "proj/sub/AGENTS.md": "SUBHEAD_beta_body_SUBTAIL",
+        "proj/sub/deep/AGENTS.md": "DEEPHEAD_gamma_body_DEEPTAIL"
+      },
+      "global_files": {},
+      "project_doc_max_bytes": 0,
+      "capture": "joiner-no-global.txt"
+    },
+    {
+      "id": "marker-global",
+      "note": "global doc plus two project files, no cap: pins the project-doc marker bytes",
+      "cwd": "proj/sub",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "ROOTHEAD_r_ROOTTAIL",
+        "proj/sub/AGENTS.md": "SUBHEAD_s_SUBTAIL"
+      },
+      "global_files": {
+        "AGENTS.md": "GLOBHEAD_g_GLOBTAIL"
+      },
+      "project_doc_max_bytes": 0,
+      "capture": "marker-global.txt"
+    },
+    {
+      "id": "cap-fit-80",
+      "note": "root 40 + cwd 40 content bytes at cap 80: both delivered in full although the rendered stream is 82 bytes, so joiners are not metered",
+      "cwd": "proj/sub",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRROOTTAIL",
+        "proj/sub/AGENTS.md": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSUBTAIL"
+      },
+      "global_files": {},
+      "project_doc_max_bytes": 80,
+      "capture": "cap-fit-80.txt"
+    },
+    {
+      "id": "cap-cut-79",
+      "note": "same fixture at cap 79: the cwd file loses exactly one tail byte, so the meter is content-only and in load order",
+      "cwd": "proj/sub",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRROOTTAIL",
+        "proj/sub/AGENTS.md": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSUBTAIL"
+      },
+      "global_files": {},
+      "project_doc_max_bytes": 79,
+      "capture": "cap-cut-79.txt"
+    },
+    {
+      "id": "cap-global-exempt-1",
+      "note": "global 40 bytes plus project 41 bytes at cap 1: the full global doc and marker render while the project chain is cut to one byte, so global and marker are exempt",
+      "cwd": "proj",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPROJTAIL"
+      },
+      "global_files": {
+        "AGENTS.md": "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGLOBTAIL"
+      },
+      "project_doc_max_bytes": 1,
+      "capture": "cap-global-exempt-1.txt"
+    },
+    {
+      "id": "cap-verbatim-12",
+      "note": "13-byte file ending in three newlines at cap 12: trailing whitespace is metered verbatim, not trimmed",
+      "cwd": "proj",
+      "git_root": "proj",
+      "files": {
+        "proj/AGENTS.md": "XXXXXXXXXX\n\n\n"
+      },
+      "global_files": {},
+      "project_doc_max_bytes": 12,
+      "capture": "cap-verbatim-12.txt"
+    },
+    {
+      "id": "worktree-override-shadows-tracked",
+      "note": "Phase 1 Crew layout: cwd is the worktree root ws/.worktrees/crew-1 whose .git is a FILE, inside a workspace that is itself a repo (.git dir) with its own AGENTS.md. Codex stats the marker (file or dir; the gitdir pointer is never resolved) and stops there, and AGENTS.override.md shadows the sibling tracked AGENTS.md entirely: only the override renders and the workspace doc never loads",
+      "cwd": "ws/.worktrees/crew-1",
+      "git_root": "ws/.worktrees/crew-1",
+      "git_root_kind": "file",
+      "outer_git_dir": "ws",
+      "files": {
+        "ws/AGENTS.md": "WORKSPACE_PARENT_DOC",
+        "ws/.worktrees/crew-1/AGENTS.md": "TRACKED REPO INSTRUCTIONS",
+        "ws/.worktrees/crew-1/AGENTS.override.md": "MATE CREW CONTEXT"
+      },
+      "global_files": {},
+      "project_doc_max_bytes": 0,
+      "capture": "worktree-override-shadows-tracked.txt"
+    }
+  ]
+}

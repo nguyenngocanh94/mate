@@ -1,0 +1,11 @@
+  /private/tm/cl/-Users-anh--treehouse-gomate-dd5648-8/9/s/l/control   main ❯ claude
+ ▐▛███▛█   Claude Code v2.1.270
+▝▜██████▀  Opus 5 (1M context) · API Usage Billing
+  ▝▝ ▝▝    /…/9d909400-bbef-4b86-8ee1-7519b4c2c4d4/scratchpad/lab/control
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+──────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CL…
+  ⏵⏵ auto mode on (shift+tab to cycle)                            Not logged in · Run /login
