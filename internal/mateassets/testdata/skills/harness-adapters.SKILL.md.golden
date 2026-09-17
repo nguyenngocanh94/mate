@@ -1,0 +1,79 @@
+---
+name: harness-adapters
+description: Per-harness facts the Mate needs to read and steer a Crew pane. Use before interrupting or exiting a Crew, when `matev2 state` says unknown, when `matev2 peek` shows a dialog or a screen you cannot name, or when a send is refused with "showing a screen mate cannot name". Covers Codex and Claude Code, the two harnesses a matev2 Crew runs on.
+---
+
+# harness-adapters
+
+Load this before any harness-specific judgement about a Crew's pane.
+It is a reference, not a procedure: read the rows for the harness the Crew actually runs on and go back to what you were doing.
+
+Which harness a Crew runs on is printed by `/usr/local/bin/matev2 crew list shop` in the HARNESS column, and by `matev2 crew spawn` in its first line.
+Never guess it from what you yourself run on; you run on `claude-code` and a Crew defaults to Codex.
+
+## What you can and cannot do to a pane
+
+You have exactly three pane operations, and none of them sends a raw key:
+
+- `matev2 peek <project> <crew>` reads the last lines of the pane and changes nothing.
+- `matev2 send <project> <crew> "<one line>"` types one line and presses enter until the composer clears.
+- `matev2 crew stop <project> <crew>` ends the agent and closes the pane.
+
+There is no interrupt key, no escape, no arrow key, and no bare enter.
+So "interrupt the Crew" in practice means one of: send a line the harness will accept mid-turn with `--queue`, or stop the Crew and spawn a fresh one with the same brief plus a note of what was already tried.
+Anything that would need a keystroke is an escalation to the captain, not something you improvise.
+
+## Composer states you will be told about
+
+`matev2 send` and `matev2 state` classify the pane before acting, and report what they saw:
+
+| Reading | Screen | Meaning |
+| --- | --- | --- |
+| busy / `working · source: pane` | the harness's mid-turn indicator | A turn is running. A send refuses unless you pass `--queue`. |
+| empty | an idle composer | Safe to send. |
+| pending | text sitting unsubmitted in the composer | Somebody else is typing there. Never type over it. |
+| unknown | anything else | A dialog, a scrolled transcript, or a harness that has not finished starting. Peek and read it. |
+
+An `unknown` reading is the one that needs this skill.
+Peek, match what you see against the sections below, and act on that - do not re-send and do not stop the Crew until you know which of the two it is.
+
+## codex
+
+Codex is the default Crew harness.
+
+| Fact | Value |
+| --- | --- |
+| Busy signature | `esc to interrupt`, usually inside a `• Working (Xs • esc to interrupt)` footer |
+| Idle composer | a bordered input box with the cursor in it |
+| Directory trust | `Do you trust the contents of this directory?`, asked per absolute path |
+| Instructions | the brief is delivered as a file in the worktree that Codex reads at startup |
+
+Codex confirms trust for each absolute path separately, and a Crew worktree is always a path it has never seen, so the dialog appears on essentially every spawn.
+`matev2 crew spawn` answers it during launch and prints a `note: answered the codex directory-trust dialog for <worktree>` line on stderr when it did.
+If you peek and the dialog is still on screen, the spawn did not complete: report that to the captain rather than sending a line at it, because a line typed into that dialog is not an answer to it.
+
+A first prompt that Codex never picked up leaves the pane idle with the brief line visible in the composer.
+That is a `pending` reading, and the fix is not to type: peek, then report it, because the Crew has not started and its worktree is empty.
+
+## claude
+
+Claude Code is what you run on, and what a Crew runs on when a spawn is given `--harness claude`.
+
+| Fact | Value |
+| --- | --- |
+| Busy signature | `esc to interrupt` |
+| Idle composer | a `>` prompt box |
+| Directory trust | a trust confirmation whose default highlight is the refusing option |
+| Instructions | the brief is delivered as a launch-time system prompt, so nothing lands in the worktree |
+
+The trust dialog's default highlight is the choice that exits the agent.
+This is exactly why you have no key-sending command: a blind confirmation here kills the Crew rather than starting it.
+Claude also shows a one-time bypass-permissions acceptance screen the first time a given configuration directory sees it; it looks like a dialog and reads as `unknown` the same way.
+
+Claude renders a greyed-out suggestion inside an otherwise-empty composer after a turn ends.
+It is not typed text and the classifier ignores it, but it is why a peek of an idle Claude pane can look like it has something in the box when `state` says the composer is empty; believe `state`.
+
+## Adding a harness
+
+Only Codex and Claude Code are verified for a matev2 Crew.
+If the captain asks for another, say that it is not verified and that a Crew on it would be unsupervisable, because every row above - the busy signature especially - has to be measured before `matev2 state` can tell working from wedged.

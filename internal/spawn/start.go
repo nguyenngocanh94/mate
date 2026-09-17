@@ -363,6 +363,8 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		MemoryFile:    w.MemoryFile(project),
 		BacklogFile:   w.BacklogFile(project),
 		MatevBin:      binary,
+		MateDir:       mateDir,
+		CrewsDir:      w.CrewsDir(project),
 	}); err != nil {
 		return err
 	}

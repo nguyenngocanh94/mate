@@ -26,6 +26,8 @@ func fixedParams() Params {
 		MemoryFile:    "/ws/.matev2/projects/shop/mate/memory.md",
 		BacklogFile:   "/ws/.matev2/projects/shop/mate/backlog.md",
 		MatevBin:      "/usr/local/bin/matev2",
+		MateDir:       "/ws/.matev2/projects/shop/mate",
+		CrewsDir:      "/ws/.matev2/projects/shop/crews",
 	}
 }
 

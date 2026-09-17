@@ -33,6 +33,30 @@ func Write(dir string, p Params) error {
 	if err := ensureFile(filepath.Join(dir, "backlog.md"), "# Backlog\n"); err != nil {
 		return err
 	}
+	return writeSkills(dir, p)
+}
+
+// ClaudeSkillsDir is where Claude Code discovers skills relative to its own
+// working directory: `<cwd>/.claude/skills/<name>/SKILL.md`.
+const ClaudeSkillsDir = ".claude/skills"
+
+// writeSkills installs every SkillNames entry under dir, replacing whatever
+// is there. Skills are generated content like the manual, not the Mate's own
+// memory, so they are rewritten on every start rather than preserved.
+func writeSkills(dir string, p Params) error {
+	for _, name := range SkillNames {
+		data, err := RenderSkill(name, p)
+		if err != nil {
+			return err
+		}
+		skillDir := filepath.Join(dir, filepath.FromSlash(ClaudeSkillsDir), name)
+		if err := os.MkdirAll(skillDir, 0o755); err != nil {
+			return err
+		}
+		if err := writeAtomic(filepath.Join(skillDir, "SKILL.md"), data); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
