@@ -5,9 +5,21 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/hook"
+	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
+
+// TestPromptMarkerMatchesSend keeps hook.PromptMarker (which cannot import
+// internal/send without pulling the runtime/harness stack into a package
+// that must stay a pure function of a JSON payload) in step with the one
+// place that spells the sentinel out for a reason: send.Marker's doc
+// comment records the live measurement that picked it.
+func TestPromptMarkerMatchesSend(t *testing.T) {
+	if hook.PromptMarker != send.Marker {
+		t.Fatalf("hook.PromptMarker = %q, want send.Marker %q", hook.PromptMarker, send.Marker)
+	}
+}
 
 func newWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
@@ -57,6 +69,15 @@ func TestHandlePromptTableDriven(t *testing.T) {
 		},
 		{
 			name:       "marker-prefixed prompt is recorded as app and never clears auto",
+			payload:    "{\"prompt\":\"\u27e6matev2\u27e7 signal: crews/k3.status\"}",
+			autoBefore: true,
+			wantAuto:   true,
+			wantSent: []store.SentEntry{
+				{Source: store.SourceApp, Target: store.TargetMate, Text: "signal: crews/k3.status"},
+			},
+		},
+		{
+			name:       "legacy 0x1f-prefixed prompt is still recognised as app for one release",
 			payload:    `{"prompt":"\u001fsignal: crews/k3.status"}`,
 			autoBefore: true,
 			wantAuto:   true,

@@ -307,8 +307,8 @@ func TestSendPrefixesTheFromAppMarkerOnRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rt.typed[0] != "\x1fsignal: crews/k3.status" {
-		t.Fatalf("typed = %q, want the 0x1f prefix", rt.typed[0])
+	if rt.typed[0] != send.Marker+"signal: crews/k3.status" {
+		t.Fatalf("typed = %q, want the send.Marker prefix", rt.typed[0])
 	}
 	if report.Text != rt.typed[0] {
 		t.Fatalf("report text = %q, want what was typed", report.Text)

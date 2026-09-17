@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
@@ -27,7 +29,8 @@ import (
 //  3. the box - the same query.BoxView the rail draws - shows that entry
 //  4. the reply action types "A" into the crew's own pane
 //  5. the crew continues and writes `done: chose A`
-//  6. the forward action hands `signal: crews/k3.status` to the Mate
+//  6. the forward action hands `signal: <absolute status file path>` to the
+//     Mate
 //  7. sent.log carries app -> mate, and the Mate's own Stop hook then
 //     records a mate line - which it only can after reading the file the
 //     signal pointed it at
@@ -137,15 +140,28 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	if !ask.Attention {
 		t.Fatalf("a needs-decision entry is not marked attention: %+v", ask)
 	}
-	if ask.Signal != query.BoxStatusSignal("k3") {
-		t.Fatalf("signal = %q, want %q", ask.Signal, query.BoxStatusSignal("k3"))
+	wantSignal := query.BoxStatusSignal(w.CrewStatus("shop", "k3"))
+	if ask.Signal != wantSignal {
+		t.Fatalf("signal = %q, want %q", ask.Signal, wantSignal)
 	}
 
-	// 4. The `r` key's action: one line into the crew's own composer.
-	replyOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionReply, Target: "shop", TargetKind: "project", Crew: "k3", Input: "A"})
-	if err != nil {
-		t.Fatalf("reply action: %v\npane:\n%s", err, paneTail())
+	// 4. The `r` key's action: one line into the crew's own composer. The
+	// crew's turn does not necessarily end the instant it appends the
+	// status line - Codex can keep working for a few more seconds - so a
+	// busy composer here is retried rather than treated as a failure; the
+	// action itself never types over a busy pane (send.ErrAgentBusy).
+	var replyOut string
+	replyDeadline := time.Now().Add(90 * time.Second)
+	for {
+		replyOut, err = action(ctx, console.ActionRequest{
+			Action: console.ActionReply, Target: "shop", TargetKind: "project", Crew: "k3", Input: "A"})
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, send.ErrAgentBusy) || time.Now().After(replyDeadline) {
+			t.Fatalf("reply action: %v\npane:\n%s", err, paneTail())
+		}
+		time.Sleep(2 * time.Second)
 	}
 	t.Logf("reply action: %s", replyOut)
 	assertSentLine(t, w, store.SourceUser, store.CrewTarget("k3"), "A")

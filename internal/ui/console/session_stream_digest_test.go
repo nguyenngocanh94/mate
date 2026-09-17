@@ -44,7 +44,7 @@ func awaitingBox(n int) query.Field[query.BoxView] {
 		entries = append(entries, query.BoxEntry{
 			Seq: i, At: sessionTestClock(10, i), Kind: query.BoxStatus,
 			Crew: fmt.Sprintf("k%d", i+1), Source: "crew", Verb: "needs-decision",
-			Text: "does this fit?", Attention: true, Signal: query.BoxStatusSignal(fmt.Sprintf("k%d", i+1)),
+			Text: "does this fit?", Attention: true, Signal: query.BoxStatusSignal(fmt.Sprintf("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k%d.status", i+1)),
 		})
 	}
 	return query.KnownField(query.BoxView{Entries: entries, Crews: n, Awaiting: n})

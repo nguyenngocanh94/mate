@@ -30,7 +30,7 @@
    13:41  k3  working  reading the ticket                                                                               
    13:52  user->mate  spawn a crew for the webhook fix                                                                  
  ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe_events?                                 
-▏  14:02  app->mate  signal: crews/k3.status                                                                            
+▏  14:02  app->mate  signal: /Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status                         
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                         
  ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

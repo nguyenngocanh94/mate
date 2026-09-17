@@ -72,7 +72,7 @@ func TestStreamModeBoxKeysNeedThePrefix(t *testing.T) {
 		t.Fatalf("action requests = %+v, want exactly the forward", action.reqs)
 	}
 	req := action.reqs[0]
-	if req.Crew != "k3" || req.Input != query.BoxStatusSignal("k3") {
+	if req.Crew != "k3" || req.Input != query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status") {
 		t.Errorf("forward request = %+v, want crew k3 and its status signal", req)
 	}
 }

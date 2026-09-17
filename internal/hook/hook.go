@@ -16,10 +16,24 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// PromptMarker is the byte the app prefixes onto every line it types into
-// Mate's own pane (docs/mvp.md section 4), so Mate - and this hook - can
-// tell an app-injected line apart from the user's own typing.
-const PromptMarker = 0x1f
+// PromptMarker is the sentinel the app prefixes onto every line it types
+// into Mate's own pane (docs/mvp.md section 4), so Mate - and this hook -
+// can tell an app-injected line apart from the user's own typing. It must
+// stay equal to send.Marker; internal/send cannot be imported here (it pulls
+// in the runtime/harness stack this pure hook package must not depend on),
+// so the two are kept in sync by hook_test.go's TestPromptMarkerMatchesSend.
+//
+// This used to be the single control byte 0x1f: a task 15 live run found
+// that byte never reached Claude Code's own UserPromptSubmit payload
+// (send.Marker's doc comment has the measurement). legacyPromptMarker is
+// still recognised for one release so an in-flight digest sent with the old
+// byte, from a Mate started before this change, is still read as the app's.
+const PromptMarker = "⟦matev2⟧ "
+
+// legacyPromptMarker is the abandoned 0x1f byte, tolerated as a leading
+// marker for one release (see PromptMarker's doc comment). Remove this once
+// no Mate still running predates the sentinel switch.
+const legacyPromptMarker = 0x1f
 
 // AutoOffText is the second sent.log line HandlePrompt appends when a plain
 // user prompt (no marker) turns auto mode off.
@@ -53,7 +67,7 @@ type stopPayload struct {
 // A marker-prefixed prompt is the app's own doing (docs/mvp.md section 5's
 // auto-mode digest, or its user-mode confirmation send): it is recorded as
 // Source: app with the marker stripped, and never turns auto mode off,
-// because the byte's whole purpose is telling the difference.
+// because the sentinel's whole purpose is telling the difference.
 func HandlePrompt(w *store.Workspace, project string, raw []byte) error {
 	var payload promptPayload
 	if err := json.Unmarshal(raw, &payload); err != nil {
@@ -62,7 +76,11 @@ func HandlePrompt(w *store.Workspace, project string, raw []byte) error {
 	prompt := payload.Prompt
 	source := store.SourceUser
 	text := prompt
-	if len(prompt) > 0 && prompt[0] == PromptMarker {
+	switch {
+	case strings.HasPrefix(prompt, PromptMarker):
+		source = store.SourceApp
+		text = strings.TrimPrefix(prompt, PromptMarker)
+	case len(prompt) > 0 && prompt[0] == legacyPromptMarker:
 		source = store.SourceApp
 		text = prompt[1:]
 	}
