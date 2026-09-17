@@ -25,32 +25,88 @@ func boxRailSnapshot() SessionSnapshot {
 // visible with colour stripped, which is exactly what a plainPalette fixture
 // proves.
 func TestGoldenBoxRailSelectedNeedsDecision(t *testing.T) {
-	frame := RenderSessionFrame(boxRailSnapshot(), "", boxRail{sel: 2}, 120, 36, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(boxRailSnapshot(), "", boxRail{sel: 2, zone: zoneBox, mode: query.ModeSupervised}, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	assertGolden(t, "box-rail-selected-120x36-unicode", frame)
 }
 
-// TestGoldenBoxRailStreamKeyHints is the same rail in stream mode, where the
-// three keys live behind Ctrl+b: the hint lines are the only thing on screen
-// that says so, and a reader who trusts the snapshot-mode wording would type
-// into the harness instead.
-func TestGoldenBoxRailStreamKeyHints(t *testing.T) {
-	frame := RenderSessionFrame(boxRailSnapshot(), "", boxRail{sel: 2, stream: true}, 120, 36, unicodeGlyphs, plainPalette())
+// TestGoldenSessionTerminalFocus is the Mate session view as it opens: the
+// terminal has focus, so the hint line names the agent's keys and nothing
+// else, and the rail draws no selection marker of its own. This is the
+// fixture that would fail if the view ever again reserved a keystroke out of
+// the agent's own alphabet.
+func TestGoldenSessionTerminalFocus(t *testing.T) {
+	rail := boxRail{sel: 2, zone: zoneTerminal, mode: query.ModeSupervised}
+	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
-	assertGolden(t, "box-rail-stream-120x36-unicode", frame)
+	assertGolden(t, "session-focus-terminal-120x36-unicode", frame)
+}
+
+// TestGoldenSessionBoxFocusWithHoverStrip is the other focus state, with the
+// pointer resting on the needs-decision entry: the hint line names the box's
+// keys, the entry under the pointer grows its action strip, and the header
+// carries the four clickable labels. Rendered with plainPalette, so nothing
+// here is carried by the accent colour alone - the words "BOX" and the
+// buttons themselves are what a monochrome reader sees.
+func TestGoldenSessionBoxFocusWithHoverStrip(t *testing.T) {
+	rail := boxRail{sel: 2, hover: 2, zone: zoneBox, mode: query.ModeSupervised}
+	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
+	assertFrameShape(t, frame, 120, 36)
+	assertGolden(t, "session-focus-box-120x36-unicode", frame)
+}
+
+// TestGoldenSessionHeaderLabelsAutoMode pins the header's clickable labels
+// at the widest rail a reader can drag to, in auto mode - the one state the
+// mode label reports rather than merely offers, and the width at which all
+// four labels fit on one line.
+func TestGoldenSessionHeaderLabelsAutoMode(t *testing.T) {
+	rail := boxRail{sel: 2, zone: zoneBox, mode: query.ModeAuto, railW: railMaxWidth}
+	snap := boxRailSnapshot()
+	snap.Target.Mode = query.ModeAuto
+	frame := RenderStreamSessionFrame(snap, sessionGoldenTerminal(t), false, rail, 160, 48, unicodeGlyphs, plainPalette())
+	assertFrameShape(t, frame, 160, 48)
+	assertGolden(t, "session-header-labels-160x48-unicode", frame)
+}
+
+// sessionGoldenTerminal is a small, deterministic PTY frame so the focus
+// goldens show a real terminal beside the rail rather than an empty pane.
+func sessionGoldenTerminal(t *testing.T) *TerminalBuffer {
+	t.Helper()
+	b := NewTerminalBuffer(83, 33)
+	if _, err := b.Write([]byte("shop-mate $ matev2 crew list\r\nk3  needs-decision\r\nshop-mate $ ")); err != nil {
+		t.Fatalf("seed the terminal buffer: %v", err)
+	}
+	b.Flush()
+	return b
 }
 
 // TestGoldenBoxReplyInputOpen renders the one-line reply input in the rail,
-// with a refusal already on the outcome line - the two pieces of rail chrome
-// that only appear once a reader has pressed something.
+// with its [send]/[cancel] buttons and a refusal already on the outcome line
+// - the pieces of rail chrome that only appear once a reader has pressed
+// something.
 func TestGoldenBoxReplyInputOpen(t *testing.T) {
 	rail := boxRail{
-		sel: 2, reply: true, replyCrew: "k3", replyText: "A",
+		sel: 2, zone: zoneBox, mode: query.ModeSupervised,
+		reply: true, replyCrew: "k3", replyText: "A",
 		outcome: errMsg("Send refused: composer holds unsubmitted text · nothing was sent"),
 	}
 	frame := RenderSessionFrame(boxRailSnapshot(), "", rail, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	assertGolden(t, "box-reply-input-120x36-unicode", frame)
+}
+
+// TestGoldenBoxRestartConfirmation pins the one-line recovery prompt: a
+// restart stops a live agent, so it is never one keystroke away, and the
+// question sits in the rail with its own [yes]/[no] buttons rather than in a
+// modal drawn over the terminal being restarted.
+func TestGoldenBoxRestartConfirmation(t *testing.T) {
+	rail := boxRail{
+		sel: 2, zone: zoneBox, mode: query.ModeSupervised,
+		confirm: true, confirmText: "restart Mate payments-api?",
+	}
+	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
+	assertFrameShape(t, frame, 120, 36)
+	assertGolden(t, "session-restart-confirm-120x36-unicode", frame)
 }
 
 // TestGoldenBoxPeekOverlay renders `p`'s overlay over the project frame. The
@@ -85,6 +141,12 @@ func TestGoldenBoxPanelFocused(t *testing.T) {
 	if m.focus != paneBox {
 		t.Fatalf("focus = %v, want paneBox after two Tabs", m.focus)
 	}
+	// The cursor and the pointer both on the needs-decision entry, so the
+	// panel's own action strip is in the fixture too: it is the same strip
+	// the rail draws, and the project frame is the surface where it is
+	// easiest to lose.
+	m.boxSel = 2
+	m.boxHover = 2
 	assertGolden(t, "box-panel-focused-120x36-unicode", renderFrame(t, m))
 }
 

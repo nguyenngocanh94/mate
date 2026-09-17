@@ -54,6 +54,20 @@ const (
 	ActionForward Action = "forward"
 	ActionReply   Action = "reply"
 	ActionPeek    Action = "peek"
+	// The two recovery actions. They exist because a Mate is a live
+	// interactive agent sharing its composer with the reader: a key
+	// sequence that went astray can leave junk half-typed in it, and an
+	// agent can wedge outright. Both are offered as clickable labels on the
+	// rail header as well as keys, because a reader reaching for them is
+	// already in a state where remembering a keystroke is the last thing
+	// they want to do.
+	//
+	// ActionRestartMate stops the Mate and starts it again through the same
+	// seams the action menu uses. ActionClearComposer presses Ctrl+U in the
+	// Mate's pane - it types nothing and sends nothing, so it can never
+	// become a message the Mate answers.
+	ActionRestartMate   Action = "restart_mate"
+	ActionClearComposer Action = "clear_composer"
 	// TODO(task 21/22): v1 also had retry, discard and switch_harness.
 	// matev2 has no retry (a Crew runs once), and discard/merge belong to
 	// mvp.md's task 21 and 22.
@@ -142,6 +156,29 @@ const (
 	// the list as soon as it is not, the same rule paneInspector follows
 	// when the inspector column disappears.
 	paneBox
+)
+
+// clickMemo is the previous mouse press: what it landed on and when. A
+// second press on the same thing inside doubleClickWindow is a double
+// click, which is the only gesture in this Console that means something
+// different from two single ones.
+type clickMemo struct {
+	surface int
+	index   int
+	at      time.Time
+}
+
+// doubleClickWindow is how close together two presses have to be. 400ms is
+// the middle of the range desktop toolkits use; a terminal cannot ask the
+// system for the reader's own setting.
+const doubleClickWindow = 400 * time.Millisecond
+
+// The surfaces a click can be remembered on, so a press on the rail and a
+// press on the project panel are never mistaken for one double click.
+const (
+	clickSurfaceNone int = iota
+	clickSurfaceRail
+	clickSurfacePanel
 )
 
 // footerTone selects the message line's word-and-colour pairing. The tone
@@ -269,7 +306,31 @@ type Model struct {
 	// because the session frame gives it a row of its own: folding it into
 	// msg would let any unrelated Console message (a stream fallback notice,
 	// a refresh failure) steal a row from the agent's own terminal.
-	boxMsg          footerMsg
+	boxMsg footerMsg
+	// boxHover is the entry the mouse pointer is over, -1 for none. It is
+	// one field rather than one per surface because a pointer is in one
+	// place: only the surface under it ever reads it, and it is cleared the
+	// moment the pointer leaves a box.
+	boxHover int
+	// railWidth is the column the reader has dragged the session view's
+	// splitter to, 0 until they do. It persists for the Console's run - a
+	// split that snapped back to the default on every re-entry would be a
+	// setting the reader has to make again every time.
+	railWidth int
+	// draggingSplit is true between the press on the splitter and its
+	// release: mouse motion in between moves the split, wherever the
+	// pointer happens to be, the way a real drag behaves once it has been
+	// grabbed.
+	draggingSplit bool
+	// The one-line recovery confirmation (box_keys.go). Restarting a Mate
+	// stops a live agent, so it is never one keystroke away.
+	boxConfirm       bool
+	boxConfirmText   string
+	boxConfirmChoice actionChoice
+	// lastClick is what a double click is measured against: the entry and
+	// the moment of the previous press, since a tea.MouseMsg carries no
+	// timestamp of its own.
+	lastClick       clickMemo
 	boxReply        bool
 	boxReplyCrew    string
 	boxReplyProject string
@@ -393,10 +454,11 @@ func New(load LoadFunc, attachCmd AttachCmdFunc, action ...ActionFunc) Model {
 		completedOpen: map[string]bool{},
 		// -1 is "follow the newest box entry" on both box surfaces; see
 		// sessionFlow.boxSel.
-		boxSel: -1,
-		sess:   sessionFlow{boxSel: -1},
-		g:      glyphsFor(os.Getenv),
-		p:      defaultPalette(),
+		boxSel:   -1,
+		boxHover: -1,
+		sess:     sessionFlow{boxSel: -1},
+		g:        glyphsFor(os.Getenv),
+		p:        defaultPalette(),
 	}
 }
 

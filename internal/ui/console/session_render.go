@@ -43,10 +43,9 @@ func RenderSessionFrame(snapshot SessionSnapshot, composer string, rail boxRail,
 // output) - a second, Console-drawn composer on top of it is the very "two
 // input boxes" defect the ruling was written to close. Side-channel
 // metadata (RecordedStatus, the runtime banner, the inbox rail) is
-// unaffected; the composer box's 4 lines shrink to streamDetachHintLine's
-// single line, the one piece of chrome stream mode still draws (a Crew or
-// narrow-Mate frame otherwise has no on-screen way to leave once Esc and
-// Ctrl+C both go to the agent).
+// unaffected; the composer box's 4 lines go to the PTY, and the one line
+// of Console chrome left on the frame is sessionHintLine, which names the
+// focused zone's keys (session_focus.go).
 func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, frozen bool, rail boxRail, w, h int, g glyphSet, p palette) string {
 	if buffer == nil {
 		return RenderSessionFrame(snapshot, "", rail, w, h, g, p)
@@ -63,60 +62,45 @@ func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, 
 // banner leaves the frame fewer rows than the buffer holds. The frozen flag
 // is ignored for a nil terminal (snapshot mode never freezes a buffer).
 func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, frozen bool, composer string, rail boxRail, w, h int, g glyphSet, p palette) string {
+	geo := sessionGeometry(snapshot, rail, terminal != nil, w, h, g)
 	s := newScreen(w, h)
 	s.push(sessionHeaderLine(snapshot.Target, snapshot.RecordedStatus, g, p))
-	rest := h - 1
-
+	switch {
+	case geo.railW > 0:
+		s.push(sessionSplitRule(w, geo.railW, g, p, rail.zone == zoneBox))
+		railLines := sessionRailLines(snapshot.Box, rail, geo, g, p)
+		pane := sessionPaneLines(snapshot, terminal, frozen, composer, g, p, geo.paneW, geo.bodyH)
+		divider := span{text: g.VRule, style: p.Faint}
+		if rail.zone == zoneBox {
+			divider.style = p.Acc
+		}
+		for i := 0; i < geo.bodyH; i++ {
+			s.pushSplit(railLines[i], geo.railW, divider, pane[i], geo.paneW)
+		}
+	case geo.digestH > 0:
+		s.push(sessionFullRule(w, g, p))
+		for _, l := range sessionDigestLines(snapshot.Box, rail, g, p, w) {
+			s.push(l)
+		}
+		s.push(sessionFullRule(w, g, p))
+		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, geo.bodyH) {
+			s.push(l)
+		}
+	default: // Crew: no rail, no digest, at any width.
+		s.push(newLine())
+		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, geo.bodyH) {
+			s.push(l)
+		}
+	}
 	// The outcome line takes the frame's full width, not the rail's: a
 	// refusal from internal/send quotes the composer state and the text it
 	// refused to overwrite, and 36 columns of that is a sentence cut before
 	// it says anything. It is the session frame's equivalent of frame.go's
 	// message line, which is why it sits on the bottom edge the same way.
-	outcome := rail.outcome.tone != toneNone && rail.outcome.text != ""
-	if outcome {
-		rest--
+	if geo.outcome {
+		s.push(boxOutcomeLine(rail.outcome, g, p, w))
 	}
-
-	rw := sessionRailWidth(snapshot.Target.Kind, w)
-	switch {
-	case snapshot.Target.Kind == SessionTargetMate && rw > 0:
-		s.push(sessionSplitRule(w, rw, g, p))
-		rest--
-		railLines := sessionRailLines(snapshot.Box, rail, g, p, rw, rest)
-		pane := sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w-rw-1, rest)
-		divider := span{text: g.VRule, style: p.Faint}
-		for i := 0; i < rest; i++ {
-			s.pushSplit(railLines[i], rw, divider, pane[i], w-rw-1)
-		}
-		if outcome {
-			s.push(boxOutcomeLine(rail.outcome, g, p, w))
-		}
-	case snapshot.Target.Kind == SessionTargetMate:
-		s.push(sessionFullRule(w, g, p))
-		rest--
-		digest := sessionDigestLines(snapshot.Box, rail, g, p, w)
-		for _, l := range digest {
-			s.push(l)
-		}
-		rest -= len(digest)
-		s.push(sessionFullRule(w, g, p))
-		rest--
-		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, rest) {
-			s.push(l)
-		}
-		if outcome {
-			s.push(boxOutcomeLine(rail.outcome, g, p, w))
-		}
-	default: // Crew: no rail, no digest, at any width.
-		s.push(newLine())
-		rest--
-		for _, l := range sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w, rest) {
-			s.push(l)
-		}
-		if outcome {
-			s.push(boxOutcomeLine(rail.outcome, g, p, w))
-		}
-	}
+	s.push(sessionHintLine(rail, geo, g, p, w))
 	return s.String()
 }
 
@@ -151,30 +135,28 @@ func sessionFrameOverhead(kind SessionTargetKind, w int) int {
 // than it could show is a truncated transcript with room to spare. Never
 // negative.
 func SessionTranscriptCapacity(kind SessionTargetKind, w, h int) int {
-	const composerChromeHeight = 4 // sessionComposerChrome is always exactly 4 lines
-	return max0(h - sessionFrameOverhead(kind, w) - composerChromeHeight)
+	return max0(h - sessionFrameOverhead(kind, w) - sessionComposerChromeHeight - sessionHintHeight)
 }
 
-// streamDetachHintHeight is the one line of chrome stream mode keeps in
-// place of the composer box it removes entirely (streamDetachHintLine,
-// below). Named separately from composerChromeHeight in
-// SessionTranscriptCapacity so the two heights can never be confused for
-// one another even though both currently happen to differ from zero.
-const streamDetachHintHeight = 1
+// sessionComposerChromeHeight is sessionComposerChrome's fixed height: the
+// box's two edges, its input line and the harness hint row under it.
+const sessionComposerChromeHeight = 4
+
+// sessionHintHeight is the frame's single bottom key line
+// (sessionHintLine), drawn in both modes at every width: it is the only
+// thing on screen that says which zone the next keystroke belongs to.
+const sessionHintHeight = 1
 
 // StreamTranscriptCapacity is SessionTranscriptCapacity's stream-mode
 // counterpart: the same upper bound, but reserving only
-// streamDetachHintHeight instead of the composer box's 4 lines, since
+// sessionHintHeight instead of the composer box's 4 lines, since
 // RenderStreamSessionFrame draws no composer at all (ADR 0026 step 6, the
 // captain's ruling) - the PTY gets back most, not all, of the height a
-// Console-drawn composer used to take; the one line it does not get is
-// streamDetachHintLine, the counter-review fix for a Crew or narrow-Mate
-// Agent View otherwise having no on-screen way to leave once Esc and
-// Ctrl+C both go to the agent. session_mode.go's streamTerminalSize uses
-// this, not SessionTranscriptCapacity, to size the actual PTY the stream
-// opens.
+// Console-drawn composer used to take; the one line it does not get is the
+// frame's key hint line. session_mode.go's streamTerminalSize uses this,
+// not SessionTranscriptCapacity, to size the actual PTY the stream opens.
 func StreamTranscriptCapacity(kind SessionTargetKind, w, h int) int {
-	return max0(h - sessionFrameOverhead(kind, w) - streamDetachHintHeight)
+	return max0(h - sessionFrameOverhead(kind, w) - sessionHintHeight)
 }
 
 // ---------- header ----------
@@ -226,28 +208,42 @@ func sessionFullRule(w int, g glyphSet, p palette) *line {
 
 // sessionSplitRule is frame.go's ruleLine shape, with the rail's own width
 // standing in for the inspector's: the tee marks the column the vertical
-// divider below it lines up with.
-func sessionSplitRule(w, rw int, g glyphSet, p palette) *line {
+// divider below it lines up with. The rail's half of the rule goes accent
+// while the box has focus, which is the border signal the focus model
+// promises - one zone's edge is lit, and it is the zone the next keystroke
+// belongs to.
+func sessionSplitRule(w, rw int, g glyphSet, p palette, boxFocused bool) *line {
+	railStyle, teeStyle := p.Faint, p.Faint
+	if boxFocused {
+		railStyle, teeStyle = p.Acc, p.Acc
+	}
 	return newLine().
-		add(strings.Repeat(g.HRule, rw), p.Faint).
-		add(g.TeeDown, p.Faint).
+		add(strings.Repeat(g.HRule, rw), railStyle).
+		add(g.TeeDown, teeStyle).
 		add(strings.Repeat(g.HRule, w-rw-1), p.Faint)
 }
 
-// sessionRailWidth mirrors railWidth in design/mate-tui.js: the rail exists
-// only for a Mate, and only at the two breakpoints the Console's own
-// inspector already uses (140, 100 - layout.go's inspectorWide/Narrow
-// switch), with widths (42, 36) sized for this pane rather than reused from
-// the inspector's own (60, 50).
+// sessionRailWidth is the rail's default width: it exists only for a Mate,
+// and only at the two breakpoints the Console's own inspector already uses
+// (140, 100 - layout.go's inspectorWide/Narrow switch).
+//
+// The widths (50, 44) are sized for what the rail now has to carry on one
+// line: an entry's own words plus the action strip an attention entry grows
+// under the cursor (boxStripWidth, 24 cells). The earlier 42/36 predate that
+// strip and left a needs-decision line cut to nine cells the moment it was
+// selected, which is a row that tells the reader nothing at exactly the
+// moment they are deciding what to do about it. A reader who wants the
+// balance elsewhere drags the splitter (session_focus.go): these are
+// defaults, not limits.
 func sessionRailWidth(kind SessionTargetKind, cols int) int {
 	if kind != SessionTargetMate {
 		return 0
 	}
 	switch {
 	case cols >= 140:
-		return 42
+		return 50
 	case cols >= 100:
-		return 36
+		return 44
 	default:
 		return 0
 	}
@@ -269,6 +265,23 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 type boxRail struct {
 	// sel is the index into BoxView.Entries the keys act on, -1 for none.
 	sel int
+	// hover is the entry the pointer is over, -1 for none. It exists only
+	// so an entry can show its action strip before the reader has committed
+	// to selecting it; nothing else reads it.
+	hover int
+	// zone is which half of the view owns the keyboard (session_focus.go).
+	// It decides which border is accent and which keys the hint line names.
+	zone sessionZone
+	// railW is the width the reader has dragged the splitter to, 0 for the
+	// breakpoint default. It persists for the Console's run.
+	railW int
+	// mode is the project's communication mode, which the header's
+	// clickable [supervised]/[auto] label both names and flips.
+	mode query.Mode
+	// confirm is the one-line confirmation the recovery actions ask for,
+	// and confirmText is the question.
+	confirm     bool
+	confirmText string
 	// outcome is the one line the last box action left behind: the Model's
 	// own footer message. The session frame is not built from frame.go's
 	// six-line chrome and so has no message line of its own, so
@@ -286,61 +299,137 @@ type boxRail struct {
 	stream bool
 }
 
-// sessionRailLines returns exactly h *line values for the rail pane at
-// width w: a 3-line header, the box body, and a footer naming the keys.
-func sessionRailLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, p palette, w, h int) []*line {
-	header := []*line{
-		newLine().add(" CREW "+g.Crumb+" MATE", p.Bold),
-		boxCountLine(v, g, p),
-		sessionFullRule(w, g, p),
+// sessionRailLines returns exactly geo.bodyH *line values for the rail
+// pane: the clickable label header, the box body, and a footer that carries
+// the reply input or the recovery confirmation when one is open. It draws
+// no key hints of its own - the frame's single bottom hint line names the
+// focused zone's keys and nothing else, so a reader is never shown two key
+// lines and left to work out which one is live.
+func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeom, g glyphSet, p palette) []*line {
+	w := geo.railW
+	header := make([]*line, 0, geo.railHdrH)
+	for _, row := range packLabels(sessionHeaderLabels(rail.mode, g), w) {
+		l := newLine()
+		at := 0
+		for _, lab := range row {
+			l.add(strings.Repeat(" ", max0(lab.x-at)), p.Dim)
+			l.add(lab.text, labelStyle(lab.id, rail, p))
+			at = lab.x + cells(lab.text)
+		}
+		header = append(header, l.cut(w, g))
 	}
-	footer := []*line{sessionFullRule(w, g, p)}
-	if rail.reply {
-		footer = append(footer, boxReplyInputLine(rail, p, w))
-	}
-	footer = append(footer, sessionRailKeyLines(rail, p)...)
+	title := newLine().add(" ", p.Dim).addSpan(paneTitleSpan("CREW "+g.Crumb+" MATE", rail.zone == zoneBox, p))
+	header = append(header, title, boxCountLine(v, g, p), sessionFullRule(w, g, p))
 
-	avail := max0(h - len(header) - len(footer))
-	body := boxBodyLines(v, rail.sel, true, g, p, w, avail)
-	return append(append(header, body...), footer...)
+	footer := []*line{sessionFullRule(w, g, p)}
+	if rail.confirm {
+		footer = append(footer, boxConfirmLine(rail, g, p, w))
+	}
+	if rail.reply {
+		footer = append(footer, boxReplyInputLine(rail, g, p, w))
+	}
+
+	hover := -1
+	if rail.zone == zoneBox {
+		hover = rail.hover
+	}
+	body := boxBodyLines(v, rail.sel, hover, rail.zone == zoneBox, g, p, w, geo.railBodyH)
+	return fitLines(append(append(header, body...), footer...), geo.bodyH)
+}
+
+// labelStyle tints one header label. The mode label is the only one that
+// reports state rather than offering an action, so it carries the accent
+// while auto mode is on - the one setting that lets the Console type into
+// the Mate's composer without a keystroke.
+func labelStyle(id labelID, rail boxRail, p palette) lipgloss.Style {
+	if id == labelMode && rail.mode == query.ModeAuto {
+		return p.Amber
+	}
+	return p.Fg
 }
 
 // boxReplyInputLine is the rail's one-line input (the `r` key). It reuses
 // the Console's existing input shape - a label, the typed text, and a "_"
 // caret - rather than inventing a second one: onboardInputLines draws the
 // new-project name the same way, and two input affordances that look
-// different would read as two different kinds of field.
-func boxReplyInputLine(rail boxRail, p palette, w int) *line {
-	label := " reply " + rail.replyCrew + " > "
-	text := cutCells(rail.replyText, max0(w-cells(label)-1))
-	return newLine().add(label, p.Dim).add(text+"_", p.Fg)
+// different would read as two different kinds of field. Its two buttons sit
+// on the same line, right-aligned, at the coordinates sessionFooterLabels
+// hands the mouse.
+func boxReplyInputLine(rail boxRail, g glyphSet, p palette, w int) *line {
+	return labelledInputLine(" reply "+rail.replyCrew+" > ", rail.replyText+"_",
+		[]labelSpec{{labelSend, "[send]"}, {labelCancel, "[cancel]"}}, g, p, w)
 }
 
-// sessionRailKeyLines names the box keys, in the form the current mode
-// actually accepts them. Stream mode hands every unprefixed key to the
-// agent's own terminal (ADR 0026, the captain's ruling), so there the box
-// keys live behind the same Ctrl+b prefix the detach does; in snapshot mode
-// the Console owns the keyboard and the bare keys work. The hint has to say
-// which, or half the readers press a key that lands in the harness.
-func sessionRailKeyLines(rail boxRail, p palette) []*line {
-	if rail.reply {
-		return []*line{
-			newLine().add(" Enter", p.Fg).add(" send reply", p.Dim).add("  Esc", p.Fg).add(" cancel", p.Dim),
-			newLine(),
+// boxConfirmLine is the one-line prompt the recovery actions ask for. A
+// restart stops a live agent, so it is never one keystroke away; the
+// question and its two buttons take one rail row and nothing else moves.
+func boxConfirmLine(rail boxRail, g glyphSet, p palette, w int) *line {
+	return labelledInputLine(" "+rail.confirmText+" ", "",
+		[]labelSpec{{labelYes, "[yes]"}, {labelNo, "[no]"}}, g, p, w)
+}
+
+// labelledInputLine draws a dim label, foreground text, and buttons pinned
+// to the right edge, cutting the text rather than the buttons: the buttons
+// are the only way a mouse-driven reader can answer, so they are the part
+// that must survive a narrow rail.
+func labelledInputLine(label, text string, specs []labelSpec, g glyphSet, p palette, w int) *line {
+	buttons := 0
+	for i, s := range specs {
+		if i > 0 {
+			buttons++
 		}
+		buttons += cells(s.text)
 	}
-	if rail.stream {
-		return []*line{
-			newLine().add(" Ctrl+b", p.Faint).add(" Enter", p.Fg).add(" send", p.Dim).
-				add("  r", p.Fg).add(" reply", p.Dim).add("  p", p.Fg).add(" peek", p.Dim),
-			newLine().add(" Ctrl+b", p.Faint).add(" j/k", p.Fg).add(" move", p.Dim).
-				add("  Ctrl+b", p.Faint).add(" q", p.Fg).add(" detach", p.Dim),
+	avail := max0(w - buttons - 1)
+	lab := cutCells(label, avail)
+	body := cutCells(text, max0(avail-cells(lab)))
+	l := newLine().add(lab, p.Dim).add(body, p.Fg)
+	l.add(strings.Repeat(" ", max0(avail-cells(lab)-cells(body))+1), p.Dim)
+	for i, s := range specs {
+		if i > 0 {
+			l.add(" ", p.Dim)
 		}
+		l.add(s.text, p.Acc)
 	}
-	return []*line{
-		newLine().add(" Enter", p.Fg).add(" send", p.Dim).
-			add("  r", p.Fg).add(" reply", p.Dim).add("  p", p.Fg).add(" peek", p.Dim),
-		newLine().add(" j/k", p.Fg).add(" move", p.Dim).add("  Esc", p.Fg).add(" detach", p.Dim),
+	return l.cut(w, g)
+}
+
+// sessionHintLine is the frame's one key line: the keys of the zone that
+// owns the keyboard, and nothing else. Naming both zones' keys at once is
+// what the Ctrl+b prefix already did badly - the reader had to hold in
+// their head which half of the line applied to the key they were about to
+// press.
+func sessionHintLine(rail boxRail, geo sessionGeom, g glyphSet, p palette, w int) *line {
+	l := newLine()
+	switch {
+	case rail.reply:
+		return l.add(" REPLY  ", p.Bold).
+			add("Enter", p.Fg).add(" send", p.Dim).
+			add("  Esc", p.Fg).add(" cancel", p.Dim).cut(w, g)
+	case rail.confirm:
+		return l.add(" CONFIRM  ", p.Bold).
+			add("Enter", p.Fg).add(" yes", p.Dim).
+			add("  Esc", p.Fg).add(" no", p.Dim).cut(w, g)
+	case rail.zone == zoneBox:
+		l.add(" BOX  ", p.Bold).
+			add(g.UpDown, p.Fg).add(" move", p.Dim).
+			add("  Enter", p.Fg).add(" "+g.Arrow+" mate", p.Dim).
+			add("  r", p.Fg).add(" reply", p.Dim).
+			add("  p", p.Fg).add(" peek", p.Dim).
+			add("  m", p.Fg).add(" mode", p.Dim).
+			add("  R", p.Fg).add(" restart", p.Dim).
+			add("  u", p.Fg).add(" clear composer", p.Dim).
+			add("  Esc", p.Fg).add(" project", p.Dim).
+			add("  F2", p.Fg).add(" terminal", p.Dim)
+		return l.cut(w, g)
+	default:
+		l.add(" TERMINAL  ", p.Bold).add("every key goes to the agent", p.Dim)
+		if geo.railW > 0 || geo.digestH > 0 {
+			l.add("  "+g.Dot+"  ", p.Faint).add("F2", p.Fg).add(" box", p.Dim)
+		} else {
+			l.add("  "+g.Dot+"  ", p.Faint).add("F2", p.Fg).add(" console", p.Dim)
+		}
+		return l.cut(w, g)
 	}
 }
 
@@ -402,8 +491,12 @@ func sessionDigestLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, 
 		start = len(entries) - maxDigestEntries
 		out = append(out, newLine().add(fmt.Sprintf(" %s %d older", g.Up, start), p.Dim))
 	}
+	hover := -1
+	if rail.zone == zoneBox {
+		hover = rail.hover
+	}
 	for i := start; i < len(entries); i++ {
-		out = append(out, boxEntryLine(entries[i], i == rail.sel, true, g, p, w))
+		out = append(out, boxEntryLine(entries[i], i == rail.sel, i == hover, rail.zone == zoneBox, g, p, w))
 	}
 	return out
 }
@@ -417,21 +510,16 @@ func sessionDigestLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, 
 // mode (terminal != nil) the composer box itself is gone: the PTY's own
 // screen already includes whatever composer the harness draws, and drawing
 // a second one on top of it is the defect the captain's ruling
-// (2026-09-12) closed. What stream mode keeps instead is one line,
-// streamDetachHintLine: a Crew Agent View has no rail at any width, and a
-// Mate one only gets "Ctrl+b then q  detach" from its rail footer at >=100
-// columns (sessionRailLines) - without this line, once Esc and Ctrl+C both
-// go to the agent, those frames would show no way to leave the Console at
-// all (a counter-review finding). A non-Known Runtime gets one banner line
-// above the transcript - "runtime_missing" (Absent) or "unknown" (Unknown),
-// never upgraded into a lifecycle word (ADR 0025) - without clearing or
-// replacing whatever the last successful poll recorded.
+// (2026-09-12) closed. The frame's own key line (sessionHintLine) is not
+// drawn here: it belongs to the whole frame, not to this pane, because it
+// names the keys of whichever zone has focus. A non-Known Runtime gets one
+// banner line above the transcript - "runtime_missing" (Absent) or
+// "unknown" (Unknown), never upgraded into a lifecycle word (ADR 0025) -
+// without clearing or replacing whatever the last successful poll recorded.
 func sessionPaneLines(snapshot SessionSnapshot, terminal *TerminalSnapshot, frozen bool, composer string, g glyphSet, p palette, w, h int) []*line {
 	var chrome []*line
 	if terminal == nil {
 		chrome = sessionComposerChrome(g, p, w, composer)
-	} else {
-		chrome = []*line{streamDetachHintLine(g, p)}
 	}
 	bodyH := h - len(chrome)
 	if bodyH < 0 {
@@ -611,26 +699,6 @@ func sessionComposerChrome(g glyphSet, p palette, w int, composer string) []*lin
 		w, g,
 	)
 	return []*line{edge(g.CornerTL, g.CornerTR), box, edge(g.CornerBL, g.CornerBR), hint}
-}
-
-// streamDetachHintLine is stream mode's whole pane chrome: one line naming
-// its sole detach, in the exact wording sessionRailLines' own footer
-// already uses so the two never say the same thing two different ways.
-// Unlike that footer it draws unconditionally, at every SessionTargetKind
-// and every width - a Crew Agent View has no rail to carry it, and a Mate
-// one only gets the rail at >=100 columns - because stream mode has
-// forwarded both Esc and Ctrl+C to the agent, leaving Ctrl+b q as the one
-// way out of the Console a reader has not already been told about
-// elsewhere on screen.
-func streamDetachHintLine(g glyphSet, p palette) *line {
-	// Ctrl+b m, not a bare "m": stream mode hands every other key to the
-	// agent's own terminal (the captain's ruling, ADR 0026), so the mode
-	// toggle has to live behind the same prefix the detach does, or it would
-	// swallow a letter the reader meant for the harness.
-	return newLine().
-		add(" Ctrl+b then q", p.Fg).add("  detach", p.Dim).
-		add("  "+g.Dot+"  ", p.Faint).
-		add("Ctrl+b m", p.Fg).add("  Mode", p.Dim)
 }
 
 func max0(n int) int {

@@ -187,60 +187,67 @@ func TestStreamModeKeystrokesReachThePTYInOrder(t *testing.T) {
 	}
 }
 
-func TestStreamModeCtrlBThenQDetachesWithoutForwardingEitherKey(t *testing.T) {
+// TestStreamModeForwardsCtrlBToThePTY: the prefix is gone. Ctrl+b belongs
+// to the agent like every other key under terminal focus - a harness that
+// binds it (or a shell running under one) gets it byte-exactly.
+func TestStreamModeForwardsCtrlBToThePTY(t *testing.T) {
 	m, channel := enterStreamMode(t, &controllerTestFactory{})
 
 	m, cmd := send(t, m, tea.KeyMsg{Type: tea.KeyCtrlB})
 	if cmd != nil {
-		t.Fatalf("ctrl+b alone produced a Cmd; want nil while awaiting the detach key")
+		t.Fatalf("ctrl+b produced a Cmd; want the byte forwarded and nothing else")
 	}
-	if !m.sess.awaitingDetach {
-		t.Fatalf("ctrl+b did not arm the detach prefix")
+	if m.sess.phase != sessionActive {
+		t.Fatalf("ctrl+b left session mode; nothing about it is a Console key any more")
 	}
-	m, closeCmd := send(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	got := waitForWrites(t, channel, 1)
+	if len(got) != 1 || !bytes.Equal(got[0], []byte{0x02}) {
+		t.Fatalf("written bytes = %q, want ctrl+b's own byte", got)
+	}
+}
+
+// TestStreamModeEscFromBoxFocusDetachesWithoutForwardingIt: under box focus
+// nothing reaches the PTY, and Esc is the way out of the view.
+func TestStreamModeEscFromBoxFocusDetachesWithoutForwardingIt(t *testing.T) {
+	m, channel := enterStreamMode(t, &controllerTestFactory{})
+
+	m, cmd := send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	if cmd != nil || m.sess.zone != zoneBox {
+		t.Fatalf("F2 did not focus the box (zone %v, cmd %v)", m.sess.zone, cmd != nil)
+	}
+	m, closeCmd := send(t, m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.sess.phase == sessionActive {
-		t.Fatalf("ctrl+b q did not leave session mode")
+		t.Fatalf("Esc under box focus did not leave session mode")
 	}
 	if closeCmd != nil {
 		send(t, m, closeCmd())
 	}
 	if len(channel.writtenBytes()) != 0 {
-		t.Fatalf("ctrl+b q forwarded bytes to the PTY, want the detach to swallow both keys")
+		t.Fatalf("keys under box focus reached the PTY: %q", channel.writtenBytes())
 	}
 }
 
-// TestStreamModeCtrlBThenAnyOtherKeyIsSwallowedNotForwarded records the
-// decision session-view-contract.md's "Stream mode" section answers:
-// stream mode reserves the whole Ctrl+b prefix, the same way tmux discards
-// an unrecognised key after its own escape prefix, rather than forwarding a
-// key that only sometimes reaches the agent depending on what preceded it.
-func TestStreamModeCtrlBThenAnyOtherKeyIsSwallowedNotForwarded(t *testing.T) {
+// TestStreamModeForwardsMouseEventsToThePTYInPaneCoordinates: a click
+// inside the terminal zone is forwarded, translated to the agent's own
+// screen origin. The agent draws at (0,0) of its pane, not of the Console's
+// frame, so an untranslated report would name a different cell entirely.
+func TestStreamModeForwardsMouseEventsToThePTYInPaneCoordinates(t *testing.T) {
 	m, channel := enterStreamMode(t, &controllerTestFactory{})
+	geo := m.sessionGeom()
 
-	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyCtrlB})
-	m, cmd := send(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
-	if cmd != nil {
-		t.Fatalf("ctrl+b x produced a Cmd; want nil (swallowed, not forwarded)")
-	}
-	if m.sess.phase != sessionActive {
-		t.Fatalf("ctrl+b x left session mode; want it to stay in stream mode")
-	}
-	if got := channel.writtenBytes(); len(got) != 0 {
-		t.Fatalf("ctrl+b x forwarded bytes %x, want none", got)
-	}
-}
-
-func TestStreamModeForwardsMouseEventsToThePTY(t *testing.T) {
-	m, channel := enterStreamMode(t, &controllerTestFactory{})
-
-	m, cmd := send(t, m, tea.MouseMsg{X: 4, Y: 9, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	m, cmd := send(t, m, tea.MouseMsg{
+		X: geo.paneX + 4, Y: geo.paneTop + 9,
+		Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
 	if cmd != nil {
 		t.Fatalf("mouse press produced a Cmd; want nil (the write is enqueued synchronously)")
+	}
+	if m.sess.zone != zoneTerminal {
+		t.Fatalf("a click in the terminal zone left focus at %v", m.sess.zone)
 	}
 	got := waitForWrites(t, channel, 1)
 	want := []byte("\x1b[<0;5;10M")
 	if len(got) != 1 || !bytes.Equal(got[0], want) {
-		t.Fatalf("written bytes = %q, want %q", got, want)
+		t.Fatalf("written bytes = %q, want %q (pane-relative)", got, want)
 	}
 }
 
@@ -317,24 +324,31 @@ func TestStreamFallbackDropsKeysInsteadOfAccumulatingAnInvisibleComposer(t *test
 	}
 }
 
-// TestRenderStreamSessionFrameAlwaysShowsADetachHint is a counter-review
-// regression: once Esc and Ctrl+C both go to the agent, a Crew Agent View
-// (no rail at any width) or a narrow Mate one (rail only appears at >=100
-// columns) would otherwise show no on-screen way to leave the Console at
-// all. Checked at a Crew target (no rail ever) and a narrow (80-column)
-// Mate target (rail suppressed) - the two shapes that had nothing before
-// this fix.
-func TestRenderStreamSessionFrameAlwaysShowsADetachHint(t *testing.T) {
-	const hint = "Ctrl+b then q"
+// TestRenderStreamSessionFrameAlwaysSaysWhichZoneOwnsTheKeyboard: once
+// every key under terminal focus goes to the agent, the hint line is the
+// only thing on screen that says so and names the key that moves focus
+// back. Checked at a Crew target (no rail ever) and a narrow (80-column)
+// Mate target (rail suppressed) - the two shapes with the least chrome.
+func TestRenderStreamSessionFrameAlwaysSaysWhichZoneOwnsTheKeyboard(t *testing.T) {
 	crewBuffer := NewTerminalBuffer(78, 22)
 	crewFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetCrew}}, crewBuffer, false, boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
-	if !strings.Contains(crewFrame, hint) {
-		t.Fatalf("Crew stream frame has no detach hint:\n%s", crewFrame)
+	for _, want := range []string{"TERMINAL", "every key goes to the agent", "F2"} {
+		if !strings.Contains(crewFrame, want) {
+			t.Fatalf("Crew stream frame does not name %q:\n%s", want, crewFrame)
+		}
 	}
 
 	narrowMateBuffer := NewTerminalBuffer(78, 20)
 	narrowMateFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, narrowMateBuffer, false, boxRail{sel: -1}, 80, 24, unicodeGlyphs, plainPalette())
-	if !strings.Contains(narrowMateFrame, hint) {
-		t.Fatalf("narrow Mate stream frame has no detach hint:\n%s", narrowMateFrame)
+	for _, want := range []string{"TERMINAL", "F2"} {
+		if !strings.Contains(narrowMateFrame, want) {
+			t.Fatalf("narrow Mate stream frame does not name %q:\n%s", want, narrowMateFrame)
+		}
+	}
+
+	boxFocused := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, NewTerminalBuffer(76, 20), false,
+		boxRail{sel: -1, zone: zoneBox}, 160, 48, unicodeGlyphs, plainPalette())
+	if !strings.Contains(boxFocused, "BOX") || strings.Contains(boxFocused, "every key goes to the agent") {
+		t.Fatalf("a box-focused frame still names the terminal zone's keys:\n%s", boxFocused)
 	}
 }

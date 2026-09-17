@@ -9,10 +9,10 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-// Where the three box keys live, per mode (mvp.md task 15). The routing is
-// the part a reader gets wrong at no cost to the tests and at real cost to
-// them: an unprefixed `r` in stream mode is a letter in the harness's
-// composer, not a reply.
+// Where the three box keys live, per focus zone (mvp.md task 15,
+// session_focus.go). The routing is the part a reader gets wrong at no cost
+// to the tests and at real cost to them: an `r` typed with the terminal
+// focused is a letter in the harness's composer, not a reply.
 
 // recordingAction captures what the Console asked its ActionFunc for.
 type recordingAction struct {
@@ -38,9 +38,10 @@ func streamBoxFixture(t *testing.T, action *recordingAction) Model {
 	return m
 }
 
-// TestStreamModeBoxKeysNeedThePrefix: unprefixed, all three keys are bytes
-// for the agent's own terminal; behind Ctrl+b they are the box's.
-func TestStreamModeBoxKeysNeedThePrefix(t *testing.T) {
+// TestStreamModeBoxKeysNeedBoxFocus: with the terminal focused all three
+// keys are bytes for the agent's own terminal; with the box focused they are
+// the box's, bare.
+func TestStreamModeBoxKeysNeedBoxFocus(t *testing.T) {
 	action := &recordingAction{out: "delivered"}
 	m := streamBoxFixture(t, action)
 
@@ -48,25 +49,25 @@ func TestStreamModeBoxKeysNeedThePrefix(t *testing.T) {
 		m, _ = send(t, m, key(k))
 	}
 	if len(action.reqs) != 0 {
-		t.Fatalf("unprefixed keys ran %+v; in stream mode they belong to the agent's terminal", action.reqs)
+		t.Fatalf("keys under terminal focus ran %+v; they belong to the agent's terminal", action.reqs)
 	}
 	if m.boxReply {
-		t.Fatal("an unprefixed r opened the reply input instead of reaching the harness")
+		t.Fatal("an r under terminal focus opened the reply input instead of reaching the harness")
 	}
 
-	// Ctrl+b Enter forwards the selected entry, which defaults to the newest
-	// - the needs-decision line.
-	m, cmd := send(t, m, key("ctrl+b"))
-	m, cmd = send(t, m, key("enter"))
+	// Enter under box focus forwards the selected entry, which defaults to
+	// the newest - the needs-decision line.
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
-		t.Fatal("Ctrl+b Enter issued no command")
+		t.Fatal("Enter under box focus issued no command")
 	}
 	msg, ok := cmd().(actionDoneMsg)
 	if !ok {
-		t.Fatalf("Ctrl+b Enter produced %T, want actionDoneMsg", cmd())
+		t.Fatalf("Enter under box focus produced %T, want actionDoneMsg", cmd())
 	}
 	if msg.choice.action != ActionForward {
-		t.Fatalf("Ctrl+b Enter ran %s, want forward", msg.choice.action)
+		t.Fatalf("Enter under box focus ran %s, want forward", msg.choice.action)
 	}
 	if len(action.reqs) != 1 {
 		t.Fatalf("action requests = %+v, want exactly the forward", action.reqs)
@@ -77,26 +78,29 @@ func TestStreamModeBoxKeysNeedThePrefix(t *testing.T) {
 	}
 }
 
-// TestStreamModeCtrlBMovesTheRailSelection pins Ctrl+b j/k, the movement
-// half of the same rule.
-func TestStreamModeCtrlBMovesTheRailSelection(t *testing.T) {
+// TestBoxFocusMovesTheRailSelectionWithBareKeys pins j/k, the movement half
+// of the same rule: bare under box focus, the agent's under terminal focus.
+func TestBoxFocusMovesTheRailSelectionWithBareKeys(t *testing.T) {
 	m := streamBoxFixture(t, &recordingAction{})
 	if got := m.sessionRailState().sel; got != 2 {
 		t.Fatalf("initial selection = %d, want the newest entry (2)", got)
 	}
-	m, _ = send(t, m, key("ctrl+b"))
+	m, _ = send(t, m, key("k"))
+	if got := m.sessionRailState().sel; got != 2 {
+		t.Fatalf("a k under terminal focus moved the selection to %d; it belongs to the agent", got)
+	}
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, _ = send(t, m, key("k"))
 	if got := m.sessionRailState().sel; got != 1 {
-		t.Fatalf("selection after Ctrl+b k = %d, want 1", got)
+		t.Fatalf("selection after k under box focus = %d, want 1", got)
 	}
-	m, _ = send(t, m, key("k"))
-	if got := m.sessionRailState().sel; got != 1 {
-		t.Fatalf("a bare k moved the selection to %d; unprefixed keys belong to the agent", got)
-	}
-	m, _ = send(t, m, key("ctrl+b"))
 	m, _ = send(t, m, key("j"))
 	if got := m.sessionRailState().sel; got != 2 {
-		t.Fatalf("selection after Ctrl+b j = %d, want 2", got)
+		t.Fatalf("selection after j under box focus = %d, want 2", got)
+	}
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	if m.sess.zone != zoneTerminal {
+		t.Fatalf("F2 did not toggle back to the terminal (zone %v)", m.sess.zone)
 	}
 }
 
@@ -109,7 +113,7 @@ func TestBoxForwardRefusesAMessageEntry(t *testing.T) {
 	m := streamBoxFixture(t, action)
 	m.sess.boxSel = 1 // the user->mate message
 
-	m, _ = send(t, m, key("ctrl+b"))
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, cmd := send(t, m, key("enter"))
 	if cmd != nil {
 		t.Fatalf("forwarding a message issued a command: %T", cmd())
@@ -126,17 +130,17 @@ func TestBoxForwardRefusesAMessageEntry(t *testing.T) {
 	}
 }
 
-// TestStreamModeReplyInputTakesUnprefixedKeys: once the input is open it is
-// a Console-drawn field with a visible caret, so every keystroke is its own -
+// TestStreamModeReplyInputTakesEveryKey: once the input is open it is a
+// Console-drawn field with a visible caret, so every keystroke is its own -
 // otherwise a reply could not contain the letters q, r or p.
-func TestStreamModeReplyInputTakesUnprefixedKeys(t *testing.T) {
+func TestStreamModeReplyInputTakesEveryKey(t *testing.T) {
 	action := &recordingAction{out: "replied"}
 	m := streamBoxFixture(t, action)
 
-	m, _ = send(t, m, key("ctrl+b"))
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, _ = send(t, m, key("r"))
 	if !m.boxReply || m.boxReplyCrew != "k3" {
-		t.Fatalf("Ctrl+b r did not open the reply input for k3: reply=%v crew=%q", m.boxReply, m.boxReplyCrew)
+		t.Fatalf("r under box focus did not open the reply input for k3: reply=%v crew=%q", m.boxReply, m.boxReplyCrew)
 	}
 	for _, r := range "prq A" {
 		m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
@@ -174,10 +178,10 @@ func TestBoxPeekOpensAndClosesTheOverlay(t *testing.T) {
 	action := &recordingAction{out: "line one\nline two\nline three"}
 	m := streamBoxFixture(t, action)
 
-	m, _ = send(t, m, key("ctrl+b"))
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, cmd := send(t, m, key("p"))
 	if cmd == nil {
-		t.Fatal("Ctrl+b p issued no command")
+		t.Fatal("p under box focus issued no command")
 	}
 	m, _ = send(t, m, cmd())
 	if !m.peek.open || m.peek.crew != "k3" {

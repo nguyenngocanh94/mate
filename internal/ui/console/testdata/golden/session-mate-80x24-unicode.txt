@@ -5,7 +5,6 @@
    13:52  user->mate  spawn a crew for the webhook fix                          
  ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe…
 ────────────────────────────────────────────────────────────────────────────────
-⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. 
   Reading its report before reviewing attempt 2.                                
                                                                                 
 ⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                  
@@ -22,3 +21,4 @@
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ? for shortcuts                                               ⏵⏵ accept edits on
+ TERMINAL  every key goes to the agent  ·  F2 box                               

@@ -14,7 +14,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.relayout()
 		if m.sess.stream != nil && m.sess.phase == sessionActive {
 			size := streamTerminalSize(m.sess.target.Kind, m.w, m.h,
-				sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w))
+				sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w), m.railWidth)
 			m.sess.terminal.Resize(size.Cols, size.Rows)
 			return m, sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, m.sess.gen)
 		}
@@ -145,15 +145,20 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.peek = peekFlow{}
 	}
-	// Stream mode owns the whole keyboard except its own Ctrl+b q detach
-	// (onSessionStreamKey): Esc and Ctrl+C are forwarded to the agent's PTY
-	// instead of leaving session mode or quitting the Console - the two
-	// keys ADR 0026 deliberately inverts relative to snapshot mode (see
-	// session-view-contract.md, "Esc semantics invert" / "Ctrl+C ... second
-	// key that inverts"). This check must run before the Ctrl+C-quits
-	// branch below, or a real terminal program's own Ctrl+C handling (a
-	// shell's job control, an editor's own binding) would never reach it.
-	if m.sess.phase == sessionActive && m.sess.stream != nil {
+	// Stream mode with the terminal zone focused owns the whole keyboard:
+	// Esc and Ctrl+C are forwarded to the agent's PTY instead of leaving
+	// session mode or quitting the Console (session-view-contract.md, "Esc
+	// semantics invert" / "Ctrl+C ... second key that inverts"). This check
+	// must run before the Ctrl+C-quits branch below, or a real terminal
+	// program's own Ctrl+C handling (a shell's job control, an editor's own
+	// binding) would never reach it.
+	//
+	// With the box zone focused nothing reaches the PTY at all, so Ctrl+C
+	// means what it means everywhere else in the Console - quit - and falls
+	// through to the branch below. It is the one way out that does not
+	// depend on remembering which zone has focus.
+	if m.sess.phase == sessionActive && m.sess.stream != nil &&
+		!(key == "ctrl+c" && m.sess.zone == zoneBox && !m.boxReply && !m.boxConfirm) {
 		return m.onSessionStreamKey(msg)
 	}
 	// q always quits, at every size and in every phase, and never stops an
@@ -249,10 +254,25 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.harnessPick {
 		return m.onHarnessKey(msg)
 	}
+	if key == "f2" {
+		// The same key that moves focus in the session view moves it here, so
+		// one key means "the other zone" everywhere in the Console. Tab still
+		// cycles list -> inspector -> box; F2 goes straight to the box and
+		// back.
+		if _, panel := m.boxRegion(layout(m.w, m.h)); panel {
+			if m.focus == paneBox {
+				m.focus = paneList
+			} else {
+				m.focus = paneBox
+			}
+			m.msg = footerMsg{}
+		}
+		return m, nil
+	}
 	if m.focus == paneBox {
-		// The box panel owns the keyboard while Tab has focused it
-		// (box_keys.go): Enter, r and p act on the selected entry instead of
-		// on the list row, and Esc or Tab hands focus back.
+		// The box panel owns the keyboard while focus is on it (box_keys.go):
+		// Enter, r and p act on the selected entry instead of on the list
+		// row, and Esc, Tab or F2 hands focus back.
 		model, cmd := m.onProjectBoxKey(msg)
 		return model, cmd
 	}
@@ -354,16 +374,23 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// onMouse forwards a mouse event to the live PTY when stream mode is active,
-// and drops it otherwise. Mouse reporting is enabled Program-wide
-// (tea.WithMouseAllMotion, cmd/matev2/console.go), not just while a stream is
-// open, so a MouseMsg can reach the Console at any time - this guard is
-// what keeps it from doing anything outside an active stream.
+// onMouse routes a mouse event to the surface it landed on
+// (session_mouse.go). Mouse reporting is enabled Program-wide
+// (tea.WithMouseAllMotion, cmd/matev2/console.go), so an event can reach the
+// Console at any time; every branch below resolves it against the geometry
+// of the frame that is actually drawn, and an event on a frame with nothing
+// clickable on it does nothing at all.
 func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.sess.phase != sessionActive || m.sess.stream == nil {
+	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
+		return m.onSessionMouse(msg)
+	}
+	if m.sess.phase != sessionIdle || m.attachHoldsTerminal() || m.phase != phaseReady {
 		return m, nil
 	}
-	return m.onSessionStreamMouse(msg)
+	if l := m.listLayout(); l.TooSmall {
+		return m, nil
+	}
+	return m.onFrameMouse(msg)
 }
 
 // onBusyQuit is what q/ctrl+c do while an action's ActionFunc is still

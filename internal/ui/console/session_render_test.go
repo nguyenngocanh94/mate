@@ -273,12 +273,12 @@ func TestSessionTranscriptCapacity(t *testing.T) {
 		w, h int
 		want int
 	}{
-		{"mate rail 160x48", SessionTargetMate, 160, 48, 42},
-		{"mate rail boundary 140x48", SessionTargetMate, 140, 48, 42},
-		{"mate digest just below rail boundary 99x48", SessionTargetMate, 99, 48, 41},
-		{"mate digest narrow 80x24", SessionTargetMate, 80, 24, 17},
-		{"crew 160x48", SessionTargetCrew, 160, 48, 42},
-		{"crew narrow 80x24", SessionTargetCrew, 80, 24, 18},
+		{"mate rail 160x48", SessionTargetMate, 160, 48, 41},
+		{"mate rail boundary 140x48", SessionTargetMate, 140, 48, 41},
+		{"mate digest just below rail boundary 99x48", SessionTargetMate, 99, 48, 40},
+		{"mate digest narrow 80x24", SessionTargetMate, 80, 24, 16},
+		{"crew 160x48", SessionTargetCrew, 160, 48, 41},
+		{"crew narrow 80x24", SessionTargetCrew, 80, 24, 17},
 		{"tiny window never goes negative", SessionTargetMate, 20, 3, 0},
 	}
 	for _, tc := range cases {
@@ -295,9 +295,9 @@ func TestSessionTranscriptCapacity(t *testing.T) {
 }
 
 func TestStreamTerminalSizeReservesBannerLines(t *testing.T) {
-	withoutBanner := streamTerminalSize(SessionTargetCrew, 80, 24, 0)
-	withBanner := streamTerminalSize(SessionTargetCrew, 80, 24, 1)
-	withTwoBanners := streamTerminalSize(SessionTargetCrew, 80, 24, 2)
+	withoutBanner := streamTerminalSize(SessionTargetCrew, 80, 24, 0, 0)
+	withBanner := streamTerminalSize(SessionTargetCrew, 80, 24, 1, 0)
+	withTwoBanners := streamTerminalSize(SessionTargetCrew, 80, 24, 2, 0)
 
 	if withBanner.Rows != withoutBanner.Rows-1 {
 		t.Fatalf("one banner rows = %d, want %d", withBanner.Rows, withoutBanner.Rows-1)
@@ -305,7 +305,7 @@ func TestStreamTerminalSizeReservesBannerLines(t *testing.T) {
 	if withTwoBanners.Rows != withoutBanner.Rows-2 {
 		t.Fatalf("two banner rows = %d, want %d", withTwoBanners.Rows, withoutBanner.Rows-2)
 	}
-	if tiny := streamTerminalSize(SessionTargetCrew, 20, 3, 2); tiny.Rows != 1 {
+	if tiny := streamTerminalSize(SessionTargetCrew, 20, 3, 2, 0); tiny.Rows != 1 {
 		t.Fatalf("tiny stream rows = %d, want clamped 1", tiny.Rows)
 	}
 }
@@ -340,8 +340,8 @@ func TestStreamTranscriptCapacity(t *testing.T) {
 			if got != tc.want {
 				t.Fatalf("StreamTranscriptCapacity(%v, %d, %d) = %d, want %d", tc.kind, tc.w, tc.h, got, tc.want)
 			}
-			if want := SessionTranscriptCapacity(tc.kind, tc.w, tc.h) + 3; got != want && tc.want != 0 {
-				t.Fatalf("StreamTranscriptCapacity(%v, %d, %d) = %d, want SessionTranscriptCapacity+3 = %d", tc.kind, tc.w, tc.h, got, want)
+			if want := SessionTranscriptCapacity(tc.kind, tc.w, tc.h) + 4; got != want && tc.want != 0 {
+				t.Fatalf("StreamTranscriptCapacity(%v, %d, %d) = %d, want SessionTranscriptCapacity+4 = %d", tc.kind, tc.w, tc.h, got, want)
 			}
 		})
 	}
@@ -354,7 +354,7 @@ func TestStreamTranscriptCapacity(t *testing.T) {
 // the PTY 3 rows shorter than the frame actually gives it - must fail this
 // test.
 func TestStreamTerminalSizeUsesStreamCapacityNotSessionCapacity(t *testing.T) {
-	size := streamTerminalSize(SessionTargetCrew, 160, 48, 0)
+	size := streamTerminalSize(SessionTargetCrew, 160, 48, 0, 0)
 	want := StreamTranscriptCapacity(SessionTargetCrew, 160, 48)
 	if size.Rows != want {
 		t.Fatalf("streamTerminalSize rows = %d, want StreamTranscriptCapacity's %d (not SessionTranscriptCapacity's %d)",

@@ -18,13 +18,17 @@ import (
 //	p      peek: the crew's own pane, 40 lines, in a scrollable overlay.
 //	j/k    move the selection.
 //
-// Where they live depends on who owns the keyboard. Stream mode forwards
-// every unprefixed key to the agent's PTY (ADR 0026, the captain's ruling),
-// so there they sit behind the same Ctrl+b prefix as the detach; in
-// snapshot mode and on the project frame's box panel the Console owns the
-// keyboard and the bare keys work. sessionRailKeyLines and keyHints say
-// which, so a reader is never told about a key that would land in the
-// harness instead.
+// They are bare everywhere, and they are live exactly while the box has
+// focus (session_focus.go): in the session view that is the box zone, on
+// the project frame it is paneBox. The Ctrl+b prefix they used to sit
+// behind in stream mode is gone - a prefix is a mode with no indicator, and
+// a mis-typed one delivered `r` or `q` into the agent's own composer.
+// sessionHintLine and keyHints name only the focused surface's keys, so a
+// reader is never told about a key that would land in the harness instead.
+//
+// The two recovery actions (`R` restart, `u` clear composer) live here too:
+// they are box-focus keys and rail-header labels for the same reason the
+// three above are, and they go through the same ActionFunc seam.
 //
 // None of them acts on anything itself: each builds an actionChoice and
 // goes through runAction, so the whole existing machinery - the busy flag,
@@ -73,13 +77,96 @@ func (m Model) sessionRailState() boxRail {
 	} else if v.IsKnown() {
 		sel = clampInt(sel, 0, len(v.Value.Entries)-1)
 	}
+	hover := -1
+	if m.sess.zone == zoneBox {
+		hover = m.boxHover
+	}
 	return boxRail{
-		sel:       sel,
-		outcome:   m.boxMsg,
-		reply:     m.boxReply,
-		replyCrew: m.boxReplyCrew,
-		replyText: m.boxReplyText,
-		stream:    m.sess.stream != nil,
+		sel:         sel,
+		hover:       hover,
+		zone:        m.sess.zone,
+		railW:       m.railWidth,
+		mode:        m.sess.target.Mode,
+		outcome:     m.boxMsg,
+		reply:       m.boxReply,
+		replyCrew:   m.boxReplyCrew,
+		replyText:   m.boxReplyText,
+		confirm:     m.boxConfirm,
+		confirmText: m.boxConfirmText,
+		stream:      m.sess.stream != nil,
+	}
+}
+
+// ---------- the recovery actions ----------
+
+// beginRestartMate is `R`, and the rail header's [restart mate] label. It
+// never runs on the keystroke itself: a restart stops a live agent, and an
+// agent stopped by accident takes minutes to bring back. The confirmation
+// is one rail line with its own [yes]/[no] buttons rather than the project
+// frame's modal overlay, because the session view has no overlay and a
+// modal drawn over a live PTY would hide the thing being restarted.
+func (m Model) beginRestartMate(project string) Model {
+	if project == "" || m.actionBusy {
+		return m
+	}
+	m.boxConfirm, m.boxConfirmText = true, "restart Mate "+project+"?"
+	m.boxConfirmChoice = restartMateChoice(project)
+	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
+	return m
+}
+
+// beginClearComposer is `u`, and the [clear composer] label: one Ctrl+U
+// into the Mate's pane. It asks for no confirmation because it sends
+// nothing and types nothing - it only removes what a stray key sequence
+// left half-typed in the composer, which is the state it exists for.
+func (m Model) beginClearComposer(project string) (Model, tea.Cmd) {
+	if project == "" || m.actionBusy {
+		return m, nil
+	}
+	return m.runAction(clearComposerChoice(project))
+}
+
+// onBoxConfirmKey is the confirmation line's keyboard: Enter runs it, Esc
+// and anything else that is not a decision leaves the Mate alone.
+func (m Model) onBoxConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter", "y":
+		return m.resolveBoxConfirm(true)
+	case "esc", "n":
+		return m.resolveBoxConfirm(false)
+	}
+	return m, nil
+}
+
+// resolveBoxConfirm is the confirmation's one exit, for Enter/Esc and for
+// the [yes]/[no] buttons alike.
+func (m Model) resolveBoxConfirm(yes bool) (Model, tea.Cmd) {
+	choice := m.boxConfirmChoice
+	m.boxConfirm, m.boxConfirmText, m.boxConfirmChoice = false, "", actionChoice{}
+	if !yes {
+		return m, nil
+	}
+	return m.runAction(choice)
+}
+
+func restartMateChoice(project string) actionChoice {
+	return actionChoice{
+		action: ActionRestartMate, enabled: true, dangerous: true,
+		desc: "Restart the Mate of " + project,
+		req: ActionRequest{
+			Action: ActionRestartMate, Target: project, TargetKind: "project",
+		},
+	}
+}
+
+func clearComposerChoice(project string) actionChoice {
+	return actionChoice{
+		action: ActionClearComposer, enabled: true,
+		desc: "Clear the Mate's composer",
+		req: ActionRequest{
+			Action: ActionClearComposer, Target: project, TargetKind: "project",
+		},
 	}
 }
 
@@ -125,24 +212,35 @@ func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 func (m Model) onBoxReplyKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
-		return m, nil
+		return m.cancelBoxReply(), nil
 	case "backspace":
 		m.boxReplyText = trimLastCluster(m.boxReplyText)
 		return m, nil
 	case "enter":
-		crew, project, text := m.boxReplyCrew, m.boxReplyProject, strings.TrimSpace(m.boxReplyText)
-		m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
-		if text == "" {
-			m.boxMsg = errMsg("Reply refused: a reply is one non-empty line " + m.g.Dot + " nothing was sent")
-			return m, nil
-		}
-		return m.runAction(boxReplyChoice(project, crew, text))
+		return m.submitBoxReply()
 	}
 	if len(msg.Runes) > 0 && len([]rune(m.boxReplyText)) < 500 {
 		m.boxReplyText += string(msg.Runes)
 	}
 	return m, nil
+}
+
+// submitBoxReply and cancelBoxReply are what Enter and Esc do, and what the
+// input line's own [send] and [cancel] buttons do. One implementation, so a
+// click and a keystroke cannot end up meaning different things.
+func (m Model) submitBoxReply() (Model, tea.Cmd) {
+	crew, project, text := m.boxReplyCrew, m.boxReplyProject, strings.TrimSpace(m.boxReplyText)
+	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
+	if text == "" {
+		m.boxMsg = errMsg("Reply refused: a reply is one non-empty line " + m.g.Dot + " nothing was sent")
+		return m, nil
+	}
+	return m.runAction(boxReplyChoice(project, crew, text))
+}
+
+func (m Model) cancelBoxReply() Model {
+	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
+	return m
 }
 
 // beginBoxForward is Enter: hand the selected entry to the Mate. A message

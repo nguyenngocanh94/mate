@@ -57,11 +57,11 @@ type sessionFlow struct {
 	// entry read is in flight (nothing blocks the keyboard for it, unlike
 	// the classic hand-off's attachHoldsTerminal).
 	entryRow row
-	// awaitingDetach is true for the one key after a bare "ctrl+b": the next
-	// key decides whether this was "ctrl+b q" (leave session mode) or two
-	// keys the composer never gets to see either way - Ctrl+b is not
-	// forwarded to the harness by this MVP.
-	awaitingDetach bool
+	// zone is which of the view's two halves owns the keyboard
+	// (session_focus.go). It is zoneTerminal on entering the view: a reader
+	// who opened a Mate opened it to talk to the Mate, and the rail is one
+	// click or one F2 away.
+	zone sessionZone
 	// gen fences every scheduled tick and in-flight read: a message whose
 	// gen no longer matches m.sess.gen is dropped instead of applied. This
 	// is what lets leaving session mode (or starting a different entry
@@ -216,7 +216,7 @@ func (m Model) beginSession(r row, target SessionTarget) (Model, tea.Cmd) {
 		openCtx, cancel := context.WithCancel(m.baseCtx())
 		m.sess.openCancel = cancel
 		m.msg = infoMsg("Opening live session view for " + sessionLabel(target) + m.g.Ellipsis)
-		return m, sessionStreamOpenCmd(openCtx, m.sessionStream, target, streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w)), gen)
+		return m, sessionStreamOpenCmd(openCtx, m.sessionStream, target, streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w), m.railWidth), gen)
 	}
 	m.msg = infoMsg("Opening session view for " + sessionLabel(target) + m.g.Ellipsis)
 	return m, sessionReadCmd(m.baseCtx(), m.sessionReader, target, gen)
@@ -347,7 +347,7 @@ func (m Model) onSessionStreamOpened(msg sessionStreamOpenedMsg) (Model, tea.Cmd
 		return m.beginStreamFallback(msg.err)
 	}
 	target := m.sess.target
-	size := streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w))
+	size := streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w), m.railWidth)
 	stream := newStreamSession(m.baseCtx(), msg.channel, size)
 	m.sess.stream = stream
 	if m.sess.openCancel != nil {
@@ -509,7 +509,7 @@ func (m Model) resizeStreamForReserve(previousReservedLines, gen int) tea.Cmd {
 	if currentReservedLines == previousReservedLines || m.sess.stream == nil {
 		return sessionStreamMetadataTickCmd(sessionMetadataInterval, gen)
 	}
-	size := streamTerminalSize(m.sess.target.Kind, m.w, m.h, currentReservedLines)
+	size := streamTerminalSize(m.sess.target.Kind, m.w, m.h, currentReservedLines, m.railWidth)
 	m.sess.terminal.Resize(size.Cols, size.Rows)
 	return tea.Batch(sessionStreamMetadataTickCmd(sessionMetadataInterval, gen),
 		sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, gen))
@@ -582,6 +582,7 @@ func (m Model) endSession() (Model, tea.Cmd) {
 	closer := m.sessionClose
 	stream := m.sess.stream
 	gen := m.sess.gen + 1
+	m = m.clearBoxInteraction()
 	if stream != nil {
 		m.sess = sessionFlow{boxSel: -1, gen: gen, phase: sessionClosing, target: target}
 		return m, sessionStreamCloseCmd(stream, gen)
@@ -598,10 +599,13 @@ func (m Model) endSession() (Model, tea.Cmd) {
 	}
 }
 
-func streamTerminalSize(kind SessionTargetKind, w, h, reservedLines int) TerminalSize {
+func streamTerminalSize(kind SessionTargetKind, w, h, reservedLines, railWidth int) TerminalSize {
 	cols := w
 	if kind == SessionTargetMate {
-		if rail := sessionRailWidth(kind, w); rail > 0 {
+		// resolveRailWidth, not sessionRailWidth: the splitter is draggable
+		// (session_focus.go), so the PTY's width has to follow the column the
+		// reader actually put the divider at, not the breakpoint default.
+		if rail := resolveRailWidth(kind, w, railWidth); rail > 0 {
 			cols = w - rail - 1
 		}
 	}
@@ -644,44 +648,18 @@ func sessionStreamReservedLines(snapshot SessionSnapshot, kind SessionTargetKind
 
 // onSessionKey handles every key while the snapshot-mode composer owns the
 // keyboard (sessionActive or sessionFallback with m.sess.stream == nil).
-// Esc leaves outright; "ctrl+b" then "q" leaves the way a Herdr terminal
-// detach would (ADR 0025's own keystroke, kept even though this session
-// view is embedded rather than a subprocess handoff, so the muscle memory
-// from attach.go's hand-off still works); every other key is composer
-// input. "ctrl+b" not followed by "q" is swallowed rather than forwarded -
-// the MVP composer has no raw keystroke passthrough to a harness, only a
-// submit-on-Enter line. Stream mode never reaches this function - see
-// onSessionStreamKey, which forwards raw bytes instead of a composer line
-// (ADR 0026 step 6, the captain's ruling that stream mode owns its own
-// input and draws no composer of its own).
+// The zone model is the same one stream mode uses (session_focus.go): with
+// the terminal zone focused the keys are the composer's, with the box zone
+// focused they are the rail's, and F2 moves between them. Esc leaves the
+// view from either zone here - snapshot mode's composer is Console-drawn,
+// not a real terminal, so there is nothing under it that wants Esc.
 func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-	if m.sess.awaitingDetach {
-		m.sess.awaitingDetach = false
-		if key == "q" {
-			return m.endSession()
-		}
-		if key == "m" {
-			return m.beginModeToggle(m.sess.target.ProjectID)
-		}
-		return m, nil
-	}
-	// The box keys are bare here: the Console owns the keyboard in snapshot
-	// mode, so there is nothing to prefix them away from. They are offered
-	// before the composer for the same reason the key hints name them -
-	// matev2 never wires SessionPrompt (cmd/matev2/console.go builds only
-	// the stream ports), so the snapshot composer has nowhere to send, while
-	// the rail always has something to act on. A box with no entries
-	// consumes nothing and the composer keeps every key.
-	if model, cmd, handled := m.onSessionBoxKey(msg); handled {
+	if model, cmd, handled := m.onSessionZoneKey(msg); handled {
 		return model, cmd
 	}
-	switch key {
+	switch msg.String() {
 	case "esc":
 		return m.endSession()
-	case "ctrl+b":
-		m.sess.awaitingDetach = true
-		return m, nil
 	case "enter":
 		return m.sendComposer()
 	case "backspace":
@@ -695,30 +673,12 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // onSessionStreamKey handles every key while stream mode owns the terminal
-// (m.sess.stream != nil, ADR 0026 step 6). There is no composer here: the
-// captain's ruling (2026-09-12, "Khi stream mode active, bỏ
-// sessionComposerChrome; input phải do terminal của agent sở hữu") means
-// every key but the detach prefix is encoded to raw bytes and written to
-// the PTY, exactly the way a real terminal would deliver it. This
-// deliberately inverts two of onSessionKey's own keys:
-//
-//   - Esc is forwarded, not treated as "leave session mode" - a real
-//     terminal never intercepts it, and Vim, the harness's own UI or any
-//     other interactive program under the agent needs to receive it.
-//   - "ctrl+b" then anything other than "q" is swallowed, matching
-//     onSessionKey - it is the one universal exception. tmux's own escape
-//     prefix behaves the same way (an unrecognised key after the prefix is
-//     discarded, not forwarded as two separate keystrokes), and stream
-//     mode reserves the whole prefix for the same reason: a Ctrl+b that
-//     sometimes reaches the agent and sometimes doesn't, depending on what
-//     follows it, would be a worse surprise than never delivering the
-//     prefix byte itself (session-view-contract.md, "Stream mode").
-//
-// Ctrl+C is not special-cased here: update.go's onKey only calls this
-// function for Ctrl+C once stream mode is confirmed active, so it reaches
-// encodeKeyMsg and is enqueued like any other control key - the second key
-// ADR 0026 explicitly inverts relative to snapshot mode's Console-wide
-// quit.
+// (m.sess.stream != nil, ADR 0026 step 6). With the terminal zone focused
+// there is no prefix and no exception: every key is encoded to the bytes a
+// real terminal would have sent and written to the PTY, including q, j, k,
+// Enter, Esc and Ctrl+C. That is what the zone model buys - the reader can
+// see which zone has focus before pressing anything, so the view no longer
+// has to reserve keystrokes out of the agent's own alphabet.
 //
 // The encoded bytes are handed to streamSession.enqueueWrite rather than
 // written via a per-key tea.Cmd: a Cmd runs on its own goroutine with no
@@ -731,38 +691,8 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // (streamSession.writeLoop's own doc comment), so there is no separate
 // write-result message to route here.
 func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// The reply input (box_keys.go) is the one thing that takes unprefixed
-	// keys while a stream is open: it is a Console-drawn field with a
-	// visible caret, so every keystroke while it is open was aimed at it,
-	// not at the harness. It is closed by Esc or by submitting, and the
-	// rail's own key hints say so.
-	if m.boxReply {
-		model, cmd := m.onBoxReplyKey(msg)
+	if model, cmd, handled := m.onSessionZoneKey(msg); handled {
 		return model, cmd
-	}
-	if m.sess.awaitingDetach {
-		m.sess.awaitingDetach = false
-		switch msg.String() {
-		case "q":
-			return m.endSession()
-		case "m":
-			// The one other key the prefix claims. A bare 'm' cannot be it:
-			// stream mode forwards every unprefixed key to the agent's own
-			// terminal, so binding the letter itself would eat a character
-			// the reader meant to type to the harness.
-			return m.beginModeToggle(m.sess.target.ProjectID)
-		}
-		// The box keys (mvp.md task 15) live behind this prefix for exactly
-		// the same reason 'm' does: an unprefixed Enter, r or p belongs to
-		// the harness's own composer.
-		if model, cmd, handled := m.onSessionBoxKey(msg); handled {
-			return model, cmd
-		}
-		return m, nil
-	}
-	if msg.String() == "ctrl+b" {
-		m.sess.awaitingDetach = true
-		return m, nil
 	}
 	if data, ok := encodeKeyMsg(msg); ok && m.sess.stream != nil {
 		m.sess.stream.enqueueWrite(data)
@@ -770,21 +700,52 @@ func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// onSessionStreamMouse forwards a mouse event to the PTY exactly like a key
-// (session-view-contract.md, "Input model": key AND mouse events are
-// encoded and written, never appended to a string, and never through a
-// per-event Cmd - see onSessionStreamKey's own doc comment on ordering).
-// update.go's onMouse is the guard that only calls this while stream mode
-// is actually active - mouse reporting itself is enabled Program-wide
-// (cmd/matev2/console.go's tea.WithMouseCellMotion, not toggled per session
-// mode), so a MouseMsg can in principle reach the Console at any time; a
-// button this encoder does not recognise is dropped rather than guessed
-// at.
-func (m Model) onSessionStreamMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if data, ok := encodeMouseMsg(msg); ok && m.sess.stream != nil {
-		m.sess.stream.enqueueWrite(data)
+// onSessionZoneKey is everything both modes share: the modal fields that
+// own the keyboard outright, the F2 zone switch, and the box zone's own
+// keys. The third return says whether the key was consumed; false hands it
+// on to the mode's own terminal (the PTY, or the snapshot composer).
+func (m Model) onSessionZoneKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+	// The reply input and the recovery confirmation are Console-drawn
+	// fields with a visible caret or a visible question: while one is open
+	// every keystroke was aimed at it, not at the harness.
+	if m.boxReply {
+		model, cmd := m.onBoxReplyKey(msg)
+		return model, cmd, true
 	}
-	return m, nil
+	if m.boxConfirm {
+		model, cmd := m.onBoxConfirmKey(msg)
+		return model, cmd, true
+	}
+	if msg.Type == tea.KeyF2 {
+		m.sess.zone = m.sess.zone.other()
+		m.boxHover = -1
+		return m, nil, true
+	}
+	if m.sess.zone != zoneBox {
+		return m, nil, false
+	}
+	switch msg.String() {
+	case "esc":
+		model, cmd := m.endSession()
+		return model, cmd, true
+	case "m":
+		model, cmd := m.beginModeToggle(m.sess.target.ProjectID)
+		return model, cmd, true
+	case "R":
+		return m.beginRestartMate(m.sess.target.ProjectID), nil, true
+	case "u":
+		model, cmd := m.beginClearComposer(m.sess.target.ProjectID)
+		return model, cmd, true
+	}
+	if model, cmd, handled := m.onSessionBoxKey(msg); handled {
+		return model, cmd, true
+	}
+	// Nothing reaches the PTY while the box has focus. A key the rail does
+	// not bind is swallowed rather than forwarded, because a key that
+	// sometimes reaches the agent and sometimes does not, depending on a
+	// focus the reader may have forgotten, is the exact defect the prefix
+	// model was removed for.
+	return m, nil, true
 }
 
 // trimLastCluster removes the composer's last grapheme cluster rather than
@@ -833,4 +794,15 @@ func sessionErrorReason(err error) string {
 		return string(coded.Code) + ": " + coded.Message
 	}
 	return err.Error()
+}
+
+// clearBoxInteraction drops every half-finished box interaction: the reply
+// input, the recovery confirmation, the hover and the drag. Leaving the
+// session view has to leave them behind - a confirmation still armed when
+// the reader comes back would answer a question they have forgotten asking.
+func (m Model) clearBoxInteraction() Model {
+	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
+	m.boxConfirm, m.boxConfirmText, m.boxConfirmChoice = false, "", actionChoice{}
+	m.boxHover, m.draggingSplit, m.lastClick = -1, false, clickMemo{}
+	return m
 }

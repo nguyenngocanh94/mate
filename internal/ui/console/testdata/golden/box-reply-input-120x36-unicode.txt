@@ -1,36 +1,36 @@
  claude-code · mate-payments-api · supervised                                                                           
-────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────
- CREW › MATE                        │                                                                                   
- 1 attention · 3 entries            │                                                                                   
-────────────────────────────────────│                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │                                                                                   
-                                    │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook.    
-                                    │  Reading its report before reviewing attempt 2.                                   
-                                    │                                                                                   
-                                    │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                     
-                                    │  ⎟  Read 84 lines (ctrl+o to expand)                                              
-                                    │                                                                                   
-                                    │⏺ Reply(a1 · Upgrade database adapter)                                             
-                                    │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."      
-                                    │                                                                                   
-                                    │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
-   13:41  k3  working  reading the …│  "Upgrade database adapter".                                                      
-   13:52  user->mate  spawn a crew …│                                                                                   
-▌! 14:01  k3  needs-decision  migra…│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
-────────────────────────────────────│╭─────────────────────────────────────────────────────────────────────────────────╮
- reply k3 > A_                      ││ >                                                                               │
- Enter send reply  Esc cancel       │╰─────────────────────────────────────────────────────────────────────────────────╯
-                                    │? for shortcuts                                                  ⏵⏵ accept edits on
+────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────
+ [← project] [supervised] [restart mate]    │                                                                           
+ [clear composer]                           │                                                                           
+ CREW › MATE                                │                                                                           
+ 1 attention · 3 entries                    │                                                                           
+────────────────────────────────────────────│                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │                                                                           
+                                            │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/    
+                                            │  webhook. Reading its report before reviewing attempt 2.                  
+                                            │                                                                           
+                                            │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                             
+                                            │  ⎟  Read 84 lines (ctrl+o to expand)                                      
+                                            │                                                                           
+                                            │⏺ Reply(a1 · Upgrade database adapter)                                     
+                                            │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate     
+                                            │      task."                                                               
+                                            │                                                                           
+                                            │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict 
+                                            │  on "Upgrade database adapter".                                           
+                                            │                                                                           
+   13:41  k3  working  reading the ticket   │✻ Waiting for the completion report from crew-payments-api-2 (esc to interr
+   13:52  user->mate  spawn a crew for the …│╭─────────────────────────────────────────────────────────────────────────╮
+▌! 14:01  k3  needs… [→ mate] [reply] [peek]││ >                                                                       │
+────────────────────────────────────────────│╰─────────────────────────────────────────────────────────────────────────╯
+ reply k3 > A_               [send] [cancel]│? for shortcuts                                          ⏵⏵ accept edits on
  ! Send refused: composer holds unsubmitted text · nothing was sent                                                     
+ REPLY  Enter send  Esc cancel                                                                                          

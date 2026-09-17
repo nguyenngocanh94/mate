@@ -16,6 +16,10 @@ const (
 	// ... , rule, message, keys. The main region is exactly h - chromeRows.
 	chromeRows = 6
 
+	// frameBodyTop is the first frame row of the main region: the header,
+	// the breadcrumb and the rule above it (frame.go's render).
+	frameBodyTop = 3
+
 	// inspectorWide/inspectorNarrow are the two inspector widths. 50 is
 	// chosen so the value column is 31 cells: comfortable headroom over any
 	// id mate actually generates (internal/domain/id.go: prefix_ plus 16 hex

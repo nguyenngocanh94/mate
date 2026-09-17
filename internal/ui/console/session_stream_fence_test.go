@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
@@ -40,9 +42,10 @@ func TestStaleMetadataMustNotOverwriteTheNewSession(t *testing.T) {
 		Box:            awaitingBox(4),
 	}
 
-	// Leave (Ctrl+b q) and re-enter: session 2 is live and healthy.
-	m, _ = send(t, m, key("ctrl+b"))
-	m, closeCmd := send(t, m, key("q"))
+	// Leave (F2 to the box, then Esc) and re-enter: session 2 is live and
+	// healthy.
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, closeCmd := send(t, m, key("esc"))
 	if closeCmd == nil {
 		t.Fatal("detach did not schedule a close")
 	}
@@ -113,8 +116,8 @@ func TestStaleStreamErrorMustNotCollapseTheNewSession(t *testing.T) {
 		t.Fatal("stream 1 did not open")
 	}
 
-	m, _ = send(t, m, key("ctrl+b"))
-	m, closeCmd := send(t, m, key("q"))
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, closeCmd := send(t, m, key("esc"))
 	if closeCmd == nil {
 		t.Fatal("detach did not schedule a close")
 	}

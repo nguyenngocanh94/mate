@@ -643,14 +643,14 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 		}
 	}
 	if m.focus == paneBox {
-		// The box keys are bare on this frame: the Console owns the keyboard
-		// here, unlike the session view's stream mode, where the same three
-		// keys sit behind Ctrl+b (sessionRailKeyLines).
+		// The box keys are bare: nothing on this frame is prefixed, here or
+		// in the session view (session_focus.go).
 		return []keyHint{
 			{key: m.g.UpDown, desc: "Move", sacrifice: keyMovement},
 			{key: "Enter", desc: "Send to Mate", sacrifice: keyAction},
 			{key: "r", desc: "Reply", sacrifice: keyAction},
 			{key: "p", desc: "Peek", sacrifice: keyAction},
+			{key: "F2", desc: "List", optional: true},
 			{key: "Esc", desc: "List", sacrifice: keyBack},
 			{key: "q", desc: "Quit", sacrifice: keyQuit},
 		}
