@@ -47,7 +47,11 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 	root := ws.Root()
 	var w warnings
 	snap := Snapshot{
-		WorkspaceID: store.SessionName(root),
+		// The workspace has no id of its own (mvp.md section 3): the
+		// directory is the only name there is, so the breadcrumb shows
+		// that rather than the derived Herdr session name, which names a
+		// runtime handle and not this workspace.
+		WorkspaceID: filepath.Base(root),
 		Workspace: KnownField(WorkspaceValue{
 			Name: filepath.Base(root),
 			Root: root,
