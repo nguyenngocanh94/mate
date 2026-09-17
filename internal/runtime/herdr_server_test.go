@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"os"
 	"os/exec"
 	"strings"
@@ -38,6 +39,8 @@ func TestHerdrServerEnvPassesOperatorEnvironmentMinusMateNamespace(t *testing.T)
 	t.Setenv("SOME_SHELL_INTEGRATION_VAR", "keep-me")
 	t.Setenv("MATEV2_AGENT_ID", "strip-me")
 	t.Setenv("MATEV2_WORKSPACE_ID", "strip-me-too")
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "outer-agent-session")
 
 	env := herdrServerEnv()
 
@@ -47,6 +50,9 @@ func TestHerdrServerEnvPassesOperatorEnvironmentMinusMateNamespace(t *testing.T)
 		found[key] = true
 		if strings.HasPrefix(key, "MATEV2_") {
 			t.Fatalf("herdrServerEnv leaked a mate identity var into the spawned server: %q", kv)
+		}
+		if harness.IsNestedSessionEnv(key) {
+			t.Fatalf("herdrServerEnv leaked a nested Claude session var into the spawned server: %q", kv)
 		}
 	}
 	for _, want := range []string{"PATH", "HOME", "SOME_SHELL_INTEGRATION_VAR"} {

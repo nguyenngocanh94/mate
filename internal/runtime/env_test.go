@@ -93,7 +93,7 @@ func TestPaneEnvCopiesLaunchSpecEnv(t *testing.T) {
 	if len(got) != 2 || got[0].Key != "MATEV2_AGENT_ID" || got[0].Value != "mate_001" || got[1].Key != "MATEV2_AGENT_ROLE" {
 		t.Fatalf("PaneEnv = %#v", got)
 	}
-	if got := launch.UnsetEnv(); !slices.Equal(got, []string{"CLAUDE_CONFIG_DIR"}) {
+	if got := launch.UnsetEnv(); !slices.Equal(got, append([]string{"CLAUDE_CONFIG_DIR"}, harness.NestedSessionEnv...)) {
 		t.Fatalf("PaneEnv launch unset env = %#v", got)
 	}
 }

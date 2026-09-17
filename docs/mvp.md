@@ -137,7 +137,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Test xanh với fake Herdr không chứng minh gì. Mỗi milestone có live test trên Herdr lab session riêng, tên `TestLive*`, chạy khi `MATEV2_LIVE=1`.
 - Lệnh báo thành công phải kiểm tra lại hệ thống thật, không tin handle cũ.
 - Live test runtime cần một lab session do người chạy cấp qua `MATEV2_HERDR_LIVE_SESSION=fm-lab-...` và `TMPDIR` không đi qua symlink (macOS `/var` → `/private/var`). Herdr báo cwd của pane đã resolve symlink, nên guard so cwd trong `runtime` dùng `samePath` thay vì so chuỗi (sửa 2026-09-17, v1 có cùng lỗi).
-- Known drift 2026-09-17, Claude Code 2.1.274: session interactive khởi động qua Herdr bắn hook `Stop` với `transcript_path` đúng slug nhưng file `.jsonl` không xuất hiện trong 20 giây; headless `claude -p` thì có ngay. Chưa rõ nguyên nhân. Ảnh hưởng token monitor sau MVP, không ảnh hưởng MVP. `TestLiveHerdrClaudeStopHookFiresWithRealPayload` đang fail vì đúng điều này.
+- Nested-session env (đo 2026-09-17, Claude Code 2.1.274): một Claude Code đang chạy export `CLAUDECODE=1`, `CLAUDE_CODE_SESSION_ID`, và các biến `CLAUDE_CODE_*` khác cho process con. Nếu Herdr server được khởi động từ shell đó thì mọi pane kế thừa chúng, và Claude trong pane coi mình là session con: hook `Stop` vẫn bắn nhưng transcript không bao giờ được ghi. Runtime gỡ `harness.NestedSessionEnv` khỏi env của server lúc spawn và khỏi pane ngay trước `agent start`. Bài học chung: không tin env kế thừa qua Herdr server, mọi biến harness cần đúng phải được set hoặc unset ở pane.
 
 ## 8. Tái sử dụng từ v1
 

@@ -370,7 +370,8 @@ func herdrServerEnv() []string {
 	env := os.Environ()
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
-		if strings.HasPrefix(kv, "MATEV2_") {
+		key, _, _ := strings.Cut(kv, "=")
+		if refusedServerEnvKey(key) {
 			continue
 		}
 		out = append(out, kv)
@@ -383,8 +384,11 @@ func herdrServerEnv() []string {
 // config.IdentityEnvKeys is deliberate: a key added later is refused by
 // default, and the failure of a new key leaking is worse than the failure of
 // an unrelated MATEV2_-prefixed one being dropped.
+// harness.NestedSessionEnv is refused for the same reason: the server hands
+// its environment to every pane, and an agent that starts the server must not
+// make every Mate and Crew look like its own child session.
 func refusedServerEnvKey(key string) bool {
-	return strings.HasPrefix(key, "MATEV2_") || key == "HERDR_SESSION"
+	return strings.HasPrefix(key, "MATEV2_") || key == "HERDR_SESSION" || harness.IsNestedSessionEnv(key)
 }
 
 func (h *Herdr) waitRunning(ctx context.Context, session string) error {
@@ -925,12 +929,15 @@ func (h *Herdr) StartAgent(ctx context.Context, spec AgentStartSpec) (AgentHandl
 	if err != nil {
 		return AgentHandle{}, err
 	}
-	// A long-running Herdr server can carry CLAUDE_CONFIG_DIR from the
-	// environment it was started with. The default Claude launch must remove
-	// that inherited value in this pane, rather than setting an empty value or
-	// mutating the server environment shared by other agents.
-	for _, key := range spec.Launch().UnsetEnv() {
-		if _, err := h.run(ctx, session.Name, []string{"pane", "run", spec.Tab().PaneID, "unset", key}); err != nil {
+	// A long-running Herdr server can carry CLAUDE_CONFIG_DIR, and the
+	// nested-session variables of whichever Claude Code session started it,
+	// from the environment it was started with. The launch must remove those
+	// inherited values in this pane (one `unset` for all of them), rather than
+	// setting empty values or mutating the server environment shared by other
+	// agents. See harness.NestedSessionEnv for the measured failure.
+	if keys := spec.Launch().UnsetEnv(); len(keys) > 0 {
+		argv := append([]string{"pane", "run", spec.Tab().PaneID, "unset"}, keys...)
+		if _, err := h.run(ctx, session.Name, argv); err != nil {
 			return AgentHandle{}, err
 		}
 	}

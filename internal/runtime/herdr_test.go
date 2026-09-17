@@ -962,6 +962,11 @@ func TestHerdrStartClearsDefaultClaudeConfigInPaneBeforeAgentStart(t *testing.T)
 			if !argvHas(spec.Args, "unset", "CLAUDE_CONFIG_DIR") {
 				t.Fatalf("default Claude launch clear command = %#v", spec.Args)
 			}
+			for _, k := range harness.NestedSessionEnv {
+				if !argvHas(spec.Args, k) {
+					t.Fatalf("clear command must also unset nested-session var %s: %#v", k, spec.Args)
+				}
+			}
 			return process.Result{}, nil
 		}
 		if argvHas(spec.Args, "agent", "start") {

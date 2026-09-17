@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/matev2/internal/config"
@@ -156,12 +157,16 @@ func (s LaunchSpec) ClaudeConfigDir() string { return s.claudeConfigDir }
 // pane's shell before starting the harness. This is distinct from setting an
 // empty value: Claude treats its default account configuration as the
 // variable being absent, and an inherited Herdr server may still carry an
-// old value.
+// old value. Every launch also removes NestedSessionEnv, so a harness never
+// mistakes itself for a child of whichever agent started the Herdr server.
 func (s LaunchSpec) UnsetEnv() []string {
-	if s.unsetEnv == nil {
-		return nil
+	out := append([]string(nil), s.unsetEnv...)
+	for _, k := range NestedSessionEnv {
+		if !slices.Contains(out, k) {
+			out = append(out, k)
+		}
 	}
-	return append([]string(nil), s.unsetEnv...)
+	return out
 }
 
 // Notes are recorded tradeoffs (inline process-table exposure, unproven flags).
