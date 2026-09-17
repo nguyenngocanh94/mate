@@ -175,10 +175,10 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 01 | Khởi tạo module Go, `cmd/matev2`, Makefile `check`, gotestreport với `TestLive*` là skip duy nhất được phép | `make check` xanh. Đã xong. |
-| 02 | Copy `internal/runtime`, `internal/process`, `internal/harness` launch spec và startup prompt classifier từ v1. Đổi import, giữ test và testdata. Live test đổi tên thành `TestLive*` và gate bằng `MATEV2_LIVE=1`. Đổi tên biến môi trường `MATE_*` thành `MATEV2_*`. | Test unit pass, live test skip có kiểm soát. |
-| 03 ∥ | `internal/store`: layout `.matev2/`, đọc ghi `workspace.yaml`, `project.yaml`, `.meta`, append `.status` và `sent.log` có flock, ranh giới đường dẫn trong workspace. | Test với thư mục tạm; symlink ra ngoài workspace bị từ chối. |
-| 04 ∥ | `matev2 init`, `matev2 project add/list/remove`. Repo phải là thư mục con của workspace và là git repo. | Đăng ký hai project trên thư mục thật. |
+| 01 | Khởi tạo module Go, `cmd/matev2`, Makefile `check`, gotestreport với `TestLive*` là skip duy nhất được phép | `make check` xanh. Đã xong 2026-09-17. |
+| 02 | Copy `internal/runtime`, `internal/process`, `internal/harness` launch spec và startup prompt classifier từ v1. Đổi import, giữ test và testdata. Live test đổi tên thành `TestLive*` và gate bằng `MATEV2_LIVE=1`. Đổi tên biến môi trường `MATE_*` thành `MATEV2_*`. | Test unit pass, live test skip có kiểm soát. Đã xong 2026-09-17. |
+| 03 ∥ | `internal/store`: layout `.matev2/`, đọc ghi `workspace.yaml`, `project.yaml`, `.meta`, append `.status` và `sent.log` có flock, ranh giới đường dẫn trong workspace. | Test với thư mục tạm; symlink ra ngoài workspace bị từ chối. Đã xong 2026-09-17. |
+| 04 ∥ | `matev2 init`, `matev2 project add/list/remove`. Repo phải là thư mục con của workspace và là git repo. | Đăng ký hai project trên thư mục thật. Đã xong 2026-09-17. |
 
 ### M1. Console và Mate sống
 
