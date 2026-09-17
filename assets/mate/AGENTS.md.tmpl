@@ -232,13 +232,18 @@ Spawn one Crew per task:
 {{.MatevBin}} crew spawn {{.ProjectName}} <id> --brief {{.MateDir}}/briefs/<id>.md --task "<one line>"
 ```
 
+That command creates a worktree, launches a harness and answers its trust dialog, so it regularly takes a minute or more.
+If whatever runs it for you asks for a timeout, give it at least five minutes; do not kill it and retry, because a half-finished spawn leaves a record you then have to clean up.
+
 Then, in order:
 
 1. Record the three printed lines - branch, worktree, status path - where you can find them again.
 2. Add the task to `{{.BacklogFile}}` under In flight, with the crew id, the branch, and one line of what it is for.
    Edit the file yourself; the `matev2 backlog` command does not exist yet (section 4).
 3. Run `{{.MatevBin}} peek {{.ProjectName}} <id>` once, to confirm the Crew is processing its brief rather than sitting on a dialog or a dead harness.
-4. Tell the captain, in one sentence of outcome language, that the work has started.
+4. Do not stop here.
+   A spawned Crew is not a delivered result, and "I've started it" is not an outcome the captain asked for.
+   Go straight to section 9 and supervise the Crew until it is done, failed, or waiting on you.
 
 Never spawn a Crew for work that overlaps an in-flight Crew's files; queue it instead (section 5).
 
@@ -258,7 +263,21 @@ There is no acknowledgement, no correlation id, no waiting for a reply to arrive
 
 ## 9. Supervision, review and delivery
 
-You are woken when something about a Crew needs attention: a status line with a captain-relevant verb (`needs-decision`, `blocked`, `done`, `failed`), or a Crew that has gone quiet without one of those verbs and is not provably still working.
+**Waiting is your job, not someone else's.**
+Nothing wakes you on its own today; the console watcher that will do that lands in a later task.
+So while a Crew is in flight you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
+Check it about every twenty seconds with one command:
+
+```text
+sleep 20; {{.MatevBin}} state {{.ProjectName}} <id>
+```
+
+Repeat that while the line says `working`.
+Real work takes minutes, so expect to run it many times over; each run costs one line of output, and that is the whole cost of supervising.
+Stop repeating when the line says something else, and act on it: `parked` means answer it, `done` means review it, `failed` means recover it, `unknown` means look at the pane.
+If a Crew is genuinely quiet for many minutes with nothing to show for it, load `stuck-crew-recovery` rather than continuing to poll.
+
+You are also woken when something about a Crew needs attention: a status line with a captain-relevant verb (`needs-decision`, `blocked`, `done`, `failed`), or a Crew that has gone quiet without one of those verbs and is not provably still working.
 On a wake, read the named status file first; that is usually enough.
 Then run `matev2 state` on that Crew before concluding anything, because the status log is a history and `state` is the current reading.
 If the Crew stopped without a verb, `matev2 peek` its pane to see whether it is still genuinely working, stuck, or finished silently.
