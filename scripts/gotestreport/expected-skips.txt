@@ -1,0 +1,11 @@
+# Tests allowed to skip during `make check` / `make test-race`.
+# Adding a name here is a reviewable claim that the test is not required
+# to run on every machine. A skip not listed here fails the suite.
+#
+# Syntax: <TestName> [GOOS]
+# TestName may end with * for a prefix match.
+# GOOS, if present, restricts the allow to that runtime.GOOS.
+#
+# Live Herdr/harness proofs are named TestLive* and skip unless MATEV2_LIVE=1. A green
+# suite that skipped them is not evidence those features work.
+TestLive*

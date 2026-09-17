@@ -1,0 +1,10 @@
+/bin/
+/coverage.out
+/coverage.html
+*.test
+*.out
+.DS_Store
+/.matev2/
+/.worktrees/
+/skip-report.md
+/skip-report-race.md
