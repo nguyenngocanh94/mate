@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/store"
@@ -78,6 +79,11 @@ type Deps struct {
 	StartupPromptTimeout time.Duration
 	// StartTimeout is passed to `agent start --timeout`.
 	StartTimeout time.Duration
+	// BriefDeliveryTimeout bounds the wait for a crew pane to leave idle
+	// after the brief prompt. Zero means DefaultBriefDeliveryTimeout.
+	BriefDeliveryTimeout time.Duration
+	// Git runs the crew worktree commands. The zero value is the real git.
+	Git gitx.Git
 	// Sleep is the pause between pane polls; tests shorten it.
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Now is the clock the meta's timestamps come from.
@@ -116,6 +122,23 @@ func (d Deps) startupPromptTimeout() time.Duration {
 		return d.StartupPromptTimeout
 	}
 	return d.readinessTimeout()
+}
+
+func (d Deps) briefDeliveryTimeout() time.Duration {
+	if d.BriefDeliveryTimeout > 0 {
+		return d.BriefDeliveryTimeout
+	}
+	return DefaultBriefDeliveryTimeout
+}
+
+// git is the git command surface the crew saga uses. A Deps with no Git
+// runs the real binary, which is what the CLI wants and what the package's
+// own tests want too: they operate on real temporary repositories.
+func (d Deps) git() gitx.Git {
+	if d.Git.Runner != nil {
+		return d.Git
+	}
+	return gitx.New()
 }
 
 func (d Deps) startTimeout() time.Duration {
