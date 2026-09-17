@@ -61,6 +61,16 @@ type AgentSpec struct {
 	// non-interactive resume path, so BuildLaunchSpec refuses with
 	// ErrResumeUnsupported.
 	ResumeSessionID string
+	// ManualInCwd says the agent's cwd already loads the operating manual on
+	// its own, so the launch must not carry a context flag as well. Claude
+	// Code reads `CLAUDE.md` from the directory it starts in, and a Mate's
+	// cwd holds one that is exactly `@AGENTS.md`; passing that same manual
+	// as --append-system-prompt-file delivered it twice (docs/mvp.md, "No ky
+	// thuat"). With this set, ContextPath must be empty and the resulting
+	// spec's delivery is DeliveryCwdManual. It is ignored by Codex, which
+	// has no cwd auto-load of CLAUDE.md and whose one delivery mechanism is
+	// itself a file in the cwd.
+	ManualInCwd bool
 	// InlineFallback requests Claude's bounded --append-system-prompt path.
 	// Ignored for Codex. The constructor still fails closed if the file is
 	// missing, empty, relative, or over budget.

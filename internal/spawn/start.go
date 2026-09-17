@@ -363,6 +363,8 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		MemoryFile:    w.MemoryFile(project),
 		BacklogFile:   w.BacklogFile(project),
 		MatevBin:      binary,
+		MateDir:       mateDir,
+		CrewsDir:      w.CrewsDir(project),
 	}); err != nil {
 		return err
 	}
@@ -432,7 +434,11 @@ func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mat
 	}
 	switch kind {
 	case harness.KindClaude:
-		spec.ContextPath = filepath.Join(mateDir, "AGENTS.md")
+		// No context path: `<mate>/CLAUDE.md` is `@AGENTS.md` and Claude
+		// loads it from the cwd on its own, so passing the same manual as
+		// --append-system-prompt-file put it in context twice (docs/mvp.md,
+		// task 17).
+		spec.ManualInCwd = true
 		// A fresh session id is what a first start names for a later
 		// `--resume` (task 10); the settings file is where task 08's hooks
 		// go. Claude refuses either without the other, fresh or resumed.

@@ -13,6 +13,24 @@ var (
 	briefTemplate  = template.Must(template.ParseFS(assets.FS, "crew/brief.md.tmpl"))
 )
 
+// SkillNames are the Claude Code skills installed beside the manual, in the
+// order Write lays them down. Each one is
+// `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
+// `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
+// Code discovers a skill relative to its own working directory.
+var SkillNames = []string{"harness-adapters", "stuck-crew-recovery"}
+
+// skillTemplates holds one parsed template per SkillNames entry. Parsing at
+// init keeps a malformed skill a build-time failure rather than a Mate that
+// starts without its playbooks.
+var skillTemplates = func() map[string]*template.Template {
+	out := make(map[string]*template.Template, len(SkillNames))
+	for _, name := range SkillNames {
+		out[name] = template.Must(template.ParseFS(assets.FS, "mate/skills/"+name+"/SKILL.md.tmpl"))
+	}
+	return out
+}()
+
 // Params fills assets/mate/AGENTS.md.tmpl. Every field is a value the Mate
 // needs at bootstrap; every path is absolute, because the rendered file is
 // the thing the Mate reads to find everything else.
@@ -41,6 +59,13 @@ type Params struct {
 	BacklogFile string
 	// MatevBin is the absolute path of the matev2 binary the Mate invokes.
 	MatevBin string
+	// MateDir is the absolute path of the Mate's own working directory, the
+	// one place it may write: its briefs, memory and backlog live there.
+	MateDir string
+	// CrewsDir is the absolute path of `projects/<p>/crews/`, where every
+	// crew's `.meta` and `.status` file lives. The Mate reads it, never
+	// writes it.
+	CrewsDir string
 }
 
 // Render fills assets/mate/AGENTS.md.tmpl with p and returns the result. It
@@ -49,6 +74,21 @@ func Render(p Params) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := agentsTemplate.Execute(&buf, p); err != nil {
 		return nil, fmt.Errorf("mateassets: render AGENTS.md: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// RenderSkill fills the named skill's template with p. The name must be one
+// of SkillNames; anything else is a programming error and is reported as one
+// rather than silently writing nothing.
+func RenderSkill(name string, p Params) ([]byte, error) {
+	tmpl, ok := skillTemplates[name]
+	if !ok {
+		return nil, fmt.Errorf("mateassets: unknown skill %q", name)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, p); err != nil {
+		return nil, fmt.Errorf("mateassets: render skill %s: %w", name, err)
 	}
 	return buf.Bytes(), nil
 }

@@ -59,10 +59,22 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	}
 	cwd := spec.Cwd
 	path := spec.ContextPath
-	if path == "" {
+	// ManualInCwd is the caller asserting that the cwd already loads the
+	// manual (Claude reads CLAUDE.md from the directory it starts in), so
+	// this launch carries no context flag at all. The two are mutually
+	// exclusive rather than merely redundant: a spec that names a path AND
+	// claims the cwd loads it is the double delivery this flag exists to
+	// remove, so it is refused instead of silently preferring one.
+	switch {
+	case spec.ManualInCwd && path != "":
+		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
+			"claude launch cannot both carry a context path and declare the manual already loaded from cwd", ErrContextRequired)
+	case spec.ManualInCwd && spec.InlineFallback:
+		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
+			"claude inline fallback needs a context file to inline; it cannot be combined with a cwd-loaded manual", ErrContextRequired)
+	case !spec.ManualInCwd && path == "":
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "claude context path is required", ErrContextRequired)
-	}
-	if !filepath.IsAbs(path) {
+	case path != "" && !filepath.IsAbs(path):
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, fmt.Sprintf("context path %s is relative", path), ErrContextRequired)
 	}
 	if cwd == "" || !filepath.IsAbs(cwd) {
@@ -148,6 +160,16 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 		model:           spec.Model,
 		claudeConfigDir: configDir,
 		unsetEnv:        unsetEnv,
+	}
+	if spec.ManualInCwd {
+		out.contextFiles = nil
+		out.contextRequired = false
+		out.delivery = DeliveryCwdManual
+		out.args = extra
+		out.notes = append(append([]string(nil), dangerousPermissionNotes...),
+			"no context flag is passed: Claude Code loads CLAUDE.md from the directory it starts in, and the caller declared that file already loads the manual",
+		)
+		return finalize(out)
 	}
 	if spec.InlineFallback {
 		info, err := os.Stat(path)

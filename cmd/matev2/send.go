@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
@@ -26,7 +27,7 @@ func cmdSend(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stderr, `usage: matev2 send <project> <crew> "<one line>" [--workspace <dir>] [--marker] [--queue] [--from user|mate]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	markerFlag := fs.Bool("marker", false, "prefix the app-sent marker byte (0x1f)")
+	markerFlag := fs.Bool("marker", false, "prefix the app-sent sentinel "+strconv.Quote(send.Marker))
 	queueFlag := fs.Bool("queue", false, "type into a busy pane instead of refusing; the harness queues it")
 	fromFlag := fs.String("from", "", "who is sending: user or mate (default: mate when MATEV2_AGENT_ROLE=mate, else user)")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
