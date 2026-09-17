@@ -1,0 +1,36 @@
+ mate console                                                                                        No snapshot loaded 
+ (unknown)                                                                                                              
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+ Could not read snapshot                                                                                                
+                                                                                                                        
+ open /Users/dev/work/acme/.mate/mate.db: permission denied                                                             
+                                                                                                                        
+ No earlier snapshot is loaded, so nothing else is shown.                                                               
+ r retries the read; q quits.                                                                                           
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ! Snapshot read failed                                                                                                 
+ r Retry  q Quit                                                                                                        

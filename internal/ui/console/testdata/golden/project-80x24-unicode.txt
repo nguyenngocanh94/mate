@@ -1,0 +1,24 @@
+ mate console   workspace ws_acme                                As of 14:02:11 
+ ws_acme › payments-api                                       Project · 2 tasks 
+────────────────────────────────────────────────────────────────────────────────
+  MATE                            HARNESS      STATUS         BINDING           
+▌ mate-payments-api               claude       running        active            
+                                                                                
+  TASKS  2                             STATUS           ATTEMPTS  ATTENTION     
+  Fix webhook idempotency so retried S…running          2                       
+  Add idempotency-key index            ready            0                       
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ ↑↓ Move  a Actions  Enter Attach mate  Esc Back  r Refresh  q Quit             

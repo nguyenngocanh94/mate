@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 tasks 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+ Session open failed                                                                                                    
+                                                                                                                        
+ Target           mate-payments-api                                                                                     
+ Reference        mate_01J9M2G9N3X8D5J0B4H7V2T1WK                                                                       
+ Now              no session open                                                                                       
+                                                                                                                        
+ 1. Live stream failed                                                                                                  
+ Cause            the runtime is not reachable                                                                          
+ Code             runtime_unavailable                                                                                   
+ Message          herdr: server shut down                                                                               
+ Next             check the runtime is running, then retry                                                              
+                                                                                                                        
+ 2. Snapshot view failed                                                                                                
+ Cause            another agent holds the pane                                                                          
+ Code             target_blocked                                                                                        
+ Message          pane p3 is held by another agent                                                                      
+ Next             conflict: another agent holds the pane; stop or detach it, then retry                                 
+                                                                                                                        
+ 3. Attach failed                                                                                                       
+ Cause            the runtime is not reachable                                                                          
+ Code             runtime_unavailable (derived from exit 20)                                                            
+ Exit             mate attach exit 20                                                                                   
+ Message          (no message recorded)                                                                                 
+ Next             check the runtime is running, then retry                                                              
+                                                                                                                        
+ Esc closes this view. Nothing here changes the session.                                                                
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+ ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) · +2 earlier · snapshot re-read           
+ ↑↓ Scroll  Esc Close  q Quit                                                                                           

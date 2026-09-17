@@ -1,0 +1,24 @@
+ mate console                                                No snapshot loaded 
+ (unknown)                                                                      
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ Could not read snapshot                                                        
+                                                                                
+ runtime_unavailable: sqlite: database is locked (SQLITE_BUSY) after 5s (/      
+ Users/dev/work/acme/.mate/mate.db)                                             
+                                                                                
+ No earlier snapshot is loaded, so nothing else is shown.                       
+ r retries the read; q quits.                                                   
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+ ! Snapshot read failed                                                         
+ r Retry  q Quit                                                                

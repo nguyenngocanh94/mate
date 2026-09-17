@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api › Fix webhook idempotency so retried Stripe deliveries do not double-charge   Task · 2 attempts 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ CREW  attempt 2 of 2                             
+▌ #2  crew_01J9P6…B8DT  running          claude       retry of #1    │                                                  
+  ↓ Completed (1)                                     ! failed       │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
+                                                                     │ Task             Fix webhook idempotency so      
+                                                                     │                  retried Stripe deliveries do    
+                                                                     │                  not double-charge               
+                                                                     │ Retry of         attempt 1 ·                     
+                                                                     │                  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
+                                                                     │                                                  
+                                                                     │ Recorded status  running                         
+                                                                     │ Harness          claude                          
+                                                                     │ Agent            crew-payments-api-2             
+                                                                     │ Binding          active                          
+                                                                     │                  recorded active; this does not  
+                                                                     │                  prove the agent is alive        
+                                                                     │ Runtime          herdr · mate-acme · tab crew/   
+                                                                     │                  01J9P6Q6 · pane p-7c1e          
+                                                                     │ Bound since      13:41:05                        
+                                                                     │                                                  
+                                                                     │ Repo             payments-api                    
+                                                                     │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
+                                                                     │ Branch           crew/task_01J9P2B4/attempt-2    
+                                                                     │ Worktree         /Users/dev/work/acme/repos/     
+                                                                     │                  payments-api/.worktrees/        
+                                                                     │                  crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 
+                                                                     │ Worktree status  created                         
+                                                                     │                                                  
+                                                                     │ Last event       14:01:58  agent.tool_call       
+                                                                     │ Reason           none · not an error state       
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  a Actions  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                                      

@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › ledger-worker                                                                              Project · 0 tasks 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  MATE                 HARNESS      STATUS         BINDING           │ MATE  ledger-worker                              
+▌ none assigned                                    ! no mate         │                                                  
+                                                                     │ ID               none · this project has no      
+  TASKS  0                  STATUS           ATTEMPTS  ATTENTION     │                  designated Mate                 
+                                                                     │ Agent            none · this project has no      
+  No tasks recorded for ledger-worker.                               │                  designated Mate                 
+  Tasks are created by the Mate or the mate CLI; press r to re-read. │ Harness          none · this project has no      
+                                                                     │                  designated Mate                 
+                                                                     │                                                  
+                                                                     │ Recorded status  none · this project has no      
+                                                                     │                  designated Mate                 
+                                                                     │ Binding          none · this project has no      
+                                                                     │                  designated Mate                 
+                                                                     │                                                  
+                                                                     │ Last event       none · this project has no      
+                                                                     │                  designated Mate                 
+                                                                     │ Reason           none · not an error state       
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  a Actions  s Create mate  Enter Attach mate (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit         

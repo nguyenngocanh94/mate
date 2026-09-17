@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 tasks 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  MATE                 HARNESS      STATUS         BINDING           │ MATE  payments-api                               
+▌ mate-payments-api    claude       running        active            │                                                  
+                                                                     │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK 
+  TASKS  2                  STATUS           ATTEMPTS  ATTENTION     │ Agent            mate-payments-api               
+  Fix webhook idempotency s…running          2                       │ Harness          claude                          
+  Add idempotency-key index ready            0                       │                                                  
+                                                                     │ Recorded status  running                         
+                                                                     │ Binding          active                          
+                                                                     │                  recorded active; this does not  
+                                                                     │                  prove the agent is alive        
+                                                                     │ Runtime          herdr · mate-acme · tab mate/   
+                                                                     │                  payments-api · pane p-3f2a      
+                                                                     │ Bound since      09:14:02                        
+                                                                     │                                                  
+                                                                     │ Last event       13:41:05  crew.started          
+                                                                     │ Reason           none · not an error state       
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+ ! Action refused: a Project is created at the workspace level; Esc goes back there · nothing started                   
+ ↑↓ Move  a Actions  h Change harness  Enter Attach mate  Esc Back  Tab Inspector  r Refresh  q Quit                    

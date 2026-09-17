@@ -1,0 +1,24 @@
+ mate console   workspace ws_acme                                As of 14:02:11 
+ ws_acme › payments-api › Fix webhook idempotency so retried… Task · 2 attempts 
+────────────────────────────────────────────────────────────────────────────────
+  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE                      
+▌ #2  crew_01J9P6…B8DT  running          claude       retry of #1               
+  ↓ Completed (1)                                     ! failed                  
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+ ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) ·…
+ ↑↓ Move  a Actions  e Details  Enter Attach crew  Esc Back  r Refresh  q Quit  

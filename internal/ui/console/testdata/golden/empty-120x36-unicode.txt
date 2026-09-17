@@ -1,0 +1,36 @@
+ mate console   workspace ws_acme                                                     Recorded snapshot  As of 14:02:11 
+ ws_acme                                                                                         Workspace · 0 projects 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  PROJECTS  0           MATE                    TASKS  ATTENTION     │ WORKSPACE                                        
+                                                                     │                                                  
+  No projects recorded in workspace ws_acme.                         │ nothing selected                                 
+  Press n to add a Project, then a to onboard its Mate.              │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ a Actions  n New project  r Refresh  q Quit                                                                            

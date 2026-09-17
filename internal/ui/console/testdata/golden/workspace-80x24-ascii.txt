@@ -1,0 +1,24 @@
+ mate console   workspace ws_acme                                As of 14:02:11 
+ ws_acme                                                 Workspace . 2 projects 
+--------------------------------------------------------------------------------
+  PROJECTS  2                      MATE                    TASKS  ATTENTION     
+> payments-api                     claude . running        2                    
+  ledger-worker                    none                    0      ! no mate     
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+--------------------------------------------------------------------------------
+                                                                                
+ j/k Move  a Actions  n New project  Enter Open project  r Refresh  q Quit      

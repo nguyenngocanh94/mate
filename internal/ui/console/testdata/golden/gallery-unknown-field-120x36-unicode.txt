@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api › Fix webhook idempotency so retried Stripe deliveries do not double-charge   Task · 2 attempts 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ COMPLETED                                        
+  #2  crew_01J9P6…B8DT  running          claude       retry of #1    │                                                  
+▌ ↓ Completed (1)                                     ! failed       │ Finished         1 of 2 attempts                 
+                                                                     │                  Finished attempts stay in the   
+                                                                     │                  snapshot. Enter shows or hides  
+                                                                     │                  them in this list.              
+                                                                     │                                                  
+                                                                     │ Needs attention  ! failed                        
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+ ? 1 field unknown: worktree of attempt 2 (lookup timed out (2s))                                                       
+ ↑↓ Move  a Actions  Enter Show completed  Esc Back  Tab Inspector  r Refresh  q Quit                                   

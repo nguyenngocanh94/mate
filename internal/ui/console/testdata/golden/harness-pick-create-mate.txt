@@ -1,0 +1,36 @@
+ mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 0 tasks 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  CHOOSE AN AGENT                                                                                                       
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+  ▌ claude                                                                                                              
+    codex                                                                                                               
+                                                                                                                        
+  The new Mate is created and started with this agent.                                                                  
+                                                                                                                        
+  Enter Use claude  Esc Cancel                                                                                          
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  Enter Use claude  Esc Cancel  q Quit                                                                          
