@@ -296,7 +296,9 @@ func (s agentStartSpec) Validate() error {
 	}
 	launchCwd := filepath.Clean(s.launch.Cwd())
 	paneCwd := filepath.Clean(strings.TrimSpace(s.tab.Cwd))
-	if launchCwd != paneCwd {
+	// Herdr reports the pane cwd with symlinks resolved (macOS /var -> /private/var);
+	// the launch spec may hold the unresolved spelling. Same directory is what matters.
+	if !samePath(launchCwd, paneCwd) {
 		return observability.NewError(
 			observability.CodeUsage,
 			fmt.Sprintf("launch spec was validated at cwd %s but the pane runs in %s; required context would not be discovered", launchCwd, paneCwd),

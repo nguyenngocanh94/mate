@@ -227,9 +227,20 @@ func TestLiveHerdrClaudeStopHookFiresWithRealPayload(t *testing.T) {
 	if strings.TrimSpace(payload.TranscriptPath) == "" {
 		t.Fatal("Stop hook payload carried no transcript_path")
 	}
-	if _, statErr := os.Stat(payload.TranscriptPath); statErr != nil {
-		t.Fatalf("Stop hook's own transcript_path %q is not readable: %v", payload.TranscriptPath, statErr)
+	// Claude Code 2.1.274 (measured 2026-09-17) can report a transcript_path
+	// the interactive session has not flushed yet when the Stop hook runs;
+	// the headless -p path has it on disk at hook time. Poll rather than
+	// stat once, and record how long it took.
+	transcriptWait := time.Now()
+	for {
+		if _, statErr := os.Stat(payload.TranscriptPath); statErr == nil {
+			break
+		} else if time.Since(transcriptWait) > 20*time.Second {
+			t.Fatalf("Stop hook's own transcript_path %q did not appear within 20s: %v", payload.TranscriptPath, statErr)
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
+	t.Logf("transcript_path appeared %s after the Stop hook payload was read", time.Since(transcriptWait).Round(100*time.Millisecond))
 
 	userHome, err := os.UserHomeDir()
 	if err != nil {

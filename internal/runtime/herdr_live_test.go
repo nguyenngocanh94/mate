@@ -255,7 +255,7 @@ func TestLiveHerdrSessionWorkspaceTabStart(t *testing.T) {
 			t.Fatalf("multiple Herdr calls carried Claude locator args: %#v", rec.snapshot())
 		}
 		sawLocatorArgs = true
-		want := []string{"--session-id", sessionID, "--settings", settingsPath, "--append-system-prompt-file", ctxPath}
+		want := []string{"--dangerously-skip-permissions", "--session-id", sessionID, "--settings", settingsPath, "--append-system-prompt-file", ctxPath}
 		if !slices.Equal(locatorArgs, want) {
 			t.Fatalf("live Claude args after herdr agent start -- = %#v, want %#v", locatorArgs, want)
 		}

@@ -521,3 +521,40 @@ func TestStartBoundaryValidatesLaunchSpecNotJustShape(t *testing.T) {
 		t.Fatalf("err = %v, want ErrContextRequired", err)
 	}
 }
+
+// Herdr reports a pane cwd with symlinks resolved (macOS /var -> /private/var),
+// while the launch spec may hold the spelling the caller passed. The cwd guard
+// must treat both as the same directory, and still refuse a different one.
+func TestNewAgentStartSpecAcceptsSymlinkedSpellingOfPaneCwd(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	rt, _, session, tab := boot(t)
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(real, "context.md")
+	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+		Kind: harness.KindClaude, Cwd: link, ContextPath: path,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := mustReserve(t, rt, session, "mate_sym")
+
+	viaLink := tab
+	viaLink.Cwd = real
+	if _, err := runtime.NewAgentStartSpec(viaLink, res, launch, 0); err != nil {
+		t.Fatalf("symlinked spelling of the same cwd must be accepted: %v", err)
+	}
+
+	other := tab
+	other.Cwd = t.TempDir()
+	if _, err := runtime.NewAgentStartSpec(other, res, launch, 0); err == nil {
+		t.Fatal("a different pane cwd must still be refused")
+	}
+}
