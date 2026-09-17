@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "agent_blocked",
+    "message": "agent mate-g4-01 is blocked and requires interactive input"
+  },
+  "id": "cli:agent:prompt"
+}

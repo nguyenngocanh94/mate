@@ -1,0 +1,7 @@
+GLOBHEAD_g_GLOBTAIL
+
+--- project-doc ---
+
+ROOTHEAD_r_ROOTTAIL
+
+SUBHEAD_s_SUBTAIL

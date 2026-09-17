@@ -1,5 +1,12 @@
 module github.com/nguyenngocanh94/matev2
 
-go 1.24.1
+go 1.25.0
 
-require gopkg.in/yaml.v3 v3.0.1
+require (
+	github.com/BurntSushi/toml v1.5.0
+	github.com/charmbracelet/x/term v0.2.2
+	github.com/creack/pty v1.1.24
+	github.com/google/uuid v1.6.0
+	golang.org/x/sys v0.47.0
+	gopkg.in/yaml.v3 v3.0.1
+)

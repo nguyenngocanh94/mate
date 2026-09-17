@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "agent_name_taken",
+    "message": "agent name mate-g4-01 is already used; candidates: terminal_id=term_65abf501349f72 pane_id=w1:p2 workspace_id=w1 tab_id=w1:t2 cwd=/private/tmp/gomate-g4-s3-cwd.R5Unrd status=Blocked"
+  },
+  "id": "cli:agent:start"
+}

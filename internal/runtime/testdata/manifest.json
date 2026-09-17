@@ -1,0 +1,15 @@
+{
+  "herdr_version": "0.8.2",
+  "protocol": 20,
+  "captured": "2026-09-05",
+  "lab_session": "fm-lab-gomate-g4-s3-15761-16240",
+  "helper": "fm-herdr-lab.sh run",
+  "notes": [
+    "JSON is the default CLI output for workspace/tab/pane/agent subcommands; --json is rejected there (exit 2, human usage). status and session list still take --json.",
+    "Error envelopes are JSON on stderr with exit 1. CLI syntax / unknown --kind is human text on stderr with exit 2.",
+    "Headless named server starts with zero workspaces.",
+    "workspace create with a duplicate label creates a second workspace; EnsureProjectWorkspace must list-and-reuse, not create blindly.",
+    "agent start that returns agent_not_ready still leaves a live agent (blocked, launch_pending). Wait --until blocked on that agent exits 0.",
+    "session-list.json is sanitized to default + this lab session; the live fleet is not committed."
+  ]
+}

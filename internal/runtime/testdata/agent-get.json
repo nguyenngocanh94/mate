@@ -1,0 +1,23 @@
+{
+  "id": "cli:agent:get",
+  "result": {
+    "agent": {
+      "agent": "claude",
+      "agent_status": "blocked",
+      "cwd": "/private/tmp/gomate-g4-s3-cwd.R5Unrd",
+      "focused": false,
+      "foreground_cwd": "/private/tmp/gomate-g4-s3-cwd.R5Unrd",
+      "launch_pending": true,
+      "name": "mate-g4-01",
+      "pane_id": "w1:p2",
+      "revision": 2,
+      "state_change_seq": 1,
+      "tab_id": "w1:t2",
+      "terminal_id": "term_65abf501349f72",
+      "terminal_title": "claude",
+      "terminal_title_stripped": "claude",
+      "workspace_id": "w1"
+    },
+    "type": "agent_info"
+  }
+}

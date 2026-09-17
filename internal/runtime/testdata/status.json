@@ -1,0 +1,26 @@
+{
+  "client": {
+    "version": "0.8.2",
+    "channel": "stable",
+    "protocol": 20,
+    "binary": "/Users/anh/.local/bin/herdr",
+    "session": "fm-lab-gomate-g4-s3-15761-16240"
+  },
+  "server": {
+    "status": "running",
+    "running": true,
+    "version": "0.8.2",
+    "protocol": 20,
+    "capabilities": {
+      "live_handoff": true,
+      "detached_server_daemon": false
+    },
+    "compatible": true,
+    "socket": "/Users/anh/.config/herdr/sessions/fm-lab-gomate-g4-s3-15761-16240/herdr.sock",
+    "session": "fm-lab-gomate-g4-s3-15761-16240",
+    "restart_needed": false
+  },
+  "update": {
+    "restart_needed": false
+  }
+}
