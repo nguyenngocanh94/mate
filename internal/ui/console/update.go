@@ -311,7 +311,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onMouse forwards a mouse event to the live PTY when stream mode is active,
 // and drops it otherwise. Mouse reporting is enabled Program-wide
-// (tea.WithMouseAllMotion, cmd/mate/console.go), not just while a stream is
+// (tea.WithMouseAllMotion, cmd/matev2/console.go), not just while a stream is
 // open, so a MouseMsg can reach the Console at any time - this guard is
 // what keeps it from doing anything outside an active stream.
 func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -324,7 +324,7 @@ func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // onBusyQuit is what q/ctrl+c do while an action's ActionFunc is still
 // running (actionBusy): it cancels the context that action is running under
 // - the one signal available, since Bubble Tea leaks the goroutine rather
-// than stopping it - and records what was abandoned so cmd/mate can tell the
+// than stopping it - and records what was abandoned so cmd/matev2 can tell the
 // operator plainly once the terminal is back (see AbandonedAction). The
 // Console has nothing left to draw once tea.Quit takes effect, which is why
 // the message cannot just be m.msg: this is the one thing that survives

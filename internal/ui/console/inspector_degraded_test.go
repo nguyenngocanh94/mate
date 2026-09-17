@@ -10,12 +10,12 @@ import (
 )
 
 // This file is the inspector pane's ownership of the degraded-Crew
-// acceptance surface (Worktree status, Reason, Retry of) that PR 46 was
+// acceptance surface (Worktree status, Reason) that PR 46 was
 // told to strip its own fixtures for rather than ship them incomplete
 // (firstmate's seam ruling, 2026-09-10). It covers exactly the two gallery
 // states design/mate-console-states.html names "repair-120" and
 // "review-120" - a recorded worktree removal on a needs_repair Crew, and an
-// Absent Reason/Retry-of/Binding on a Crew whose status is not an error
+// Absent Reason/Binding on a Crew whose status is not an error
 // state - so the distinction between "recorded as gone" and "could not be
 // read" has real teeth rather than only the rendering code's say-so.
 
@@ -25,10 +25,9 @@ import (
 // repair precheck records for why cleanup was not run automatically.
 func galleryRepairTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
-		CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS", Attempt: 1,
+		CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
 		Status:      query.CrewNeedsRepair,
 		HarnessKind: query.HarnessCodex,
-		RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
 			Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
@@ -56,10 +55,9 @@ func galleryRepairTree() query.Snapshot {
 // never the same rendering as a failed read.
 func galleryAbsentTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
-		CrewID: "crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB", Attempt: 1,
+		CrewID:      "crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB",
 		Status:      query.CrewAwaitingReview,
 		HarnessKind: query.HarnessClaude,
-		RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
 			Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
@@ -132,12 +130,12 @@ func TestCrewNeedsRepairRendersRecordedWorktreeRemovalDistinctFromAFailedRead(t 
 	}
 }
 
-// TestCrewNotAnErrorStateRendersAbsentReasonRetryOfAndBindingAsNoneWithReason
-// is B2's second required case: Reason, Retry of and Binding are each
+// TestCrewNotAnErrorStateRendersAbsentReasonAndBindingAsNoneWithReason
+// is B2's second required case: Reason and Binding are both
 // Absent - a fact the read established, not a blank and not the Known-empty
 // "(no reason recorded)" sentence, which is a different fact about a
 // different status (see TestErrorReasonKnownButEmptySaysSoRatherThanBlank).
-func TestCrewNotAnErrorStateRendersAbsentReasonRetryOfAndBindingAsNoneWithReason(t *testing.T) {
+func TestCrewNotAnErrorStateRendersAbsentReasonAndBindingAsNoneWithReason(t *testing.T) {
 	m := newFixture(t, galleryAbsentTree(), 120, 36, unicodeGlyphs)
 	m = intoFirstCrew(t, m)
 	l := layout(m.w, m.h)
@@ -152,11 +150,6 @@ func TestCrewNotAnErrorStateRendersAbsentReasonRetryOfAndBindingAsNoneWithReason
 	}
 	if strings.HasPrefix(reason, "(no reason recorded)") {
 		t.Fatalf("Reason = %q, an Absent reason must not render as the Known-empty sentence", reason)
-	}
-
-	retryOf, ok := fields["Retry of"]
-	if !ok || !strings.HasPrefix(retryOf, "none") || !strings.Contains(retryOf, "first attempt") {
-		t.Fatalf("Retry of = %q, ok=%v, want none plus first attempt", retryOf, ok)
 	}
 
 	binding, ok := fields["Binding"]

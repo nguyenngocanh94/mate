@@ -247,7 +247,7 @@ func TestStreamModeForwardsMouseEventsToThePTY(t *testing.T) {
 // TestMouseEventsOutsideStreamModeAreDropped proves onMouse's guard: a
 // MouseMsg reaching a Model that is not in an active stream (the ordinary
 // navigation tree, here) must not panic on a nil stream and must produce no
-// Cmd - mouse mode is enabled Program-wide (cmd/mate/console.go), so this
+// Cmd - mouse mode is enabled Program-wide (cmd/matev2/console.go), so this
 // case is reachable in production any time the reader moves the mouse
 // outside an open Agent View session.
 func TestMouseEventsOutsideStreamModeAreDropped(t *testing.T) {

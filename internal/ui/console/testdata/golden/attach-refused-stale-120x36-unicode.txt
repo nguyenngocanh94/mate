@@ -1,36 +1,36 @@
- mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
- ws_acme › payments-api › Fix webhook idempotency so retried Stripe deliveries do not double-charge   Task · 2 attempts 
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ CREW  attempt 1 of 2                             
-  #2  crew_01J9P6…B8DT  running          claude       retry of #1    │                                                  
-  ↑ Completed (1)                                     ! failed       │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
-▌ #1  crew_01J9P4…A7CS  failed           codex        ! failed       │ Task             Fix webhook idempotency so      
-                                                                     │                  retried Stripe deliveries do    
-                                                                     │                  not double-charge               
-                                                                     │ Retry of         none · first attempt            
-                                                                     │                                                  
+  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS            
+  mate-payments-api    claude       running        active            │                                                  
+                                                                     │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
+  CREWS  1          TASK              STATUS           NOTE          │ Task             Fix webhook idempotency so      
+  crew_01J9P6…B8DT  Add idempotency-k…running                        │                  retried Stripe deliveries do    
+  ↑ Completed (1)                                      ! failed      │                  not double-charge               
+▌ crew_01J9P4…A7CS  Fix webhook idemp…failed           ! failed      │                                                  
                                                                      │ Recorded status  failed                          
                                                                      │ Harness          codex                           
                                                                      │ Agent            crew-payments-api-1             
                                                                      │ Binding          stale                           
-                                                                     │                  recorded stale: mate could not  
-                                                                     │                  confirm the agent stopped, and  
-                                                                     │                  attach is refused while stale   
+                                                                     │                  recorded stale: matev2 could    
+                                                                     │                  not confirm the agent stopped,  
+                                                                     │                  and attach is refused while     
+                                                                     │                  stale                           
                                                                      │ Runtime          herdr · mate-acme · tab crew/   
                                                                      │                  01J9P4P5 · pane p-2b91          
                                                                      │ Bound since      10:02:14                        
                                                                      │                                                  
                                                                      │ Repo             payments-api                    
                                                                      │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │ Branch           crew/task_01J9P2B4/attempt-1    
-                                                                     │ Worktree         /Users/dev/work/acme/repos/     
-                                                                     │                  payments-api/.worktrees/        
-                                                                     │                  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
-                                                                     │                  /a1                             
+                                                                     │ Branch           matev2/01J9P4Q5                 
+                                                                     │ Worktree         /Users/dev/work/acme/           
+                                                                     │                  .worktrees/                     
+                                                                     │                  payments-api-crew_01J9P4Q5R6S7T 
+                                                                     │                  8U9V0W1X2A7CS                   
                                                                      │ Worktree status  created                         
                                                                      │                                                  
                                                                      │ Last event       13:21:37  crew.failed           
-                                                                     │  ↓ 2 more                                        
+                                                                     │  ↓ 6 more                                        
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
  ! Attach refused: binding recorded stale, stop unconfirmed · nothing started                                           
  ↑↓ Move  a Actions  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                        

@@ -56,7 +56,7 @@ import (
 
 // handoverNotice is the tea.ExecCommand the Console hands to tea.Exec. It
 // writes one line to the terminal Bubble Tea has just released, then runs
-// `mate attach`.
+// `matev2 attach`.
 //
 // The setters mirror Bubble Tea's own osExecCommand (exec.go): each only
 // fills a stream the caller left nil, so a command that was built with its
@@ -183,13 +183,13 @@ func readAttachResult(path string) (observability.Envelope, error) {
 //
 // The sentence says the three things the reader needs and nothing the
 // Console has not established: which session is taking the terminal, that
-// `mate attach` is what is running, and that the way back is Ctrl+b then q
+// `matev2 attach` is what is running, and that the way back is Ctrl+b then q
 // and does not stop the agent (ADR 0010). It does not say the agent is
 // alive: the recorded binding said active, which is not liveness.
 func handoverNoticeText(label string, g glyphSet) string {
 	dot := " " + g.Dot + " "
-	return "mate console: attaching to " + truncateEnd(sanitizeText(label), handoverLabelCells, g) +
-		" via mate attach" + dot +
+	return "matev2 console: attaching to " + truncateEnd(sanitizeText(label), handoverLabelCells, g) +
+		" via matev2 attach" + dot +
 		"detach with Ctrl+b then q" + dot +
 		"detaching does not stop the agent"
 }

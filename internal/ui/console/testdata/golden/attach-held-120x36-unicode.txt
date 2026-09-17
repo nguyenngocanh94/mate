@@ -1,16 +1,12 @@
- mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
- ws_acme › payments-api › Fix webhook idempotency so retried Stripe deliveries do not double-charge   Task · 2 attempts 
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ CREW  attempt 2 of 2                             
-▌ #2  crew_01J9P6…B8DT  running          claude       retry of #1    │                                                  
-  ↓ Completed (1)                                     ! failed       │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
-                                                                     │ Task             Fix webhook idempotency so      
-                                                                     │                  retried Stripe deliveries do    
-                                                                     │                  not double-charge               
-                                                                     │ Retry of         attempt 1 ·                     
-                                                                     │                  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
-                                                                     │                                                  
-                                                                     │ Recorded status  running                         
+  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
+  mate-payments-api    claude       running        active            │                                                  
+                                                                     │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
+  CREWS  1          TASK              STATUS           NOTE          │ Task             Add idempotency-key index       
+▌ crew_01J9P6…B8DT  Add idempotency-k…running                        │                                                  
+  ↓ Completed (1)                                      ! failed      │ Recorded status  running                         
                                                                      │ Harness          claude                          
                                                                      │ Agent            crew-payments-api-2             
                                                                      │ Binding          active                          
@@ -22,15 +18,19 @@
                                                                      │                                                  
                                                                      │ Repo             payments-api                    
                                                                      │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │ Branch           crew/task_01J9P2B4/attempt-2    
-                                                                     │ Worktree         /Users/dev/work/acme/repos/     
-                                                                     │                  payments-api/.worktrees/        
-                                                                     │                  crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 
+                                                                     │ Branch           matev2/01J9P6Q6                 
+                                                                     │ Worktree         /Users/dev/work/acme/           
+                                                                     │                  .worktrees/                     
+                                                                     │                  payments-api-crew_01J9P6Q6W0E5V 
+                                                                     │                  8XK2M4B8DT                      
                                                                      │ Worktree status  created                         
                                                                      │                                                  
                                                                      │ Last event       14:01:58  agent.tool_call       
                                                                      │ Reason           none · not an error state       
-                                                                     │                                                  
+                                                                     │ Attention        none · crew                     
+                                                                     │                  crew_01J9P6Q6W0E5V8XK2M4B8DT    
+                                                                     │                  is recorded running and         
+                                                                     │  ↓ 2 more                                        
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
  crew-payments-api-2 owns this terminal · Console idle until it returns                                                 
  Ctrl+b q Detach; does not stop the agent                                                                               

@@ -1,12 +1,11 @@
- mate console   workspace ws_1                                                        Recorded snapshot  As of 14:02:11 
- ws_1 › acme › a task                                                                                  Task · 1 attempt 
+ matev2 console   workspace ws_1                                                      Recorded snapshot  As of 14:02:11 
+ ws_1 › acme                                                                                           Project · 1 crew 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ CREW  attempt 1 of 1                             
-▌ #1  crew_01J9P8…Z0AB  awaiting_review  claude       ? unknown      │                                                  
+  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB            
+  none assigned                                    ! no mate         │                                                  
                                                                      │ ID               crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB 
-                                                                     │ Task             a task                          
-                                                                     │ Retry of         none · first attempt            
-                                                                     │                                                  
+  CREWS  1          TASK              STATUS           NOTE          │ Task                                             
+▌ crew_01J9P8…Z0AB                    awaiting_review  ? unknown     │                                                  
                                                                      │ Recorded status  awaiting_review                 
                                                                      │ Harness          claude                          
                                                                      │ Agent            crew-payments-api-1             
@@ -26,6 +25,7 @@
                                                                      │ Reason           none · the recorded status of   
                                                                      │                  this attempt is not an error    
                                                                      │                  state                           
+                                                                     │ Attention        unknown · r re-reads            
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  

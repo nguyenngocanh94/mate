@@ -61,7 +61,7 @@ func TestAgentDisappearanceDuringActiveSessionRendersRuntimeMissingAndNeverMutat
 		t.Fatalf("agent disappearance must not leave session mode: phase = %v", m.sess.phase)
 	}
 	if m.attachHoldsTerminal() {
-		t.Fatalf("agent disappearance must not fall back to the classic mate attach hand-off")
+		t.Fatalf("agent disappearance must not fall back to the classic matev2 attach hand-off")
 	}
 	if m.sess.snapshot.Runtime.Status != query.Absent {
 		t.Fatalf("Runtime.Status = %v, want Absent", m.sess.snapshot.Runtime.Status)
@@ -461,8 +461,8 @@ func TestReEnteringSessionAfterEscIssuesAFreshEntryReadAndIgnoresTheOldGeneratio
 // or internal/application), so the invariant "the transcript is never
 // written back to state just because it was displayed" is guaranteed at
 // compile time for this package. The write-side guarantee - that
-// cmd/mate/session_bridge.go's readSession does not call any store Write
-// either - is asserted directly in cmd/mate's own session_lifecycle_test.go,
+// cmd/matev2/session_bridge.go's readSession does not call any store Write
+// either - is asserted directly in cmd/matev2's own session_lifecycle_test.go,
 // where a real store is available to check.
 func TestSessionModeNeverExposesAWriteSeamForTheTranscript(t *testing.T) {
 	ctrl := &recordingSessionController{snap: SessionSnapshot{

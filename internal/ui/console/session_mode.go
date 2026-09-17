@@ -17,7 +17,7 @@ import (
 // Model's own key handling and Bubble Tea message loop. This file owns
 // only the Console-side state machine (entering/leaving session mode,
 // polling cadence, the composer); the ports themselves (SessionReader/
-// SessionPrompt/SessionClose) are built in cmd/mate/console.go from
+// SessionPrompt/SessionClose) are built in cmd/matev2/console.go from
 // internal/query, internal/application and runtime.Adapter - this package
 // never reaches those directly (doc.go, boundary_test.go).
 
@@ -66,7 +66,7 @@ type sessionFlow struct {
 	// gen no longer matches m.sess.gen is dropped instead of applied. This
 	// is what lets leaving session mode (or starting a different entry
 	// read) stop the poll chain without Bubble Tea offering a way to
-	// cancel a Cmd outright (see cmd/mate/console.go's own note on
+	// cancel a Cmd outright (see cmd/matev2/console.go's own note on
 	// leaked goroutines, and attach.go's onBusyQuit for the same
 	// constraint elsewhere in this package).
 	gen int
@@ -190,7 +190,7 @@ func (m Model) sessionTargetFor(r row) (SessionTarget, bool) {
 // committing to session mode: a target whose first read fails falls back to
 // the classic hand-off (attach.go) rather than leaving the reader on a screen
 // that shows nothing. ADR 0025's "Fallback chain (amended by ADR 0026)" is
-// the authoritative statement: snapshot mode lỗi → `mate attach` hand-off.
+// the authoritative statement: snapshot mode lỗi → `matev2 attach` hand-off.
 // What the reader is told on that fallback is onSessionSnapshot's business.
 func (m Model) beginSession(r row, target SessionTarget) (Model, tea.Cmd) {
 	target.TranscriptCapacity = SessionTranscriptCapacity(target.Kind, m.w, m.h)
@@ -728,7 +728,7 @@ func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // per-event Cmd - see onSessionStreamKey's own doc comment on ordering).
 // update.go's onMouse is the guard that only calls this while stream mode
 // is actually active - mouse reporting itself is enabled Program-wide
-// (cmd/mate/console.go's tea.WithMouseCellMotion, not toggled per session
+// (cmd/matev2/console.go's tea.WithMouseCellMotion, not toggled per session
 // mode), so a MouseMsg can in principle reach the Console at any time; a
 // button this encoder does not recognise is dropped rather than guessed
 // at.

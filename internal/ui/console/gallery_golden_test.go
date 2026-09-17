@@ -27,13 +27,13 @@ const galleryWorkspaceRoot = "/Users/dev/work/acme"
 
 func galleryWorkspace() query.Field[query.WorkspaceValue] {
 	return query.KnownField(query.WorkspaceValue{
-		Name: "acme", Root: galleryWorkspaceRoot, DatabasePath: galleryWorkspaceRoot + "/.matev2/matev2.db",
+		Name: "acme", Root: galleryWorkspaceRoot,
 	})
 }
 
 // TestGalleryEmptyLoadingAndError covers the gallery's "Empty, loading,
 // lỗi tải toàn bộ" group: a workspace with no Projects, a Project with no
-// Mate, a Project with no Tasks, Loading, and a whole-snapshot read error
+// Mate, a Project with no Crews, Loading, and a whole-snapshot read error
 // with its retry affordance. Header and footer must stay present and the
 // three screens must read as three different facts, never as each other.
 func TestGalleryEmptyLoadingAndError(t *testing.T) {
@@ -54,11 +54,12 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 				ProjectID: "proj_01J9M1C5H9S4Z1E6X0D3Q8P7RF",
 				Name:      "notifications-service",
 				Mate:      absentMate("this project has no designated Mate"),
-				Tasks: []query.TaskNode{{
-					TaskID: "task_01J9N3N4T8C3J0Q5G9P2A7Z6BR",
-					Title:  "Migrate email delivery to SES",
-					Status: query.TaskReady,
-					Error:  query.AbsentField[query.ErrorReason](notErrorState),
+				Crews: []query.CrewNode{{
+					CrewID:      "crew_01J9N3N4T8C3J0Q5G9P2A7Z6BR",
+					Task:        "Migrate email delivery to SES",
+					Status:      query.CrewRunning,
+					HarnessKind: query.HarnessCodex,
+					Error:       query.AbsentField[query.ErrorReason](notErrorState),
 				}},
 			}},
 		}
@@ -68,7 +69,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 		assertGolden(t, "gallery-project-no-mate-120x36-unicode", renderFrame(t, m))
 	})
 
-	t.Run("project without tasks", func(t *testing.T) {
+	t.Run("project without crews", func(t *testing.T) {
 		tree := query.Snapshot{
 			WorkspaceID: "ws_acme",
 			Workspace:   galleryWorkspace(),
@@ -90,14 +91,13 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 		m, _ = send(t, m, key("enter"))
 		frame := renderFrame(t, m)
 		// The Mate row is always present - "Mate ở hàng đầu, luôn tìm thấy"
-		// (design notes) - so a Project with no Tasks is not an empty list;
-		// it is a list of exactly one row, the Mate, and no Task rows below
-		// it. emptyMessage's "No Tasks yet" is for a Project frame with zero
-		// rows at all, which a designated Mate always prevents.
-		if strings.Contains(frame, "No Tasks yet") {
+		// (design notes) - so a Project with no Crews is not an empty list;
+		// it is a list of exactly one row, the Mate, and no Crew rows below
+		// it.
+		if strings.Contains(frame, "No Crews yet") {
 			t.Fatalf("a Project with a Mate row must not show the empty-list message:\n%s", frame)
 		}
-		assertGolden(t, "gallery-project-no-tasks-80x24-unicode", frame)
+		assertGolden(t, "gallery-project-no-crews-80x24-unicode", frame)
 	})
 
 	t.Run("loading", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 		// show the breadcrumb falsely claiming "0 projects". The only fact a
 		// failed first load establishes is that the read failed, not how many
 		// Projects the workspace has.
-		err := errFake("runtime_unavailable: sqlite: database is locked (SQLITE_BUSY) after 5s (" + galleryWorkspaceRoot + "/.matev2/matev2.db)")
+		err := errFake("runtime_unavailable: open " + galleryWorkspaceRoot + "/.matev2/workspace.yaml: permission denied")
 		failed := newFailedFixture(t, err, 80, 24, unicodeGlyphs)
 		frame := renderFrame(t, failed)
 		if !strings.Contains(frame, "r retries the read; q quits.") {
@@ -154,15 +154,14 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 	}
 }
 
-// galleryUnknownTree is sampleTree with its running attempt's worktree read
+// galleryUnknownTree is sampleTree with its running Crew's worktree read
 // failed instead of succeeding, and Snapshot.Warnings carrying exactly that
-// one field - the shape query.LoadSnapshot itself produces for a partial
-// read failure (see internal/query/read.go's note calls).
+// one field - the shape a loader produces for a partial read failure.
 func galleryUnknownTree() query.Snapshot {
 	tree := sampleTree()
 	const reason = "lookup timed out (2s)"
-	crew := &tree.Projects[0].Tasks[0].Crews[1]
-	row := query.RowRef{Kind: query.RowCrew, ID: crew.CrewID, Label: "attempt 2"}
+	crew := &tree.Projects[0].Crews[1]
+	row := query.RowRef{Kind: query.RowCrew, ID: crew.CrewID, Label: "crew 01J9P6Q6"}
 	crew.Worktree = query.UnknownField[query.WorktreeValue](reason)
 	tree.Warnings = []query.FieldWarning{{Field: "worktree", Row: row, Reason: reason}}
 	return tree
@@ -178,11 +177,9 @@ func TestGalleryKnownAbsentUnknown(t *testing.T) {
 		tree := galleryUnknownTree()
 		m := newFixture(t, tree, 120, 36, unicodeGlyphs)
 		m, _ = send(t, m, key("enter")) // payments-api
-		m, _ = send(t, m, key("down"))  // the webhook Task
-		m, _ = send(t, m, key("enter")) // its attempts
-		m, _ = send(t, m, key("down"))  // the attempt whose worktree failed to read
+		m, _ = send(t, m, key("down"))  // the Crew whose worktree failed to read
 		frame := renderFrame(t, m)
-		want := "? 1 field unknown: worktree of attempt 2 (lookup timed out (2s))"
+		want := "? 1 field unknown: worktree of crew 01J9P6Q6 (lookup timed out (2s))"
 		if !strings.Contains(frame, want) {
 			t.Fatalf("frame does not carry the standing unknown-field line %q:\n%s", want, frame)
 		}
@@ -191,12 +188,8 @@ func TestGalleryKnownAbsentUnknown(t *testing.T) {
 
 	// The gallery's other two states in this group - a needs_repair Crew
 	// with a missing recorded worktree and its reason, and an
-	// awaiting_review Crew whose Binding/RetryOf/Error are legitimately
-	// Absent with the reason each is none - render Worktree status, Reason
-	// and Retry of. Those are inspector-pane fields (PR 48's surface, per
-	// firstmate's ruling on this PR's fix round), not this task's chrome and
-	// footer surface, so they are not fixtured here. Rendering them
-	// incompletely - as this PR previously did, showing only a path and
-	// branch under a needs_repair status with no explanation - would bless
-	// output the design's own honesty rules call out by name.
+	// awaiting_review Crew whose Binding and Error are legitimately Absent
+	// with the reason each is none - render Worktree status and Reason.
+	// Those are inspector-pane fields, not this task's chrome and footer
+	// surface, so they are not fixtured here.
 }

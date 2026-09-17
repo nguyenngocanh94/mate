@@ -17,7 +17,7 @@ import (
 // invites the reader to believe it is live.
 type LoadFunc func(context.Context) (query.Snapshot, error)
 
-// AttachCmdFunc builds the *exec.Cmd that runs `mate attach <target>`. The
+// AttachCmdFunc builds the *exec.Cmd that runs `matev2 attach <target>`. The
 // Console runs it through tea.Exec, wrapped in a handoverNotice, which
 // releases the terminal to the child and restores the Console's own render
 // loop when it exits - Herdr's own UI is never drawn by this process.
@@ -150,10 +150,10 @@ type Model struct {
 	action    ActionFunc
 
 	// sessionReader, sessionPrompt and sessionClose are the ADR 0025 snapshot
-	// ports, built by cmd/mate's bridge from internal/query,
+	// ports, built by cmd/matev2's bridge from internal/query,
 	// internal/application and runtime.Adapter - this package never reaches
 	// those directly. A nil sessionReader is a test-only configuration:
-	// cmd/mate always wires the ports (console.go's handleConsole, which
+	// cmd/matev2 always wires the ports (console.go's handleConsole, which
 	// treats runtimeAdapter's error branch as a test seam), so in production
 	// Enter on a Mate/Crew row always tries the Agent View first. Without
 	// the ports it takes the classic tea.Exec hand-off (attach.go)
@@ -162,7 +162,7 @@ type Model struct {
 	sessionPrompt SessionPrompt
 	sessionClose  SessionClose
 	// sessionStream is the primary Agent View transport. It is a Console
-	// boundary closure; cmd/mate adapts runtime.SessionStream into it.
+	// boundary closure; cmd/matev2 adapts runtime.SessionStream into it.
 	sessionStream SessionStreamFactory
 	// sessionMetadata refreshes status/runtime/inbox without touching the
 	// terminal buffer or calling the snapshot transcript path.
@@ -251,7 +251,7 @@ type Model struct {
 	// one signal quitting mid-action can still send it.
 	actionCancel context.CancelFunc
 	// actionAbandoned is set when the operator quits while actionBusy: the
-	// description of what was abandoned, surfaced to cmd/mate via
+	// description of what was abandoned, surfaced to cmd/matev2 via
 	// AbandonedAction so it can tell the operator plainly after the
 	// terminal is restored, since the Console itself has nothing left to
 	// draw by then.
@@ -266,7 +266,7 @@ type Model struct {
 	// overlay lived on the Model here. mvp.md defers the observer that
 	// feeds them (internal/watch) to task 18.
 
-	// ctx is the context the program itself was started with (cmd/mate's
+	// ctx is the context the program itself was started with (cmd/matev2's
 	// handleConsole, via WithContext) - not context.Background(), so an
 	// in-flight action's own context is a child of something the program
 	// actually owns and can act on. nil in tests that build a Model
@@ -276,7 +276,7 @@ type Model struct {
 	quitting bool
 }
 
-// WithContext attaches the context the program itself owns - cmd/mate's
+// WithContext attaches the context the program itself owns - cmd/matev2's
 // handleConsole passes the same context it gave tea.WithContext. Every
 // in-flight ActionFunc call is a child of this context rather than of
 // context.Background(), so quitting mid-action has something to cancel.
@@ -318,7 +318,7 @@ func (m Model) baseCtx() context.Context {
 }
 
 // AbandonedAction reports what was abandoned if the operator quit while an
-// action was in flight (empty, false otherwise). cmd/mate checks this after
+// action was in flight (empty, false otherwise). cmd/matev2 checks this after
 // tea.Program.Run returns and tells the operator plainly - the Console's own
 // screen is gone by then, so this is the one place left to say it.
 func (m Model) AbandonedAction() (string, bool) {
@@ -359,8 +359,8 @@ type treeLoadedMsg struct {
 	err  error
 }
 
-// AttachFinishedMsg is sent after the `mate attach` subprocess started by
-// tea.Exec returns - exported so cmd/mate's wiring and tests can recognize
+// AttachFinishedMsg is sent after the `matev2 attach` subprocess started by
+// tea.Exec returns - exported so cmd/matev2's wiring and tests can recognize
 // it without reaching into package internals.
 type AttachFinishedMsg struct {
 	Err error
@@ -439,7 +439,7 @@ func (m Model) currentProject() query.ProjectNode {
 
 // rowsFor computes the rows one frame lists, against the tree as it stands
 // now. Recomputed on every render rather than cached: Phase 1 workspace
-// volume is small (LoadSnapshot's own tradeoff, internal/query/read.go)
+// volume is small (LoadSnapshot's own tradeoff, internal/query/load.go)
 // and a cache would be one more place selection and tree could drift apart.
 func (m Model) rowsFor(i int) []row {
 	if i < 0 || i >= len(m.stack) {
@@ -462,6 +462,32 @@ func (m Model) rowsFor(i int) []row {
 
 // currentRows are the rows of the frame the keys act on.
 func (m Model) currentRows() []row { return m.rowsFor(len(m.stack) - 1) }
+
+// jumpToCrew rebuilds the navigation stack to Workspace -> Project and
+// selects the given Crew, reusing reconcileSelection's own by-identity
+// positioning rather than hand-computing a row index. A finished Crew sits
+// in the collapsed Completed group, which reconcileSelection expands for
+// exactly this case (revealCompletedIfSelHidden).
+func (m Model) jumpToCrew(crewID string) (Model, bool) {
+	for _, p := range m.tree.Projects {
+		for _, c := range p.Crews {
+			if c.CrewID != crewID {
+				continue
+			}
+			m.stack = []frame{
+				{kind: frameWorkspace, selID: p.ProjectID},
+				{kind: frameProject, id: p.ProjectID, selID: c.CrewID},
+			}
+			m = m.reconcileSelection()
+			m.focus = paneList
+			m.detail = false
+			m.inspTop = 0
+			m.msg = footerMsg{}
+			return m, true
+		}
+	}
+	return m, false
+}
 
 // selectedRow is the row the keys act on, or false when the frame is empty.
 func (m Model) selectedRow() (row, bool) {

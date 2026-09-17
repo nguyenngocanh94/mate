@@ -1,13 +1,13 @@
- mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
- ws_acme › ledger-worker                                                                              Project · 0 tasks 
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › ledger-worker                                                                              Project · 0 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE                 HARNESS      STATUS         BINDING           │ MATE  ledger-worker                              
 ▌ none assigned                                    ! no mate         │                                                  
                                                                      │ ID               none · this project has no      
-  TASKS  0                  STATUS           ATTEMPTS  ATTENTION     │                  designated Mate                 
+  CREWS  0          TASK              STATUS           NOTE          │                  designated Mate                 
                                                                      │ Agent            none · this project has no      
-  No tasks recorded for ledger-worker.                               │                  designated Mate                 
-  Tasks are created by the Mate or the mate CLI; press r to re-read. │ Harness          none · this project has no      
+  No crews recorded for ledger-worker.                               │                  designated Mate                 
+  Crews are spawned by the Mate; press r to re-read.                 │ Harness          none · this project has no      
                                                                      │                  designated Mate                 
                                                                      │                                                  
                                                                      │ Recorded status  none · this project has no      

@@ -79,47 +79,34 @@ func hostileTree() query.Snapshot {
 					Binding:   query.KnownField(query.BindingValue{Status: query.BindingActive, AgentName: "mate_" + strings.Repeat("B", 40)}),
 					Error:     query.AbsentField[query.ErrorReason](notErrorState),
 				},
-				Tasks: []query.TaskNode{
+				Crews: []query.CrewNode{
 					{
-						TaskID: "task_" + strings.Repeat("C", 40),
-						Title:  "修正\t" + long + " ‼️ tail",
-						Status: query.TaskAwaitingReview,
-						Error:  query.UnknownField[query.ErrorReason]("event read failed"),
-						Crews: []query.CrewNode{
-							{
-								CrewID:    "crew_" + strings.Repeat("D", 40),
-								Attempt:   1,
-								Status:    query.CrewNeedsRepair,
-								RetryOf:   query.UnknownField[query.RetryValue]("attempt lookup failed"),
-								Worktree:  query.UnknownField[query.WorktreeValue]("worktree lookup failed"),
-								AgentName: query.UnknownField[string]("binding lookup failed"),
-								Binding:   query.UnknownField[query.BindingValue]("binding lookup failed"),
-								Error:     query.KnownField(query.ErrorReason(strings.Repeat("因為 ", 40) + "\x1b[31mred\x1b[0m")),
-							},
-							{
-								CrewID:    "",
-								Attempt:   2,
-								Status:    query.CrewBlocked,
-								RetryOf:   query.AbsentField[query.RetryValue]("first attempt"),
-								Worktree:  query.KnownField(query.WorktreeValue{Path: "", Branch: "", Status: ""}),
-								AgentName: query.KnownField(""),
-								Binding:   query.KnownField(query.BindingValue{Status: query.BindingReserved}),
-								Error:     query.AbsentField[query.ErrorReason](notErrorState),
-							},
-							{
-								CrewID:  "crew_" + strings.Repeat("E", 40),
-								Attempt: 3,
-								Status:  query.CrewFailed,
-								RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
-								Worktree: query.KnownField(query.WorktreeValue{
-									Path:   "/repos/payments-api/.worktrees/crew_evil\nname/a1",
-									Branch: "fix/branch",
-								}),
-								AgentName: query.KnownField(strings.Repeat("‼️", 8) + long),
-								Binding:   query.KnownField(query.BindingValue{Status: query.BindingActive, AgentName: strings.Repeat("‼️", 8) + long}),
-								Error:     query.AbsentField[query.ErrorReason](notErrorState),
-							},
-						},
+						CrewID:    "crew_" + strings.Repeat("D", 40),
+						Task:      "修正\t" + long + " ‼️ tail",
+						Status:    query.CrewNeedsRepair,
+						Worktree:  query.UnknownField[query.WorktreeValue]("worktree lookup failed"),
+						AgentName: query.UnknownField[string]("binding lookup failed"),
+						Binding:   query.UnknownField[query.BindingValue]("binding lookup failed"),
+						Error:     query.KnownField(query.ErrorReason(strings.Repeat("因為 ", 40) + "\x1b[31mred\x1b[0m")),
+					},
+					{
+						CrewID:    "",
+						Status:    query.CrewBlocked,
+						Worktree:  query.KnownField(query.WorktreeValue{Path: "", Branch: "", Status: ""}),
+						AgentName: query.KnownField(""),
+						Binding:   query.KnownField(query.BindingValue{Status: query.BindingReserved}),
+						Error:     query.AbsentField[query.ErrorReason](notErrorState),
+					},
+					{
+						CrewID: "crew_" + strings.Repeat("E", 40),
+						Status: query.CrewFailed,
+						Worktree: query.KnownField(query.WorktreeValue{
+							Path:   "/repos/payments-api/.worktrees/crew_evil\nname/a1",
+							Branch: "fix/branch",
+						}),
+						AgentName: query.KnownField(strings.Repeat("‼️", 8) + long),
+						Binding:   query.KnownField(query.BindingValue{Status: query.BindingActive, AgentName: strings.Repeat("‼️", 8) + long}),
+						Error:     query.AbsentField[query.ErrorReason](notErrorState),
 					},
 				},
 			},
@@ -145,21 +132,21 @@ func TestEveryFrameIsExactlyHLinesOfWCells(t *testing.T) {
 				t.Run(g.Name+"/"+treeName+"/"+size.name, func(t *testing.T) {
 					m := newFixture(t, tree, size.w, size.h, g)
 					// Walk the surfaces: drill into the *first* Project,
-					// its *first* Task and a hostile Crew, page, focus the
-					// inspector, open Detail, refresh, fail. hostileTree's
-					// hostile payload - the tab/VS16 title, the CJK error,
-					// the VS16 agent name, the newline-in-a-path worktree -
-					// lives entirely under Project 0; a sweep that moves
-					// "down" before its first "enter" selects Project 1
-					// (deliberately empty) instead and never renders any of
-					// it, which is exactly how this guard went blind to the
-					// grapheme regression the direct text_test.go cases
-					// caught (see assertHostileCrewAgentSurvives below, and
-					// the F3 fix-round-2 counter-review). Project 1 is
+					// down its Crews to the hostile one in the Completed
+					// group, page, focus the inspector, open Detail,
+					// refresh, fail. hostileTree's hostile payload - the
+					// tab/VS16 task line, the CJK error, the VS16 agent
+					// name, the newline-in-a-path worktree - lives entirely
+					// under Project 0; a sweep that moves "down" before its
+					// first "enter" selects Project 1 (deliberately empty)
+					// instead and never renders any of it, which is exactly
+					// how this guard went blind to the grapheme regression
+					// the direct text_test.go cases caught (see
+					// assertHostileCrewAgentSurvives below). Project 1 is
 					// still visited, at the end, once the hostile branch has
 					// been rendered.
-					steps := []string{"enter", "down", "enter", "down", "down", "enter", "down", "tab", "pgdn", "pgup", "tab", "esc", "esc", "esc", "down", "enter"}
-					const hostileCrewStep = 7 // the "tab" that opens the inspector/Detail on the selected Crew
+					steps := []string{"enter", "down", "down", "down", "enter", "down", "tab", "pgdn", "pgup", "tab", "esc", "esc", "down", "enter"}
+					const hostileCrewStep = 6 // the "tab" that opens the inspector/Detail on the selected Crew
 					assertFrameShape(t, m.View(), size.w, size.h)
 					if treeName == "hostile" {
 						assertNoRawControlChars(t, m.View())
@@ -318,7 +305,7 @@ func TestFrameIsThreeLinesOfChromeAroundExactlyHMinusSixLines(t *testing.T) {
 		t.Run(size.name, func(t *testing.T) {
 			m := newFixture(t, sampleTree(), size.w, size.h, unicodeGlyphs)
 			lines := strings.Split(renderFrame(t, m), "\n")
-			if !strings.HasPrefix(lines[0], " mate console") {
+			if !strings.HasPrefix(lines[0], " matev2 console") {
 				t.Errorf("line 0 = %q, want the header", lines[0])
 			}
 			if !strings.Contains(lines[1], "ws_acme") {
@@ -698,18 +685,15 @@ func TestInspectorNeverTruncatesAPathAndKeepsItsSuffix(t *testing.T) {
 			m, _ = send(t, m, key("down"))
 		}
 		frame := renderFrame(t, m)
-		want := sampleTree().Projects[0].Tasks[0].Crews[0]
+		want := sampleTree().Projects[0].Crews[0]
 		inspector := inspectorColumn(t, frame, layout(size.w, size.h))
 		if strings.Contains(inspector, unicodeGlyphs.Ellipsis) {
 			t.Fatalf("at %dx%d the inspector truncated something:\n%s", size.w, size.h, inspector)
 		}
-		// The path wraps, so the pieces that matter must each land on one
-		// line whole: the crew id (what a reader pastes into a command) and
-		// the attempt suffix (what tells two attempts apart). They need not
-		// share a line - at a 31-cell value column the two together are 34
-		// cells - but neither may be split.
+		// The path wraps, so the piece that matters must land on one line
+		// whole: the crew id, which is what a reader pastes into a command.
 		lines := strings.Split(inspector, "\n")
-		for _, whole := range []string{want.CrewID, "/a1"} {
+		for _, whole := range []string{want.CrewID} {
 			if !containsWhole(lines, whole) {
 				t.Fatalf("at %dx%d the inspector split %q:\n%s", size.w, size.h, whole, inspector)
 			}

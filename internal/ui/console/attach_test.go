@@ -79,25 +79,24 @@ func attachFixture(t *testing.T, spy *attachSpy, w, h int, g glyphSet) Model {
 	return m
 }
 
-// toRunningAttempt walks to the second Crew attempt of sampleTree's first
-// Task: the one whose binding is recorded active, and so the one row in the
+// toRunningAttempt walks to the second Crew of sampleTree's first Project:
+// the one whose binding is recorded active, and so the one row in the
 // fixture an attach may be tried on.
 func toRunningAttempt(t *testing.T, m Model) Model {
 	t.Helper()
 	m, _ = send(t, m, key("enter")) // the payments-api Project
-	m, _ = send(t, m, key("down"))  // its first Task
-	m, _ = send(t, m, key("enter")) // that Task's attempts: the running Crew is first; the failed one sits in Completed
-	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != sampleTree().Projects[0].Tasks[0].Crews[1].CrewID {
-		t.Fatalf("selected row = %+v (ok=%v), want the running Crew attempt", r, ok)
+	m, _ = send(t, m, key("down"))  // its Crews: the running one is first; the failed one sits in Completed
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != sampleTree().Projects[0].Crews[1].CrewID {
+		t.Fatalf("selected row = %+v (ok=%v), want the running Crew", r, ok)
 	}
 	return m
 }
 
-// toFailedAttempt walks to sampleTree's first Crew attempt, which is
-// recorded failed and so lives in the Completed group until revealed.
+// toFailedAttempt walks to sampleTree's first Crew, which is recorded
+// failed and so lives in the Completed group until revealed.
 func toFailedAttempt(t *testing.T, m Model) Model {
 	t.Helper()
-	failedID := sampleTree().Projects[0].Tasks[0].Crews[0].CrewID
+	failedID := sampleTree().Projects[0].Crews[0].CrewID
 	var ok bool
 	m, ok = m.jumpToCrew(failedID)
 	if !ok {
@@ -166,14 +165,14 @@ func TestAttachAnnouncesHandsOverAndReReadsExactlyOnce(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("Enter on an attachable row returned no Cmd")
 	}
-	if want := sampleTree().Projects[0].Tasks[0].Crews[1].CrewID; len(spy.targets) != 1 || spy.targets[0] != want {
+	if want := sampleTree().Projects[0].Crews[1].CrewID; len(spy.targets) != 1 || spy.targets[0] != want {
 		t.Fatalf("targets = %v, want exactly one attach of %q", spy.targets, want)
 	}
 	if spy.loads != 1 {
 		t.Fatalf("announcing an attach read the snapshot again (loads=%d)", spy.loads)
 	}
 	view := renderFrame(t, m)
-	for _, want := range []string{"Attaching to crew-payments-api-2", "via mate attach", "detach: Ctrl+b then q"} {
+	for _, want := range []string{"Attaching to crew-payments-api-2", "via matev2 attach", "detach: Ctrl+b then q"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("the announcement frame does not say %q:\n%s", want, view)
 		}
@@ -378,7 +377,7 @@ func TestAFailureWhoseReReadFailsKeepsTheCause(t *testing.T) {
 		t.Fatalf("e must open the failure detail view while a failure is recorded")
 	}
 	detail := renderFrame(t, m)
-	for _, want := range []string{"Session open failed", "runtime_unavailable (derived from exit 20)", "mate attach exit 20", "Exit"} {
+	for _, want := range []string{"Session open failed", "runtime_unavailable (derived from exit 20)", "matev2 attach exit 20", "Exit"} {
 		if !strings.Contains(detail, want) {
 			t.Fatalf("detail view must say %q, got:\n%s", want, detail)
 		}
@@ -389,25 +388,24 @@ func TestAFailureWhoseReReadFailsKeepsTheCause(t *testing.T) {
 
 // TestTheReturnKeepsTheTaskAndTheRowByIdAcrossAMovedSnapshot: the re-read
 // after a hand-over is a refresh like any other, so it must re-find the
-// selection by identity. Here the returning snapshot has a new attempt
+// selection by identity. Here the returning snapshot has a new Crew
 // inserted ahead of the selected one and a new Project ahead of the
 // current one, which moves every index the pre-attach frame held.
-func TestTheReturnKeepsTheTaskAndTheRowByIdAcrossAMovedSnapshot(t *testing.T) {
-	selected := sampleTree().Projects[0].Tasks[0].Crews[1]
+func TestTheReturnKeepsTheProjectAndTheRowByIdAcrossAMovedSnapshot(t *testing.T) {
+	selected := sampleTree().Projects[0].Crews[1]
 	moved := func() query.Snapshot {
 		tree := sampleTree()
 		// A Project inserted at the front moves the Project index; a Crew
-		// inserted at the front of the Task moves the row index.
+		// inserted at the front of the Project moves the row index.
 		tree.Projects = append([]query.ProjectNode{{
 			ProjectID: "proj_01J9M9ZZZZZZZZZZZZZZZZZZZZ",
 			Name:      "inserted-first",
 			Mate:      absentMate("this project has no designated Mate"),
 		}}, tree.Projects...)
-		crews := tree.Projects[1].Tasks[0].Crews
+		crews := tree.Projects[1].Crews
 		inserted := crews[1]
 		inserted.CrewID = "crew_01J9PZZZZZZZZZZZZZZZZZZZZZ"
-		inserted.Attempt = 0
-		tree.Projects[1].Tasks[0].Crews = append([]query.CrewNode{inserted}, crews...)
+		tree.Projects[1].Crews = append([]query.CrewNode{inserted}, crews...)
 		return tree
 	}
 	spy := &attachSpy{tree: func(n int) (query.Snapshot, error) {
@@ -427,18 +425,18 @@ func TestTheReturnKeepsTheTaskAndTheRowByIdAcrossAMovedSnapshot(t *testing.T) {
 	m, cmd := send(t, m, AttachFinishedMsg{})
 	m, _ = send(t, m, cmd())
 
-	if m.cur().kind != frameTask || m.cur().id != sampleTree().Projects[0].Tasks[0].TaskID {
-		t.Fatalf("frame after the return = %+v, want the same Task", m.cur())
+	if m.cur().kind != frameProject || m.cur().id != sampleTree().Projects[0].ProjectID {
+		t.Fatalf("frame after the return = %+v, want the same Project", m.cur())
 	}
 	r, ok := m.selectedRow()
 	if !ok || r.id != selected.CrewID {
 		t.Fatalf("selected row after the return = %+v (ok=%v), want %q", r, ok, selected.CrewID)
 	}
 	if m.cur().sel == beforeIndex {
-		t.Fatalf("the inserted attempt did not move the row index (%d); the test proves nothing", beforeIndex)
+		t.Fatalf("the inserted crew did not move the row index (%d); the test proves nothing", beforeIndex)
 	}
-	if !strings.Contains(renderFrame(t, m), selected.CrewID) {
-		t.Fatalf("the selected attempt is not on the frame after the return")
+	if !strings.Contains(renderFrame(t, m), shortID(selected.CrewID, m.g)) {
+		t.Fatalf("the selected crew is not on the frame after the return")
 	}
 }
 
@@ -521,9 +519,9 @@ func TestRefusedFailedAndStoppedAreThreeDistinctOutcomes(t *testing.T) {
 		notSays []string
 		spawned int
 	}{
-		{"stale", []string{"Attach refused", "stale", "stop unconfirmed", "nothing started"}, []string{"mate attach exit", "failed"}, 0},
+		{"stale", []string{"Attach refused", "stale", "stop unconfirmed", "nothing started"}, []string{"matev2 attach exit", "failed"}, 0},
 		{"runtime failure", []string{"Attach failed", "the runtime is not reachable", "runtime_unavailable"}, []string{"refused", "nothing started"}, 1},
-		{"stopped mate", []string{"Attach refused", "stopped", "no session to attach", "nothing started"}, []string{"stale", "mate attach exit"}, 0},
+		{"stopped mate", []string{"Attach refused", "stopped", "no session to attach", "nothing started"}, []string{"stale", "matev2 attach exit"}, 0},
 	}
 	for i, w := range want {
 		if got[i].name != w.name {
@@ -555,7 +553,7 @@ func TestRefusedFailedAndStoppedAreThreeDistinctOutcomes(t *testing.T) {
 // TestTheMateRefusalIsDecidedFromTheSnapshotBinding: the Mate branch reads
 // MateNode.Binding exactly as the Crew branch reads CrewNode.Binding. A
 // Mate recorded running whose binding is stale, absent or unknown is
-// refused here, with no subprocess - not handed to `mate attach` to refuse.
+// refused here, with no subprocess - not handed to `matev2 attach` to refuse.
 func TestTheMateRefusalIsDecidedFromTheSnapshotBinding(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -959,7 +957,7 @@ func TestEveryAttachMessageFitsAnEightyColumnFrame(t *testing.T) {
 		collect(name, m)
 	}
 
-	// The same states through the Model shape cmd/mate actually builds:
+	// The same states through the Model shape cmd/matev2 actually builds:
 	// session ports wired and a reader that fails every entry read, so a row
 	// the Agent View can open takes the entry-read-failure fallback into the
 	// classic hand-off, and a row it cannot takes the refusal directly. Before
@@ -1221,7 +1219,7 @@ func attachGallery() []attachGalleryState {
 			return renderFrame(t, announcing(t))
 		},
 		says: []string{
-			"Attaching to crew-payments-api-2", "via mate attach",
+			"Attaching to crew-payments-api-2", "via matev2 attach",
 			"detach: Ctrl+b then q",
 			// the key line, which is all the reader has once the child owns
 			// the keyboard
@@ -1271,7 +1269,7 @@ func attachGallery() []attachGalleryState {
 		},
 		// The one thing a stale binding must never read as: a failure that
 		// ran, or a confirmed stop.
-		notSays: []string{"Attach failed", "mate attach exit", "not active"},
+		notSays: []string{"Attach failed", "matev2 attach exit", "not active"},
 	}, {
 		name:  "attach-failed-runtime-120x36-unicode",
 		build: func(t *testing.T) string { return runtimeFailure(t, 120, 36) },
@@ -1305,7 +1303,7 @@ func attachGallery() []attachGalleryState {
 			"Attach refused", "Mate recorded stopped", "no session to attach",
 			"nothing started",
 		},
-		notSays: []string{"Attach failed", "mate attach exit", "stale"},
+		notSays: []string{"Attach failed", "matev2 attach exit", "stale"},
 	}}
 }
 

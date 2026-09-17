@@ -299,7 +299,7 @@ func key(s string) tea.KeyMsg {
 const notErrorState = "not an error state"
 
 // absentMate is a Project with no designated Mate, shaped the way
-// query.LoadSnapshot shapes one: every dependent field carries the
+// the store-backed loader shapes one: every dependent field carries the
 // designation's Absent state forward rather than being left unset.
 func absentMate(why string) query.MateNode {
 	return query.MateNode{
@@ -328,7 +328,7 @@ func sampleTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Workspace: query.KnownField(query.WorkspaceValue{
-			Name: "acme", Root: "/Users/dev/work/acme", DatabasePath: "/Users/dev/work/acme/.matev2/matev2.db",
+			Name: "acme", Root: "/Users/dev/work/acme",
 		}),
 		Projects: []query.ProjectNode{
 			{
@@ -353,97 +353,73 @@ func sampleTree() query.Snapshot {
 				Repos: query.KnownField([]query.RepoValue{
 					{RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api", Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main"},
 				}),
-				Tasks: []query.TaskNode{
+				Crews: []query.CrewNode{
 					{
-						TaskID: "task_01J9P2B4C6D8E0F2G4H6J8K0LM",
-						RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
-						Title:  "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
-						Status: query.TaskRunning,
+						CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
+						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+						Task:        "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
+						Status:      query.CrewFailed,
+						HarnessKind: query.HarnessCodex,
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
 							Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
 						}),
-						Error:     query.AbsentField[query.ErrorReason](notErrorState),
-						Attention: query.AbsentField[query.Attention]("attempt 2 is recorded running and nothing about it needs attention"),
-						Crews: []query.CrewNode{
-							{
-								CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-								RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
-								Attempt:     1,
-								Status:      query.CrewFailed,
-								HarnessKind: query.HarnessCodex,
-								RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
-								Repo: query.KnownField(query.RepoValue{
-									RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-									Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
-								}),
-								Worktree: query.KnownField(query.WorktreeValue{
-									Path:   "/Users/dev/work/acme/repos/payments-api/.worktrees/crew_01J9P4Q5R6S7T8U9V0W1X2A7CS/a1",
-									Branch: "crew/task_01J9P2B4/attempt-1",
-									Status: query.WorktreeRecordedCreated,
-								}),
-								AgentName: query.KnownField("crew-payments-api-1"),
-								Binding: query.KnownNote(query.BindingValue{
-									Status: query.BindingStale, AgentName: "crew-payments-api-1",
-									Runtime: "herdr", Session: "mate-acme", Tab: "crew/01J9P4P5", Pane: "p-2b91",
-									BoundSince: time.Date(2026, 9, 10, 10, 2, 14, 0, time.UTC), BoundSinceKind: query.BoundSinceActivated,
-								}, "recorded stale: mate could not confirm the agent stopped, and attach is refused while stale"),
-								LastEvent: query.KnownField(query.EventValue{
-									EventType: "crew.failed", OccurredAt: time.Date(2026, 9, 10, 13, 21, 37, 0, time.UTC),
-								}),
-								Error: query.KnownField(query.ErrorReason("harness exited 1 before reporting")),
-								Attention: query.KnownField(query.Attention{
-									Kind: query.AttentionFailed, Why: "attempt 1 failed: harness exited 1 before reporting",
-								}),
-							},
-							{
-								CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
-								RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
-								Attempt:     2,
-								Status:      query.CrewRunning,
-								HarnessKind: query.HarnessClaude,
-								RetryOf: query.KnownField(query.RetryValue{
-									CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS", Attempt: 1,
-								}),
-								Repo: query.KnownField(query.RepoValue{
-									RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-									Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
-								}),
-								Worktree: query.KnownField(query.WorktreeValue{
-									Path:   "/Users/dev/work/acme/repos/payments-api/.worktrees/crew_01J9P6Q6W0E5V8XK2M4B8DT/a2",
-									Branch: "crew/task_01J9P2B4/attempt-2",
-									Status: query.WorktreeRecordedCreated,
-								}),
-								AgentName: query.KnownField("crew-payments-api-2"),
-								Binding: query.KnownNote(query.BindingValue{
-									Status: query.BindingActive, AgentName: "crew-payments-api-2",
-									Runtime: "herdr", Session: "mate-acme", Tab: "crew/01J9P6Q6", Pane: "p-7c1e",
-									BoundSince: time.Date(2026, 9, 10, 13, 41, 5, 0, time.UTC), BoundSinceKind: query.BoundSinceActivated,
-								}, "recorded active; this does not prove the agent is alive"),
-								LastEvent: query.KnownField(query.EventValue{
-									EventType: "agent.tool_call", OccurredAt: time.Date(2026, 9, 10, 14, 1, 58, 0, time.UTC),
-								}),
-								Error:     query.AbsentField[query.ErrorReason](notErrorState),
-								Attention: query.AbsentField[query.Attention]("attempt 2 is recorded running and nothing about it needs attention"),
-							},
-						},
+						Worktree: query.KnownField(query.WorktreeValue{
+							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
+							Branch: "matev2/01J9P4Q5",
+							Status: query.WorktreeRecordedCreated,
+						}),
+						AgentName: query.KnownField("crew-payments-api-1"),
+						Binding: query.KnownNote(query.BindingValue{
+							Status: query.BindingStale, AgentName: "crew-payments-api-1",
+							Runtime: "herdr", Session: "mate-acme", Tab: "crew/01J9P4P5", Pane: "p-2b91",
+							BoundSince: time.Date(2026, 9, 10, 10, 2, 14, 0, time.UTC), BoundSinceKind: query.BoundSinceActivated,
+						}, "recorded stale: matev2 could not confirm the agent stopped, and attach is refused while stale"),
+						LastEvent: query.KnownField(query.EventValue{
+							EventType: "crew.failed", OccurredAt: time.Date(2026, 9, 10, 13, 21, 37, 0, time.UTC),
+						}),
+						Error: query.KnownField(query.ErrorReason("harness exited 1 before reporting")),
+						Attention: query.KnownField(query.Attention{
+							Kind: query.AttentionFailed,
+							Why:  "crew crew_01J9P4Q5R6S7T8U9V0W1X2A7CS failed: harness exited 1 before reporting",
+						}),
 					},
 					{
-						TaskID:    "task_01J9P7N8P9Q0R1S2T3U4V5W6XY",
-						Title:     "Add idempotency-key index",
-						Status:    query.TaskReady,
+						CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
+						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+						Task:        "Add idempotency-key index",
+						Status:      query.CrewRunning,
+						HarnessKind: query.HarnessClaude,
+						Repo: query.KnownField(query.RepoValue{
+							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
+							Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
+						}),
+						Worktree: query.KnownField(query.WorktreeValue{
+							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P6Q6W0E5V8XK2M4B8DT",
+							Branch: "matev2/01J9P6Q6",
+							Status: query.WorktreeRecordedCreated,
+						}),
+						AgentName: query.KnownField("crew-payments-api-2"),
+						Binding: query.KnownNote(query.BindingValue{
+							Status: query.BindingActive, AgentName: "crew-payments-api-2",
+							Runtime: "herdr", Session: "mate-acme", Tab: "crew/01J9P6Q6", Pane: "p-7c1e",
+							BoundSince: time.Date(2026, 9, 10, 13, 41, 5, 0, time.UTC), BoundSinceKind: query.BoundSinceActivated,
+						}, "recorded active; this does not prove the agent is alive"),
+						LastEvent: query.KnownField(query.EventValue{
+							EventType: "agent.tool_call", OccurredAt: time.Date(2026, 9, 10, 14, 1, 58, 0, time.UTC),
+						}),
 						Error:     query.AbsentField[query.ErrorReason](notErrorState),
-						Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
+						Attention: query.AbsentField[query.Attention]("crew crew_01J9P6Q6W0E5V8XK2M4B8DT is recorded running and nothing about it needs attention"),
 					},
 				},
-				Attention: query.AbsentField[query.ProjectAttention]("no task in this project needs attention and its Mate is recorded healthy"),
+				Attention: query.KnownField(query.ProjectAttention{CrewsNeedingAttention: 1}),
 			},
 			{
 				ProjectID: "proj_01J9M4H7K9L1M3N5P7Q9R1S3TU",
 				Name:      "ledger-worker",
 				Mate:      absentMate("this project has no designated Mate"),
 				Attention: query.KnownField(query.ProjectAttention{
-					Kind: query.AttentionNoMate, Why: "the project has no designated Mate, so no attempt can be started",
+					Kind: query.AttentionNoMate, Why: "the project has no designated Mate, so no crew can be spawned",
 				}),
 			},
 		},

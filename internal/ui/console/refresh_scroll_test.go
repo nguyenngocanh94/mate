@@ -50,7 +50,7 @@ func crewTaskWithTwoCrews() query.Snapshot {
 }
 
 func dropFirstCrewAttempt(tree query.Snapshot) query.Snapshot {
-	tree.Projects[0].Tasks[0].Crews = tree.Projects[0].Tasks[0].Crews[1:]
+	tree.Projects[0].Crews = tree.Projects[0].Crews[1:]
 	return tree
 }
 
@@ -60,8 +60,8 @@ func dropFirstCrewAttempt(tree query.Snapshot) query.Snapshot {
 // refresh it away.
 func TestRefreshResetsInspectorScrollWhenSelectionMovesToADifferentRow_Detail(t *testing.T) {
 	tree := crewTaskWithTwoCrews()
-	removedID := tree.Projects[0].Tasks[0].Crews[0].CrewID
-	survivorID := tree.Projects[0].Tasks[0].Crews[1].CrewID
+	removedID := tree.Projects[0].Crews[0].CrewID
+	survivorID := tree.Projects[0].Crews[1].CrewID
 
 	m := sizedFixture(t, tree, 80, 24)
 	m = toFailedAttempt(t, m)
@@ -101,8 +101,8 @@ func TestRefreshResetsInspectorScrollWhenSelectionMovesToADifferentRow_Detail(t 
 // (100-139 cols), focus moved there with Tab instead of Detail.
 func TestRefreshResetsInspectorScrollWhenSelectionMovesToADifferentRow_Wide(t *testing.T) {
 	tree := crewTaskWithTwoCrews()
-	removedID := tree.Projects[0].Tasks[0].Crews[0].CrewID
-	survivorID := tree.Projects[0].Tasks[0].Crews[1].CrewID
+	removedID := tree.Projects[0].Crews[0].CrewID
+	survivorID := tree.Projects[0].Crews[1].CrewID
 
 	m := sizedFixture(t, tree, 120, 36)
 	m = toFailedAttempt(t, m)

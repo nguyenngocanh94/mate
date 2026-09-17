@@ -15,7 +15,7 @@ import (
 // The session-open failure chain.
 //
 // Opening an embedded Agent View is a chain of steps - the live PTY stream,
-// then the snapshot controller, then the classic `mate attach` hand-off -
+// then the snapshot controller, then the classic `matev2 attach` hand-off -
 // and each step can fail for a reason the next step knows nothing about. The
 // pre-fix Console reported only the taxonomy *code* of the step that failed
 // most recently (sessionErrorCode), because the message line is one line and
@@ -108,8 +108,8 @@ type sessionFailure struct {
 }
 
 const (
-	exitNoteSignalled = "mate attach was signalled"
-	exitNoteNotRun    = "mate attach did not run"
+	exitNoteSignalled = "matev2 attach was signalled"
+	exitNoteNotRun    = "matev2 attach did not run"
 )
 
 // recordOpenFailure appends one failed step to the chain. It is a Model
@@ -244,7 +244,7 @@ func openFailureCause(f sessionFailure, err error) string {
 		if facts, ok := attachExits[f.ExitCode]; ok {
 			return facts.Cause
 		}
-		return fmt.Sprintf("mate attach exited %d", f.ExitCode)
+		return fmt.Sprintf("matev2 attach exited %d", f.ExitCode)
 	}
 	// The last resort is the step's own message. It is arbitrary text, which
 	// is why it is bounded nowhere and the one-line summary may have to cut
@@ -471,7 +471,7 @@ func openFailureShortLine(f sessionFailure) string {
 //
 // The message is dropped only when it would restate the cause, which is the
 // case when the cause *is* that message (an uncoded error), and an exit whose
-// number the cause already names ("mate attach exited 7") is not repeated
+// number the cause already names ("matev2 attach exited 7") is not repeated
 // either. The pair is not bounded: the error's message is arbitrary text, and
 // messageLine cuts an over-long line with a visible marker (frame.go) - the
 // safety net that makes carrying the message affordable. The cause itself is
@@ -489,7 +489,7 @@ func openFailureEvidence(f sessionFailure, cause string) string {
 		}
 	}
 	switch {
-	case f.ExitCode >= 0 && cause != fmt.Sprintf("mate attach exited %d", f.ExitCode):
+	case f.ExitCode >= 0 && cause != fmt.Sprintf("matev2 attach exited %d", f.ExitCode):
 		parts = append(parts, fmt.Sprintf("exit %d", f.ExitCode))
 	case f.ExitNote != "" && cause != f.ExitNote:
 		parts = append(parts, f.ExitNote)
@@ -507,7 +507,7 @@ func (m Model) sessionModeLabel() string {
 	case m.sess.phase == sessionActive || m.sess.phase == sessionFallback:
 		return "snapshot view"
 	case m.attachHoldsTerminal():
-		return "mate attach"
+		return "matev2 attach"
 	}
 	return "no session open"
 }
@@ -583,7 +583,7 @@ func codeFieldValue(f sessionFailure) string {
 func exitFieldValue(f sessionFailure) string {
 	switch {
 	case f.ExitCode >= 0:
-		return fmt.Sprintf("mate attach exit %d", f.ExitCode)
+		return fmt.Sprintf("matev2 attach exit %d", f.ExitCode)
 	case f.ExitNote != "":
 		return f.ExitNote
 	}

@@ -11,7 +11,7 @@ import (
 
 // The seams. Five surfaces of the redesign belong to their own tasks; this
 // file is where the frame calls into them, with a foundation implementation
-// behind each one so `mate console` builds and runs today. Each is
+// behind each one so `matev2 console` builds and runs today. Each is
 // deliberately small - replacing one should mean rewriting a function, not
 // unpicking the frame.
 //
@@ -156,7 +156,7 @@ func (m Model) projectFields(r row, valueWidth int) []*line {
 // reason is empty - the same guard availabilitySpans applies, so a custom
 // field builder never emits a bare " · " next to a reason nobody set (an
 // unset Field in a hand-built fixture, never a real query-layer read: every
-// Absent/Unknown field query.LoadSnapshot produces carries a reason).
+// Absent/Unknown field the store-backed loader produces carries a reason).
 func reasonSpan(reason string, g glyphSet, p palette) []span {
 	if reason == "" {
 		return nil
@@ -200,9 +200,13 @@ func mateSummarySpans(mate query.MateNode, g glyphSet, p palette) []span {
 // each Crew's own inspector already answers "why" for itself.
 func crewsCountSpans(p query.ProjectNode, g glyphSet, pal palette) []span {
 	out := []span{{text: fmt.Sprint(len(p.Crews)), style: pal.Fg}}
-	if p.Attention.State == query.Known && p.Attention.Value.CrewsNeedingAttention > 0 {
+	if n := p.Attention.Value.CrewsNeedingAttention; p.Attention.State == query.Known && n > 0 {
+		verb := " need attention"
+		if n == 1 {
+			verb = " needs attention"
+		}
 		out = append(out, span{
-			text:  " " + g.Dot + " " + plural(p.Attention.Value.CrewsNeedingAttention, "crew", "crews") + " need attention",
+			text:  " " + g.Dot + " " + plural(n, "crew", "crews") + verb,
 			style: pal.Amber,
 		})
 	}
@@ -301,6 +305,10 @@ func (m Model) crewFields(r row, valueWidth int) []*line {
 	out = append(out, newLine())
 	out = append(out, m.field("Last event", m.eventSpans(c.LastEvent), valueWidth)...)
 	out = append(out, m.field("Reason", errorReasonSpans(c.Error, c.Status == query.CrewFailed, m.g, m.p), valueWidth)...)
+	// Attention was the Task block's field in v1. With the Task level gone
+	// the Crew is the only row that carries one, so the sentence behind the
+	// list's one-word ATTENTION lands here.
+	out = append(out, m.field("Attention", attentionFieldSpans(c.Attention, m.g, m.p), valueWidth)...)
 	// TODO(task 18): the Runtime health / last check / reason block went
 	// here. It read the health observer, which mvp.md defers to task 18.
 	return out

@@ -1,15 +1,13 @@
  matev2 console   workspace ws_acme                              As of 14:02:11 
- ws_acme > payments-api                                       Project . 2 crews 
---------------------------------------------------------------------------------
+ ws_acme › docs-site                                          Project · 0 crews 
+────────────────────────────────────────────────────────────────────────────────
   MATE                            HARNESS      STATUS         BINDING           
-> mate-payments-api               claude       running        active            
+▌ mate-docs-site                  claude       stopped        none              
                                                                                 
-  CREWS  1          TASK                         STATUS           NOTE          
-  crew_01J9P6..B8DT Add idempotency-key index    running                        
-  v Completed (1)                                                 ! failed      
+  CREWS  0          TASK                         STATUS           NOTE          
                                                                                 
-                                                                                
-                                                                                
+  No crews recorded for docs-site.                                              
+  Crews are spawned by the Mate; press r to re-read.                            
                                                                                 
                                                                                 
                                                                                 
@@ -19,6 +17,8 @@
                                                                                 
                                                                                 
                                                                                 
---------------------------------------------------------------------------------
                                                                                 
- j/k Move  a Actions  Enter Attach mate  Esc Back  Tab Detail  r Refresh  q Quit
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ ↑↓ Move  s Resume mate  Enter Attach mate (n/a)  Esc Back  r Refresh  q Quit   

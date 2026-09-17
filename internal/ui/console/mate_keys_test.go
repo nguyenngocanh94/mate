@@ -25,7 +25,7 @@ func projectFrame(t *testing.T, tree query.Snapshot) Model {
 func mateTree(mate query.MateNode, actions []query.ActionAvailability) query.Snapshot {
 	tree := sampleTree()
 	tree.Projects = tree.Projects[:1]
-	tree.Projects[0].Tasks = nil
+	tree.Projects[0].Crews = nil
 	mate.Actions = actions
 	tree.Projects[0].Mate = mate
 	return tree
@@ -41,13 +41,12 @@ func knownMate(status query.MateStatus, kind query.HarnessKind) query.MateNode {
 	}
 }
 
-func mateCaps(onboard, start, resume, switchH bool) []query.ActionAvailability {
+func mateCaps(onboard, start, resume bool) []query.ActionAvailability {
 	return []query.ActionAvailability{
 		{Action: "start", Available: start, Reason: "recorded status"},
 		{Action: "stop", Available: false, Reason: "no active binding to stop"},
 		{Action: "resume", Available: resume, Reason: "recorded status"},
 		{Action: "onboard", Available: onboard, Reason: "create and start this Project's Mate"},
-		{Action: "switch_harness", Available: switchH, Reason: "restart this Mate under a different harness"},
 	}
 }
 
@@ -64,19 +63,19 @@ func TestTheStartKeyLabelFollowsTheRecordedMateStatus(t *testing.T) {
 		{
 			name: "no mate",
 			mate: absentMate("this Project has no Mate"),
-			caps: mateCaps(true, false, false, false),
+			caps: mateCaps(true, false, false),
 			want: "s Create mate",
 		},
 		{
 			name: "created",
 			mate: knownMate(query.MateCreated, query.HarnessClaude),
-			caps: mateCaps(false, true, false, true),
+			caps: mateCaps(false, true, false),
 			want: "s Start mate",
 		},
 		{
 			name: "stopped",
 			mate: knownMate(query.MateStopped, query.HarnessClaude),
-			caps: mateCaps(false, false, true, true),
+			caps: mateCaps(false, false, true),
 			want: "s Resume mate",
 		},
 	}
@@ -88,9 +87,6 @@ func TestTheStartKeyLabelFollowsTheRecordedMateStatus(t *testing.T) {
 			if !strings.Contains(view, tc.want) {
 				t.Fatalf("key line does not offer %q:\n%s", tc.want, view)
 			}
-			if !strings.Contains(view, "h Change harness") && tc.name != "no mate" {
-				t.Fatalf("key line does not offer the harness key:\n%s", view)
-			}
 		})
 	}
 }
@@ -100,7 +96,7 @@ func TestTheStartKeyLabelFollowsTheRecordedMateStatus(t *testing.T) {
 // configured default.
 func TestCreatingAMateAsksWhichAgentToUse(t *testing.T) {
 	t.Parallel()
-	m, got := withRunner(projectFrame(t, mateTree(absentMate("this Project has no Mate"), mateCaps(true, false, false, false))), "Mate created", nil)
+	m, got := withRunner(projectFrame(t, mateTree(absentMate("this Project has no Mate"), mateCaps(true, false, false))), "Mate created", nil)
 	m, cmd := send(t, m, key("s"))
 	if cmd != nil {
 		t.Fatalf("s dispatched before the agent was chosen: %v", cmd)
@@ -140,8 +136,8 @@ func TestStartAndResumeDoNotAskForAnAgent(t *testing.T) {
 		caps   []query.ActionAvailability
 		action Action
 	}{
-		{"created", knownMate(query.MateCreated, query.HarnessClaude), mateCaps(false, true, false, true), ActionStart},
-		{"stopped", knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true, true), ActionResume},
+		{"created", knownMate(query.MateCreated, query.HarnessClaude), mateCaps(false, true, false), ActionStart},
+		{"stopped", knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true), ActionResume},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -161,77 +157,10 @@ func TestStartAndResumeDoNotAskForAnAgent(t *testing.T) {
 	}
 }
 
-// TestSwitchingHarnessAsksThenConfirmsBeforeDestroyingThePanel is the
-// captain's modal: the user is told the old panel and its harness session
-// are destroyed and unsaved work is lost, and nothing runs until they accept.
-func TestSwitchingHarnessAsksThenConfirmsBeforeDestroyingThePanel(t *testing.T) {
-	t.Parallel()
-	tree := sampleTree()
-	tree.Projects = tree.Projects[:1]
-	tree.Projects[0].Tasks = nil
-	tree.Projects[0].Mate.Actions = mateCaps(false, false, false, true)
-	m, got := withRunner(projectFrame(t, tree), "switched", nil)
-
-	m, cmd := send(t, m, key("h"))
-	if cmd != nil {
-		t.Fatalf("h dispatched before anything was chosen: %v", cmd)
-	}
-	m, _ = send(t, m, key("down")) // codex
-	m, cmd = send(t, m, key("enter"))
-	if cmd != nil || len(*got) != 0 {
-		t.Fatalf("choosing an agent ran the switch without a confirmation: cmd=%v calls=%d", cmd, len(*got))
-	}
-	view := renderFrame(t, m)
-	for _, want := range []string{"CONFIRM", "Object", "Scope", "Effect", "destroyed", "unsaved"} {
-		if !strings.Contains(flattenWrap(view), want) {
-			t.Fatalf("confirmation missing %q:\n%s", want, view)
-		}
-	}
-	m, cmd = send(t, m, key("enter"))
-	if cmd == nil {
-		t.Fatal("the confirmation did not dispatch the switch")
-	}
-	m, _ = send(t, m, cmd())
-	if len(*got) != 1 {
-		t.Fatalf("runner calls = %d, want one", len(*got))
-	}
-	if (*got)[0].Action != ActionSwitchHarness || (*got)[0].Harness != query.HarnessCodex {
-		t.Fatalf("request = %+v, want a switch_harness carrying codex", (*got)[0])
-	}
-}
-
-// TestSwitchingHarnessOnAStoppedMateDoesNotClaimAPanelWillBeDestroyed is the
-// package's standing rule: never assert more than the recorded state says.
-func TestSwitchingHarnessOnAStoppedMateDoesNotClaimAPanelWillBeDestroyed(t *testing.T) {
-	t.Parallel()
-	m := projectFrame(t, mateTree(knownMate(query.MateStopped, query.HarnessClaude), mateCaps(false, false, true, true)))
-	m, _ = send(t, m, key("h"))
-	m, _ = send(t, m, key("enter")) // claude, same kind: still a restart
-	flat := flattenWrap(renderFrame(t, m))
-	if !strings.Contains(flat, "No live panel is recorded") {
-		t.Fatalf("confirmation does not say there is no live panel:\n%s", flat)
-	}
-	if strings.Contains(flat, "unsaved") {
-		t.Fatalf("confirmation warns about unsaved work with nothing live:\n%s", flat)
-	}
-}
-
-// TestTheHarnessKeyIsRefusedWithNoMate: h has nothing to restart, and the
-// refusal must point at the key that does create one.
-func TestTheHarnessKeyIsRefusedWithNoMate(t *testing.T) {
-	t.Parallel()
-	m, got := withRunner(projectFrame(t, mateTree(absentMate("this Project has no Mate"), mateCaps(true, false, false, false))), "must not run", nil)
-	m, cmd := send(t, m, key("h"))
-	if cmd != nil || len(*got) != 0 {
-		t.Fatalf("h ran something with no Mate: cmd=%v calls=%d", cmd, len(*got))
-	}
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "nothing started") {
-		t.Fatalf("refusal = %+v", m.msg)
-	}
-	if !strings.Contains(m.msg.text, "s ") {
-		t.Fatalf("refusal %q does not point at the key that creates a Mate", m.msg.text)
-	}
-}
+// TODO(task 10): three tests lived here for the 'h' key - the
+// harness-switch confirm on a live Mate, the same on a stopped one, and
+// its refusal with no Mate. Restarting a Mate under another harness is
+// mvp.md's task 10.
 
 // TestMateKeysAreNotOfferedAwayFromAProjectScreen: the captain asked for
 // these on a Project screen. A key line must never name a key that refuses.
@@ -249,7 +178,7 @@ func TestMateKeysAreNotOfferedAwayFromAProjectScreen(t *testing.T) {
 // TestEscapeLeavesTheHarnessPickerWithoutRunningAnything.
 func TestEscapeLeavesTheHarnessPickerWithoutRunningAnything(t *testing.T) {
 	t.Parallel()
-	m, got := withRunner(projectFrame(t, mateTree(absentMate("this Project has no Mate"), mateCaps(true, false, false, false))), "must not run", nil)
+	m, got := withRunner(projectFrame(t, mateTree(absentMate("this Project has no Mate"), mateCaps(true, false, false))), "must not run", nil)
 	m, _ = send(t, m, key("s"))
 	m, cmd := send(t, m, key("esc"))
 	if cmd != nil || len(*got) != 0 {

@@ -376,7 +376,15 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		crewStart = 1
 	}
 	crewRowsOnScreen := rows[crewStart:]
-	noteW := iw - colCrewID - colStatus - colHarness
+	crewsWide := wideList(w)
+	// TASK is the one column allowed to cut a value short (titleCell): the
+	// job a Crew was spawned for is what a reader scans this list by, so it
+	// takes whatever width is left and truncates with an ellipsis rather
+	// than being dropped whole the way a NOTE item is.
+	taskW := iw - colCrewID - colStatus - colAttention
+	if crewsWide {
+		taskW -= colUpdated
+	}
 
 	activeCrews := 0
 	for _, c := range proj.Crews {
@@ -387,9 +395,12 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 	items = append(items, headerListLine(func(focused bool) *line {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREWS  %d", activeCrews), focused, p)}, colCrewID)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("TASK", p)}, taskW)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colStatus)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("HARNESS", p)}, colHarness)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("TASK", p)}, noteW)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("NOTE", p)}, colAttention)...)
+		if crewsWide {
+			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
+		}
 		return l
 	}))
 
@@ -412,9 +423,12 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 				l := selectRow(newLine(), selected, p)
 				l.addSpans(rowPrefix(selected, focused, g, p)...)
 				l.addSpans(fitCell([]span{{text: completedGroupTitle(len(finished), m.completedOpen[proj.ProjectID], g), style: p.Fg}}, colCrewID)...)
+				l.addSpans(fitCell(nil, taskW)...)
 				l.addSpans(fitCell(nil, colStatus)...)
-				l.addSpans(fitCell(nil, colHarness)...)
-				l.addSpans(fitCell(m.completedCrewNoteSpans(finished, noteW), noteW)...)
+				l.addSpans(fitCell(m.completedCrewNoteSpans(finished, colAttention), colAttention)...)
+				if crewsWide {
+					l.addSpans(fitCell(nil, colUpdated)...)
+				}
 				return l
 			}))
 			continue
@@ -431,9 +445,12 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 			l := selectRow(newLine(), selected, p)
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
 			l.addSpans(fitCell([]span{{text: shortID(c.CrewID, g), style: p.Fg}}, colCrewID)...)
+			l.addSpans(titleCell(c.Task, taskW, p.Fg, g)...)
 			l.addSpans(fitCell([]span{statusSpan(string(c.Status), p)}, colStatus)...)
-			l.addSpans(fitCell([]span{{text: string(c.HarnessKind), style: p.Fg}}, colHarness)...)
-			l.addSpans(fitCell(m.crewRowNoteSpans(c, noteW), noteW)...)
+			l.addSpans(fitCell(m.crewRowNoteSpans(c, colAttention), colAttention)...)
+			if crewsWide {
+				l.addSpans(fitCell(updatedSpans(c.LastEvent, p), colUpdated)...)
+			}
 			return l
 		}))
 	}
@@ -537,10 +554,9 @@ func (m Model) completedCrewNoteSpans(crews []query.CrewNode, w int) []span {
 	return packNoteItems(items, w)
 }
 
-// crewNoteItems is the Crew row's own TASK cell items, in priority order,
-// before width packing: the one-line task the Crew was spawned for, the
-// query layer's derived Attention, then the worktree's own recorded
-// removal. Split out
+// crewNoteItems is the Crew row's own NOTE cell items, in priority order,
+// before width packing: the query layer's derived Attention, then the
+// worktree's own recorded removal. Split out
 // (rather than a single crewNoteSpans free function, which PR 92's
 // counter-review found had drifted to zero production callers while its own
 // regression tests stayed green against it - B3) so m.crewRowNoteSpans
@@ -551,9 +567,6 @@ func (m Model) completedCrewNoteSpans(crews []query.CrewNode, w int) []span {
 // function's own behaviour exactly.
 func crewNoteItems(c query.CrewNode, p palette) [][]span {
 	var items [][]span
-	if c.Task != "" {
-		items = append(items, []span{{text: c.Task, style: p.Fg}})
-	}
 	if s := attentionSpans(c.Attention, p); len(s) > 0 {
 		items = append(items, s)
 	}

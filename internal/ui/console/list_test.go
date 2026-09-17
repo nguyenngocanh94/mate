@@ -10,17 +10,17 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-// ---------- golden fixtures: the Project level (Mate row + Tasks) ----------
+// ---------- golden fixtures: the Project level (Mate row + Crews) ----------
 //
 // frames_golden_test.go's own golden suite (the foundation's) covers the
-// Workspace list and a Task's Crew attempts, but never drills into a
-// Project - the one level with two stacked tables (design/mate-console-
-// design-notes.html, "Trong pane"). These fixtures close that gap.
+// Workspace list but never drills into a Project - the one level with two
+// stacked tables (design/mate-console-design-notes.html, "Trong pane").
+// These fixtures close that gap.
 
 func intoProject(t *testing.T, w, h int, g glyphSet) Model {
 	t.Helper()
 	m := newFixture(t, sampleTree(), w, h, g)
-	m, _ = send(t, m, key("enter")) // payments-api: Mate row + two Tasks
+	m, _ = send(t, m, key("enter")) // payments-api: Mate row + its Crews
 	return m
 }
 
@@ -29,36 +29,26 @@ func TestGoldenProjectLevelAtEveryBreakpoint(t *testing.T) {
 	assertGolden(t, "project-120x36-unicode", renderFrame(t, intoProject(t, 120, 36, unicodeGlyphs)))
 	assertGolden(t, "project-80x24-unicode", renderFrame(t, intoProject(t, 80, 24, unicodeGlyphs)))
 	assertGolden(t, "project-80x24-ascii", renderFrame(t, intoProject(t, 80, 24, asciiGlyphs)))
+	assertGolden(t, "project-140x40-ascii", renderFrame(t, intoProject(t, 140, 40, asciiGlyphs)))
 }
 
-// TestGoldenTaskLevelAsciiGlyphs: frames_golden_test.go's own attempts-*
-// fixtures cover the Task level in Unicode only. The list pane's own
-// acceptance bar asks for both glyph sets at every level.
-func TestGoldenTaskLevelAsciiGlyphs(t *testing.T) {
-	m := newFixture(t, sampleTree(), 140, 40, asciiGlyphs)
-	m, _ = send(t, m, key("enter")) // payments-api
-	m, _ = send(t, m, key("down"))  // its first Task
-	m, _ = send(t, m, key("enter")) // that Task's attempts
-	assertGolden(t, "attempts-140x40-ascii", renderFrame(t, m))
-}
-
-// TestGoldenProjectWithoutMateAndWithoutTasks pins the two empty-ish
+// TestGoldenProjectWithoutMateAndWithoutCrews pins the two empty-ish
 // Project states the gallery names explicitly: a Project with no designated
 // Mate ("! no mate" in the Binding cell) and a Project with a Mate but zero
-// Tasks (the two-line empty message under the Tasks header).
-func TestGoldenProjectWithoutMateAndWithoutTasks(t *testing.T) {
+// Crews (the two-line empty message under the Crews header).
+func TestGoldenProjectWithoutMateAndWithoutCrews(t *testing.T) {
 	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
 	m, _ = send(t, m, key("down")) // ledger-worker: no designated Mate
 	m, _ = send(t, m, key("enter"))
 	assertGolden(t, "project-nomate-120x36-unicode", renderFrame(t, m))
 
-	withoutTasks := noTasksTree()
-	m2 := newFixture(t, withoutTasks, 80, 24, unicodeGlyphs)
+	withoutCrews := noCrewsTree()
+	m2 := newFixture(t, withoutCrews, 80, 24, unicodeGlyphs)
 	m2, _ = send(t, m2, key("enter"))
-	assertGolden(t, "project-notasks-80x24-unicode", renderFrame(t, m2))
+	assertGolden(t, "project-nocrews-80x24-unicode", renderFrame(t, m2))
 }
 
-func noTasksTree() query.Snapshot {
+func noCrewsTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme"}),
@@ -71,23 +61,23 @@ func noTasksTree() query.Snapshot {
 				Binding:    query.AbsentField[query.BindingValue]("no runtime binding is held"),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),
 			},
-			Attention: query.AbsentField[query.ProjectAttention]("no task in this project needs attention and its Mate is recorded healthy"),
+			Attention: query.AbsentField[query.ProjectAttention]("no crew in this project needs attention and its Mate is recorded healthy"),
 		}},
 	}
 }
 
-// ---------- selection identity at the Project level (B1) ----------
+// ---------- selection identity at the Project level ----------
 
-// TestProjectLevelSelectionMarksTheRightRow: the Project level's currentRows()
-// puts the Mate row at position 0 and each Task at position idx+1 (rows.go's
-// projectDetailRows). projectListItems must label a Task's list item with
-// that same position - not the Task's own index into proj.Tasks - or the
-// Mate row and the first Task collide on rowIdx 0 (both painted selected at
-// once) while every later Task's marker is drawn one row off from the
-// selection Up/Down and Enter actually act on.
+// TestProjectLevelSelectionMarksTheRightRow: the Project level's
+// currentRows() puts the Mate row at position 0 and each Crew after it
+// (rows.go's projectDetailRows). projectListItems must label a Crew's list
+// item with that same position - not the Crew's own index into proj.Crews -
+// or the Mate row and the first Crew collide on rowIdx 0 (both painted
+// selected at once) while every later Crew's marker is drawn one row off
+// from the selection Up/Down and Enter actually act on.
 func TestProjectLevelSelectionMarksTheRightRow(t *testing.T) {
 	m := newFixture(t, sampleTree(), 160, 48, unicodeGlyphs)
-	m, _ = send(t, m, key("enter")) // payments-api: Mate row + two Tasks
+	m, _ = send(t, m, key("enter")) // payments-api: Mate row + its Crews
 	l := layout(m.w, m.h)
 
 	markedLine := func(m Model) string {
@@ -112,23 +102,21 @@ func TestProjectLevelSelectionMarksTheRightRow(t *testing.T) {
 		t.Fatalf("initial selection marked %q, want the Mate row (mate-payments-api)", got)
 	}
 
-	m, _ = send(t, m, key("down")) // sel == 1: first Task
-	if got := markedLine(m); !strings.Contains(got, "Fix webhook") {
-		t.Fatalf("sel=1 marked %q, want the first Task (Fix webhook…)", got)
+	running := sampleTree().Projects[0].Crews[1]
+	m, _ = send(t, m, key("down")) // sel == 1: the one active Crew
+	if got := markedLine(m); !strings.Contains(got, "Add idempotency-key index") {
+		t.Fatalf("sel=1 marked %q, want the running Crew's task line", got)
 	}
 	if got := markedLine(m); strings.Contains(got, "mate-payments-api") {
 		t.Fatalf("sel=1 still marked the Mate row: %q", got)
 	}
-	if r, ok := m.selectedRow(); !ok || r.kind != rowTask || r.id != "task_01J9P2B4C6D8E0F2G4H6J8K0LM" {
-		t.Fatalf("selectedRow() at sel=1 = %+v, want the first Task", r)
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != running.CrewID {
+		t.Fatalf("selectedRow() at sel=1 = %+v, want the running Crew", r)
 	}
 
-	m, _ = send(t, m, key("down")) // sel == 2: second Task
-	if got := markedLine(m); !strings.Contains(got, "Add idempotency-key index") {
-		t.Fatalf("sel=2 marked %q, want the second Task (Add idempotency-key index)", got)
-	}
-	if r, ok := m.selectedRow(); !ok || r.kind != rowTask || r.id != "task_01J9P7N8P9Q0R1S2T3U4V5W6XY" {
-		t.Fatalf("selectedRow() at sel=2 = %+v, want the second Task", r)
+	m, _ = send(t, m, key("down")) // sel == 2: the Completed group
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCompletedGroup {
+		t.Fatalf("selectedRow() at sel=2 = %+v, want the Completed group", r)
 	}
 
 	// Exactly one row is ever marked selected - never zero, never two.
@@ -148,37 +136,34 @@ func TestProjectLevelSelectionMarksTheRightRow(t *testing.T) {
 // ---------- column widths ----------
 
 // TestFixedColumnWidthsHoldAcrossLevels checks the design's own numbers
-// (STATUS 17, ATTEMPTS 10, ATTENTION 14, HARNESS 13) directly against the
+// (HARNESS 13, STATUS 15/17, BINDING 18, ATTENTION 14) directly against the
 // rendered header line, by locating each header word and measuring the gap
 // to the next one - not by re-deriving the constants list.go already uses,
 // which would just check the code against itself. The expected widths below
-// are literal numbers, not colStatus/colAttempts/etc: a mutation that
-// changes one of those constants (e.g. colStatus 17 -> 16) must fail this
-// test, which it cannot do if the test's own expectation is the same
-// constant (N4, PR 49 counter-review).
+// are literal numbers, not colStatus/colCrewID/etc: a mutation that changes
+// one of those constants (e.g. colStatus 17 -> 16) must fail this test,
+// which it cannot do if the test's own expectation is the same constant.
 func TestFixedColumnWidthsHoldAcrossLevels(t *testing.T) {
 	m := newFixture(t, sampleTree(), 160, 48, unicodeGlyphs)
 	l := layout(m.w, m.h)
 
+	// Workspace level: MATE 24, CREWS 7, ATTENTION 14.
+	wsHeader := m.listLines(l.List, l.Body)[0].render(l.List)
+	requireColumnGap(t, wsHeader, "MATE", "CREWS", 24)
+	requireColumnGap(t, wsHeader, "CREWS", "ATTENTION", 7)
+	requireColumnGap(t, wsHeader, "ATTENTION", "UPDATED", 14)
+
 	// Project level: HARNESS 13, STATUS 15, BINDING 18 (its own Mate-row
-	// table), then blank, then TASKS with STATUS 17, ATTEMPTS 10, ATTENTION
-	// 14, UPDATED 10.
+	// table), then blank, then the Crew table's STATUS 17, NOTE 14.
 	proj, _ := send(t, m, key("enter"))
 	header := proj.listLines(l.List, l.Body)[0].render(l.List)
 	requireColumnGap(t, header, "HARNESS", "STATUS", 13)
 	requireColumnGap(t, header, "STATUS", "BINDING", 15)
 
-	// items: [0] mate header, [1] mate row, [2] blank separator, [3] tasks header.
-	tasksHeaderLine := proj.listLines(l.List, l.Body)[3].render(l.List)
-	requireColumnGap(t, tasksHeaderLine, "STATUS", "ATTEMPTS", 17)
-	requireColumnGap(t, tasksHeaderLine, "ATTEMPTS", "ATTENTION", 10)
-	requireColumnGap(t, tasksHeaderLine, "ATTENTION", "UPDATED", 14)
-
-	// Task level: STATUS 17, HARNESS 13.
-	task, _ := send(t, proj, key("down"))
-	task, _ = send(t, task, key("enter"))
-	crewHeader := task.listLines(l.List, l.Body)[0].render(l.List)
-	requireColumnGap(t, crewHeader, "STATUS", "HARNESS", 17)
+	// items: [0] mate header, [1] mate row, [2] blank separator, [3] crews header.
+	crewHeader := proj.listLines(l.List, l.Body)[3].render(l.List)
+	requireColumnGap(t, crewHeader, "STATUS", "NOTE", 17)
+	requireColumnGap(t, crewHeader, "NOTE", "UPDATED", 14)
 }
 
 // TestUpdatedColumnBoundaryAt89And90 (N4): the UPDATED column must be absent
@@ -246,43 +231,14 @@ func manyProjectsTree(n int) query.Snapshot {
 	return tree
 }
 
-func manyTasksTree(n int) query.Snapshot {
-	var tasks []query.TaskNode
-	for i := 0; i < n; i++ {
-		tasks = append(tasks, query.TaskNode{
-			TaskID:    fmt.Sprintf("task_%03d", i),
-			Title:     fmt.Sprintf("task-%03d", i),
-			Status:    query.TaskReady,
-			Error:     query.AbsentField[query.ErrorReason](notErrorState),
-			Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
-		})
-	}
-	return query.Snapshot{
-		WorkspaceID: "ws_many",
-		Workspace:   query.KnownField(query.WorkspaceValue{Name: "many"}),
-		Projects: []query.ProjectNode{{
-			ProjectID: "proj_big", Name: "big-project",
-			Mate: query.MateNode{
-				Designated: query.KnownField(query.MateIdentity{MateID: "mate_big", HarnessKind: query.HarnessClaude, Status: query.MateRunning}),
-				AgentName:  query.KnownField("mate-big"),
-				Binding:    query.KnownField(query.BindingValue{Status: query.BindingActive}),
-				Error:      query.AbsentField[query.ErrorReason](notErrorState),
-			},
-			Tasks:     tasks,
-			Attention: query.AbsentField[query.ProjectAttention]("no task in this project needs attention and its Mate is recorded healthy"),
-		}},
-	}
-}
-
 func manyCrewsTree(n int) query.Snapshot {
 	var crews []query.CrewNode
 	for i := 0; i < n; i++ {
 		crews = append(crews, query.CrewNode{
 			CrewID:      fmt.Sprintf("crew_%03d", i),
-			Attempt:     i + 1,
+			Task:        fmt.Sprintf("task-%03d", i),
 			Status:      query.CrewRunning,
 			HarnessKind: query.HarnessClaude,
-			RetryOf:     query.AbsentField[query.RetryValue]("first attempt"),
 			Error:       query.AbsentField[query.ErrorReason](notErrorState),
 			Attention:   query.AbsentField[query.Attention]("nothing about it needs attention"),
 		})
@@ -298,13 +254,8 @@ func manyCrewsTree(n int) query.Snapshot {
 				Binding:    query.KnownField(query.BindingValue{Status: query.BindingActive}),
 				Error:      query.AbsentField[query.ErrorReason](notErrorState),
 			},
-			Tasks: []query.TaskNode{{
-				TaskID: "task_big", Title: "big-task", Status: query.TaskRunning,
-				Error:     query.AbsentField[query.ErrorReason](notErrorState),
-				Attention: query.AbsentField[query.Attention]("nothing about it needs attention"),
-				Crews:     crews,
-			}},
-			Attention: query.AbsentField[query.ProjectAttention]("no task in this project needs attention and its Mate is recorded healthy"),
+			Crews:     crews,
+			Attention: query.AbsentField[query.ProjectAttention]("no crew in this project needs attention and its Mate is recorded healthy"),
 		}},
 	}
 }
@@ -397,45 +348,14 @@ func listPaneText(frame string, g glyphSet) string {
 	return strings.Join(lines, "\n")
 }
 
-// TestTaskLevelScrollIndicators exercises the same up/down indicator logic
-// against a Task's Crew attempts (30 attempts), a single flat table with no
-// interleaved headers - the simpler of the two shapes the list pane draws.
-func TestTaskLevelScrollIndicators(t *testing.T) {
-	m := loaded(t, manyCrewsTree(30), nil)
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})
-	m, _ = send(t, m, key("enter")) // the Project's Mate row + one Task
-	m, _ = send(t, m, key("down"))  // the Task row
-	m, _ = send(t, m, key("enter"))
-
-	frame := renderFrame(t, m)
-	list := listPaneText(frame, m.g)
-	if strings.Contains(list, "  "+m.g.Up+" ") {
-		t.Fatalf("at the top of the Crew list, an up indicator should not appear:\n%s", frame)
-	}
-	if !strings.Contains(list, "  "+m.g.Down+" ") {
-		t.Fatalf("with 30 attempts in a short body, a down indicator is expected:\n%s", frame)
-	}
-	for i := 0; i < 29; i++ {
-		m, _ = send(t, m, key("down"))
-	}
-	frame = renderFrame(t, m)
-	list = listPaneText(frame, m.g)
-	if strings.Contains(list, "  "+m.g.Down+" ") {
-		t.Fatalf("at the bottom of the Crew list, a down indicator should not appear:\n%s", frame)
-	}
-	if !strings.Contains(list, "  "+m.g.Up+" ") {
-		t.Fatalf("scrolled to the bottom, an up indicator is expected:\n%s", frame)
-	}
-}
-
-// TestProjectLevelTasksScrollThroughTheCombinedList: the Project level's
-// Mate row and its Tasks are one selection sequence (the Mate row is
-// currentRows() index 0), so scrolling far enough into a long Tasks list
+// TestProjectLevelCrewsScrollThroughTheCombinedList: the Project level's
+// Mate row and its Crews are one selection sequence (the Mate row is
+// currentRows() index 0), so scrolling far enough into a long Crew list
 // scrolls the Mate section off screen along with it - the same "whatever is
 // off screen shows as N more" behaviour as any other level, not a special
 // pinned header.
-func TestProjectLevelTasksScrollThroughTheCombinedList(t *testing.T) {
-	m := loaded(t, manyTasksTree(60), nil)
+func TestProjectLevelCrewsScrollThroughTheCombinedList(t *testing.T) {
+	m := loaded(t, manyCrewsTree(60), nil)
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 20})
 	m, _ = send(t, m, key("enter"))
 
@@ -449,13 +369,41 @@ func TestProjectLevelTasksScrollThroughTheCombinedList(t *testing.T) {
 	}
 	frame = renderFrame(t, m)
 	if !strings.Contains(frame, "task-059") {
-		t.Fatalf("after paging to the last Task, it should be on screen:\n%s", frame)
+		t.Fatalf("after paging to the last Crew, it should be on screen:\n%s", frame)
 	}
-	if !strings.Contains(frame, "  "+m.g.Up+" ") {
-		t.Fatalf("scrolled past the Mate section and most Tasks, an up indicator is expected:\n%s", frame)
+	if !strings.Contains(listPaneText(frame, m.g), "  "+m.g.Up+" ") {
+		t.Fatalf("scrolled past the Mate section and most Crews, an up indicator is expected:\n%s", frame)
 	}
-	if got := m.currentRows()[m.cur().sel].id; got != "task_059" {
-		t.Fatalf("sel after 60 downs = row %q, want the last Task task_059", got)
+	if got := m.currentRows()[m.cur().sel].id; got != "crew_059" {
+		t.Fatalf("sel after 60 downs = row %q, want the last Crew crew_059", got)
+	}
+}
+
+// TestProjectLevelScrollIndicators exercises the up/down indicator logic
+// against a Project's 30 Crews.
+func TestProjectLevelScrollIndicators(t *testing.T) {
+	m := loaded(t, manyCrewsTree(30), nil)
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})
+	m, _ = send(t, m, key("enter"))
+
+	frame := renderFrame(t, m)
+	list := listPaneText(frame, m.g)
+	if strings.Contains(list, "  "+m.g.Up+" ") {
+		t.Fatalf("at the top of the Crew list, an up indicator should not appear:\n%s", frame)
+	}
+	if !strings.Contains(list, "  "+m.g.Down+" ") {
+		t.Fatalf("with 30 crews in a short body, a down indicator is expected:\n%s", frame)
+	}
+	for i := 0; i < 30; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	frame = renderFrame(t, m)
+	list = listPaneText(frame, m.g)
+	if strings.Contains(list, "  "+m.g.Down+" ") {
+		t.Fatalf("at the bottom of the Crew list, a down indicator should not appear:\n%s", frame)
+	}
+	if !strings.Contains(list, "  "+m.g.Up+" ") {
+		t.Fatalf("scrolled to the bottom, an up indicator is expected:\n%s", frame)
 	}
 }
 
@@ -629,35 +577,23 @@ func TestUnknownLastEventRendersHonestlyInTheUpdatedColumn(t *testing.T) {
 	}
 }
 
-// TestUnknownLatestCrewLastEventRendersHonestlyInTheProjectTaskList is B3's
-// Task-row counterpart: latestCrewLastEvent (list.go) supplies the UPDATED
-// cell for a Task row at the Project level exactly the way the Mate row
-// supplies it at the Workspace level, and the same Unknown-must-not-render-
-// blank rule applies there too. Reverting latestCrewLastEvent to fold
-// Unknown into Absent (restoring a blank UPDATED cell for a read failure,
-// while leaving Known timestamps untouched) previously left the whole
-// console package green, because no test entered a Project and gave its
-// latest Crew an unknown event.
-func TestUnknownLatestCrewLastEventRendersHonestlyInTheProjectTaskList(t *testing.T) {
+// TestUnknownCrewLastEventRendersHonestlyInTheProjectCrewList is the
+// Crew-row counterpart: a Crew row's UPDATED cell at the Project level
+// follows the same Unknown-must-not-render-blank rule as the Mate row's at
+// the Workspace level.
+func TestUnknownCrewLastEventRendersHonestlyInTheProjectCrewList(t *testing.T) {
 	tree := sampleTree()
-	// task_01J9P2B4... has two Crews; index len-1 (attempt 2) is what
-	// latestCrewLastEvent reads.
-	tree.Projects[0].Tasks[0].Crews[1].LastEvent = query.UnknownField[query.EventValue]("event lookup timed out")
+	tree.Projects[0].Crews[1].LastEvent = query.UnknownField[query.EventValue]("event lookup timed out")
 	m := newFixture(t, tree, 160, 48, unicodeGlyphs) // 160 wide: list pane clears the UPDATED boundary
 	m, _ = send(t, m, key("enter"))                  // into payments-api
 	frame := renderFrame(t, m)
-	if !strings.Contains(frame, "? unknown") {
-		t.Fatalf("an unreadable latest-Crew event should render as unknown in a Task row's UPDATED column:\n%s", frame)
-	}
-	// The second Task (task_01J9P7N8...) has no Crews at all: its UPDATED
-	// cell is a legitimate Absent blank, distinct from the Unknown case
-	// above - the frame must carry both without collapsing them.
-	if strings.Contains(frame, "Add idempotency-key index") {
-		lines := strings.Split(frame, "\n")
-		for _, l := range lines {
-			if strings.Contains(l, "Add idempotency-key index") && strings.Contains(l, "? unknown") {
-				t.Fatalf("a Task with no attempts must not render \"? unknown\" in UPDATED:\n%s", l)
+	for _, l := range strings.Split(frame, "\n") {
+		if strings.Contains(l, "Add idempotency-key index") {
+			if !strings.Contains(l, "? unknown") {
+				t.Fatalf("an unreadable Crew event should render as unknown in the UPDATED column:\n%s", l)
 			}
+			return
 		}
 	}
+	t.Fatalf("the active Crew row is not on the frame:\n%s", frame)
 }

@@ -120,7 +120,7 @@ type confirmGalleryState struct {
 func hostileStopConfirm(t *testing.T, w, h int) Model {
 	t.Helper()
 	tree := hostileTree()
-	tree.Projects[0].Tasks[0].Crews[2].CrewID = "crew_\u0085修正\x1b[31mtail‼️more"
+	tree.Projects[0].Crews[2].CrewID = "crew_\u0085修正\x1b[31mtail‼️more"
 	m := New(func(context.Context) (query.Snapshot, error) { tree.AsOf = goldenAsOf; return tree, nil }, nil)
 	m.p = plainPalette()
 	m.g = unicodeGlyphs
@@ -179,44 +179,11 @@ func confirmGallery() []confirmGalleryState {
 			"released only after the service confirms its outcome.",
 		},
 		notSays: []string{"\x1b", "\u0085"},
-	}, {
-		name: "confirm-discard-failed-crew",
-		build: func(t *testing.T) string {
-			return renderFrame(t, failedCrewDiscardConfirm(t, 120, 36))
-		},
-		says: []string{
-			"CONFIRM discard?", "Object", "Scope", "Effect",
-			"worktree and branch", "Unmerged work is lost",
-		},
-		notSays: []string{"nothing started"},
 	}}
 }
 
-func failedCrewDiscardConfirm(t *testing.T, w, h int) Model {
-	t.Helper()
-	tree := sampleTree()
-	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{tree.Projects[0].Tasks[0].Crews[0]}
-	m := New(func(context.Context) (query.Snapshot, error) { tree.AsOf = goldenAsOf; return tree, nil }, nil)
-	m.p = plainPalette()
-	m.g = unicodeGlyphs
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: w, Height: h})
-	m, _ = send(t, m, m.Init()())
-	m, _ = send(t, m, key("enter"))
-	m, _ = send(t, m, key("down"))
-	m, _ = send(t, m, key("enter"))
-	m, _ = send(t, m, key("enter")) // expand Completed
-	m, _ = send(t, m, key("down"))
-	m, _ = send(t, m, key("a"))
-	m.actionIndex = 5 // discard
-	m, cmd := send(t, m, key("enter"))
-	if cmd != nil || m.confirm == nil {
-		t.Fatalf("discard must open a confirmation without running: cmd=%v confirm=%+v", cmd, m.confirm)
-	}
-	if m.confirm.choice.action != ActionDiscard {
-		t.Fatalf("confirmation is for %q, want discard", m.confirm.choice.action)
-	}
-	return m
-}
+// TODO(task 22): a confirm-discard-failed-crew gallery state and its
+// failedCrewDiscardConfirm fixture lived here. discard is mvp.md task 22.
 
 // TestGoldenConfirmationFrames pins the confirmation gallery byte for byte.
 // Accept a deliberate change with:

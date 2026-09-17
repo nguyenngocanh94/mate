@@ -1,23 +1,23 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
- ws_acme › notifications-service                                                                       Project · 1 crew 
+ ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  MATE                 HARNESS      STATUS         BINDING           │ MATE  notifications-service                      
-▌ none assigned                                    ! no mate         │                                                  
-                                                                     │ ID               none · this project has no      
-  CREWS  1          TASK              STATUS           NOTE          │                  designated Mate                 
-  crew_01J9N3…Z6BR  Migrate email del…running          ? unknown     │ Agent            none · this project has no      
-                                                                     │                  designated Mate                 
-                                                                     │ Harness          none · this project has no      
-                                                                     │                  designated Mate                 
+  MATE                 HARNESS      STATUS         BINDING           │ COMPLETED                                        
+  mate-payments-api    claude       running        active            │                                                  
+                                                                     │ Finished         1 of 2 crews                    
+  CREWS  1          TASK              STATUS           NOTE          │                  Finished crews stay in the      
+  crew_01J9P6…B8DT  Add idempotency-k…running                        │                  snapshot. Enter shows or hides  
+▌ ↑ Completed (1)                                      ! failed      │                  them in this list.              
+  crew_01J9P4…A7CS  Fix webhook idemp…failed           ! failed      │                                                  
+                                                                     │ Needs attention  ! failed                        
                                                                      │                                                  
-                                                                     │ Recorded status  none · this project has no      
-                                                                     │                  designated Mate                 
-                                                                     │ Binding          none · this project has no      
-                                                                     │                  designated Mate                 
                                                                      │                                                  
-                                                                     │ Last event       none · this project has no      
-                                                                     │                  designated Mate                 
-                                                                     │ Reason           none · not an error state       
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  
@@ -33,4 +33,4 @@
                                                                      │                                                  
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
- ↑↓ Move  a Actions  s Create mate  Enter Attach mate (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit         
+ ↑↓ Move  a Actions  Enter Hide completed  Esc Back  Tab Inspector  r Refresh  q Quit                                   

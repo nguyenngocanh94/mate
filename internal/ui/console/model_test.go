@@ -91,31 +91,22 @@ func TestNavigationDrillsInAndBackOutRestoringSelection(t *testing.T) {
 		t.Fatalf("frame = %+v, want the Workspace with sel 1", m.cur())
 	}
 
-	// Into the first Project, past the Mate row onto its first Task, then
-	// into that Task's attempts, then back out again.
+	// Into the first Project, past the Mate row onto its first Crew, then
+	// back out again.
 	m, _ = send(t, m, key("up"))
 	m, _ = send(t, m, key("enter"))
 	if m.cur().kind != frameProject {
 		t.Fatalf("frame = %+v, want a Project frame", m.cur())
 	}
-	m, _ = send(t, m, key("down")) // off the Mate row, onto the first Task
-	r, ok := m.selectedRow()
-	if !ok || r.kind != rowTask {
-		t.Fatalf("selected row = %+v (ok=%v), want the first Task row", r, ok)
-	}
-	m, _ = send(t, m, key("enter"))
-	if m.cur().kind != frameTask {
-		t.Fatalf("frame = %+v, want a Task frame", m.cur())
-	}
 	rows := m.currentRows()
-	if len(rows) != 2 || rows[0].kind != rowCrew {
-		t.Fatalf("attempt rows = %+v, want 2 rowCrew entries", rows)
+	if len(rows) != 3 || rows[0].kind != rowMate || rows[1].kind != rowCrew || rows[2].kind != rowCompletedGroup {
+		t.Fatalf("project rows = %+v, want the Mate row, one Crew and the Completed group", rows)
 	}
-	m, _ = send(t, m, key("esc"))
-	if m.cur().kind != frameProject || m.cur().sel != 1 {
-		t.Fatalf("frame = %+v, want the Project frame with the Task row still selected", m.cur())
+	m, _ = send(t, m, key("down")) // off the Mate row, onto the active Crew
+	r, ok := m.selectedRow()
+	if !ok || r.kind != rowCrew {
+		t.Fatalf("selected row = %+v (ok=%v), want the first Crew row", r, ok)
 	}
-	m, _ = send(t, m, key("esc"))
 	m, _ = send(t, m, key("esc"))
 	if m.cur().kind != frameWorkspace || len(m.stack) != 1 {
 		t.Fatalf("Esc at the root changed the stack: %+v", m.stack)
@@ -152,7 +143,7 @@ func TestEnterOnCrewRowAttachesByCrewID(t *testing.T) {
 		t.Fatalf("expected an attach Cmd for the Crew row")
 	}
 	cmd()
-	if want := sampleTree().Projects[0].Tasks[0].Crews[1].CrewID; got != want {
+	if want := sampleTree().Projects[0].Crews[1].CrewID; got != want {
 		t.Fatalf("attach target = %q, want %q", got, want)
 	}
 }
@@ -194,7 +185,7 @@ func TestFooterSaysAttachIsUnavailableBeforeTheKeystroke(t *testing.T) {
 		t.Fatalf("view = %q, want the key line to mark the attach unavailable", view)
 	}
 	m, _ = send(t, m, key("up"))
-	m, _ = send(t, m, key("up")) // the running attempt, above the Completed group
+	m, _ = send(t, m, key("up")) // the running Crew, above the Completed group
 	view = renderFrame(t, m)
 	if !strings.Contains(view, "Attach crew") || strings.Contains(view, "Attach crew (unavailable)") {
 		t.Fatalf("view = %q, want a plain attach hint for an active binding", view)
@@ -303,7 +294,7 @@ func TestRefreshClampsWhenTheSelectedRowIsGone(t *testing.T) {
 	}
 }
 
-// TestRefreshDropsFramesWhoseEntityIsGone: a Task the refresh no longer
+// TestRefreshDropsFramesWhoseEntityIsGone: a Project the refresh no longer
 // reports must not leave the reader inside an empty frame that says nothing
 // about why it is empty. The stack unwinds to the deepest level that still
 // resolves.
@@ -311,17 +302,16 @@ func TestRefreshDropsFramesWhoseEntityIsGone(t *testing.T) {
 	full := sampleTree()
 	m := loaded(t, full, nil)
 	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // Task
-	m, _ = send(t, m, key("enter")) // its attempts
-	if len(m.stack) != 3 {
-		t.Fatalf("precondition: stack depth %d, want 3", len(m.stack))
+	m, _ = send(t, m, key("down"))  // its active Crew
+	if len(m.stack) != 2 {
+		t.Fatalf("precondition: stack depth %d, want 2", len(m.stack))
 	}
 
-	withoutTask := sampleTree()
-	withoutTask.Projects[0].Tasks = withoutTask.Projects[0].Tasks[1:]
-	m, _ = send(t, m, treeLoadedMsg{tree: withoutTask})
+	withoutCrew := sampleTree()
+	withoutCrew.Projects[0].Crews = withoutCrew.Projects[0].Crews[1:]
+	m, _ = send(t, m, treeLoadedMsg{tree: withoutCrew})
 	if len(m.stack) != 2 || m.cur().kind != frameProject {
-		t.Fatalf("stack = %+v, want it unwound to the Project frame", m.stack)
+		t.Fatalf("stack = %+v, want it still on the Project frame", m.stack)
 	}
 
 	withoutProject := query.Snapshot{WorkspaceID: full.WorkspaceID, Projects: full.Projects[1:]}
@@ -628,9 +618,9 @@ func TestViewIsEmptyBeforeTheFirstSizeMessage(t *testing.T) {
 // still renders its row, its status and everything else that did read.
 func TestOneUnreadableFieldDoesNotTakeTheWholeScreenToAnErrorPage(t *testing.T) {
 	tree := sampleTree()
-	tree.Projects[0].Tasks[0].Crews[0].Worktree = query.UnknownField[query.WorktreeValue]("worktree lookup failed")
-	tree.Projects[0].Tasks[0].Crews[0].AgentName = query.UnknownField[string]("binding lookup failed")
-	tree.Projects[0].Tasks[0].Crews[0].Binding = query.UnknownField[query.BindingValue]("binding lookup failed")
+	tree.Projects[0].Crews[0].Worktree = query.UnknownField[query.WorktreeValue]("worktree lookup failed")
+	tree.Projects[0].Crews[0].AgentName = query.UnknownField[string]("binding lookup failed")
+	tree.Projects[0].Crews[0].Binding = query.UnknownField[query.BindingValue]("binding lookup failed")
 	m := loaded(t, tree, nil)
 	if m.phase != phaseReady {
 		t.Fatalf("phase = %v, want phaseReady: one field is not a read failure", m.phase)

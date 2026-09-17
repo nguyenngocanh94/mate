@@ -1,11 +1,11 @@
- mate console                                                No snapshot loaded 
+ matev2 console                                              No snapshot loaded 
  (unknown)                                                                      
 ────────────────────────────────────────────────────────────────────────────────
                                                                                 
  Could not read snapshot                                                        
                                                                                 
- runtime_unavailable: sqlite: database is locked (SQLITE_BUSY) after 5s (/      
- Users/dev/work/acme/.mate/mate.db)                                             
+ runtime_unavailable: open /Users/dev/work/acme/.matev2/workspace.yaml:         
+ permission denied                                                              
                                                                                 
  No earlier snapshot is loaded, so nothing else is shown.                       
  r retries the read; q quits.                                                   

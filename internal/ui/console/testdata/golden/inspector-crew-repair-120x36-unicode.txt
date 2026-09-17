@@ -1,12 +1,11 @@
- mate console   workspace ws_1                                                        Recorded snapshot  As of 14:02:11 
- ws_1 › acme › a task                                                                                  Task · 1 attempt 
+ matev2 console   workspace ws_1                                                      Recorded snapshot  As of 14:02:11 
+ ws_1 › acme                                                                                           Project · 1 crew 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE           │ CREW  attempt 1 of 1                             
-▌ #1  crew_01J9P4…A7CS  needs_repair     codex        ? unknown      │                                                  
+  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS            
+  none assigned                                    ! no mate         │                                                  
                                                                      │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
-                                                                     │ Task             a task                          
-                                                                     │ Retry of         none · first attempt            
-                                                                     │                                                  
+  CREWS  1          TASK              STATUS           NOTE          │ Task                                             
+▌ crew_01J9P4…A7CS                    needs_repair     ? unknown     │                                                  
                                                                      │ Recorded status  needs_repair                    
                                                                      │ Harness          codex                           
                                                                      │ Agent            none · no runtime binding has   
@@ -31,6 +30,7 @@
                                                                      │                  still exists. Cleanup not       
                                                                      │                  authorized while observed       
                                                                      │                  state is uncertain.             
+                                                                     │ Attention        unknown · r re-reads            
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
  ↑↓ Move  a Actions  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                        

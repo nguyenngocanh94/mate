@@ -59,16 +59,16 @@ func TestProjectRowStartDispatchesForEmptyAndPopulatedProjects(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		repos query.Field[[]query.RepoValue]
-		tasks []query.TaskNode
+		crews []query.CrewNode
 	}{
 		{name: "empty", repos: query.AbsentField[[]query.RepoValue]("no repo is registered in this project")},
-		{name: "with-repo-and-worktree", repos: query.KnownField([]query.RepoValue{{RepoID: "repo_1", DisplayName: "repo", Path: "/repo", DefaultBranch: "main"}}), tasks: []query.TaskNode{{TaskID: "task_1", Title: "task", Crews: []query.CrewNode{{CrewID: "crew_1", Worktree: query.KnownField(query.WorktreeValue{Path: "/worktree", Branch: "crew", Status: query.WorktreeRecordedCreated})}}}}},
+		{name: "with-repo-and-worktree", repos: query.KnownField([]query.RepoValue{{RepoID: "repo_1", DisplayName: "repo", Path: "/repo", DefaultBranch: "main"}}), crews: []query.CrewNode{{CrewID: "crew_1", Task: "task", Worktree: query.KnownField(query.WorktreeValue{Path: "/worktree", Branch: "crew", Status: query.WorktreeRecordedCreated})}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := sampleTree()
 			tree.Projects = tree.Projects[:1]
 			tree.Projects[0].Repos = tc.repos
-			tree.Projects[0].Tasks = tc.tasks
+			tree.Projects[0].Crews = tc.crews
 			tree.Projects[0].Mate.Designated = query.KnownField(query.MateIdentity{
 				MateID: "mate_created", HarnessKind: query.HarnessClaude, Status: query.MateCreated, IsDefault: true,
 			})
@@ -183,7 +183,7 @@ func TestUnavailableActionIsRefusalAndDoesNotRun(t *testing.T) {
 	m = toRunningAttempt(t, m)
 	m, _ = send(t, m, key("a"))
 	// Repair is unavailable for the active Crew, so move to it.
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		m, _ = send(t, m, key("down"))
 	}
 	m, cmd := send(t, m, key("enter"))
@@ -197,14 +197,13 @@ func TestUnavailableActionIsRefusalAndDoesNotRun(t *testing.T) {
 
 func TestConfirmationFrameSanitizesHostileRecordedIdentity(t *testing.T) {
 	tree := hostileTree()
-	tree.Projects[0].Tasks[0].Crews[0].CrewID = "crew_\n修正\x1b[31m\x85"
-	tree.Projects[0].Tasks[0].Crews[0].Binding = query.KnownField(query.BindingValue{Status: query.BindingStale})
+	tree.Projects[0].Crews[0].CrewID = "crew_\n修正\x1b[31m\x85"
+	tree.Projects[0].Crews[0].Binding = query.KnownField(query.BindingValue{Status: query.BindingStale})
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // first Task
-	m, _ = send(t, m, key("enter")) // Crew attempts
+	m, _ = send(t, m, key("down"))  // its first Crew
 	m, _ = send(t, m, key("a"))
-	m.actionIndex = 4 // repair; first hostile Crew is needs_repair
+	m.actionIndex = 3 // repair; the first hostile Crew is needs_repair
 	m, _ = send(t, m, key("enter"))
 	if m.confirm == nil {
 		t.Fatalf("repair for hostile needs_repair Crew did not ask for confirmation")
@@ -223,57 +222,22 @@ func TestConfirmationFrameSanitizesHostileRecordedIdentity(t *testing.T) {
 	}
 }
 
-// TestRetryMenuEntryIsRefusedByNonTerminalSiblingBeyondPreparingOrRunning is
-// B5's console-side regression: retryChoice's own sibling scan (not just
-// query's) must count needs_repair/needs_rebase/blocked as active, matching
-// persistence's activeCrewSQL (`status NOT IN ('succeeded', 'failed')`).
-// These fixtures carry no query-computed Actions, so this exercises
-// retryChoice's local decision directly - the same path
-// TestUnavailableActionIsRefusalAndDoesNotRun and
-// TestConfirmationFrameSanitizesHostileRecordedIdentity already rely on.
-func TestRetryMenuEntryIsRefusedByNonTerminalSiblingBeyondPreparingOrRunning(t *testing.T) {
-	tree := sampleTree()
-	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: query.CrewFailed},
-		{CrewID: "crew_sibling", Status: query.CrewNeedsRepair},
-	}
-	m := loaded(t, tree, nil)
-	m, _ = send(t, m, key("enter")) // the one Project
-	m, _ = send(t, m, key("down"))  // its Task
-	m, _ = send(t, m, key("enter")) // active sibling is listed; the failed target is in Completed
-	m, _ = send(t, m, key("down"))  // Completed group
-	m, _ = send(t, m, key("enter")) // expand
-	m, _ = send(t, m, key("down"))  // the failed target
-	m, _ = send(t, m, key("a"))
-	retry := m.actionChoices[3]
-	if retry.action != ActionRetry {
-		t.Fatalf("menu index 3 = %+v, want retry", retry)
-	}
-	if retry.enabled {
-		t.Fatalf("retry with a needs_repair sibling = %+v, want refused", retry)
-	}
-	if !strings.Contains(retry.desc, "another attempt is active") {
-		t.Fatalf("retry desc = %q, want the truthful active-attempt refusal", retry.desc)
-	}
-}
-
-// TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding is B6's
-// console-side regression: an Unknown binding read must not be reported as
-// the established fact "no stale binding is recorded" - that fact was
-// never read, only the read itself failed.
+// TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding: an
+// Unknown binding read must not be reported as the established fact "no
+// stale binding is recorded" - that fact was never read, only the read
+// itself failed.
 func TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding(t *testing.T) {
 	tree := sampleTree()
-	tree.Projects[0].Tasks[0].Crews = []query.CrewNode{
+	tree.Projects[0].Crews = []query.CrewNode{
 		{CrewID: "crew_target", Status: query.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter")) // the one Project
-	m, _ = send(t, m, key("down"))  // its Task
-	m, _ = send(t, m, key("enter")) // that Task's Crew attempts
+	m, _ = send(t, m, key("down"))  // its one Crew
 	m, _ = send(t, m, key("a"))
-	repair := m.actionChoices[4]
+	repair := m.actionChoices[3]
 	if repair.action != ActionRepair {
-		t.Fatalf("menu index 4 = %+v, want repair", repair)
+		t.Fatalf("menu index 3 = %+v, want repair", repair)
 	}
 	if repair.enabled {
 		t.Fatalf("repair with an unknown binding = %+v, want refused", repair)

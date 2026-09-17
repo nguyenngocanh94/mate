@@ -1,8 +1,8 @@
- mate console   workspace ws_acme                                As of 14:02:11 
+ matev2 console   workspace ws_acme                              As of 14:02:11 
  ws_acme                                                 Workspace . 2 projects 
 --------------------------------------------------------------------------------
-  PROJECTS  2                      MATE                    TASKS  ATTENTION     
-> payments-api                     claude . running        2                    
+  PROJECTS  2                      MATE                    CREWS  ATTENTION     
+> payments-api                     claude . running        2      ! 1 crew      
   ledger-worker                    none                    0      ! no mate     
                                                                                 
                                                                                 

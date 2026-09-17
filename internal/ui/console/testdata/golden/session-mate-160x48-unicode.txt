@@ -33,7 +33,7 @@
                                           │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. Reading its report before reviewing  
  09:05                     awaiting reply │  attempt 2.                                                                                                         
   attempt 1 · Add idempotency-key index   │                                                                                                                     
-  Backfill existing rows before or after  │⏺ Read(.mate/reports/crew-01j9p4p5v9d4.json)                                                                         
+  Backfill existing rows before or after  │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                                                       
   the index build finishes?               │  ⎟  Read 84 lines (ctrl+o to expand)                                                                                
                                           │                                                                                                                     
                                           │⏺ Reply(a1 · Upgrade database adapter)                                                                               

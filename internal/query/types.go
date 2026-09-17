@@ -41,9 +41,8 @@ type Snapshot struct {
 // `workspace` table (ADR 0005), so the directory is the only name a UI can
 // truthfully show.
 type WorkspaceValue struct {
-	Name         string
-	Root         string
-	DatabasePath string
+	Name string
+	Root string
 }
 
 // ProjectNode is one registered Project plus its designated Mate, its

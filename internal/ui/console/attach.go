@@ -20,14 +20,14 @@ import (
 //	refused  the Console read the snapshot, decided the attach cannot
 //	         happen, and started nothing. The message reads "Attach
 //	         refused: <what the snapshot says>, nothing was started".
-//	failed   the Console started `mate attach` and it came back non-zero,
+//	failed   the Console started `matev2 attach` and it came back non-zero,
 //	         or could not be started at all. The message reads "Attach
 //	         failed: <cause> <evidence>" - the evidence parenthetical
 //	         (session_failure.go) carries what the child itself reported.
 //
 // The two never render alike, and the difference is words rather than
 // colour: both are red, and a reader with a monochrome terminal still has
-// "refused ... nothing was started" against "failed ... mate attach exit".
+// "refused ... nothing was started" against "failed ... matev2 attach exit".
 //
 // Neither ever claims the agent is alive or dead. A refusal reports what
 // the recorded snapshot says (ADR 0027: a stale binding means mate could
@@ -38,7 +38,7 @@ import (
 //
 // The Console never talks to Herdr. The design notes' sample code calls
 // `herdr agent attach` directly; in this codebase attach is this same
-// binary's own `mate attach <target>` use case (ADR 0010), built by the
+// binary's own `matev2 attach <target>` use case (ADR 0010), built by the
 // AttachCmdFunc the CLI layer supplies and run through tea.Exec so Bubble
 // Tea releases and restores the terminal. boundary_test.go enforces that
 // rather than trusting this paragraph.
@@ -63,7 +63,7 @@ const (
 	// the renderer does flush in time. It is not the guarantee that they
 	// were told: handover.go is.
 	attachAnnouncing
-	// attachHeld: the `mate attach` subprocess owns the terminal. The
+	// attachHeld: the `matev2 attach` subprocess owns the terminal. The
 	// Console is not drawing and not reading state; the frame it would draw
 	// says exactly that, because it is what the terminal shows for the
 	// moment between the child exiting and AttachFinishedMsg arriving.
@@ -141,7 +141,7 @@ func (e *attachReportError) Unwrap() error {
 // frame in front of the reader (handover.go explains why nothing can, and
 // what carries that guarantee instead). What the ordering buys is that the
 // flow is in attachHeld before the child can hand the terminal back.
-// Exported for the same reason AttachFinishedMsg is - cmd/mate's wiring and
+// Exported for the same reason AttachFinishedMsg is - cmd/matev2's wiring and
 // the tests recognize it without reaching into package internals.
 type AttachHandedOverMsg struct{}
 
@@ -169,7 +169,7 @@ func (m Model) beginAttach(r row) (Model, tea.Cmd) {
 	}
 	cmd, err := m.buildAttachCmd(target.id)
 	if err != nil {
-		// The Console tried to start `mate attach` and could not. That is a
+		// The Console tried to start `matev2 attach` and could not. That is a
 		// failure, not a refusal - and it must not leave the flow in
 		// attachAnnouncing, which ignores keys while it waits for a
 		// subprocess that will never run. It is recorded in the failure chain
@@ -181,7 +181,7 @@ func (m Model) beginAttach(r row) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.att = attachFlow{phase: attachAnnouncing, target: target}
-	m.msg = infoMsg(fmt.Sprintf("Attaching to %s via mate attach %s detach: Ctrl+b then q",
+	m.msg = infoMsg(fmt.Sprintf("Attaching to %s via matev2 attach %s detach: Ctrl+b then q",
 		target.label, m.g.Dot))
 	// The announcement the reader is *guaranteed* to see is not this frame:
 	// it is the line handoverNotice writes to the terminal Bubble Tea has
@@ -220,12 +220,12 @@ func (m Model) buildAttachCmd(target string) (*exec.Cmd, error) {
 	}
 	cmd := m.attachCmd(target)
 	if cmd == nil {
-		return nil, errors.New("mate attach could not be built for " + target)
+		return nil, errors.New("matev2 attach could not be built for " + target)
 	}
 	return cmd, nil
 }
 
-// attachTargetFor resolves the row to the `mate attach <target>` argument
+// attachTargetFor resolves the row to the `matev2 attach <target>` argument
 // and the label the messages use.
 //
 // The target is always an id from the snapshot - a Mate id or a Crew id -
@@ -283,7 +283,7 @@ const (
 // attachRefusal decides, from the snapshot alone, whether Enter can attach
 // to this row - and says why not. A binding that is stale, absent or
 // unreadable is refused here rather than by Herdr: a stale binding means
-// mate could not confirm the agent stopped (ADR 0027), and `mate attach`
+// mate could not confirm the agent stopped (ADR 0027), and `matev2 attach`
 // refuses it outright, so announcing an attach that cannot happen would be a
 // lie the Console tells before the subprocess gets a chance to tell the
 // truth. A *held but not active* (reserved) binding is deliberately not a

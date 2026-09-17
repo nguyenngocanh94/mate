@@ -1,5 +1,5 @@
- mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
- ws_acme › payments-api                                                                               Project · 0 tasks 
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 0 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   CHOOSE AN AGENT                                                                                                       
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  

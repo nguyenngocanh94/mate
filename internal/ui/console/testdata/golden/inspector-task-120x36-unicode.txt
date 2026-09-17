@@ -18,12 +18,12 @@
                                                                      │                                                  
                                                                      │ Repo             payments-api                    
                                                                      │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │ Branch           unknown · lookup timed out      
-                                                                     │                  (2s) · r re-reads               
-                                                                     │ Worktree         unknown · lookup timed out      
-                                                                     │                  (2s) · r re-reads               
-                                                                     │ Worktree status  unknown · lookup timed out      
-                                                                     │                  (2s) · r re-reads               
+                                                                     │ Branch           matev2/01J9P6Q6                 
+                                                                     │ Worktree         /Users/dev/work/acme/           
+                                                                     │                  .worktrees/                     
+                                                                     │                  payments-api-crew_01J9P6Q6W0E5V 
+                                                                     │                  8XK2M4B8DT                      
+                                                                     │ Worktree status  created                         
                                                                      │                                                  
                                                                      │ Last event       14:01:58  agent.tool_call       
                                                                      │ Reason           none · not an error state       
@@ -32,5 +32,5 @@
                                                                      │                  is recorded running and         
                                                                      │  ↓ 2 more                                        
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
- ? 1 field unknown: worktree of crew 01J9P6Q6 (lookup timed out (2s))                                                   
+                                                                                                                        
  ↑↓ Move  a Actions  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                                      

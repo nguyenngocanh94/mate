@@ -16,7 +16,7 @@ import (
 // driving Herdr.
 //
 // It is scaffolding for tests and local development, not a production seam:
-// cmd/mate/console.go's bridge builds the real snapshot ports from
+// cmd/matev2/console.go's bridge builds the real snapshot ports from
 // internal/query, internal/application and runtime.Adapter.
 type FakeSessionController struct {
 	mu sync.Mutex

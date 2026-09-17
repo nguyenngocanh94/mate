@@ -89,7 +89,7 @@ func TestTheFailureSummaryLeadsWithTheCauseAndKeepsTheCode(t *testing.T) {
 			name: "attach that never ran",
 			step: stepAttach,
 			err:  errors.New("without an attach command"),
-			want: "Attach failed: mate attach did not run (without an attach command)",
+			want: "Attach failed: matev2 attach did not run (without an attach command)",
 		},
 		{
 			// A step that reported neither a code nor an exit: its own text is
@@ -181,7 +181,7 @@ func TestTheFailureDetailCarriesWhatTheOneLineCannot(t *testing.T) {
 		"1. Attach failed",
 		"the runtime is not reachable",
 		"runtime_unavailable (derived from exit 20)",
-		"mate attach exit 20",
+		"matev2 attach exit 20",
 		"herdr: attach refused",
 		"terminal already has an attached client",
 		"Esc closes this view",
@@ -384,7 +384,7 @@ func TestTheNextStepFollowsTheEvidenceOnly(t *testing.T) {
 // agree.
 func TestTheAttachExitTableIsTheOneSourceForExitFacts(t *testing.T) {
 	// Every exit the CLI publishes has a phrase, so no exit-only failure falls
-	// through to the bare "mate attach exited N".
+	// through to the bare "matev2 attach exited N".
 	published := map[int]string{
 		observability.ExitGeneric:            "generic failure (several codes)",
 		observability.ExitUsage:              "usage",
@@ -645,7 +645,7 @@ func TestTheFailureLineNamesTheModeTheReaderIsInNow(t *testing.T) {
 	}
 	// In the hand-off the mode clause names the hand-off instead.
 	m.att = attachFlow{phase: attachHeld, target: attachTargetRef{kind: rowMate, id: "mate_1", label: "payments-api-mate"}}
-	if got := m.openFailureLine(true); !strings.Contains(got, "mate attach") {
+	if got := m.openFailureLine(true); !strings.Contains(got, "matev2 attach") {
 		t.Fatalf("line = %q, want it to name the hand-off", got)
 	}
 }

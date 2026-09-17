@@ -52,7 +52,7 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 	}
 	choices := make([]actionChoice, 0, 5)
 	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.repairChoice(selected), m.onboardChoice(selected))
-	// Capability is authored by query.LoadSnapshot. The local builders above
+	// Capability is authored by the store-backed loader. The local builders above
 	// only supply row-specific wording and target identity; availability is
 	// replaced from the DTO so this surface cannot drift from other clients.
 	for i := range choices {
@@ -66,7 +66,7 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 	return choices
 }
 
-// actionCapability finds query.LoadSnapshot's capability for one
+// actionCapability finds the store-backed loader's capability for one
 // already-built choice. The source is the choice's own target, never just
 // the selected row: at the Workspace level a selected Project row carries
 // its *own* onboard capability ("this Project already has a Mate"), which
@@ -297,7 +297,7 @@ func (m Model) beginNewProject() Model {
 }
 
 // newProjectChoice is the workspace-level onboard action as the 'n' key
-// reaches it. Availability is query.LoadSnapshot's own (m.tree.Actions), the
+// reaches it. Availability is the store-backed loader's own (m.tree.Actions), the
 // same source the menu entry uses, so the shortcut and the menu cannot
 // disagree about whether a Project may be added.
 func (m Model) newProjectChoice() (actionChoice, bool) {
@@ -569,7 +569,7 @@ func (m Model) onboardInputLines(w, h int) []*line {
 // Mate actions are reachable by their own key rather than five keystrokes
 // through the `a` menu, whose other entries mostly refuse there. `a` still
 // lists everything; these are shortcuts into the same choices, so both
-// surfaces read availability from query.LoadSnapshot and cannot disagree.
+// surfaces read availability from the store-backed loader and cannot disagree.
 
 // harnessOrder is the picker's order, and claude is first because it is the
 // configured default for a new Mate (config.DefaultMateHarness).

@@ -1,13 +1,13 @@
- mate console   workspace ws_acme                                As of 14:02:11 
- ws_acme › docs-site                                          Project · 0 tasks 
+ matev2 console   workspace ws_acme                              As of 14:02:11 
+ ws_acme › docs-site                                          Project · 0 crews 
 ────────────────────────────────────────────────────────────────────────────────
   MATE                            HARNESS      STATUS         BINDING           
 ▌ mate-docs-site                  claude       stopped        none              
                                                                                 
-  TASKS  0                             STATUS           ATTEMPTS  ATTENTION     
+  CREWS  0          TASK                         STATUS           NOTE          
                                                                                 
-  No tasks recorded for docs-site.                                              
-  Tasks are created by the Mate or the mate CLI; press r to re-read.            
+  No crews recorded for docs-site.                                              
+  Crews are spawned by the Mate; press r to re-read.                            
                                                                                 
                                                                                 
                                                                                 

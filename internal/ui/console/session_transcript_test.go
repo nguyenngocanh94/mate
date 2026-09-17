@@ -2,6 +2,8 @@ package console
 
 import (
 	"testing"
+
+	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 func TestParseTranscriptClaudeCodeRecognizesRealMarkers(t *testing.T) {

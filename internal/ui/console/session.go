@@ -9,7 +9,7 @@ import (
 
 // TerminalSize is the display-cell geometry of the embedded terminal pane.
 // It deliberately mirrors the runtime port without importing that package;
-// cmd/mate adapts the two at the process boundary.
+// cmd/matev2 adapts the two at the process boundary.
 type TerminalSize struct {
 	Cols int
 	Rows int
@@ -48,7 +48,7 @@ const (
 
 // SessionTarget identifies the Mate or Crew a session view is attached to.
 // It mirrors application.AttachResolution's identity fields but stays
-// inside the Console boundary: the caller (cmd/mate's bridge, step 4) builds
+// inside the Console boundary: the caller (cmd/matev2's bridge, step 4) builds
 // it from an already-resolved query.Snapshot node - this package never
 // resolves a target itself, and a raw Herdr pane/tab id is never a valid ID
 // here (ADR 0010's attach-target rule applies to session targets too).
@@ -266,7 +266,7 @@ type SessionSnapshot struct {
 // SessionReader is the snapshot controller port. It is called on a
 // fixed-interval ticker (ADR 0025 default 300-500ms) and replaces the whole
 // SessionSnapshot each time. Stream mode uses it only after a stream failure.
-// The bridge in cmd/mate/console.go is the only place this closure is built
+// The bridge in cmd/matev2/console.go is the only place this closure is built
 // from internal/query, internal/application and runtime.Adapter.
 type SessionReader func(context.Context, SessionTarget) (SessionSnapshot, error)
 

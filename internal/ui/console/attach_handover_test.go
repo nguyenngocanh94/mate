@@ -161,7 +161,7 @@ func TestTheNoticeCarriesTheDetachKeystrokeAndSaysItDoesNotStopTheAgent(t *testi
 	for _, g := range []glyphSet{unicodeGlyphs, asciiGlyphs} {
 		text := handoverNoticeText("crew-payments-api-2", g)
 		for _, want := range []string{
-			"mate attach",
+			"matev2 attach",
 			"crew-payments-api-2",
 			"Ctrl+b then q",
 			"does not stop the agent",
@@ -367,7 +367,7 @@ func TestARealProgramPutsTheNoticeOnTheTerminalAfterReleasingTheAltScreen(t *tes
 		t.Fatalf("the child did not write after the alt screen was released (alt=%d child=%d):\n%q", altGone, childAt, stream)
 	}
 	handover := stream[altGone:childAt]
-	for _, want := range []string{"mate attach", "Ctrl+b then q", "does not stop the agent"} {
+	for _, want := range []string{"matev2 attach", "Ctrl+b then q", "does not stop the agent"} {
 		if !strings.Contains(handover, want) {
 			t.Fatalf("the terminal never showed %q between releasing the alt screen and the child's first byte; what it got was:\n%q", want, handover)
 		}

@@ -1,12 +1,12 @@
- mate console   workspace acme  /Users/dev/work/acme                                  Recorded snapshot  As of 14:02:11 
- ws_acme › payments-api                                                                               Project · 2 tasks 
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE                 HARNESS      STATUS         BINDING           │ MATE  payments-api                               
 ▌ mate-payments-api    claude       running        active            │                                                  
                                                                      │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK 
-  TASKS  2                  STATUS           ATTEMPTS  ATTENTION     │ Agent            mate-payments-api               
-  Fix webhook idempotency s…running          2                       │ Harness          claude                          
-  Add idempotency-key index ready            0                       │                                                  
+  CREWS  1          TASK              STATUS           NOTE          │ Agent            mate-payments-api               
+  crew_01J9P6…B8DT  Add idempotency-k…running                        │ Harness          claude                          
+  ↓ Completed (1)                                      ! failed      │                                                  
                                                                      │ Recorded status  running                         
                                                                      │ Binding          active                          
                                                                      │                  recorded active; this does not  
@@ -33,4 +33,4 @@
                                                                      │                                                  
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
- ↑↓ Move  a Actions  h Change harness  Enter Attach mate  Esc Back  Tab Inspector  r Refresh  q Quit                    
+ ↑↓ Move  a Actions  Enter Attach mate  Esc Back  Tab Inspector  r Refresh  q Quit                                      

@@ -18,7 +18,7 @@ func emptyWorkspaceTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Workspace: query.KnownField(query.WorkspaceValue{
-			Name: "acme", Root: "/Users/dev/work/acme", DatabasePath: "/Users/dev/work/acme/.matev2/matev2.db",
+			Name: "acme", Root: "/Users/dev/work/acme",
 		}),
 		Actions: []query.ActionAvailability{{Action: "onboard", Available: true, Reason: "add a Project to this workspace"}},
 	}
@@ -120,7 +120,7 @@ func TestNewProjectKeyBelowTheWorkspaceIsARefusalThatStartsNothing(t *testing.T)
 }
 
 // TestNewProjectKeyHonoursTheSnapshotsOwnCapability pins that this shortcut
-// reads query.LoadSnapshot's workspace capability rather than assuming
+// reads the store-backed loader's workspace capability rather than assuming
 // onboarding is always available - the same rule the action menu follows.
 func TestNewProjectKeyHonoursTheSnapshotsOwnCapability(t *testing.T) {
 	tree := emptyWorkspaceTree()

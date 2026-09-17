@@ -1,12 +1,12 @@
- mate console   workspace ws_acme                                As of 14:02:11 
- ws_acme › payments-api › Fix webhook idempotency so retried… Task · 2 attempts 
+ matev2 console   workspace ws_acme                              As of 14:02:11 
+ ws_acme › payments-api                                       Project · 2 crews 
 ────────────────────────────────────────────────────────────────────────────────
-  CREW ATTEMPTS  1      STATUS           HARNESS      NOTE                      
-▌ #2  crew_01J9P6…B8DT  running          claude       retry of #1               
-  ↓ Completed (1)                                     ! failed                  
+  MATE                            HARNESS      STATUS         BINDING           
+  mate-payments-api               claude       running        active            
                                                                                 
-                                                                                
-                                                                                
+  CREWS  1          TASK                         STATUS           NOTE          
+▌ crew_01J9P6…B8DT  Add idempotency-key index    running                        
+  ↓ Completed (1)                                                 ! failed      
                                                                                 
                                                                                 
                                                                                 

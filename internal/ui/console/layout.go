@@ -2,7 +2,7 @@ package console
 
 // The layout engine. Every size the Console draws with comes from
 // tea.WindowSizeMsg through Model.w/Model.h and this function; nothing in
-// the package asks the terminal how big it is (cmd/mate/console.go already
+// the package asks the terminal how big it is (cmd/matev2/console.go already
 // refuses a non-terminal before the program starts, and asking again here
 // would answer for the process rather than for this invocation).
 const (

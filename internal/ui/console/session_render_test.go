@@ -263,7 +263,7 @@ func TestSessionTranscriptUnknownRendersRawBoundedText(t *testing.T) {
 // split, the composer's fixed 4-line chrome), so a change to any of those
 // layout constants shows up here as a deliberate diff rather than only as a
 // latency regression discovered from a captain's complaint (this figure
-// bounds the ReadAgent request in cmd/mate/session_bridge.go).
+// bounds the ReadAgent request in cmd/matev2/session_bridge.go).
 func TestSessionTranscriptCapacity(t *testing.T) {
 	cases := []struct {
 		name string

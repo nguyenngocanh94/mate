@@ -20,7 +20,7 @@
   idempotency                       │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook.    
   Rebase conflict on Upgrade        │  Reading its report before reviewing attempt 2.                                   
   database adapter: keep the pool   │                                                                                   
-  wrapper, or drop it?              │⏺ Read(.mate/reports/crew-01j9p4p5v9d4.json)                                       
+  wrapper, or drop it?              │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                     
                                     │  ⎟  Read 84 lines (ctrl+o to expand)                                              
  12:58                     recorded │                                                                                   
   attempt 1 · Fix webhook           │⏺ Reply(a1 · Upgrade database adapter)                                             

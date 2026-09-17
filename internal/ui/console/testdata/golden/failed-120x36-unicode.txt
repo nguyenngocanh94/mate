@@ -1,10 +1,10 @@
- mate console                                                                                        No snapshot loaded 
+ matev2 console                                                                                      No snapshot loaded 
  (unknown)                                                                                                              
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                         
  Could not read snapshot                                                                                                
                                                                                                                         
- open /Users/dev/work/acme/.mate/mate.db: permission denied                                                             
+ open /Users/dev/work/acme/.matev2/matev2.db: permission denied                                                         
                                                                                                                         
  No earlier snapshot is loaded, so nothing else is shown.                                                               
  r retries the read; q quits.                                                                                           

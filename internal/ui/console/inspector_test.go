@@ -27,25 +27,19 @@ func oneCrewTree(c query.CrewNode) query.Snapshot {
 		WorkspaceID: "ws_1",
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_1", Name: "acme",
-			Mate: absentMate("this project has no designated Mate"),
-			Tasks: []query.TaskNode{{
-				TaskID: "task_1", Title: "a task",
-				Status: query.TaskRunning,
-				Error:  query.AbsentField[query.ErrorReason](notErrorState),
-				Crews:  []query.CrewNode{c},
-			}},
+			Mate:  absentMate("this project has no designated Mate"),
+			Crews: []query.CrewNode{c},
 		}},
 	}
 }
 
 // intoFirstCrew drills from the Workspace frame down to the first Crew row
-// of the first Project's first Task: enter the Project (row 0 is the Mate
-// row), move down to the Task row, enter it.
+// of the first Project: enter the Project (row 0 is the Mate row), then
+// move down onto its first Crew.
 func intoFirstCrew(t *testing.T, m Model) Model {
 	t.Helper()
 	m, _ = send(t, m, key("enter"))
 	m, _ = send(t, m, key("down"))
-	m, _ = send(t, m, key("enter"))
 	return m
 }
 
@@ -57,8 +51,7 @@ func intoFirstCrew(t *testing.T, m Model) Model {
 func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 	const reason = "lookup timed out (2s)"
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
-		RetryOf:  query.AbsentField[query.RetryValue]("first attempt"),
+		CrewID: "crew_1", Status: query.CrewNeedsRebase,
 		Worktree: query.UnknownField[query.WorktreeValue](reason),
 		Error:    query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -83,37 +76,8 @@ func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 	}
 }
 
-// TestRetryOfRendersFirstAttemptAndLinkedAttempt covers both states of
-// Field[query.RetryValue]: Absent says "first attempt", Known names the
-// attempt it retries plus the crew id a reader would look up.
-func TestRetryOfRendersFirstAttemptAndLinkedAttempt(t *testing.T) {
-	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_2", Attempt: 2, Status: query.CrewRunning,
-		RetryOf: query.KnownField(query.RetryValue{CrewID: "crew_1", Attempt: 1}),
-		Error:   query.AbsentField[query.ErrorReason](notErrorState),
-	})
-	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
-	m = intoFirstCrew(t, m)
-	l := layout(m.w, m.h)
-	fields := fieldValueText(m.inspectorLines(l.Inspector, l.valueWidth(), l.Body, true), l.Inspector)
-	got := fields["Retry of"]
-	if !strings.Contains(got, "attempt 1") || !strings.Contains(got, "crew_1") {
-		t.Fatalf("Retry of = %q, want attempt 1 and crew_1", got)
-	}
-
-	first := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: query.CrewRunning,
-		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
-		Error:   query.AbsentField[query.ErrorReason](notErrorState),
-	})
-	m2 := newFixture(t, first, 120, 36, unicodeGlyphs)
-	m2 = intoFirstCrew(t, m2)
-	fields2 := fieldValueText(m2.inspectorLines(l.Inspector, l.valueWidth(), l.Body, true), l.Inspector)
-	got2 := fields2["Retry of"]
-	if !strings.HasPrefix(got2, "none") || !strings.Contains(got2, "first attempt") {
-		t.Fatalf("Retry of = %q, want none - first attempt", got2)
-	}
-}
+// TODO(task 21): TestRetryOfRendersFirstAttemptAndLinkedAttempt lived
+// here. matev2 has no retry: a Crew runs once.
 
 // TestErrorReasonKnownButEmptySaysSoRatherThanBlank is query.ErrorReason's
 // own Known-but-empty case: the status is an error state, the event read
@@ -121,9 +85,8 @@ func TestRetryOfRendersFirstAttemptAndLinkedAttempt(t *testing.T) {
 // and not the same sentence as Absent's "not an error state".
 func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
-		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
-		Error:   query.KnownField(query.ErrorReason("")),
+		CrewID: "crew_1", Status: query.CrewNeedsRebase,
+		Error: query.KnownField(query.ErrorReason("")),
 	})
 	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
 	m = intoFirstCrew(t, m)
@@ -144,8 +107,7 @@ func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 // labels that do not apply.
 func TestBindingAbsentShowsOneFieldNoRuntimeOrBoundSince(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Attempt: 1, Status: query.CrewNeedsRebase,
-		RetryOf: query.AbsentField[query.RetryValue]("first attempt"),
+		CrewID: "crew_1", Status: query.CrewNeedsRebase,
 		Binding: query.AbsentField[query.BindingValue]("session ended when rebase was required"),
 		Error:   query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -165,25 +127,25 @@ func TestBindingAbsentShowsOneFieldNoRuntimeOrBoundSince(t *testing.T) {
 	}
 }
 
-// TestTaskAttentionRendersKindAndWhyOrNoneWithReason is the design's own
+// TestCrewAttentionRendersKindAndWhyOrNoneWithReason is the design's own
 // rule that the ATTENTION column's one word gets its full sentence in the
 // inspector (design/mate-console-design-notes.html, "Trong pane").
-func TestTaskAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
+func TestCrewAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 	needsAttention := query.Snapshot{
 		WorkspaceID: "ws_1",
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
-			Tasks: []query.TaskNode{{
-				TaskID: "task_1", Title: "Add refund audit trail", Status: query.TaskAwaitingReview,
+			Crews: []query.CrewNode{{
+				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewAwaitingReview,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
-				Attention: query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "attempt 1 is recorded awaiting_review and waits on a person"}),
+				Attention: query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "crew crew_1 is recorded awaiting_review and waits on a person"}),
 			}},
 		}},
 	}
 	m := newFixture(t, needsAttention, 120, 36, unicodeGlyphs)
 	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // the Task row
+	m, _ = send(t, m, key("down"))  // the Crew row
 	l := layout(m.w, m.h)
 	fields := fieldValueText(m.inspectorLines(l.Inspector, l.valueWidth(), l.Body, true), l.Inspector)
 	got := fields["Attention"]
@@ -196,10 +158,10 @@ func TestTaskAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 		Projects: []query.ProjectNode{{
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
-			Tasks: []query.TaskNode{{
-				TaskID: "task_1", Title: "Add refund audit trail", Status: query.TaskReady,
+			Crews: []query.CrewNode{{
+				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewReserved,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
-				Attention: query.AbsentField[query.Attention]("no attempt has been started and the task is recorded ready"),
+				Attention: query.AbsentField[query.Attention]("no agent has been started and the crew is recorded reserved"),
 			}},
 		}},
 	}
@@ -208,7 +170,7 @@ func TestTaskAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 	m2, _ = send(t, m2, key("down"))
 	fields2 := fieldValueText(m2.inspectorLines(l.Inspector, l.valueWidth(), l.Body, true), l.Inspector)
 	got2 := fields2["Attention"]
-	if !strings.HasPrefix(got2, "none") || !strings.Contains(got2, "recorded ready") {
+	if !strings.HasPrefix(got2, "none") || !strings.Contains(got2, "recorded reserved") {
 		t.Fatalf("Attention = %q, want none plus the recorded reason", got2)
 	}
 }
@@ -234,8 +196,7 @@ func TestMateInspectorTitleNamesItsProject(t *testing.T) {
 func TestInspectorScrollIndicatorsAtBothEndsAndInTheMiddle(t *testing.T) {
 	m := newFixture(t, sampleTree(), 80, 24, unicodeGlyphs)
 	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // Task
-	m, _ = send(t, m, key("enter")) // attempts
+	m, _ = send(t, m, key("down"))  // its active Crew
 	m, _ = send(t, m, key("tab"))   // Detail: 80 cols has no inspector column
 
 	body := bodyLines(t, renderFrame(t, m))
@@ -276,7 +237,7 @@ func TestInspectorScrollIndicatorsAtBothEndsAndInTheMiddle(t *testing.T) {
 // rendered "unknown ·  · r re-reads" - a bare " · " where the reason should
 // have been. reasonSpan/rereadsSpan (seams.go) fix this by treating the
 // reason and the re-reads hint as independently-guarded spans, mirroring
-// availabilitySpans' own guard. This is not a state query.LoadSnapshot ever
+// availabilitySpans' own guard. This is not a state the store-backed loader ever
 // produces (every Unknown field it builds carries a reason), but the
 // rendering code must not assume that - an empty reason is still legal
 // input to a Field[T].

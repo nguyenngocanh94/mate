@@ -14,19 +14,20 @@ import (
 // enforces: the Console knows internal/query's read types and two
 // caller-supplied closures, and nothing else. It never opens a database and
 // never calls Herdr, so a snapshot on screen can only have come through
-// LoadFunc and an attach can only have gone through the `mate attach`
+// LoadFunc and an attach can only have gone through the `matev2 attach`
 // subprocess (G6 gate, ADR 0010).
 //
-// Direct imports only. internal/query does import internal/persistence -
-// that is what makes it the read boundary - so a transitive check would
-// forbid the one dependency this package is supposed to have.
+// Direct imports only. internal/query is the read boundary: it is a pure
+// DTO package, and whatever fills it (internal/query/load.go, over
+// internal/store) is the caller's business, not this package's.
 var forbiddenImports = []string{
-	"github.com/nguyenngocanh94/matev2/internal/persistence",
+	"github.com/nguyenngocanh94/matev2/internal/store",
 	"github.com/nguyenngocanh94/matev2/internal/runtime",
-	"github.com/nguyenngocanh94/matev2/internal/orchestration",
+	"github.com/nguyenngocanh94/matev2/internal/harness",
+	"github.com/nguyenngocanh94/matev2/internal/process",
 }
 
-func TestConsoleImportsNeitherPersistenceNorRuntime(t *testing.T) {
+func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatalf("read package dir: %v", err)
