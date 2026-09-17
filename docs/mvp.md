@@ -222,4 +222,8 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 | 23 | `backlog.md` đồng bộ từ `.meta`, `matev2 backlog`. | Restart Mate thì backlog đúng. |
 | 24 | Acceptance end-to-end trên hai project, ghi evidence. | Một task đi hết vòng trên cả hai chế độ. |
 
+Nợ kỹ thuật đã biết:
+
+- `harness.Claude.BuildLaunchSpec` bắt buộc có `ContextPath`, nên `spawn` truyền chính `mate/AGENTS.md` qua `--append-system-prompt-file` trong khi `CLAUDE.md` cũng đã nạp nó từ cwd. Manual vào context hai lần. Với Codex, `spawn` ghi thêm `AGENTS.override.md`. Sửa ở task 17 bằng cách cho phép launch spec không có context file khi cwd đã có manual.
+
 Sau MVP: token monitor gồm locator theo `session_id`, copy parser transcript v1, `usage.jsonl` và view, tín hiệu `budget`.
