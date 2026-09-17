@@ -1,0 +1,138 @@
+package store
+
+import "path/filepath"
+
+// Names of the directories and files of docs/mvp.md section 3. They are here
+// so no other package spells them.
+const (
+	StateDirName     = ".matev2"
+	WorktreesDirName = ".worktrees"
+
+	workspaceFileName = "workspace.yaml"
+	workspaceDocName  = "WORKSPACE.md"
+	pricingFileName   = "pricing.yaml"
+	projectsDirName   = "projects"
+	projectFileName   = "project.yaml"
+	projectDocName    = "PROJECT.md"
+	sentLogName       = "sent.log"
+	mateDirName       = "mate"
+	mateMetaName      = "mate.meta"
+	autoFlagName      = ".auto"
+	memoryFileName    = "memory.md"
+	backlogFileName   = "backlog.md"
+	crewsDirName      = "crews"
+	briefFileName     = "brief.md"
+	reportFileName    = "report.md"
+)
+
+// Every helper below returns an absolute path built from the resolved
+// workspace root. They are pure string joins: they do not touch the
+// filesystem and they do not validate names, because the methods that write
+// validate first and resolve the result through the workspace boundary.
+
+// Root is the resolved absolute path of the workspace.
+func (w *Workspace) Root() string { return w.root }
+
+// StateDir is `<root>/.matev2`.
+func (w *Workspace) StateDir() string { return filepath.Join(w.root, StateDirName) }
+
+// WorkspaceFile is `<root>/.matev2/workspace.yaml`.
+func (w *Workspace) WorkspaceFile() string { return filepath.Join(w.StateDir(), workspaceFileName) }
+
+// WorkspaceDoc is `<root>/.matev2/WORKSPACE.md`, the user's rules for every Mate.
+func (w *Workspace) WorkspaceDoc() string { return filepath.Join(w.StateDir(), workspaceDocName) }
+
+// PricingFile is `<root>/.matev2/pricing.yaml`, unused before the token monitor.
+func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pricingFileName) }
+
+// ProjectsDir is `<root>/.matev2/projects`.
+func (w *Workspace) ProjectsDir() string { return filepath.Join(w.StateDir(), projectsDirName) }
+
+// ProjectDir is `<root>/.matev2/projects/<project>`.
+func (w *Workspace) ProjectDir(project string) string {
+	return filepath.Join(w.ProjectsDir(), project)
+}
+
+// ProjectFile is `projects/<project>/project.yaml`.
+func (w *Workspace) ProjectFile(project string) string {
+	return filepath.Join(w.ProjectDir(project), projectFileName)
+}
+
+// ProjectDoc is `projects/<project>/PROJECT.md`.
+func (w *Workspace) ProjectDoc(project string) string {
+	return filepath.Join(w.ProjectDir(project), projectDocName)
+}
+
+// SentLog is `projects/<project>/sent.log`.
+func (w *Workspace) SentLog(project string) string {
+	return filepath.Join(w.ProjectDir(project), sentLogName)
+}
+
+// MateDir is `projects/<project>/mate`, the working directory of Mate.
+func (w *Workspace) MateDir(project string) string {
+	return filepath.Join(w.ProjectDir(project), mateDirName)
+}
+
+// MateMeta is `projects/<project>/mate/mate.meta`.
+func (w *Workspace) MateMeta(project string) string {
+	return filepath.Join(w.MateDir(project), mateMetaName)
+}
+
+// AutoFlag is `projects/<project>/mate/.auto`; its presence means auto mode.
+func (w *Workspace) AutoFlag(project string) string {
+	return filepath.Join(w.MateDir(project), autoFlagName)
+}
+
+// MemoryFile is `projects/<project>/mate/memory.md`.
+func (w *Workspace) MemoryFile(project string) string {
+	return filepath.Join(w.MateDir(project), memoryFileName)
+}
+
+// BacklogFile is `projects/<project>/mate/backlog.md`.
+func (w *Workspace) BacklogFile(project string) string {
+	return filepath.Join(w.MateDir(project), backlogFileName)
+}
+
+// CrewsDir is `projects/<project>/crews`.
+func (w *Workspace) CrewsDir(project string) string {
+	return filepath.Join(w.ProjectDir(project), crewsDirName)
+}
+
+// CrewMeta is `projects/<project>/crews/<crew>.meta`.
+func (w *Workspace) CrewMeta(project, crew string) string {
+	return filepath.Join(w.CrewsDir(project), crew+".meta")
+}
+
+// CrewStatus is `projects/<project>/crews/<crew>.status`, the append-only log
+// a crew writes with echo.
+func (w *Workspace) CrewStatus(project, crew string) string {
+	return filepath.Join(w.CrewsDir(project), crew+".status")
+}
+
+// CrewDir is `projects/<project>/crews/<crew>`, kept after teardown.
+func (w *Workspace) CrewDir(project, crew string) string {
+	return filepath.Join(w.CrewsDir(project), crew)
+}
+
+// CrewBrief is `projects/<project>/crews/<crew>/brief.md`.
+func (w *Workspace) CrewBrief(project, crew string) string {
+	return filepath.Join(w.CrewDir(project, crew), briefFileName)
+}
+
+// CrewReport is `projects/<project>/crews/<crew>/report.md`.
+func (w *Workspace) CrewReport(project, crew string) string {
+	return filepath.Join(w.CrewDir(project, crew), reportFileName)
+}
+
+// WorktreesDir is `<root>/.worktrees`.
+func (w *Workspace) WorktreesDir() string { return filepath.Join(w.root, WorktreesDirName) }
+
+// WorktreeDir is `<root>/.worktrees/<project>-<crew>`, the git worktree a crew
+// runs in.
+func (w *Workspace) WorktreeDir(project, crew string) string {
+	return filepath.Join(w.WorktreesDir(), project+"-"+crew)
+}
+
+// RepoDir is the absolute path of a registered repository, from the relative
+// path stored in workspace.yaml.
+func (w *Workspace) RepoDir(repo string) string { return filepath.Join(w.root, repo) }
