@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|--version> ...")
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -52,6 +52,12 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdCrew(args[1:], os.Stdin, stdout, stderr)
 	case "hook":
 		return cmdHook(args[1:], os.Stdin, stdout, stderr)
+	case "send":
+		return cmdSend(args[1:], stdout, stderr)
+	case "peek":
+		return cmdPeek(args[1:], stdout, stderr)
+	case "state":
+		return cmdState(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {
