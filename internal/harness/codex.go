@@ -72,6 +72,14 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	if spec.Kind != "" && spec.Kind != KindCodex {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("codex adapter got kind %q", spec.Kind))
 	}
+	if spec.ResumeSessionID != "" {
+		// codex-cli 0.154.0's `resume` subcommand is documented as "picker
+		// by default": mate has no proven, non-interactive way to drive it
+		// through Herdr the way Claude's --resume flag works, so a resume
+		// request for Codex is refused rather than silently guessed at.
+		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
+			"resume not supported for codex: `codex resume` opens an interactive session picker", ErrResumeUnsupported)
+	}
 	cwd := spec.Cwd
 	if cwd == "" || !filepath.IsAbs(cwd) {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "codex launch requires the absolute cwd the agent will run in", ErrContextRequired)

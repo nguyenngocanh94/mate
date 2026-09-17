@@ -68,12 +68,20 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	if cwd == "" || !filepath.IsAbs(cwd) {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "claude launch requires the absolute cwd the agent will run in", ErrContextRequired)
 	}
-	if (spec.ClaudeSessionID == "") != (spec.ClaudeSettingsPath == "") {
+	if spec.ClaudeSessionID != "" && spec.ResumeSessionID != "" {
+		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
+			"claude session id and resume session id are mutually exclusive", ErrContextRequired)
+	}
+	effectiveID := spec.ClaudeSessionID
+	if spec.ResumeSessionID != "" {
+		effectiveID = spec.ResumeSessionID
+	}
+	if (effectiveID == "") != (spec.ClaudeSettingsPath == "") {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 			"claude transcript locator requires both session id and settings path", ErrContextRequired)
 	}
-	if spec.ClaudeSessionID != "" {
-		if _, err := uuid.Parse(spec.ClaudeSessionID); err != nil {
+	if effectiveID != "" {
+		if _, err := uuid.Parse(effectiveID); err != nil {
 			return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 				"claude session id must be a UUID", ErrContextRequired)
 		}
@@ -109,7 +117,12 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 
 	extra := make([]string, 0, 6)
 	extra = append(extra, "--dangerously-skip-permissions")
-	if spec.ClaudeSessionID != "" {
+	switch {
+	case spec.ResumeSessionID != "":
+		// --resume and --session-id are mutually exclusive on the Claude
+		// CLI; resuming never carries --session-id (2.1.274 --help).
+		extra = append(extra, "--resume", spec.ResumeSessionID, "--settings", spec.ClaudeSettingsPath)
+	case spec.ClaudeSessionID != "":
 		extra = append(extra, "--session-id", spec.ClaudeSessionID, "--settings", spec.ClaudeSettingsPath)
 	}
 	// dangerousPermissionNotes records why --dangerously-skip-permissions is
