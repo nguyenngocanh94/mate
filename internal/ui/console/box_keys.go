@@ -93,7 +93,6 @@ func (m Model) sessionRailState() boxRail {
 		replyText:   m.boxReplyText,
 		confirm:     m.boxConfirm,
 		confirmText: m.boxConfirmText,
-		stream:      m.sess.stream != nil,
 	}
 }
 

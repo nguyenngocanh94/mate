@@ -294,9 +294,6 @@ type boxRail struct {
 	reply     bool
 	replyCrew string
 	replyText string
-	// stream is true when the agent's PTY owns the keyboard, which is what
-	// decides whether the key hints name the Ctrl+b prefix.
-	stream bool
 }
 
 // sessionRailLines returns exactly geo.bodyH *line values for the rail

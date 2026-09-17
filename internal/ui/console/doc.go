@@ -96,7 +96,23 @@
 //
 // While the terminal is leaving or gone the Console ignores keys (they were
 // aimed at the agent session) except q, and its key line names the child's
-// own detach - Ctrl+b then q, which does not stop the agent.
+// own detach - Ctrl+b then q, which does not stop the agent. That is
+// Herdr's binding inside the subprocess (runtime.DetachKey), not a Console
+// key: it is the only Ctrl+b left anywhere here, and it is named because
+// the reader needs it to get out of somebody else's UI.
+//
+// # The session view's two focus zones
+//
+// The embedded session view has no prefix at all. It has two focus zones -
+// the box (the left rail) and the terminal (the agent's PTY) - and exactly
+// one owns the keyboard: the focused zone's border is drawn in the accent
+// colour, the frame's single bottom hint line names only that zone's keys,
+// a click moves focus, and F2 toggles it. Under terminal focus every key,
+// including q, Esc and Ctrl+C, is encoded and written to the PTY; under box
+// focus nothing reaches it. session_focus.go owns the model and the frame
+// geometry, session_mouse.go the hit tests. The Ctrl+b prefix this view
+// used to carry is gone: a prefix is a mode with no indicator, and a
+// mis-typed one delivered the key after it into the Mate's own composer.
 //
 // # The golden-frame harness
 //

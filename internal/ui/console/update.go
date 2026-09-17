@@ -109,7 +109,8 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 // snapshot that just landed. The session view keeps its own target while it
 // is open - session mode never touches the navigation stack - so without
 // this the header would keep naming the mode the target carried at entry,
-// which is exactly the value 'Ctrl+b m' just changed.
+// which is exactly the value the `m` key and the [supervised]/[auto] label
+// just changed.
 func (m Model) refreshSessionMode() Model {
 	if m.sess.target.ProjectID == "" {
 		return m
@@ -213,8 +214,8 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
 		// The composer owns the keyboard: a printable "q" is a character
 		// to type, not the Console's quit key (mirroring actionInputMode's
-		// own exception above). Esc and "ctrl+b q" are session mode's own
-		// way out (session_mode.go); nothing here reaches the navigation
+		// own exception above). Esc under box focus is session mode's own way
+		// out (session_mode.go); nothing here reaches the navigation
 		// keys below until the reader leaves. (m.sess.stream != nil here is
 		// unreachable - the check at the top of this function already
 		// handled that case - so this is always the snapshot composer, and

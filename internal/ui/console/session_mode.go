@@ -572,7 +572,8 @@ func (m Model) onSessionPromptSent(msg sessionPromptSentMsg) Model {
 	return m
 }
 
-// endSession leaves session mode: Esc or "ctrl+b q" (ADR 0025). It restores
+// endSession leaves session mode: Esc from the box zone, or the rail's
+// [← project] label (session_focus.go). It restores
 // the navigation stack and the prior selection - untouched throughout
 // session mode, since session mode never mutates them - and does not stop
 // the agent. SessionClose is given a Cmd to run on rather than invoked
