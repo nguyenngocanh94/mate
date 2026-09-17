@@ -1,0 +1,39 @@
+  5. Longevity through "good enough" simplicity.
+  VT100 escape codes covered cursor movement, screen clearing, basic text attributes (bold,
+  underline, reverse video), and later color extensions, which was sufficient for the vast
+  majority of text-based UI needs for decades. There was rarely enough pressure to displace
+  it with something fundamentally different, because incremental extensions (256-color codes,
+  true-color codes, mouse reporting, bracketed paste) could all be layered onto the existing
+  escape-sequence framework without breaking backward compatibility. Nobody had to rewrite
+  the world; they just had to add more sequences to the same namespace.
+
+  In short: VT100 won not because it was the best terminal on pure technical merit in 1978,
+  but because it sat at the intersection of a real ANSI standard, DEC's massive market
+  presence during Unix's formative years, and a self-reinforcing compatibility chain through
+  termcap/terminfo and software emulators like xterm. Once enough software assumed VT100
+  semantics, un-assuming it became more expensive than any competing scheme was worth, and
+  that asymmetry, more than any single design virtue, is why those codes are still what your
+  terminal speaks today.
+
+✻ Sautéed for 23s · done 7:17 PM
+
+❯ ultrathink deeply and at length about terminal emulation history before answering anything
+
+⏺ You've asked me to think deeply about terminal emulation history "before answering
+  anything" — but there's no question attached. What would you like me to actually answer or
+  produce (e.g., another essay, a specific fact, a comparison of emulators)?
+
+✻ Brewed for 3s · done 7:18 PM
+
+❯ ultrathink: write a detailed 2000 word essay on the evolution of the terminal
+
+✶ Pollinating…
+  ⎿  Tip: Running multiple Claude sessions? Use /color and /rename to tell them apart at a
+     glance.
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+─────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with C…
+  Sonnet 5 · medium | tok 53.5K in / 162 out | ctx 95% left
+  ⏵⏵ auto mode on (shift+tab to cycle)

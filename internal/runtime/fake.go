@@ -79,6 +79,14 @@ type Fake struct {
 	// Fake lock released, so a test can script what the pane shows next
 	// (SetReadOutput) the way a real harness redraws after a key press.
 	OnSendKeys func(handle AgentHandle, keys []string)
+	// SentText records every SendText call in order, one entry per call.
+	SentText []SentText
+	// SendTextErr makes every SendText call fail.
+	SendTextErr error
+	// OnSendText, if set, runs after a SendText call is recorded, with the
+	// Fake lock released, so a test can script what the pane shows next
+	// (SetReadOutput) the way a real harness redraws after typing.
+	OnSendText func(handle AgentHandle, text string)
 	// NextStartupScreen is what the pane of the next StartAgent shows when
 	// read, consumed by that one start. Empty means the harness's own empty
 	// composer (a clean start), which is what every launch that does not
@@ -91,6 +99,12 @@ type Fake struct {
 type SentKeys struct {
 	Handle AgentHandle
 	Keys   []string
+}
+
+// SentText is one recorded SendText call.
+type SentText struct {
+	Handle AgentHandle
+	Text   string
 }
 
 type fakeAgent struct {
@@ -473,6 +487,31 @@ func (f *Fake) SendKeys(_ context.Context, handle AgentHandle, keys []string) er
 	f.mu.Unlock()
 	if hook != nil {
 		hook(handle, keys)
+	}
+	return nil
+}
+
+// SendText implements Adapter.
+func (f *Fake) SendText(_ context.Context, handle AgentHandle, text string) error {
+	f.mu.Lock()
+	f.record("SendText")
+	if err := checkSendText(text); err != nil {
+		f.mu.Unlock()
+		return err
+	}
+	if f.SendTextErr != nil {
+		f.mu.Unlock()
+		return f.SendTextErr
+	}
+	if _, ok := f.Agents[handle.Session.Name+"/"+handle.Name]; !ok {
+		f.mu.Unlock()
+		return NewHerdrError(HerdrAgentNotFound, "agent target not found")
+	}
+	f.SentText = append(f.SentText, SentText{Handle: handle, Text: text})
+	hook := f.OnSendText
+	f.mu.Unlock()
+	if hook != nil {
+		hook(handle, text)
 	}
 	return nil
 }

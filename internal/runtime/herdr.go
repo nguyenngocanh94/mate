@@ -1237,6 +1237,64 @@ func (h *Herdr) SendKeys(ctx context.Context, handle AgentHandle, keys []string)
 	return err
 }
 
+// SendText implements Adapter as `herdr pane send-text <pane> <text>`.
+//
+// Herdr addresses literal text by *pane*, not by agent name the way
+// send-keys does, so the pane is resolved live from `agent get <name>`
+// inside this call rather than taken from the caller's recorded handle: a
+// persisted pane id can belong to somebody else by now (docs/mvp.md section
+// 7, "do not trust an old handle"). A recorded pane that disagrees with the
+// live one is refused instead of typed into. The residual race is the window
+// between the resolve and the send, which is Herdr's own and no narrower
+// than what `herdr pane send-text` offers.
+func (h *Herdr) SendText(ctx context.Context, handle AgentHandle, text string) error {
+	if strings.TrimSpace(handle.Session.Name) == "" || strings.TrimSpace(handle.Name) == "" {
+		return observability.NewError(observability.CodeUsage, "send-text requires a named session and agent")
+	}
+	if err := checkSendText(text); err != nil {
+		return err
+	}
+	obs, err := h.InspectAgent(ctx, handle)
+	if err != nil {
+		return err
+	}
+	pane := strings.TrimSpace(obs.Handle.Tab.PaneID)
+	if pane == "" {
+		return observability.NewError(observability.CodeNotFound,
+			fmt.Sprintf("agent %s occupies no pane; nothing to type into", handle.Name))
+	}
+	if recorded := strings.TrimSpace(handle.Tab.PaneID); recorded != "" && recorded != pane {
+		return observability.NewError(observability.CodeStateConflict,
+			fmt.Sprintf("agent %s is in pane %s, not the recorded pane %s; refusing to type into a pane that moved", handle.Name, pane, recorded))
+	}
+	_, err = h.run(ctx, handle.Session.Name, []string{"pane", "send-text", pane, text})
+	return err
+}
+
+// checkSendText refuses text Herdr or the harness would turn into something
+// other than one typed line: nothing at all, a newline (which submits, and
+// submitting is the caller's separate, verified step), or any other control
+// character except the 0x1f from-app marker mate prefixes deliberately.
+func checkSendText(text string) error {
+	if text == "" {
+		return observability.NewError(observability.CodeUsage, "send-text requires text")
+	}
+	for _, r := range text {
+		if r == 0x1f {
+			continue
+		}
+		if r == '\n' || r == '\r' {
+			return observability.NewError(observability.CodeUsage,
+				"send-text refuses a newline: submitting is a separate, verified step")
+		}
+		if r < 0x20 || r == 0x7f {
+			return observability.NewError(observability.CodeUsage,
+				fmt.Sprintf("send-text refuses control character %q", r))
+		}
+	}
+	return nil
+}
+
 // checkSendKeys refuses a key list Herdr would misread: nothing, an empty
 // token, a token carrying whitespace (two presses in one argument), or a token
 // that would be parsed as an option. Only the caller's measured key names
