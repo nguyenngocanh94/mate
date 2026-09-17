@@ -95,6 +95,11 @@ Không interaction row, không wait, không correlation id, không ack.
 Message box trong console là view gộp theo thời gian của `crews/*.status`, `sent.log`, và incident của observer.
 Không có file box riêng.
 
+Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần chưa được giải quyết - gọi là inbox: một status `needs-decision`/`blocked`, hoặc một incident, mà chưa có ai trả lời.
+Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật chính xác, dựa trên thứ tự byte trong file), hoặc khi `sent.log` có một dòng gửi tới `crew:<id>` sau thời điểm của câu hỏi (luật xấp xỉ, vì status không có timestamp riêng).
+`done`/`failed` không nằm trong inbox: cột STATUS của bảng crew đã mang chúng.
+Phím `a` dưới focus box bật `[all]`, hiện lại toàn bộ log để debug; mặc định tắt và không lưu lại.
+
 Gửi vào pane Mate là trường hợp đặc biệt vì người dùng cùng sở hữu composer.
 Chỉ gửi khi người dùng bấm (chế độ giám sát) hoặc khi chế độ tự động đang bật.
 Mọi dòng app tự gửi vào Mate có prefix sentinel `⟦matev2⟧ ` để Mate phân biệt với người gõ.
@@ -107,7 +112,8 @@ Cờ là file `.matev2/projects/<p>/mate/.auto`.
 Chế độ giám sát (mặc định):
 
 - Không dòng nào tự đi vào pane Mate.
-- Trên một dòng trong box: Enter gửi `⟦matev2⟧ signal: <đường dẫn tuyệt đối tới status file>` vào Mate (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
+- Trên một mục trong inbox: Enter (`[resolve]`) gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
+- `resolve` chỉ giao việc, không đóng câu hỏi. Mục rời inbox khi crew thật sự nhận được câu trả lời - `matev2 send` của Mate ghi `Source: mate` vào `sent.log` - hoặc khi crew tự ghi dòng status mới.
 
 Chế độ tự động:
 
