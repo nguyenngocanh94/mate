@@ -441,6 +441,15 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.confirm = nil
 	m.actions = false
 	m.actionChoices = nil
+	// Peek writes nothing, so it neither re-reads the snapshot nor reports
+	// through the outcome line: its whole result is the crew's screen, and
+	// that goes in the overlay (box_keys.go). A failed peek does take the
+	// ordinary failure path below - there is no screen to show then.
+	if msg.choice.action == ActionPeek && msg.err == nil {
+		m.peek = peekFlow{open: true, crew: msg.choice.req.Crew, text: msg.text}
+		m.msg = footerMsg{}
+		return m, nil
+	}
 	var result footerMsg
 	if msg.err != nil {
 		// This path means the service was actually called. It is therefore a
@@ -452,6 +461,13 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 			text = string(msg.choice.action) + " completed"
 		}
 		result = okMsg("Action " + string(msg.choice.action) + " completed " + m.g.Dot + " " + text)
+	}
+	if boxAction(msg.choice.action) {
+		// The box actions get their own wording. "Action forward failed" is
+		// the shape of a menu entry's report, and these are not menu entries:
+		// the reader pressed Enter on a line in the rail, and what they need
+		// back is whether that line reached the Mate and why not.
+		result = boxOutcome(msg, m.g)
 	}
 	m.actionAfterRead = &result
 	m.msg = result
@@ -805,4 +821,28 @@ func (m Model) recordedHarness() query.HarnessKind {
 		return ""
 	}
 	return mate.Designated.Value.HarnessKind
+}
+
+// boxAction reports whether an action came from the message box rather than
+// the action menu.
+func boxAction(a Action) bool {
+	return a == ActionForward || a == ActionReply || a == ActionPeek
+}
+
+// boxOutcome is the one line a box action leaves on the outcome line. A
+// refusal and a failure share the tone because they share the consequence:
+// nothing was typed into anybody's composer. The reason is the error's own -
+// internal/send already says which composer state it observed and quotes the
+// screen it read that from, and rewording it here would drop exactly the
+// detail that tells a reader whether to retry or to go look at the pane.
+func boxOutcome(msg actionDoneMsg, g glyphSet) footerMsg {
+	verb := map[Action]string{ActionForward: "Send", ActionReply: "Reply", ActionPeek: "Peek"}[msg.choice.action]
+	if msg.err != nil {
+		return errMsg(verb + " refused: " + msg.err.Error() + " " + g.Dot + " nothing was sent")
+	}
+	text := msg.text
+	if text == "" {
+		text = strings.ToLower(verb) + " delivered"
+	}
+	return okMsg(verb + ": " + text)
 }

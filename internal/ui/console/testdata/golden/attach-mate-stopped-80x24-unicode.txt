@@ -18,7 +18,7 @@
                                                                                 
                                                                                 
                                                                                 
-                                                                                
+ BOX  unknown                                                                   
 ────────────────────────────────────────────────────────────────────────────────
  ! Attach refused: Mate recorded stopped, no session to attach · nothing started
  ↑↓ Move  s Resume mate  Enter Attach mate (n/a)  Esc Back  r Refresh  q Quit   

@@ -22,15 +22,15 @@
                                                                      │ Worktree status  created                         
                                                                      │                                                  
                                                                      │ Last event       12:05:33  crew.reported_done    
-                                                                     │ Reason           none · the recorded status of   
-                                                                     │                  this attempt is not an error    
-                                                                     │                  state                           
-                                                                     │ Attention        unknown · r re-reads            
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                     │  ↓ 4 more                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ BOX                                                                                                            unknown 
+ unknown                                                                                                                
                                                                                                                         
- ↑↓ Move  a Actions  m Mode  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  a Actions  m Mode  Enter Attach crew (unavailable)  Esc Back  Tab Inspector/Box  r Refresh  q Quit            

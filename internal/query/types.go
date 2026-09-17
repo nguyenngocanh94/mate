@@ -72,6 +72,12 @@ type ProjectNode struct {
 	// Crews are the Project's Crews, oldest first.
 	Crews     []CrewNode
 	Attention Field[ProjectAttention]
+	// Box is the Project's message box (mvp.md section 4): crew status
+	// lines, sent.log and observer incidents merged in time order. It is
+	// read per Project rather than per Crew because that is what it is - a
+	// project-wide log, not a per-row field - and because the Console's
+	// rail and the project frame's box panel both draw the whole thing.
+	Box Field[BoxView]
 }
 
 // MateNode is the Project's designated Mate. Every field is set on every

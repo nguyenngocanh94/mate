@@ -270,11 +270,11 @@ func TestMouseEventsOutsideStreamModeAreDropped(t *testing.T) {
 // exact defect the ruling was written to close.
 func TestRenderStreamSessionFrameNeverDrawsComposerChrome(t *testing.T) {
 	buffer := NewTerminalBuffer(76, 20)
-	frame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, buffer, false, 160, 48, unicodeGlyphs, plainPalette())
+	frame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, buffer, false, boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
 	if strings.Contains(frame, unicodeGlyphs.CornerTL) || strings.Contains(frame, unicodeGlyphs.CornerBL) {
 		t.Fatalf("stream frame drew composer chrome:\n%s", frame)
 	}
-	snapshotFrame := RenderSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, "", 160, 48, unicodeGlyphs, plainPalette())
+	snapshotFrame := RenderSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, "", boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
 	if !strings.Contains(snapshotFrame, unicodeGlyphs.CornerTL) {
 		t.Fatalf("setup: snapshot mode's own composer chrome is missing from its frame, this test's contrast is meaningless")
 	}
@@ -327,13 +327,13 @@ func TestStreamFallbackDropsKeysInsteadOfAccumulatingAnInvisibleComposer(t *test
 func TestRenderStreamSessionFrameAlwaysShowsADetachHint(t *testing.T) {
 	const hint = "Ctrl+b then q"
 	crewBuffer := NewTerminalBuffer(78, 22)
-	crewFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetCrew}}, crewBuffer, false, 160, 48, unicodeGlyphs, plainPalette())
+	crewFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetCrew}}, crewBuffer, false, boxRail{sel: -1}, 160, 48, unicodeGlyphs, plainPalette())
 	if !strings.Contains(crewFrame, hint) {
 		t.Fatalf("Crew stream frame has no detach hint:\n%s", crewFrame)
 	}
 
 	narrowMateBuffer := NewTerminalBuffer(78, 20)
-	narrowMateFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, narrowMateBuffer, false, 80, 24, unicodeGlyphs, plainPalette())
+	narrowMateFrame := RenderStreamSessionFrame(SessionSnapshot{Target: SessionTarget{Kind: SessionTargetMate}}, narrowMateBuffer, false, boxRail{sel: -1}, 80, 24, unicodeGlyphs, plainPalette())
 	if !strings.Contains(narrowMateFrame, hint) {
 		t.Fatalf("narrow Mate stream frame has no detach hint:\n%s", narrowMateFrame)
 	}

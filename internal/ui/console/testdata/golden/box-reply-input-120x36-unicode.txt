@@ -26,11 +26,11 @@
                                     │⏺ Reply(a1 · Upgrade database adapter)                                             
                                     │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."      
                                     │                                                                                   
-                                    │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
-                                    │  "Upgrade database adapter".                                                      
-   13:41  k3  working  reading the …│                                                                                   
-   13:52  user->mate  spawn a crew …│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
- ! 14:01  k3  needs-decision  migra…│╭─────────────────────────────────────────────────────────────────────────────────╮
-────────────────────────────────────││ >                                                                               │
- Enter send  r reply  p peek        │╰─────────────────────────────────────────────────────────────────────────────────╯
- j/k move  Esc detach               │? for shortcuts                                                  ⏵⏵ accept edits on
+   13:41  k3  working  reading the …│⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
+   13:52  user->mate  spawn a crew …│  "Upgrade database adapter".                                                      
+▌! 14:01  k3  needs-decision  migra…│                                                                                   
+────────────────────────────────────│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
+ ! Send refused: composer holds uns…│╭─────────────────────────────────────────────────────────────────────────────────╮
+ reply k3 > A_                      ││ >                                                                               │
+ Enter send reply  Esc cancel       │╰─────────────────────────────────────────────────────────────────────────────────╯
+                                    │? for shortcuts                                                  ⏵⏵ accept edits on

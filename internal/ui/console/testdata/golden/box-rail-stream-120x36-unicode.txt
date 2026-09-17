@@ -30,7 +30,7 @@
                                     │  "Upgrade database adapter".                                                      
    13:41  k3  working  reading the …│                                                                                   
    13:52  user->mate  spawn a crew …│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
- ! 14:01  k3  needs-decision  migra…│╭─────────────────────────────────────────────────────────────────────────────────╮
+▌! 14:01  k3  needs-decision  migra…│╭─────────────────────────────────────────────────────────────────────────────────╮
 ────────────────────────────────────││ >                                                                               │
- Enter send  r reply  p peek        │╰─────────────────────────────────────────────────────────────────────────────────╯
- j/k move  Esc detach               │? for shortcuts                                                  ⏵⏵ accept edits on
+ Ctrl+b Enter send  r reply  p peek │╰─────────────────────────────────────────────────────────────────────────────────╯
+ Ctrl+b j/k move  Ctrl+b q detach   │? for shortcuts                                                  ⏵⏵ accept edits on

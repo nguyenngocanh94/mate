@@ -123,6 +123,12 @@ func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.Sessio
 		if err != nil {
 			return snap, err
 		}
+		// The box on every metadata tick (mvp.md task 15). It is a set of
+		// small file reads under `.matev2/`, on the poll that already runs for
+		// this session, so the rail follows a crew appending to its status
+		// file without the reader pressing 'r' - which is the whole point of
+		// a message box rather than a snapshot field.
+		snap.Box = query.LoadBox(ws, target.ProjectID)
 		snap.RecordedStatus = query.KnownField(string(status.State))
 		switch status.State {
 		case spawn.StateRunning:

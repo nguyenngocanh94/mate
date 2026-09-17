@@ -1,22 +1,22 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  MATE                 HARNESS    STATUS     MODE        BINDING     │ COMPLETED                                        
-  mate-payments-api    claude     running    supervised  active      │                                                  
-                                                                     │ Finished         1 of 2 crews                    
-  CREWS  1          TASK              STATUS           NOTE          │                  Finished crews stay in the      
-  crew_01J9P6…B8DT  Add idempotency-k…running                        │                  snapshot. Enter shows or hides  
-▌ ↓ Completed (1)                                      ! failed      │                  them in this list.              
+  MATE                 HARNESS    STATUS     MODE        BINDING     │ MATE  payments-api                               
+▏ mate-payments-api    claude     running    supervised  active      │                                                  
+                                                                     │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK 
+  CREWS  1          TASK              STATUS           NOTE          │ Agent            mate-payments-api               
+  crew_01J9P6…B8DT  Add idempotency-k…running                        │ Harness          claude                          
+  ↓ Completed (1)                                      ! failed      │                                                  
+                                                                     │ Recorded status  running                         
+                                                                     │ Binding          active                          
+                                                                     │                  recorded active; this does not  
+                                                                     │                  prove the agent is alive        
+                                                                     │ Runtime          herdr · mate-acme · tab mate/   
+                                                                     │                  payments-api · pane p-3f2a      
+                                                                     │ Bound since      09:14:02                        
                                                                      │                                                  
-                                                                     │ Needs attention  ! failed                        
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
-                                                                     │                                                  
+                                                                     │ Last event       13:41:05  crew.started          
+                                                                     │ Reason           none · not an error state       
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  
@@ -30,7 +30,7 @@
    13:41  k3  working  reading the ticket                                                                               
    13:52  user->mate  spawn a crew for the webhook fix                                                                  
  ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe_events?                                 
-▏  14:02  app->mate  signal: crews/k3.status                                                                            
+▌  14:02  app->mate  signal: crews/k3.status                                                                            
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                         
- ↑↓ Move  a Actions  m Mode  Enter Show completed  Esc Back  Tab Inspector/Box  r Refresh  q Quit                       
+ ↑↓ Move  Enter Send to Mate  r Reply  p Peek  Esc List  q Quit                                                         

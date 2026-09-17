@@ -25,13 +25,13 @@ import (
 // composer pane.
 //
 // composer is the operator's in-progress, unsent input text (ADR 0025 step
-// 4's composer). It is not part of SessionSnapshot: unlike Runtime,
-// Transcript and Inbox it is never observed from the runtime or from
-// committed state, and folding it into the snapshot would make a poll
-// result depend on what the reader happened to be typing. An empty
-// composer draws byte-identical to step 3's frozen goldens.
-func RenderSessionFrame(snapshot SessionSnapshot, composer string, w, h int, g glyphSet, p palette) string {
-	return renderSessionFrame(snapshot, nil, false, composer, w, h, g, p)
+// 4's composer), and rail is where the reader has put the box cursor.
+// Neither is part of SessionSnapshot: unlike Runtime, Transcript and Box
+// they are never observed from the runtime or from committed state, and
+// folding them into the snapshot would make a poll result depend on what
+// the reader happened to be doing.
+func RenderSessionFrame(snapshot SessionSnapshot, composer string, rail boxRail, w, h int, g glyphSet, p palette) string {
+	return renderSessionFrame(snapshot, nil, false, composer, rail, w, h, g, p)
 }
 
 // RenderStreamSessionFrame renders the same session chrome (header,
@@ -47,12 +47,12 @@ func RenderSessionFrame(snapshot SessionSnapshot, composer string, w, h int, g g
 // single line, the one piece of chrome stream mode still draws (a Crew or
 // narrow-Mate frame otherwise has no on-screen way to leave once Esc and
 // Ctrl+C both go to the agent).
-func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, frozen bool, w, h int, g glyphSet, p palette) string {
+func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, frozen bool, rail boxRail, w, h int, g glyphSet, p palette) string {
 	if buffer == nil {
-		return RenderSessionFrame(snapshot, "", w, h, g, p)
+		return RenderSessionFrame(snapshot, "", rail, w, h, g, p)
 	}
 	frame := buffer.Snapshot()
-	return renderSessionFrame(snapshot, &frame, frozen, "", w, h, g, p)
+	return renderSessionFrame(snapshot, &frame, frozen, "", rail, w, h, g, p)
 }
 
 // renderSessionFrame draws one session frame. frozen marks a terminal whose
@@ -62,7 +62,7 @@ func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, 
 // so it is cropped from the HEAD rather than the tail when the notice
 // banner leaves the frame fewer rows than the buffer holds. The frozen flag
 // is ignored for a nil terminal (snapshot mode never freezes a buffer).
-func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, frozen bool, composer string, w, h int, g glyphSet, p palette) string {
+func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, frozen bool, composer string, rail boxRail, w, h int, g glyphSet, p palette) string {
 	s := newScreen(w, h)
 	s.push(sessionHeaderLine(snapshot.Target, snapshot.RecordedStatus, g, p))
 	rest := h - 1
@@ -72,16 +72,16 @@ func renderSessionFrame(snapshot SessionSnapshot, terminal *TerminalSnapshot, fr
 	case snapshot.Target.Kind == SessionTargetMate && rw > 0:
 		s.push(sessionSplitRule(w, rw, g, p))
 		rest--
-		rail := sessionRailLines(snapshot.Inbox, g, p, rw, rest)
+		railLines := sessionRailLines(snapshot.Box, rail, g, p, rw, rest)
 		pane := sessionPaneLines(snapshot, terminal, frozen, composer, g, p, w-rw-1, rest)
 		divider := span{text: g.VRule, style: p.Faint}
 		for i := 0; i < rest; i++ {
-			s.pushSplit(rail[i], rw, divider, pane[i], w-rw-1)
+			s.pushSplit(railLines[i], rw, divider, pane[i], w-rw-1)
 		}
 	case snapshot.Target.Kind == SessionTargetMate:
 		s.push(sessionFullRule(w, g, p))
 		rest--
-		digest := sessionDigestLines(snapshot.Inbox, g, p, w)
+		digest := sessionDigestLines(snapshot.Box, rail, g, p, w)
 		for _, l := range digest {
 			s.push(l)
 		}
@@ -235,227 +235,158 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 }
 
 // ---------- rail (Mate, >=100 cols) and digest (Mate, <100 cols) ----------
+//
+// The rail is the project's message box (mvp.md task 15, section 4): every
+// box entry, newest at the bottom, one line each, with the selected one
+// marked and attention entries flagged. It replaces v1's interaction inbox,
+// which had a lifecycle - queued, awaiting reply, answered - that matev2
+// deliberately does not have ("Câu hỏi của crew không có vòng đời").
+// box.go owns how one entry is drawn; this file owns the pane around it.
 
-// sessionInboxKind classifies one inbox entry into the rail's three labels.
-// Awaiting (query.InteractionStatus.AwaitsReply, carried on the entry) is
-// "awaiting reply"; a non-awaiting entry recorded blocked needs the same
-// attention emphasis without itself awaiting a reply; every other -
-// terminal - status is "recorded", the plain rest of the entry's history.
-func sessionInboxKind(e SessionInboxEntry) (label string, amber bool) {
-	switch {
-	case e.Awaiting:
-		return "awaiting reply", true
-	case e.Status == query.InteractionBlocked:
-		return "attention", true
-	default:
-		return "recorded", false
-	}
+// boxRail is the rail's interaction state. It is Console state, not part of
+// a SessionSnapshot: a poll result must not depend on where the reader has
+// put the cursor or what they are half-way through typing, the same reason
+// the composer is a separate argument to RenderSessionFrame.
+type boxRail struct {
+	// sel is the index into BoxView.Entries the keys act on, -1 for none.
+	sel int
+	// outcome is the one line the last box action left behind: the Model's
+	// own footer message, drawn in the rail because the session frame has no
+	// message line of its own (it is not built from frame.go's six-line
+	// chrome). It is where a refused send - a composer holding someone
+	// else's text, a mid-turn agent - is reported.
+	outcome footerMsg
+	// reply is true while the one-line reply input is open, replyCrew names
+	// the crew it will go to, and replyText is what has been typed.
+	reply     bool
+	replyCrew string
+	replyText string
+	// stream is true when the agent's PTY owns the keyboard, which is what
+	// decides whether the key hints name the Ctrl+b prefix.
+	stream bool
 }
-
-func sessionClock(e SessionInboxEntry) string { return e.SentAt.UTC().Format("15:04") }
 
 // sessionRailLines returns exactly h *line values for the rail pane at
-// width w: a 3-line header, packed entries, and a 2-line footer. Packing
-// drops whole entries from the oldest end first (entries arrive newest-
-// first, matching list.go's own delivery order) - a request is never
-// clipped mid-sentence, matching design/mate-tui.js's inboxPane pack().
-func sessionRailLines(entries []SessionInboxEntry, g glyphSet, p palette, w, h int) []*line {
-	need := 0
-	for _, e := range entries {
-		if e.Awaiting {
-			need++
-		}
-	}
-
+// width w: a 3-line header, the box body, and a footer naming the keys.
+func sessionRailLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, p palette, w, h int) []*line {
 	header := []*line{
 		newLine().add(" CREW "+g.Crumb+" MATE", p.Bold),
-		sessionRailCountLine(g, p, need, len(entries)),
+		boxCountLine(v, g, p),
 		sessionFullRule(w, g, p),
 	}
-	footer := []*line{
-		sessionFullRule(w, g, p),
-		newLine().add(" Ctrl+b then q", p.Fg).add("  detach", p.Dim),
+	footer := []*line{sessionFullRule(w, g, p)}
+	if rail.outcome.tone != toneNone && rail.outcome.text != "" {
+		footer = append(footer, boxOutcomeLine(rail.outcome, g, p, w))
 	}
-	avail := h - len(header) - len(footer)
-	if avail < 0 {
-		avail = 0
+	if rail.reply {
+		footer = append(footer, boxReplyInputLine(rail, p, w))
 	}
+	footer = append(footer, sessionRailKeyLines(rail, p)...)
 
-	blocks := make([][]*line, len(entries))
-	for i, e := range entries {
-		blocks[i] = sessionRailEntryBlock(g, p, e, w-2)
-	}
-
-	shown, used := 0, 0
-	for _, b := range blocks {
-		cost := len(b)
-		if shown > 0 {
-			cost++
-		}
-		if used+cost > avail {
-			break
-		}
-		used += cost
-		shown++
-	}
-	hidden := len(blocks) - shown
-	if hidden > 0 {
-		// Reserve one line for the "N more" note, re-packing so the note
-		// itself never pushes a partially-shown entry past the budget.
-		shown, used = 0, 0
-		for _, b := range blocks {
-			cost := len(b)
-			if shown > 0 {
-				cost++
-			}
-			if used+cost > avail-1 {
-				break
-			}
-			used += cost
-			shown++
-		}
-		hidden = len(blocks) - shown
-	}
-
-	var out []*line
-	for i := 0; i < shown; i++ {
-		if i > 0 {
-			out = append(out, newLine())
-		}
-		out = append(out, blocks[i]...)
-	}
-	if hidden > 0 {
-		word := "requests"
-		if hidden == 1 {
-			word = "request"
-		}
-		out = append(out, newLine().add(fmt.Sprintf(" %s %d older %s", g.Down, hidden, word), p.Dim))
-	}
-	for len(out) < avail {
-		out = append(out, newLine())
-	}
-	out = out[:avail]
-
-	return append(append(header, out...), footer...)
+	avail := max0(h - len(header) - len(footer))
+	body := boxBodyLines(v, rail.sel, true, g, p, w, avail)
+	return append(append(header, body...), footer...)
 }
 
-func sessionRailCountLine(g glyphSet, p palette, need, total int) *line {
-	l := newLine()
-	if need > 0 {
-		l.add(fmt.Sprintf(" %d awaiting reply", need), p.Amber)
-	} else {
-		l.add(" none awaiting reply", p.Dim)
-	}
-	l.add(fmt.Sprintf(" %s %d recorded", g.Dot, total), p.Dim)
-	return l
+// boxReplyInputLine is the rail's one-line input (the `r` key). It reuses
+// the Console's existing input shape - a label, the typed text, and a "_"
+// caret - rather than inventing a second one: onboardInputLines draws the
+// new-project name the same way, and two input affordances that look
+// different would read as two different kinds of field.
+func boxReplyInputLine(rail boxRail, p palette, w int) *line {
+	label := " reply " + rail.replyCrew + " > "
+	text := cutCells(rail.replyText, max0(w-cells(label)-1))
+	return newLine().add(label, p.Dim).add(text+"_", p.Fg)
 }
 
-// sessionRailEntryBlock is one entry's lines: the timestamp/label row, the
-// attempt/task row, the question (wrapped with wrapAfterSlash, the same
-// wrapper the inspector uses for paths and branches, never cut with an
-// ellipsis - a request is read in full or not at all), and an optional note
-// row.
-func sessionRailEntryBlock(g glyphSet, p palette, e SessionInboxEntry, innerWidth int) []*line {
-	label, amber := sessionInboxKind(e)
-	labelStyle := p.Dim
-	if amber {
-		labelStyle = p.Amber
-	}
-	head := leftRight(
-		newLine().add(" "+sessionClock(e), p.Dim),
-		newLine().add(label+" ", labelStyle),
-		innerWidth+2, g,
-	)
-	var out []*line
-	out = append(out, head)
-	for _, ln := range wrapAfterSlash(e.Attempt+" "+g.Dot+" "+e.Task, innerWidth) {
-		out = append(out, newLine().add("  "+ln, p.Fg))
-	}
-	textStyle := p.Fg
-	if !amber {
-		textStyle = p.Dim
-	}
-	for _, ln := range wrapAfterSlash(e.Question, innerWidth) {
-		out = append(out, newLine().add("  "+ln, textStyle))
-	}
-	if e.Note != "" {
-		for _, ln := range wrapAfterSlash(g.Dot+" "+e.Note, innerWidth) {
-			out = append(out, newLine().add("  "+ln, p.Dim))
+// sessionRailKeyLines names the box keys, in the form the current mode
+// actually accepts them. Stream mode hands every unprefixed key to the
+// agent's own terminal (ADR 0026, the captain's ruling), so there the box
+// keys live behind the same Ctrl+b prefix the detach does; in snapshot mode
+// the Console owns the keyboard and the bare keys work. The hint has to say
+// which, or half the readers press a key that lands in the harness.
+func sessionRailKeyLines(rail boxRail, p palette) []*line {
+	if rail.reply {
+		return []*line{
+			newLine().add(" Enter", p.Fg).add(" send reply", p.Dim).add("  Esc", p.Fg).add(" cancel", p.Dim),
+			newLine(),
 		}
 	}
-	return out
+	if rail.stream {
+		return []*line{
+			newLine().add(" Ctrl+b", p.Faint).add(" Enter", p.Fg).add(" send", p.Dim).
+				add("  r", p.Fg).add(" reply", p.Dim).add("  p", p.Fg).add(" peek", p.Dim),
+			newLine().add(" Ctrl+b", p.Faint).add(" j/k", p.Fg).add(" move", p.Dim).
+				add("  Ctrl+b", p.Faint).add(" q", p.Fg).add(" detach", p.Dim),
+		}
+	}
+	return []*line{
+		newLine().add(" Enter", p.Fg).add(" send", p.Dim).
+			add("  r", p.Fg).add(" reply", p.Dim).add("  p", p.Fg).add(" peek", p.Dim),
+		newLine().add(" j/k", p.Fg).add(" move", p.Dim).add("  Esc", p.Fg).add(" detach", p.Dim),
+	}
 }
 
-// maxDigestEntries is how many awaiting replies the narrow-Mate digest lists
-// before collapsing the rest into a "+N more" line. sessionDigestHeight
+// maxDigestEntries is how many box entries the narrow-Mate digest lists
+// before collapsing the rest into an "N older" line. sessionDigestHeight
 // derives its own height from the same constant, so the reservation
 // session_mode.go makes for the digest and the digest the renderer actually
 // draws cannot drift apart.
 const maxDigestEntries = 3
 
 // sessionDigestHeight is how many rows sessionDigestLines will draw for a
-// given Inbox: always its header line, then up to maxDigestEntries awaiting
-// replies, then a "+N more awaiting reply" line when more are waiting. A
-// caller that must reserve the digest's rows before rendering (stream mode's
-// streamTerminalSize, so the PTY is never handed rows the frame then crops)
-// needs the count without building the lines. A test pins
-// len(sessionDigestLines(...)) == sessionDigestHeight(...).
-func sessionDigestHeight(entries []SessionInboxEntry) int {
-	need := 0
-	for _, e := range entries {
-		if e.Awaiting {
-			need++
-		}
+// given box: always its header line, then up to maxDigestEntries entries,
+// then an "N older" line when more exist. A caller that must reserve the
+// digest's rows before rendering (stream mode's streamTerminalSize, so the
+// PTY is never handed rows the frame then crops) needs the count without
+// building the lines. A test pins len(sessionDigestLines(...)) ==
+// sessionDigestHeight(...).
+func sessionDigestHeight(v query.Field[query.BoxView]) int {
+	if !v.IsKnown() {
+		return 2
 	}
-	shown := need
+	total := len(v.Value.Entries)
+	shown := total
 	if shown > maxDigestEntries {
 		shown = maxDigestEntries
 	}
+	if shown == 0 {
+		shown = 1 // the "nothing yet" line
+	}
 	height := 1 + shown
-	if need > shown {
+	if total > maxDigestEntries {
 		height++
 	}
 	return height
 }
 
-// sessionDigestLines is inboxDigest in design/mate-tui.js: below the rail
-// breakpoint there is no room for a second pane, so the rail collapses into
-// a fixed 1 (header) + up to 3 (entries) + at most 1 ("N more") lines
-// stacked above the transcript, rather than beside it. Only entries still
-// awaiting a reply are shown - a recorded or attention row is state a
-// reader can already find on the Mate's own inbox surface, not something
-// worth the three lines a narrow terminal can spare here. Entries are
-// dropped oldest-first, same as the rail, so the digest and the rail never
-// disagree about which requests survive a resize.
-func sessionDigestLines(entries []SessionInboxEntry, g glyphSet, p palette, w int) []*line {
-	var need []SessionInboxEntry
-	for _, e := range entries {
-		if e.Awaiting {
-			need = append(need, e)
-		}
-	}
-	shown := need
-	if len(shown) > maxDigestEntries {
-		shown = shown[:maxDigestEntries]
-	}
-
-	needStyle := p.Dim
-	if len(need) > 0 {
-		needStyle = p.Amber
-	}
-	out := []*line{leftRight(
+// sessionDigestLines is the rail below its own breakpoint: there is no room
+// for a second pane, so the box collapses into a header line plus the
+// newest few entries stacked above the transcript rather than beside it.
+// The newest end is kept - the same end the rail anchors to - and the
+// header still names how many entries need attention, so nothing is hidden
+// without a count saying so.
+func sessionDigestLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, p palette, w int) []*line {
+	head := leftRight(
 		newLine().add(" CREW "+g.Crumb+" MATE", p.Bold),
-		newLine().add(fmt.Sprintf("%d awaiting reply %s %d recorded ", len(need), g.Dot, len(entries)), needStyle),
+		boxCountLine(v, g, p).add(" ", p.Dim),
 		w, g,
-	)}
-	for _, e := range shown {
-		clock := sessionClock(e)
-		l := newLine().add(" "+clock+"  ", p.Dim)
-		l.add(truncateEnd(e.Attempt+" "+g.Dot+" "+e.Question, w-cells(clock)-4, g), p.Fg)
-		out = append(out, l)
+	)
+	out := []*line{head}
+	if !v.IsKnown() {
+		return append(out, newLine().add(" ", p.Dim).addSpans(availabilitySpans(v.State, "", v.Reason, p.Fg, g, p)...))
 	}
-	if len(need) > len(shown) {
-		out = append(out, newLine().add(fmt.Sprintf(" %d more awaiting reply", len(need)-len(shown)), p.Dim))
+	entries := v.Value.Entries
+	if len(entries) == 0 {
+		return append(out, newLine().add(" no crew has written a status line yet", p.Dim))
+	}
+	start := 0
+	if len(entries) > maxDigestEntries {
+		start = len(entries) - maxDigestEntries
+		out = append(out, newLine().add(fmt.Sprintf(" %s %d older", g.Up, start), p.Dim))
+	}
+	for i := start; i < len(entries); i++ {
+		out = append(out, boxEntryLine(entries[i], i == rail.sel, true, g, p, w))
 	}
 	return out
 }

@@ -75,6 +75,13 @@ type sessionFlow struct {
 	// terminal remains visible while a failed stream is being handed to the
 	// snapshot fallback. It is cleared only after a snapshot is accepted.
 	terminal *TerminalBuffer
+	// boxSel is the rail's selected entry, as an index into
+	// SessionSnapshot.Box.Value.Entries, or -1 for "follow the newest" -
+	// which is where the cursor sits until the reader moves it. An absolute
+	// index stays pointing at the same entry across a refresh because the
+	// box is append-only: internal/box returns the whole history in a stable
+	// order, so a new line lands after every index already in hand.
+	boxSel int
 	// fallback means the next sessionSnapshotMsg belongs to stream → snapshot,
 	// rather than to a normal snapshot-mode entry/poll.
 	fallback   bool
@@ -200,7 +207,7 @@ func (m Model) sessionTargetFor(r row) (SessionTarget, bool) {
 // What the reader is told on that fallback is onSessionSnapshot's business.
 func (m Model) beginSession(r row, target SessionTarget) (Model, tea.Cmd) {
 	target.TranscriptCapacity = SessionTranscriptCapacity(target.Kind, m.w, m.h)
-	m.sess = sessionFlow{gen: m.sess.gen + 1, target: target, entryRow: r,
+	m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1, target: target, entryRow: r,
 		snapshot: SessionSnapshot{Target: target, RecordedStatus: query.UnknownField[string]("session metadata pending"),
 			Runtime: SessionRuntime{Status: query.Unknown, Reason: "session metadata pending"}}}
 	gen := m.sess.gen
@@ -259,7 +266,7 @@ func (m Model) onSessionSnapshot(msg sessionSnapshotMsg) (Model, tea.Cmd) {
 			entryRow := m.sess.entryRow
 			target := m.sess.target
 			m = m.recordOpenFailure(stepSnapshotView, sessionLabel(target), target.ID, msg.err)
-			m.sess = sessionFlow{gen: m.sess.gen}
+			m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen}
 			nm, cmd := m.beginAttach(entryRow)
 			if nm.attachHoldsTerminal() {
 				nm.msg = nm.openFailureMsg()
@@ -280,7 +287,7 @@ func (m Model) onSessionSnapshot(msg sessionSnapshotMsg) (Model, tea.Cmd) {
 			entryRow := m.sess.entryRow
 			target := m.sess.target
 			m = m.recordOpenFailure(stepSnapshotView, sessionLabel(target), target.ID, msg.err)
-			m.sess = sessionFlow{gen: m.sess.gen}
+			m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen}
 			nm, cmd := m.beginAttach(entryRow)
 			if !nm.attachHoldsTerminal() {
 				// beginAttach refused, or could not build the hand-off. Its
@@ -386,7 +393,7 @@ func (m Model) beginStreamFallback(err error) (Model, tea.Cmd) {
 		if stream != nil {
 			_ = stream.close(context.Background())
 		}
-		m.sess = sessionFlow{gen: m.sess.gen + 1}
+		m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1}
 		return m, nil
 	}
 	entryRow := m.sess.entryRow
@@ -419,7 +426,7 @@ func (m Model) beginStreamFallback(err error) (Model, tea.Cmd) {
 			// No snapshot reader to fall back to: hand the terminal to the
 			// classic attach child (attach.go) instead of pretending a snapshot
 			// is coming.
-			m.sess = sessionFlow{gen: m.sess.gen}
+			m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen}
 			nm, attachCmd := m.beginAttach(entryRow)
 			return nm, attachCmd
 		}
@@ -427,7 +434,7 @@ func (m Model) beginStreamFallback(err error) (Model, tea.Cmd) {
 		return m, sessionReadCmd(m.baseCtx(), m.sessionReader, m.sess.target, m.sess.gen)
 	}
 	if m.sessionReader == nil {
-		m.sess = sessionFlow{gen: m.sess.gen}
+		m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen}
 		nm, attachCmd := m.beginAttach(entryRow)
 		return nm, attachCmd
 	}
@@ -484,7 +491,7 @@ func (m Model) onSessionStreamMetadata(msg sessionStreamMetadataMsg) (Model, tea
 	// transcript is never allowed to replace the PTY terminal buffer.
 	m.sess.snapshot.RecordedStatus = msg.snapshot.RecordedStatus
 	m.sess.snapshot.Runtime = msg.snapshot.Runtime
-	m.sess.snapshot.Inbox = append([]SessionInboxEntry(nil), msg.snapshot.Inbox...)
+	m.sess.snapshot.Box = msg.snapshot.Box
 	m.sess.snapshot.AsOf = msg.snapshot.AsOf
 	return m, m.resizeStreamForReserve(previousReservedLines, msg.gen)
 }
@@ -530,7 +537,7 @@ func (m Model) onSessionStreamClosed(msg sessionStreamClosedMsg) Model {
 	if msg.err != nil {
 		m.msg = errMsg("Session close failed: " + sessionErrorReason(msg.err))
 	}
-	m.sess = sessionFlow{gen: msg.gen}
+	m.sess = sessionFlow{boxSel: -1, gen: msg.gen}
 	return m
 }
 
@@ -576,10 +583,10 @@ func (m Model) endSession() (Model, tea.Cmd) {
 	stream := m.sess.stream
 	gen := m.sess.gen + 1
 	if stream != nil {
-		m.sess = sessionFlow{gen: gen, phase: sessionClosing, target: target}
+		m.sess = sessionFlow{boxSel: -1, gen: gen, phase: sessionClosing, target: target}
 		return m, sessionStreamCloseCmd(stream, gen)
 	}
-	m.sess = sessionFlow{gen: m.sess.gen + 1}
+	m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1}
 	m.msg = footerMsg{}
 	if closer == nil {
 		return m, nil
@@ -630,7 +637,7 @@ func streamTerminalSize(kind SessionTargetKind, w, h, reservedLines int) Termina
 func sessionStreamReservedLines(snapshot SessionSnapshot, kind SessionTargetKind, w int) int {
 	reserved := sessionBannerLineCount(snapshot, true)
 	if kind == SessionTargetMate && sessionRailWidth(kind, w) == 0 {
-		reserved += sessionDigestHeight(snapshot.Inbox)
+		reserved += sessionDigestHeight(snapshot.Box)
 	}
 	return reserved
 }
@@ -658,6 +665,16 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.beginModeToggle(m.sess.target.ProjectID)
 		}
 		return m, nil
+	}
+	// The box keys are bare here: the Console owns the keyboard in snapshot
+	// mode, so there is nothing to prefix them away from. They are offered
+	// before the composer for the same reason the key hints name them -
+	// matev2 never wires SessionPrompt (cmd/matev2/console.go builds only
+	// the stream ports), so the snapshot composer has nowhere to send, while
+	// the rail always has something to act on. A box with no entries
+	// consumes nothing and the composer keeps every key.
+	if model, cmd, handled := m.onSessionBoxKey(msg); handled {
+		return model, cmd
 	}
 	switch key {
 	case "esc":
@@ -714,6 +731,15 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // (streamSession.writeLoop's own doc comment), so there is no separate
 // write-result message to route here.
 func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// The reply input (box_keys.go) is the one thing that takes unprefixed
+	// keys while a stream is open: it is a Console-drawn field with a
+	// visible caret, so every keystroke while it is open was aimed at it,
+	// not at the harness. It is closed by Esc or by submitting, and the
+	// rail's own key hints say so.
+	if m.boxReply {
+		model, cmd := m.onBoxReplyKey(msg)
+		return model, cmd
+	}
 	if m.sess.awaitingDetach {
 		m.sess.awaitingDetach = false
 		switch msg.String() {
@@ -725,6 +751,12 @@ func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// terminal, so binding the letter itself would eat a character
 			// the reader meant to type to the harness.
 			return m.beginModeToggle(m.sess.target.ProjectID)
+		}
+		// The box keys (mvp.md task 15) live behind this prefix for exactly
+		// the same reason 'm' does: an unprefixed Enter, r or p belongs to
+		// the harness's own composer.
+		if model, cmd, handled := m.onSessionBoxKey(msg); handled {
+			return model, cmd
 		}
 		return m, nil
 	}

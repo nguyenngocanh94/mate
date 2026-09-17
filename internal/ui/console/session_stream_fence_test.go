@@ -12,7 +12,7 @@ import (
 // no stream pointer - only a gen - so the other guards (phase, stream != nil,
 // !fallback) all pass for a message scheduled during a previous session while
 // the reader detaches and re-enters inside the metadata interval. Without the
-// gen check the stale Inbox/runtime the first session reported is applied over
+// gen check the stale box/runtime the first session reported is applied over
 // the second session's frame, and resizeStreamForReserve then sizes the new
 // PTY from the old target's chrome. The message is real: the chain restarts on
 // every entry (beginSession), so a tick from the departed session is still in
@@ -37,7 +37,7 @@ func TestStaleMetadataMustNotOverwriteTheNewSession(t *testing.T) {
 		Target:         m.sess.target,
 		RecordedStatus: query.KnownField("running"),
 		Runtime:        SessionRuntime{Status: query.Absent, Reason: "session-one-agent-gone"},
-		Inbox:          awaitingInbox(4),
+		Box:            awaitingBox(4),
 	}
 
 	// Leave (Ctrl+b q) and re-enter: session 2 is live and healthy.
@@ -80,8 +80,8 @@ func TestStaleMetadataMustNotOverwriteTheNewSession(t *testing.T) {
 	if m.sess.snapshot.ControllerNotice != "" {
 		t.Errorf("a stale metadata message raised a banner on the live session: %q", m.sess.snapshot.ControllerNotice)
 	}
-	if len(m.sess.snapshot.Inbox) != 0 {
-		t.Errorf("a stale metadata message adopted the previous session's Inbox: %+v", m.sess.snapshot.Inbox)
+	if len(m.sess.snapshot.Box.Value.Entries) != 0 {
+		t.Errorf("a stale metadata message adopted the previous session's box: %+v", m.sess.snapshot.Box)
 	}
 	if cmd != nil {
 		t.Fatalf("a stale metadata message scheduled work: %T", cmd())

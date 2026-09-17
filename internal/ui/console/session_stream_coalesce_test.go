@@ -44,7 +44,7 @@ func TestStreamFrameTranslatesOneStylePerCoalescedRun(t *testing.T) {
 	g, p := unicodeGlyphs, plainPalette()
 
 	allocs := testing.AllocsPerRun(20, func() {
-		_ = RenderStreamSessionFrame(snapshot, buf, false, 160, 48, g, p)
+		_ = RenderStreamSessionFrame(snapshot, buf, false, boxRail{sel: -1}, 160, 48, g, p)
 	})
 	if allocs > 15000 {
 		t.Errorf("stream frame allocated %.0f times/run; hoisted translation measures ~9065 and the per-cell shape ~23373 - cellLipglossStyle is running per cell again", allocs)

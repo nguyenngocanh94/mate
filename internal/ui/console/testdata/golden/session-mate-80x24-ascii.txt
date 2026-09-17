@@ -1,11 +1,11 @@
  claude-code . mate-payments-api . supervised                                   
 --------------------------------------------------------------------------------
- CREW > MATE                                      4 awaiting reply . 6 recorded 
- 14:01  attempt 2 . Migration for idempotency_keys, or key off stripe_events .. 
- 13:41  attempt 1 . Rebase conflict on Upgrade database adapter: keep the poo.. 
- 11:30  attempt 1 . Composite index on (event_id, received_at), or event_id a.. 
- 1 more awaiting reply                                                          
+ CREW > MATE                                            1 attention . 3 entries 
+   13:41  k3  working  reading the ticket                                       
+   13:52  user->mate  spawn a crew for the webhook fix                          
+ ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off strip..
 --------------------------------------------------------------------------------
+* Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. 
   Reading its report before reviewing attempt 2.                                
                                                                                 
 * Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                  

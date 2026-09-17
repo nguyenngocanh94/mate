@@ -37,8 +37,8 @@ type SessionStreamFactory func(context.Context, SessionTarget, TerminalSize) (Se
 type SessionMetadataReader func(context.Context, SessionTarget) (SessionSnapshot, error)
 
 // SessionTargetKind says whether a session view is attached to a Mate or a
-// Crew. The two render differently: a Mate gets the "Crew › Mate" rail
-// (ADR 0025), a Crew gets transcript and composer only.
+// Crew. The two render differently: a Mate gets the "CREW › MATE" box rail
+// (mvp.md task 15), a Crew gets transcript and composer only.
 type SessionTargetKind string
 
 const (
@@ -188,7 +188,7 @@ type SessionTranscriptEntry struct {
 // database row and never claimed to be a faithful per-token or per-tool-
 // event stream (ADR 0025: "MVP không tuyên bố độ trung thực của từng token
 // hoặc tool event"). It is a distinct source from the inbox rail
-// (SessionInboxEntry) and the two must never be flattened into one
+// (SessionSnapshot.Box) and the two must never be flattened into one
 // "messages" list.
 type SessionTranscript struct {
 	Source      SessionTranscriptSource
@@ -203,45 +203,9 @@ type SessionTranscript struct {
 	// never shows stale content.
 	Raw string
 	// ObservedAt is when this transcript was captured - the poll tick, not
-	// SessionSnapshot.AsOf, since a poll can refresh Runtime/Inbox while a
+	// SessionSnapshot.AsOf, since a poll can refresh Runtime/Box while a
 	// transcript read fails and leaves the previous Raw/Entries in place.
 	ObservedAt time.Time
-}
-
-// SessionInboxEntry is one committed inbox item, read from query/application
-// - never derived from the transcript. Interaction and completion items have
-// separate vocabularies; completion is not a question awaiting a reply.
-type SessionInboxEntry struct {
-	Kind          query.InboxEntryKind
-	InteractionID string
-	Status        query.InteractionStatus
-	Question      string
-	Reply         string
-	SentAt        time.Time
-	// Awaiting reports whether this entry currently awaits a reply, per
-	// query.InteractionStatus.AwaitsReply - carried here rather than
-	// recomputed so the rail and the status agree on the same read.
-	Awaiting bool
-	// Attempt and Task are the interaction's owning Crew attempt label
-	// (e.g. "attempt 2") and task title, pre-resolved by query/application -
-	// the rail and digest group entries by them (session-view-contract.md),
-	// and this package does not itself join across Task/Crew to produce
-	// them.
-	Attempt string
-	Task    string
-	// Note is an optional caveat about how this entry was recorded (e.g.
-	// "reply was recorded before the crew stopped"), authored upstream the
-	// same way query.Field.Reason is - this package only displays it.
-	Note             string
-	CompletionID     string
-	CompletionStatus query.CrewStatus
-	Outcome          string
-	ReportPath       string
-	ReportRevision   string
-	ArtifactRefs     []string
-	PRURL            string
-	PRHeadSHA        string
-	SourceEventID    string
 }
 
 // SessionSnapshot is one poll's worth of session state: the target's
@@ -263,7 +227,15 @@ type SessionSnapshot struct {
 	RecordedStatus query.Field[string]
 	Runtime        SessionRuntime
 	Transcript     SessionTranscript
-	Inbox          []SessionInboxEntry
+	// Box is the Project's message box (mvp.md task 15): crew status lines,
+	// sent.log and observer incidents merged in time order by internal/box
+	// and flattened into DTOs by internal/query. It is the Mate session
+	// view's left rail. It replaces v1's interaction inbox outright: matev2
+	// has no interaction lifecycle at all (mvp.md section 4 - "Câu hỏi của
+	// crew không có vòng đời"), so there is nothing here that awaits a
+	// reply as a tracked object; there are only lines, some of which carry
+	// an attention verb.
+	Box query.Field[query.BoxView]
 	// AsOf is when this SessionSnapshot was assembled, mirroring
 	// query.Snapshot.AsOf.
 	AsOf time.Time

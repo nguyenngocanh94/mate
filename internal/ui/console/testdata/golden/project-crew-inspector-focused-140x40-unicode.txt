@@ -26,15 +26,15 @@
                                                                                │ Last event       14:01:58  agent.tool_call                 
                                                                                │ Reason           none · not an error state                 
                                                                                │ Attention        none · crew crew_01J9P6Q6W0E5V8XK2M4B8DT  
-                                                                               │                  is recorded running and nothing about it  
-                                                                               │                  needs attention                           
-                                                                               │                                                            
-                                                                               │                                                            
-                                                                               │                                                            
-                                                                               │                                                            
-                                                                               │                                                            
-                                                                               │                                                            
-                                                                               │                                                            
-───────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
+                                                                               │  ↓ 2 more                                                  
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ BOX                                                                                                                1 attention · 4 entries 
+                                                                                                                                            
+                                                                                                                                            
+   13:41  k3  working  reading the ticket                                                                                                   
+   13:52  user->mate  spawn a crew for the webhook fix                                                                                      
+ ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe_events?                                                     
+▏  14:02  app->mate  signal: crews/k3.status                                                                                                
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                                             
  ↑↓ Scroll  Tab List  Esc List  r Refresh  q Quit                                                                                           
