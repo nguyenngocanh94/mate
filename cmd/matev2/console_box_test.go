@@ -39,6 +39,7 @@ const (
 type boxFixture struct {
 	ws     *store.Workspace
 	rt     *runtime.Fake
+	deps   spawn.Deps
 	action console.ActionFunc
 	mate   runtime.AgentHandle
 	crew   runtime.AgentHandle
@@ -88,7 +89,7 @@ func newBoxFixture(t *testing.T) boxFixture {
 	}
 	rt.SetReadOutput(mate, claudeEmptyScreen)
 	rt.SetReadOutput(crew, codexEmptyScreen)
-	return boxFixture{ws: ws, rt: rt, action: action, mate: mate, crew: crew}
+	return boxFixture{ws: ws, rt: rt, deps: deps, action: action, mate: mate, crew: crew}
 }
 
 // forwardRequest is the request the rail builds for the needs-decision entry

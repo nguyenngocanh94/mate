@@ -140,7 +140,8 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 		return "", observability.NewError(observability.CodeUsage, "no Project was named for the restart")
 	}
 	stopped, err := spawn.StopMate(ctx, ws, deps, req.Target)
-	if err != nil {
+	gone := mateNotRecorded(err)
+	if err != nil && !gone {
 		return "", err
 	}
 	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Resume: true})
@@ -148,7 +149,7 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 		return "", err
 	}
 	was := "stopped " + stopped.Agent
-	if stopped.AlreadyGone {
+	if gone || stopped.AlreadyGone {
 		was = "the previous Mate was already gone"
 	}
 	return fmt.Sprintf("%s; Mate %s is running on %s in pane %s", was, res.Agent, res.Harness, res.Pane), nil
@@ -175,6 +176,15 @@ func clearComposerAction(ctx context.Context, ws *store.Workspace, deps spawn.De
 		return "", err
 	}
 	return fmt.Sprintf("%s pressed in %s's pane; nothing was sent", clearComposerKey, handle.Name), nil
+}
+
+// mateNotRecorded reports the one StopMate refusal a restart absorbs:
+// `mate.meta` names no agent, so there was nothing to stop. Every other
+// failure is propagated - a stop that could not be confirmed must not be
+// followed by a start that would race the agent still running.
+func mateNotRecorded(err error) bool {
+	var coded *observability.Error
+	return errors.As(err, &coded) && coded.Code == observability.CodeNotFound
 }
 
 // clearComposerKey is the one key [clear composer] presses. Ctrl+U is the
