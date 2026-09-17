@@ -40,33 +40,66 @@ func sessionTestClock(h, m int) time.Time {
 	return time.Date(2026, 9, 10, h, m, 0, 0, time.UTC)
 }
 
-// sessionTestBox is task 15's pinned rail fixture, and the one mvp.md's
-// task row asks for: two crew status lines - one of them the needs-decision
-// that has to be visibly highlighted - and one message, which is the entry
-// Enter must refuse to forward. Oldest first, the order the rail draws.
+// testStatusPath and testResolveLine spell the fixture's status paths and
+// `resolve:` lines through the production builders, so a fixture can never
+// pin a line the console would not actually send.
+func testStatusPath(crew string) string {
+	return "/Users/dev/work/acme/.matev2/projects/payments-api/crews/" + crew + ".status"
+}
+
+func testResolveLine(crew, question string) string {
+	return query.BoxResolveLine("payments-api", crew, question, testStatusPath(crew))
+}
+
+// sessionTestBox is task 15's pinned rail fixture: a log of five entries -
+// `working`, a message, two open questions and a `done` - of which exactly
+// two reach the inbox. That is the shape the rail now has to prove: the log
+// keeps everything, the rail draws only what somebody still has to decide,
+// and `[all]` is the only way to see the rest.
 func sessionTestBox() query.Field[query.BoxView] {
+	working := query.BoxEntry{
+		Seq: 0, At: sessionTestClock(13, 41), Kind: query.BoxStatus,
+		Source: "crew", Target: "crew:k3", Crew: "k3",
+		Verb: "working", Text: "reading the ticket",
+		Resolve: testResolveLine("k3", "reading the ticket"),
+	}
+	message := query.BoxEntry{
+		Seq: 1, At: sessionTestClock(13, 52), Kind: query.BoxMessage,
+		Source: "user", Target: "mate",
+		Text: "spawn a crew for the webhook fix",
+	}
+	asked := query.BoxEntry{
+		Seq: 2, At: sessionTestClock(14, 1), Kind: query.BoxStatus,
+		Source: "crew", Target: "crew:k3", Crew: "k3",
+		Verb: "needs-decision", Text: "migration for idempotency_keys, or key off stripe_events?",
+		Attention: true, Resolve: testResolveLine("k3", "migration for idempotency_keys, or key off stripe_events?"),
+	}
+	blocked := query.BoxEntry{
+		Seq: 3, At: sessionTestClock(14, 6), Kind: query.BoxStatus,
+		Source: "crew", Target: "crew:k9", Crew: "k9",
+		Verb: "blocked", Text: "the staging database refuses the new migration; drop and recreate it, or patch the constraint in place?",
+		Attention: true, Resolve: testResolveLine("k9", "the staging database refuses the new migration; drop and recreate it, or patch the constraint in place?"),
+	}
+	done := query.BoxEntry{
+		Seq: 4, At: sessionTestClock(14, 9), Kind: query.BoxStatus,
+		Source: "crew", Target: "crew:k2", Crew: "k2",
+		Verb: "done", Text: "PR ready for review",
+		Attention: true, Resolve: testResolveLine("k2", "PR ready for review"),
+	}
 	return query.KnownField(query.BoxView{
-		Entries: []query.BoxEntry{
-			{
-				Seq: 0, At: sessionTestClock(13, 41), Kind: query.BoxStatus,
-				Source: "crew", Target: "crew:k3", Crew: "k3",
-				Verb: "working", Text: "reading the ticket",
-				Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
-			},
-			{
-				Seq: 1, At: sessionTestClock(13, 52), Kind: query.BoxMessage,
-				Source: "user", Target: "mate",
-				Text: "spawn a crew for the webhook fix",
-			},
-			{
-				Seq: 2, At: sessionTestClock(14, 1), Kind: query.BoxStatus,
-				Source: "crew", Target: "crew:k3", Crew: "k3",
-				Verb: "needs-decision", Text: "migration for idempotency_keys, or key off stripe_events?",
-				Attention: true, Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
-			},
-		},
-		Crews: 1, Awaiting: 1, LastAt: sessionTestClock(14, 1),
+		Entries: []query.BoxEntry{working, message, asked, blocked, done},
+		Inbox:   []query.BoxEntry{asked, blocked},
+		Crews:   3, Awaiting: 2, LastAt: sessionTestClock(14, 9),
 	})
+}
+
+// sessionTestEmptyBox is the same project with nothing waiting: the log is
+// not empty, the inbox is.
+func sessionTestEmptyBox() query.Field[query.BoxView] {
+	v := sessionTestBox()
+	v.Value.Inbox = nil
+	v.Value.Awaiting = 0
+	return v
 }
 
 // sessionTestMateTranscript is the Mate sample transcript: attempt 2

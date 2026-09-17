@@ -8,9 +8,10 @@ import (
 
 // The message box's own fixtures (mvp.md task 15). The session-mate-* and
 // project-* goldens already cover the rail and the panel in their default
-// state; these pin the three things that only exist because of this task and
-// have no other fixture: a moved selection on an attention entry, the reply
-// input open, and the peek overlay.
+// state; these pin what only exists because of this task and has no other
+// fixture: an inbox item selected with its question wrapped underneath, an
+// empty inbox, the `[all]` debugging view, the reply input open, and the
+// peek overlay.
 
 // boxRailSnapshot is a Mate session frame carrying the pinned fixture box.
 func boxRailSnapshot() SessionSnapshot {
@@ -24,10 +25,40 @@ func boxRailSnapshot() SessionSnapshot {
 // attention mark) and selected (the marker glyph). Both signals have to be
 // visible with colour stripped, which is exactly what a plainPalette fixture
 // proves.
+// It is also the fixture for the inbox itself: the box behind it holds five
+// entries - a `working`, a message and a `done` among them - and the rail
+// shows the two that are still waiting on somebody, with the selected one's
+// question wrapped underneath it so it is readable without `p`.
 func TestGoldenBoxRailSelectedNeedsDecision(t *testing.T) {
-	frame := RenderSessionFrame(boxRailSnapshot(), "", boxRail{sel: 2, zone: zoneBox, mode: query.ModeSupervised}, 120, 36, unicodeGlyphs, plainPalette())
+	frame := RenderSessionFrame(boxRailSnapshot(), "", boxRail{sel: 0, zone: zoneBox, mode: query.ModeSupervised}, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	assertGolden(t, "box-rail-selected-120x36-unicode", frame)
+}
+
+// TestGoldenBoxRailEmptyInbox is the state the reader asked for and the one
+// the old rail could never show: nothing is waiting. The log behind it is not
+// empty - the same five entries are there - so this fixture is also the proof
+// that the filter, not the merge, is what emptied the rail. The placeholder
+// is quiet on purpose: "nothing to resolve" is a state, not a fault.
+func TestGoldenBoxRailEmptyInbox(t *testing.T) {
+	snap := sessionTestSnapshot(SessionTargetMate, unicodeGlyphs)
+	snap.Box = sessionTestEmptyBox()
+	rail := boxRail{sel: -1, zone: zoneBox, mode: query.ModeSupervised}
+	frame := RenderSessionFrame(snap, "", rail, 120, 36, unicodeGlyphs, plainPalette())
+	assertFrameShape(t, frame, 120, 36)
+	assertGolden(t, "box-rail-empty-120x36-unicode", frame)
+}
+
+// TestGoldenBoxRailAllMode is the `[all]` toggle: the whole merged log, the
+// way the rail used to look, with the header saying so. The header label
+// reads "[all on]" rather than relying on the accent colour, which is what a
+// plainPalette fixture proves - a reader on a monochrome terminal can still
+// tell the debugging view from a broken filter.
+func TestGoldenBoxRailAllMode(t *testing.T) {
+	rail := boxRail{all: true, sel: 4, zone: zoneBox, mode: query.ModeSupervised}
+	frame := RenderSessionFrame(boxRailSnapshot(), "", rail, 120, 36, unicodeGlyphs, plainPalette())
+	assertFrameShape(t, frame, 120, 36)
+	assertGolden(t, "box-rail-all-120x36-unicode", frame)
 }
 
 // TestGoldenSessionTerminalFocus is the Mate session view as it opens: the
@@ -36,7 +67,7 @@ func TestGoldenBoxRailSelectedNeedsDecision(t *testing.T) {
 // fixture that would fail if the view ever again reserved a keystroke out of
 // the agent's own alphabet.
 func TestGoldenSessionTerminalFocus(t *testing.T) {
-	rail := boxRail{sel: 2, zone: zoneTerminal, mode: query.ModeSupervised}
+	rail := boxRail{sel: 1, zone: zoneTerminal, mode: query.ModeSupervised}
 	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	assertGolden(t, "session-focus-terminal-120x36-unicode", frame)
@@ -49,7 +80,7 @@ func TestGoldenSessionTerminalFocus(t *testing.T) {
 // here is carried by the accent colour alone - the words "BOX" and the
 // buttons themselves are what a monochrome reader sees.
 func TestGoldenSessionBoxFocusWithHoverStrip(t *testing.T) {
-	rail := boxRail{sel: 2, hover: 2, zone: zoneBox, mode: query.ModeSupervised}
+	rail := boxRail{sel: 1, hover: 1, zone: zoneBox, mode: query.ModeSupervised}
 	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
 	assertFrameShape(t, frame, 120, 36)
 	assertGolden(t, "session-focus-box-120x36-unicode", frame)
@@ -60,7 +91,7 @@ func TestGoldenSessionBoxFocusWithHoverStrip(t *testing.T) {
 // mode label reports rather than merely offers, and the width at which all
 // four labels fit on one line.
 func TestGoldenSessionHeaderLabelsAutoMode(t *testing.T) {
-	rail := boxRail{sel: 2, zone: zoneBox, mode: query.ModeAuto, railW: railMaxWidth}
+	rail := boxRail{sel: 1, zone: zoneBox, mode: query.ModeAuto, railW: railMaxWidth}
 	snap := boxRailSnapshot()
 	snap.Target.Mode = query.ModeAuto
 	frame := RenderStreamSessionFrame(snap, sessionGoldenTerminal(t), false, rail, 160, 48, unicodeGlyphs, plainPalette())
@@ -86,7 +117,7 @@ func sessionGoldenTerminal(t *testing.T) *TerminalBuffer {
 // something.
 func TestGoldenBoxReplyInputOpen(t *testing.T) {
 	rail := boxRail{
-		sel: 2, zone: zoneBox, mode: query.ModeSupervised,
+		sel: 0, zone: zoneBox, mode: query.ModeSupervised,
 		reply: true, replyCrew: "k3", replyText: "A",
 		outcome: errMsg("Send refused: composer holds unsubmitted text · nothing was sent"),
 	}
@@ -101,7 +132,7 @@ func TestGoldenBoxReplyInputOpen(t *testing.T) {
 // modal drawn over the terminal being restarted.
 func TestGoldenBoxRestartConfirmation(t *testing.T) {
 	rail := boxRail{
-		sel: 2, zone: zoneBox, mode: query.ModeSupervised,
+		sel: 1, zone: zoneBox, mode: query.ModeSupervised,
 		confirm: true, confirmText: "restart Mate payments-api?",
 	}
 	frame := RenderStreamSessionFrame(boxRailSnapshot(), sessionGoldenTerminal(t), false, rail, 120, 36, unicodeGlyphs, plainPalette())
@@ -141,18 +172,19 @@ func TestGoldenBoxPanelFocused(t *testing.T) {
 	if m.focus != paneBox {
 		t.Fatalf("focus = %v, want paneBox after two Tabs", m.focus)
 	}
-	// The cursor and the pointer both on the needs-decision entry, so the
-	// panel's own action strip is in the fixture too: it is the same strip
-	// the rail draws, and the project frame is the surface where it is
-	// easiest to lose.
-	m.boxSel = 2
-	m.boxHover = 2
+	// The cursor and the pointer both on the one inbox item, so the panel's
+	// own action strip is in the fixture too: it is the same strip the rail
+	// draws, and the project frame is the surface where it is easiest to
+	// lose. The panel shows the inbox, not the log - the sample project's
+	// box holds four entries and exactly one of them is waiting.
+	m.boxSel = 0
+	m.boxHover = 0
 	assertGolden(t, "box-panel-focused-120x36-unicode", renderFrame(t, m))
 }
 
 // TestBoxDigestReplacesThePanelWhenTheTableWouldLoseTooMuch pins the one
 // layout decision the panel makes: at 80x24 the crews table cannot spare
-// eight rows, so the box collapses to the Summarize digest line instead.
+// eight rows, so the box collapses to the one-line digest instead.
 func TestBoxDigestReplacesThePanelWhenTheTableWouldLoseTooMuch(t *testing.T) {
 	wide := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
 	wide, _ = send(t, wide, key("enter"))
@@ -168,7 +200,7 @@ func TestBoxDigestReplacesThePanelWhenTheTableWouldLoseTooMuch(t *testing.T) {
 	// And the digest must actually carry Summarize's figures, or the frame
 	// that dropped the panel says less than the panel it replaced.
 	line := boxDigestLine(sampleBox(), unicodeGlyphs, plainPalette()).render(80)
-	for _, want := range []string{"1 attention", "4 entries", "1 awaiting", "1 crew"} {
+	for _, want := range []string{"1 to resolve", "4 entries", "1 crew"} {
 		if !containsLine(line, want) {
 			t.Errorf("the digest line %q does not carry %q", line, want)
 		}
@@ -176,21 +208,69 @@ func TestBoxDigestReplacesThePanelWhenTheTableWouldLoseTooMuch(t *testing.T) {
 }
 
 // TestBoxSelectionFollowsTheNewestUntilMoved pins the rail's default: a
-// reader who has not touched j/k is looking at the newest entry, and stays
-// on it as a crew appends - but an absolute selection, once made, keeps
-// naming the same entry rather than sliding.
+// reader who has not touched j/k is looking at the newest item, and stays on
+// it as a crew asks something new - but an absolute selection, once made,
+// keeps naming the same item rather than sliding.
 func TestBoxSelectionFollowsTheNewestUntilMoved(t *testing.T) {
+	b := boxList{field: sessionTestBox()}
+	if got := boxDefaultSelection(b); got != 1 {
+		t.Fatalf("default selection = %d, want the newest inbox item (1)", got)
+	}
+	grown := b
+	grown.field.Value.Inbox = append(append([]query.BoxEntry{}, b.rows()...),
+		query.BoxEntry{Seq: 9, Kind: query.BoxStatus, Crew: "k4", Verb: "blocked", Text: "no credentials", Attention: true})
+	if got := boxDefaultSelection(grown); got != 2 {
+		t.Fatalf("default selection after a new question = %d, want the new newest (2)", got)
+	}
+	if e, ok := boxSelectedEntry(grown, 0); !ok || e.Verb != "needs-decision" {
+		t.Fatalf("index 0 after a new question = %+v, want the same needs-decision item", e)
+	}
+}
+
+// TestBoxInboxIsTheDefaultAndAllShowsTheLog pins the one thing the `[all]`
+// toggle is for: the rail draws the inbox, the toggle draws the merge, and
+// nothing in between drops a line from the record.
+func TestBoxInboxIsTheDefaultAndAllShowsTheLog(t *testing.T) {
 	v := sessionTestBox()
-	if got := boxDefaultSelection(v); got != 2 {
-		t.Fatalf("default selection = %d, want the newest (2)", got)
+	inbox := boxList{field: v}
+	all := boxList{field: v, all: true}
+	if got := len(inbox.rows()); got != 2 {
+		t.Fatalf("inbox rows = %d, want the two open questions", got)
 	}
-	grown := v
-	grown.Value.Entries = append(append([]query.BoxEntry{}, v.Value.Entries...),
-		query.BoxEntry{Seq: 3, Kind: query.BoxStatus, Crew: "k3", Verb: "done", Text: "shipped", Attention: true})
-	if got := boxDefaultSelection(grown); got != 3 {
-		t.Fatalf("default selection after an append = %d, want the new newest (3)", got)
+	if got := len(all.rows()); got != len(v.Value.Entries) {
+		t.Fatalf("[all] rows = %d, want the whole log (%d)", got, len(v.Value.Entries))
 	}
-	if e, ok := boxSelectedEntry(grown, 2); !ok || e.Verb != "needs-decision" {
-		t.Fatalf("index 2 after an append = %+v, want the same needs-decision entry", e)
+	for _, e := range inbox.rows() {
+		if e.Verb != "needs-decision" && e.Verb != "blocked" {
+			t.Fatalf("inbox holds a %q entry; only an open question or an incident belongs there", e.Verb)
+		}
+		if !e.Resolvable() {
+			t.Fatalf("inbox item %+v carries no resolve line", e)
+		}
+	}
+	if !inbox.wraps() || all.wraps() {
+		t.Fatalf("wraps() = inbox %v, all %v; only the inbox expands its selection", inbox.wraps(), all.wraps())
+	}
+}
+
+// TestBoxEmptyInboxSaysNothingToResolve pins the placeholder and the header
+// count: an empty inbox is a state, not a failed read, and the header must
+// say so in words rather than by going blank.
+func TestBoxEmptyInboxSaysNothingToResolve(t *testing.T) {
+	b := boxList{field: sessionTestEmptyBox()}
+	if got := len(b.rows()); got != 0 {
+		t.Fatalf("empty-inbox fixture has %d rows", got)
+	}
+	body := boxBodyLines(b, -1, -1, true, unicodeGlyphs, plainPalette(), 44, 4)
+	if !containsLine(body[0].render(44), "nothing to resolve") {
+		t.Fatalf("empty inbox body = %q, want the placeholder", body[0].render(44))
+	}
+	head := boxCountLine(b, unicodeGlyphs, plainPalette()).render(44)
+	if !containsLine(head, "nothing to resolve") {
+		t.Fatalf("empty inbox header = %q, want the count line to say so", head)
+	}
+	two := boxCountLine(boxList{field: sessionTestBox()}, unicodeGlyphs, plainPalette()).render(44)
+	if !containsLine(two, "2 to resolve") {
+		t.Fatalf("header = %q, want \"2 to resolve\"", two)
 	}
 }

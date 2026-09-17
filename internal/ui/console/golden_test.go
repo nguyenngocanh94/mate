@@ -446,7 +446,7 @@ func sampleBox() query.Field[query.BoxView] {
 			{
 				Seq: 0, At: at(13, 41), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
 				Crew: "k3", Verb: "working", Text: "reading the ticket",
-				Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
+				Resolve: testResolveLine("k3", "reading the ticket"),
 			},
 			{
 				Seq: 1, At: at(13, 52), Kind: query.BoxMessage, Source: "user", Target: "mate",
@@ -456,13 +456,18 @@ func sampleBox() query.Field[query.BoxView] {
 				Seq: 2, At: at(14, 1), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
 				Crew: "k3", Verb: "needs-decision",
 				Text:      "migration for idempotency_keys, or key off stripe_events?",
-				Attention: true, Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
+				Attention: true, Resolve: testResolveLine("k3", "migration for idempotency_keys, or key off stripe_events?"),
 			},
 			{
 				Seq: 3, At: at(14, 2), Kind: query.BoxMessage, Source: "app", Target: "mate",
-				Text: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
+				Text: testResolveLine("k3", "migration for idempotency_keys, or key off stripe_events?"),
 			},
 		},
+		Inbox: []query.BoxEntry{{
+			Seq: 2, At: at(14, 1), Kind: query.BoxStatus, Source: "crew", Target: "crew:k3",
+			Crew: "k3", Verb: "needs-decision", Text: "migration for idempotency_keys, or key off stripe_events?",
+			Attention: true, Resolve: testResolveLine("k3", "migration for idempotency_keys, or key off stripe_events?"),
+		}},
 		Crews: 1, Awaiting: 1, LastAt: at(14, 2),
 	})
 }

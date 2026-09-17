@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 // Where the three box keys live, per focus zone (mvp.md task 15,
@@ -55,8 +53,8 @@ func TestStreamModeBoxKeysNeedBoxFocus(t *testing.T) {
 		t.Fatal("an r under terminal focus opened the reply input instead of reaching the harness")
 	}
 
-	// Enter under box focus forwards the selected entry, which defaults to
-	// the newest - the needs-decision line.
+	// Enter under box focus resolves the selected item, which defaults to
+	// the newest - k9's blocked line.
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
@@ -66,15 +64,42 @@ func TestStreamModeBoxKeysNeedBoxFocus(t *testing.T) {
 	if !ok {
 		t.Fatalf("Enter under box focus produced %T, want actionDoneMsg", cmd())
 	}
-	if msg.choice.action != ActionForward {
-		t.Fatalf("Enter under box focus ran %s, want forward", msg.choice.action)
+	if msg.choice.action != ActionResolve {
+		t.Fatalf("Enter under box focus ran %s, want resolve", msg.choice.action)
 	}
 	if len(action.reqs) != 1 {
-		t.Fatalf("action requests = %+v, want exactly the forward", action.reqs)
+		t.Fatalf("action requests = %+v, want exactly the resolve", action.reqs)
 	}
 	req := action.reqs[0]
-	if req.Crew != "k3" || req.Input != query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status") {
-		t.Errorf("forward request = %+v, want crew k3 and its status signal", req)
+	if req.Crew != "k9" || req.Input != m.sess.snapshot.Box.Value.Inbox[1].Resolve {
+		t.Errorf("resolve request = %+v, want crew k9 and its resolve line", req)
+	}
+}
+
+// TestBoxRailShowsOnlyTheInboxUntilAllIsToggled is the user's whole
+// complaint, pinned: the rail draws the two open questions out of a
+// five-entry log, `a` swaps in the log, and `a` again goes back.
+func TestBoxRailShowsOnlyTheInboxUntilAllIsToggled(t *testing.T) {
+	m := streamBoxFixture(t, &recordingAction{})
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	b, _ := m.sessionBoxList()
+	if got := len(b.rows()); got != 2 {
+		t.Fatalf("rail rows = %d, want only the two unresolved items", got)
+	}
+	m, _ = send(t, m, key("a"))
+	if !m.boxAll {
+		t.Fatal("`a` under box focus did not turn [all] on")
+	}
+	b, _ = m.sessionBoxList()
+	if got := len(b.rows()); got != len(m.sess.snapshot.Box.Value.Entries) {
+		t.Fatalf("[all] rows = %d, want the whole log", got)
+	}
+	if got := m.sessionRailState().sel; got != len(b.rows())-1 {
+		t.Fatalf("selection after the toggle = %d, want the newest row of the new list", got)
+	}
+	m, _ = send(t, m, key("a"))
+	if m.boxAll {
+		t.Fatal("a second `a` did not turn [all] off again")
 	}
 }
 
@@ -82,21 +107,21 @@ func TestStreamModeBoxKeysNeedBoxFocus(t *testing.T) {
 // of the same rule: bare under box focus, the agent's under terminal focus.
 func TestBoxFocusMovesTheRailSelectionWithBareKeys(t *testing.T) {
 	m := streamBoxFixture(t, &recordingAction{})
-	if got := m.sessionRailState().sel; got != 2 {
-		t.Fatalf("initial selection = %d, want the newest entry (2)", got)
+	if got := m.sessionRailState().sel; got != 1 {
+		t.Fatalf("initial selection = %d, want the newest inbox item (1)", got)
 	}
 	m, _ = send(t, m, key("k"))
-	if got := m.sessionRailState().sel; got != 2 {
+	if got := m.sessionRailState().sel; got != 1 {
 		t.Fatalf("a k under terminal focus moved the selection to %d; it belongs to the agent", got)
 	}
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, _ = send(t, m, key("k"))
-	if got := m.sessionRailState().sel; got != 1 {
-		t.Fatalf("selection after k under box focus = %d, want 1", got)
+	if got := m.sessionRailState().sel; got != 0 {
+		t.Fatalf("selection after k under box focus = %d, want 0", got)
 	}
 	m, _ = send(t, m, key("j"))
-	if got := m.sessionRailState().sel; got != 2 {
-		t.Fatalf("selection after j under box focus = %d, want 2", got)
+	if got := m.sessionRailState().sel; got != 1 {
+		t.Fatalf("selection after j under box focus = %d, want 1", got)
 	}
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	if m.sess.zone != zoneTerminal {
@@ -104,28 +129,30 @@ func TestBoxFocusMovesTheRailSelectionWithBareKeys(t *testing.T) {
 	}
 }
 
-// TestBoxForwardRefusesAMessageEntry: a message is something the Mate
-// already sent or was sent, so forwarding it says nothing. The refusal is on
-// the outcome line rather than silent, which is the only way a reader can
-// tell it from a lost keystroke.
-func TestBoxForwardRefusesAMessageEntry(t *testing.T) {
+// TestBoxResolveRefusesAMessageEntry: a message is something the Mate
+// already sent or was sent, so there is nothing in it to decide. The inbox
+// never holds one, so the row has to be reached through `[all]` - which is
+// exactly the case this refusal exists for. It is on the outcome line rather
+// than silent, the only way a reader can tell it from a lost keystroke.
+func TestBoxResolveRefusesAMessageEntry(t *testing.T) {
 	action := &recordingAction{}
 	m := streamBoxFixture(t, action)
-	m.sess.boxSel = 1 // the user->mate message
 
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, _ = send(t, m, key("a")) // the whole log, messages included
+	m.sess.boxSel = 1           // the user->mate message
 	m, cmd := send(t, m, key("enter"))
 	if cmd != nil {
-		t.Fatalf("forwarding a message issued a command: %T", cmd())
+		t.Fatalf("resolving a message issued a command: %T", cmd())
 	}
 	if len(action.reqs) != 0 {
-		t.Fatalf("forwarding a message reached ActionFunc: %+v", action.reqs)
+		t.Fatalf("resolving a message reached ActionFunc: %+v", action.reqs)
 	}
 	if m.boxMsg.tone != toneError || m.boxMsg.text == "" {
 		t.Fatalf("outcome = %+v, want a refusal naming why", m.boxMsg)
 	}
 	frame := RenderSessionFrame(m.sess.snapshot, "", m.sessionRailState(), 120, 36, unicodeGlyphs, plainPalette())
-	if !containsLine(frame, "Send refused") {
+	if !containsLine(frame, "Resolve refused") {
 		t.Errorf("the rail does not show the refusal:\n%s", frame)
 	}
 }
@@ -138,6 +165,7 @@ func TestStreamModeReplyInputTakesEveryKey(t *testing.T) {
 	m := streamBoxFixture(t, action)
 
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, _ = send(t, m, key("k")) // onto k3's question, the older of the two
 	m, _ = send(t, m, key("r"))
 	if !m.boxReply || m.boxReplyCrew != "k3" {
 		t.Fatalf("r under box focus did not open the reply input for k3: reply=%v crew=%q", m.boxReply, m.boxReplyCrew)
@@ -179,6 +207,7 @@ func TestBoxPeekOpensAndClosesTheOverlay(t *testing.T) {
 	m := streamBoxFixture(t, action)
 
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, _ = send(t, m, key("k")) // onto k3's question, the older of the two
 	m, cmd := send(t, m, key("p"))
 	if cmd == nil {
 		t.Fatal("p under box focus issued no command")
@@ -238,11 +267,11 @@ func TestProjectFrameBoxKeysAreBare(t *testing.T) {
 	if m.focus != paneBox {
 		t.Fatalf("focus = %v, want paneBox", m.focus)
 	}
-	// The panel's selection defaults to the newest entry, which in the
-	// sample box is a message; k steps back onto the needs-decision line.
-	m, _ = send(t, m, key("k"))
-	if got := m.projectBoxSelection(); got != 2 {
-		t.Fatalf("selection after k = %d, want the needs-decision entry (2)", got)
+	// The panel draws the inbox, so its one row is already the
+	// needs-decision line - no stepping back past a message to reach it,
+	// which is the whole point of the filter.
+	if got := m.projectBoxSelection(); got != 0 {
+		t.Fatalf("panel selection = %d, want the single inbox item (0)", got)
 	}
 	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
@@ -251,10 +280,10 @@ func TestProjectFrameBoxKeysAreBare(t *testing.T) {
 	if _, ok := cmd().(actionDoneMsg); !ok {
 		t.Fatalf("bare Enter produced %T, want actionDoneMsg", cmd())
 	}
-	if len(action.reqs) != 1 || action.reqs[0].Action != ActionForward {
-		t.Fatalf("action requests = %+v, want one forward", action.reqs)
+	if len(action.reqs) != 1 || action.reqs[0].Action != ActionResolve {
+		t.Fatalf("action requests = %+v, want one resolve", action.reqs)
 	}
 	if action.reqs[0].Target != "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ" || action.reqs[0].Crew != "k3" {
-		t.Errorf("forward request = %+v, want this project and crew k3", action.reqs[0])
+		t.Errorf("resolve request = %+v, want this project and crew k3", action.reqs[0])
 	}
 }

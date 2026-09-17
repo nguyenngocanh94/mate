@@ -47,7 +47,10 @@ func TestFakeSessionControllerSeedRoundTrips(t *testing.T) {
 		},
 		Box: query.KnownField(query.BoxView{Entries: []query.BoxEntry{{
 			Kind: query.BoxStatus, Crew: "k3", Source: "crew", Verb: "needs-decision",
-			Text: "pick A or B", Attention: true, Signal: query.BoxStatusSignal("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status"),
+			Text: "pick A or B", Attention: true, Resolve: testResolveLine("k3", "pick A or B"),
+		}}, Inbox: []query.BoxEntry{{
+			Kind: query.BoxStatus, Crew: "k3", Source: "crew", Verb: "needs-decision",
+			Text: "pick A or B", Attention: true, Resolve: testResolveLine("k3", "pick A or B"),
 		}}, Crews: 1, Awaiting: 1}),
 	})
 

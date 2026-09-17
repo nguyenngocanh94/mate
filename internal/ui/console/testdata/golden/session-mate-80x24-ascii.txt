@@ -1,10 +1,10 @@
  claude-code . mate-payments-api . supervised                                   
 --------------------------------------------------------------------------------
- CREW > MATE                                            1 attention . 3 entries 
-   13:41  k3  working  reading the ticket                                       
-   13:52  user->mate  spawn a crew for the webhook fix                          
- ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off strip..
+ CREW > MATE                                                       2 to resolve 
+ ! 14:01  k3  needs-decision                                                    
+ ! 14:06  k9  blocked                                                           
 --------------------------------------------------------------------------------
+* Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. 
   Reading its report before reviewing attempt 2.                                
                                                                                 
 * Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                  

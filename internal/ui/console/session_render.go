@@ -227,13 +227,14 @@ func sessionSplitRule(w, rw int, g glyphSet, p palette, boxFocused bool) *line {
 // and only at the two breakpoints the Console's own inspector already uses
 // (140, 100 - layout.go's inspectorWide/Narrow switch).
 //
-// The widths (50, 44) are sized for what the rail now has to carry on one
-// line: an entry's own words plus the action strip an attention entry grows
-// under the cursor (boxStripWidth, 24 cells). The earlier 42/36 predate that
-// strip and left a needs-decision line cut to nine cells the moment it was
-// selected, which is a row that tells the reader nothing at exactly the
-// moment they are deciding what to do about it. A reader who wants the
-// balance elsewhere drags the splitter (session_focus.go): these are
+// The widths (58, 54) are sized for what the rail has to carry on one line:
+// an inbox row's own words - "HH:MM  k3  needs-decision", 25 cells - the
+// three-cell lead, and the action strip that row grows under the cursor
+// ([resolve] [reply] [peek], boxStripWidth). 53 is the sum; the defaults sit
+// just above it. The earlier 50/44 were sized for the old "[→ mate]" strip
+// and cut "needs-decision" to "need…" the moment the reader selected the
+// row - which is the one word they were reading it for. A reader who wants
+// the balance elsewhere drags the splitter (session_focus.go): these are
 // defaults, not limits.
 func sessionRailWidth(kind SessionTargetKind, cols int) int {
 	if kind != SessionTargetMate {
@@ -241,9 +242,9 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 	}
 	switch {
 	case cols >= 140:
-		return 50
+		return 58
 	case cols >= 100:
-		return 44
+		return 54
 	default:
 		return 0
 	}
@@ -263,7 +264,11 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 // put the cursor or what they are half-way through typing, the same reason
 // the composer is a separate argument to RenderSessionFrame.
 type boxRail struct {
-	// sel is the index into BoxView.Entries the keys act on, -1 for none.
+	// all is the `[all]` toggle: draw the whole merged log instead of the
+	// inbox. It is a debugging view and it is off every time the Console
+	// starts (box_keys.go's toggleBoxAll).
+	all bool
+	// sel is the index into the rows on screen the keys act on, -1 for none.
 	sel int
 	// hover is the entry the pointer is over, -1 for none. It exists only
 	// so an entry can show its action strip before the reader has committed
@@ -304,8 +309,9 @@ type boxRail struct {
 // lines and left to work out which one is live.
 func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeom, g glyphSet, p palette) []*line {
 	w := geo.railW
+	b := boxList{field: v, all: rail.all}
 	header := make([]*line, 0, geo.railHdrH)
-	for _, row := range packLabels(sessionHeaderLabels(rail.mode, g), w) {
+	for _, row := range packLabels(sessionHeaderLabels(rail.mode, rail.all, g), w) {
 		l := newLine()
 		at := 0
 		for _, lab := range row {
@@ -316,7 +322,7 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeo
 		header = append(header, l.cut(w, g))
 	}
 	title := newLine().add(" ", p.Dim).addSpan(paneTitleSpan("CREW "+g.Crumb+" MATE", rail.zone == zoneBox, p))
-	header = append(header, title, boxCountLine(v, g, p), sessionFullRule(w, g, p))
+	header = append(header, title, boxCountLine(b, g, p), sessionFullRule(w, g, p))
 
 	footer := []*line{sessionFullRule(w, g, p)}
 	if rail.confirm {
@@ -330,7 +336,7 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeo
 	if rail.zone == zoneBox {
 		hover = rail.hover
 	}
-	body := boxBodyLines(v, rail.sel, hover, rail.zone == zoneBox, g, p, w, geo.railBodyH)
+	body := boxBodyLines(b, rail.sel, hover, rail.zone == zoneBox, g, p, w, geo.railBodyH)
 	return fitLines(append(append(header, body...), footer...), geo.bodyH)
 }
 
@@ -340,6 +346,9 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeo
 // the Mate's composer without a keystroke.
 func labelStyle(id labelID, rail boxRail, p palette) lipgloss.Style {
 	if id == labelMode && rail.mode == query.ModeAuto {
+		return p.Amber
+	}
+	if id == labelAll && rail.all {
 		return p.Amber
 	}
 	return p.Fg
@@ -410,9 +419,10 @@ func sessionHintLine(rail boxRail, geo sessionGeom, g glyphSet, p palette, w int
 	case rail.zone == zoneBox:
 		l.add(" BOX  ", p.Bold).
 			add(g.UpDown, p.Fg).add(" move", p.Dim).
-			add("  Enter", p.Fg).add(" "+g.Arrow+" mate", p.Dim).
+			add("  Enter", p.Fg).add(" resolve", p.Dim).
 			add("  r", p.Fg).add(" reply", p.Dim).
 			add("  p", p.Fg).add(" peek", p.Dim).
+			add("  a", p.Fg).add(" all", p.Dim).
 			add("  m", p.Fg).add(" mode", p.Dim).
 			add("  R", p.Fg).add(" restart", p.Dim).
 			add("  u", p.Fg).add(" clear composer", p.Dim).
@@ -444,11 +454,11 @@ const maxDigestEntries = 3
 // PTY is never handed rows the frame then crops) needs the count without
 // building the lines. A test pins len(sessionDigestLines(...)) ==
 // sessionDigestHeight(...).
-func sessionDigestHeight(v query.Field[query.BoxView]) int {
-	if !v.IsKnown() {
+func sessionDigestHeight(b boxList) int {
+	if !b.known() {
 		return 2
 	}
-	total := len(v.Value.Entries)
+	total := len(b.rows())
 	shown := total
 	if shown > maxDigestEntries {
 		shown = maxDigestEntries
@@ -470,18 +480,19 @@ func sessionDigestHeight(v query.Field[query.BoxView]) int {
 // header still names how many entries need attention, so nothing is hidden
 // without a count saying so.
 func sessionDigestLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, p palette, w int) []*line {
+	b := boxList{field: v, all: rail.all}
 	head := leftRight(
 		newLine().add(" CREW "+g.Crumb+" MATE", p.Bold),
-		boxCountLine(v, g, p).add(" ", p.Dim),
+		boxCountLine(b, g, p).add(" ", p.Dim),
 		w, g,
 	)
 	out := []*line{head}
-	if !v.IsKnown() {
+	if !b.known() {
 		return append(out, newLine().add(" ", p.Dim).addSpans(availabilitySpans(v.State, "", v.Reason, p.Fg, g, p)...))
 	}
-	entries := v.Value.Entries
+	entries := b.rows()
 	if len(entries) == 0 {
-		return append(out, newLine().add(" no crew has written a status line yet", p.Dim))
+		return append(out, newLine().add(" "+boxEmptyText(rail.all), p.Dim))
 	}
 	start := 0
 	if len(entries) > maxDigestEntries {
@@ -493,7 +504,7 @@ func sessionDigestLines(v query.Field[query.BoxView], rail boxRail, g glyphSet, 
 		hover = rail.hover
 	}
 	for i := start; i < len(entries); i++ {
-		out = append(out, boxEntryLine(entries[i], i == rail.sel, i == hover, rail.zone == zoneBox, g, p, w))
+		out = append(out, boxEntryLine(entries[i], i == rail.sel, i == hover, rail.zone == zoneBox, rail.all, g, p, w))
 	}
 	return out
 }

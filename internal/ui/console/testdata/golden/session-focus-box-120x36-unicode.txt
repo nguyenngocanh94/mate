@@ -1,36 +1,36 @@
  claude-code · mate-payments-api · supervised                                                                           
-────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────
- [← project] [supervised] [restart mate]    │shop-mate $ matev2 crew list                                               
- [clear composer]                           │k3  needs-decision                                                         
- CREW › MATE                                │shop-mate $                                                                
- 1 attention · 3 entries                    │                                                                           
-────────────────────────────────────────────│                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-                                            │                                                                           
-   13:41  k3  working  reading the ticket   │                                                                           
-   13:52  user->mate  spawn a crew for the …│                                                                           
-▌! 14:01  k3  needs… [→ mate] [reply] [peek]│                                                                           
-────────────────────────────────────────────│                                                                           
- BOX  ↑↓ move  Enter → mate  r reply  p peek  m mode  R restart  u clear composer  Esc project  F2 terminal             
+──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
+ [← project] [supervised] [all] [restart mate]        │shop-mate $ matev2 crew list                                     
+ [clear composer]                                     │k3  needs-decision                                               
+ CREW › MATE                                          │shop-mate $                                                      
+ 2 to resolve                                         │                                                                 
+──────────────────────────────────────────────────────│                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+ ! 14:01  k3  needs-decision                          │                                                                 
+▌! 14:06  k9  blocked         [resolve] [reply] [peek]│                                                                 
+    the staging database refuses the new migration;   │                                                                 
+    drop and recreate it, or patch the constraint in  │                                                                 
+    place?                                            │                                                                 
+──────────────────────────────────────────────────────│                                                                 
+ BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal     

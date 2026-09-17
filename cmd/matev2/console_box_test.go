@@ -92,29 +92,29 @@ func newBoxFixture(t *testing.T) boxFixture {
 	return boxFixture{ws: ws, rt: rt, deps: deps, action: action, mate: mate, crew: crew}
 }
 
-// forwardRequest is the request the rail builds for the needs-decision entry
-// (internal/ui/console/box_keys.go's boxForwardChoice), read off the same
-// query.BoxView the rail draws so the test cannot invent a signal line the
-// console would never send.
-func (f boxFixture) forwardRequest(t *testing.T) console.ActionRequest {
+// resolveRequest is the request the rail builds for the one inbox item
+// (internal/ui/console/box_keys.go's boxResolveChoice), read off the same
+// query.BoxView the rail draws so the test cannot invent a line the console
+// would never send. It reads Inbox, not Entries: that is what the rail
+// draws, and an item that is not in the inbox is not one a reader can act
+// on.
+func (f boxFixture) resolveRequest(t *testing.T) console.ActionRequest {
 	t.Helper()
 	box := query.LoadBox(f.ws, "shop")
 	if !box.IsKnown() {
 		t.Fatalf("LoadBox: %s", box.Reason)
 	}
-	for _, e := range box.Value.Entries {
-		if e.Kind == query.BoxStatus && e.Verb == "needs-decision" {
-			if !e.Forwardable() {
-				t.Fatalf("the needs-decision entry is not forwardable: %+v", e)
-			}
-			return console.ActionRequest{
-				Action: console.ActionForward, Target: "shop", TargetKind: "project",
-				Crew: e.Crew, Input: e.Signal,
-			}
-		}
+	if len(box.Value.Inbox) != 1 {
+		t.Fatalf("inbox = %+v, want exactly the one needs-decision item", box.Value.Inbox)
 	}
-	t.Fatalf("no needs-decision entry in the box: %+v", box.Value.Entries)
-	return console.ActionRequest{}
+	e := box.Value.Inbox[0]
+	if e.Verb != "needs-decision" || !e.Resolvable() {
+		t.Fatalf("inbox item = %+v, want a resolvable needs-decision", e)
+	}
+	return console.ActionRequest{
+		Action: console.ActionResolve, Target: "shop", TargetKind: "project",
+		Crew: e.Crew, Input: e.Resolve,
+	}
 }
 
 func sentLines(t *testing.T, ws *store.Workspace) []store.SentEntry {
@@ -126,24 +126,34 @@ func sentLines(t *testing.T, ws *store.Workspace) []store.SentEntry {
 	return entries
 }
 
-// TestConsoleBoxForwardTypesTheSignalAndRecordsIt is Enter on a status
-// entry: the marked `signal:` line reaches the Mate's composer, and only
-// that line - never the status text itself, which the Mate reads from the
-// file the signal points at.
-func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
+// TestConsoleBoxResolveTypesTheResolveLineAndRecordsIt is Enter on an inbox
+// item: the marked `resolve:` line reaches the Mate's composer carrying the
+// crew's own question, the file to read, and the command that answers the
+// crew. The status text is quoted rather than copied as the record: the file
+// the line points at is still the record, which is why the path is there.
+func TestConsoleBoxResolveTypesTheResolveLineAndRecordsIt(t *testing.T) {
 	f := newBoxFixture(t)
-	wantSignal := query.BoxStatusSignal(f.ws.CrewStatus("shop", "k3"))
-	req := f.forwardRequest(t)
-	if req.Input != wantSignal {
-		t.Fatalf("signal = %q, want %q", req.Input, wantSignal)
+	wantResolve := query.BoxResolveLine("shop", "k3", "pick A or B", f.ws.CrewStatus("shop", "k3"))
+	req := f.resolveRequest(t)
+	if req.Input != wantResolve {
+		t.Fatalf("resolve line = %q, want %q", req.Input, wantResolve)
+	}
+	for _, part := range []string{
+		`resolve: k3 asked: "pick A or B"`,
+		"read " + f.ws.CrewStatus("shop", "k3"),
+		`answer with matev2 send shop k3 "<one line>"`,
+	} {
+		if !strings.Contains(wantResolve, part) {
+			t.Errorf("resolve line %q does not carry %q", wantResolve, part)
+		}
 	}
 
 	out, err := f.action(context.Background(), req)
 	if err != nil {
-		t.Fatalf("forward: %v", err)
+		t.Fatalf("resolve: %v", err)
 	}
-	if !strings.Contains(out, wantSignal) {
-		t.Errorf("outcome = %q, want it to name the line it delivered", out)
+	if !strings.Contains(out, "asked to decide") {
+		t.Errorf("outcome = %q, want it to say the Mate was asked to decide", out)
 	}
 
 	var typed []string
@@ -155,8 +165,8 @@ func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
 	if len(typed) != 1 {
 		t.Fatalf("text typed into the Mate = %q, want exactly one line", typed)
 	}
-	if typed[0] != send.Marker+wantSignal {
-		t.Errorf("typed %q, want the marker then the signal line", typed[0])
+	if typed[0] != send.Marker+wantResolve {
+		t.Errorf("typed %q, want the marker then the resolve line", typed[0])
 	}
 
 	sent := sentLines(t, f.ws)
@@ -166,29 +176,56 @@ func TestConsoleBoxForwardTypesTheSignalAndRecordsIt(t *testing.T) {
 	if sent[0].Source != store.SourceApp || sent[0].Target != store.TargetMate {
 		t.Errorf("sent.log line = %+v, want app -> mate", sent[0])
 	}
-	if sent[0].Text != wantSignal {
-		t.Errorf("sent.log text = %q, want the signal line without the marker", sent[0].Text)
+	if sent[0].Text != wantResolve {
+		t.Errorf("sent.log text = %q, want the resolve line without the marker", sent[0].Text)
 	}
-	// The signal must be an absolute path: the Mate's cwd is its own
+	// The path in the line must be absolute: the Mate's cwd is its own
 	// workspace directory, not the project's, so `crews/k3.status` (relative
 	// to the project) resolves to nothing there.
-	if !strings.HasPrefix(wantSignal, "signal: "+f.ws.Root()) {
-		t.Fatalf("signal %q is not rooted at the workspace (%s)", wantSignal, f.ws.Root())
+	if !strings.Contains(wantResolve, "read "+f.ws.Root()) {
+		t.Fatalf("resolve line %q does not name a path rooted at the workspace (%s)", wantResolve, f.ws.Root())
 	}
 }
 
-// TestConsoleBoxForwardRefusedOnAPendingComposerRecordsNothing is the rule
+// TestConsoleBoxResolveEmptiesTheInbox is rule 1 of the inbox, end to end
+// through the action seam: the crew's own next status line is what closes
+// the item, and `resolve` on its own does not - handing the question to the
+// Mate is not an answer to the crew.
+func TestConsoleBoxResolveEmptiesTheInbox(t *testing.T) {
+	f := newBoxFixture(t)
+	if _, err := f.action(context.Background(), f.resolveRequest(t)); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	box := query.LoadBox(f.ws, "shop")
+	if len(box.Value.Inbox) != 1 {
+		t.Fatalf("inbox after a resolve = %+v, want the item still open until the crew is answered", box.Value.Inbox)
+	}
+	if err := f.ws.AppendSent("shop", store.SentEntry{
+		Source: store.SourceMate, Target: store.CrewTarget("k3"), Text: "go with A",
+	}); err != nil {
+		t.Fatalf("AppendSent: %v", err)
+	}
+	box = query.LoadBox(f.ws, "shop")
+	if len(box.Value.Inbox) != 0 {
+		t.Fatalf("inbox after the Mate answered = %+v, want empty", box.Value.Inbox)
+	}
+	if len(box.Value.Entries) == 0 {
+		t.Fatal("the merged log is empty; the inbox filter must not shrink the record")
+	}
+}
+
+// TestConsoleBoxResolveRefusedOnAPendingComposerRecordsNothing is the rule
 // mvp.md section 4 puts on the Mate's pane specifically: the human owns that
 // composer too, so a line already sitting in it is never typed over - and a
 // send that did not happen must leave no trace in sent.log, or the box would
 // show the Mate a message no agent ever received.
-func TestConsoleBoxForwardRefusedOnAPendingComposerRecordsNothing(t *testing.T) {
+func TestConsoleBoxResolveRefusedOnAPendingComposerRecordsNothing(t *testing.T) {
 	f := newBoxFixture(t)
 	f.rt.SetReadOutput(f.mate, claudePendingScreen)
 
-	out, err := f.action(context.Background(), f.forwardRequest(t))
+	out, err := f.action(context.Background(), f.resolveRequest(t))
 	if err == nil {
-		t.Fatalf("forward into a pending composer returned %q and no error", out)
+		t.Fatalf("resolve into a pending composer returned %q and no error", out)
 	}
 	if !errors.Is(err, send.ErrComposerPending) {
 		t.Fatalf("forward error = %v, want send.ErrComposerPending", err)
@@ -202,11 +239,11 @@ func TestConsoleBoxForwardRefusedOnAPendingComposerRecordsNothing(t *testing.T) 
 
 	for _, s := range f.rt.SentText {
 		if s.Handle.Name == f.mate.Name {
-			t.Errorf("a refused forward typed %q into the Mate", s.Text)
+			t.Errorf("a refused resolve typed %q into the Mate", s.Text)
 		}
 	}
 	if sent := sentLines(t, f.ws); len(sent) != 0 {
-		t.Fatalf("a refused forward wrote %+v to sent.log, want nothing", sent)
+		t.Fatalf("a refused resolve wrote %+v to sent.log, want nothing", sent)
 	}
 }
 

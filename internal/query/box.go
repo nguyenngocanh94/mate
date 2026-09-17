@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
@@ -15,8 +16,9 @@ import (
 // internal/store. The Console may import neither (doc.go, boundary_test.go),
 // so these are the flat DTOs it does see: one copy per load, made here,
 // with every derived fact the rail needs already decided - the verb, whether
-// the entry needs attention, whether Enter may hand it to the Mate, and the
-// exact line Enter would send.
+// the entry needs attention, which entries are still waiting on a decision
+// (the inbox), whether [resolve] may hand one to the Mate, and the exact
+// line [resolve] would send.
 //
 // Deciding those here rather than in the renderer is the same rule the rest
 // of this package follows: a UI that recomputes "is this attention?" from a
@@ -59,22 +61,32 @@ type BoxEntry struct {
 	// Attention marks an entry a person or the Mate must see: box.Attention
 	// over the parsed state, or any incident.
 	Attention bool
-	// Signal is the one line `Enter` hands to the Mate for this entry
-	// (mvp.md section 5), empty for an entry that is not forwardable.
-	// A message is never forwardable: the Mate either sent it or was sent
-	// it, so handing it back says nothing new.
-	Signal string
+	// Resolve is the one line `[resolve]` hands to the Mate for this entry:
+	// the crew's own question, the status file to read, and the command to
+	// answer the crew with. It is empty for an entry nothing can be decided
+	// about - a message never has one, because the Mate either sent it or
+	// was sent it, so handing it back says nothing new.
+	Resolve string
 }
 
-// Forwardable reports whether Enter may hand this entry to the Mate.
-func (e BoxEntry) Forwardable() bool { return e.Signal != "" }
+// Resolvable reports whether [resolve] may hand this entry to the Mate.
+func (e BoxEntry) Resolvable() bool { return e.Resolve != "" }
 
 // BoxView is a project's whole box plus the digest a narrow frame shows
 // instead of it.
 type BoxView struct {
 	// Entries are every message, status line and incident, oldest first -
 	// so the rail draws the newest at the bottom, the way a chat log reads.
+	// This is the whole log, unfiltered; the rail's `[all]` toggle is what
+	// puts it on screen.
 	Entries []BoxEntry
+	// Inbox is the subset a human or the Mate still has to decide on
+	// (box.Inbox): an unresolved needs-decision or blocked status line, or
+	// an unresolved incident, in the same oldest-first order. Every surface
+	// draws this by default - the rail, the project panel and the narrow
+	// digest - because a line nobody can act on is noise on a surface whose
+	// whole purpose is to be acted on.
+	Inbox []BoxEntry
 	// Crews is how many distinct crews appear in the view, and Awaiting how
 	// many of them have an attention state as their latest status
 	// (box.Summarize).
@@ -94,6 +106,11 @@ func (v BoxView) Attention() int {
 	}
 	return n
 }
+
+// ToResolve is how many things are waiting on a decision: the inbox's own
+// length, spelled as a method so the rail header, the digest line and the
+// project panel all count the same thing.
+func (v BoxView) ToResolve() int { return len(v.Inbox) }
 
 // LoadBox reads one project's box. It is exported because two callers need
 // exactly this: Load, which hangs it on the ProjectNode the project frame
@@ -128,6 +145,13 @@ func boxView(ws *store.Workspace, project string, v box.View) BoxView {
 	for _, e := range v.Entries {
 		out.Entries = append(out.Entries, boxEntry(ws, project, e))
 	}
+	// The inbox is built from the same Entry values, through the same
+	// flattener, so an item and its line in the full log are the same row
+	// with the same Seq - a reader who toggles [all] sees the entry they
+	// were looking at, not a second copy of it built by other code.
+	for _, item := range box.Inbox(v) {
+		out.Inbox = append(out.Inbox, boxEntry(ws, project, item.Entry))
+	}
 	return out
 }
 
@@ -147,14 +171,15 @@ func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 		out.Verb = string(st.State)
 		out.Text = st.Text
 		out.Attention = box.Attention(st.State)
-		// The status file is the pointer, not the line: mvp.md section 5
-		// says Enter sends `signal: <absolute status file path>`, so the
-		// Mate reads the file itself rather than trusting a line the
-		// console copied. The path must be absolute: the Mate's cwd is its
-		// own workspace directory, not the project's, so a path relative to
-		// the project (`crews/<id>.status`) resolves to nothing there.
+		// The line carries the question *and* the pointer. The question is
+		// what makes the Mate's job legible at a glance - the reader saw
+		// those words in the rail and the Mate should see the same ones -
+		// and the path is what the Mate reads before deciding, because a
+		// copy the console made is not the record. The path is absolute:
+		// the Mate's cwd is its own workspace directory, not the project's,
+		// so `crews/<id>.status` resolves to nothing there.
 		if e.Crew != "" {
-			out.Signal = BoxStatusSignal(ws.CrewStatus(project, e.Crew))
+			out.Resolve = BoxResolveLine(project, e.Crew, st.Text, ws.CrewStatus(project, e.Crew))
 		}
 	case box.KindIncident:
 		kind, text := box.ParseIncidentText(e.Text)
@@ -162,25 +187,51 @@ func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 		out.Verb = string(kind)
 		out.Text = text
 		out.Attention = true
-		out.Signal = BoxIncidentSignal(string(kind), e.Crew)
+		out.Resolve = BoxIncidentResolveLine(string(kind), e.Crew, text)
 	default:
 		out.Kind = BoxMessage
 	}
 	return out
 }
 
-// BoxStatusSignal and BoxIncidentSignal are the two lines mvp.md section 5
-// pins for the Enter key. They are spelled once, here, so the console, the
-// action that sends them and any test asserting on `sent.log` all agree.
+// BoxResolveLine and BoxIncidentResolveLine are the two lines `[resolve]`
+// sends into the Mate's pane. They are spelled once, here, so the console,
+// the action that sends them, the manual the Mate reads (assets/mate,
+// section 10) and any test asserting on `sent.log` all agree.
 //
-// BoxStatusSignal takes the crew's status file path, already resolved to an
-// absolute path by the caller (ws.CrewStatus(project, crew)): the Mate's cwd
-// is its own workspace directory, not the project's, so a path relative to
-// the project never resolves there.
-func BoxStatusSignal(statusPath string) string {
-	return fmt.Sprintf("signal: %s", statusPath)
+// They replace the `signal: <path>` lines this file used to build. A bare
+// path says only "here is a file"; it does not say that the crew is waiting,
+// what it asked, or that answering it is the Mate's job. A `resolve:` line
+// says all three, which is what the inbox exists for - an item leaves the
+// inbox when the crew has an answer, not when somebody has read about it.
+//
+// statusPath is already absolute (ws.CrewStatus(project, crew)): the Mate's
+// cwd is its own workspace directory, not the project's, so a path relative
+// to the project never resolves there.
+func BoxResolveLine(project, crew, question, statusPath string) string {
+	return fmt.Sprintf("resolve: %s asked: %q — read %s, decide, and answer with matev2 send %s %s \"<one line>\"",
+		crew, oneLine(question, resolveQuestionRunes), statusPath, project, crew)
 }
 
-func BoxIncidentSignal(kind, crew string) string {
-	return fmt.Sprintf("signal: incident %s %s", kind, crew)
+func BoxIncidentResolveLine(kind, crew, text string) string {
+	return fmt.Sprintf("resolve: incident %s %s — %s", kind, crew, oneLine(text, resolveQuestionRunes))
+}
+
+// resolveQuestionRunes bounds the quoted question. A status line is one line
+// by protocol (mvp.md section 4), but nothing enforces its length, and a
+// composer handed a thousand-rune line is one that wraps and re-flows, which
+// is exactly what internal/send's verification then cannot read back. The
+// file the line points at holds the whole of it.
+const resolveQuestionRunes = 200
+
+// oneLine flattens text to a single line of at most n runes: every run of
+// whitespace, newlines included, collapses to one space, and a double quote
+// becomes a single one so the quoted question cannot close its own quotes.
+func oneLine(text string, n int) string {
+	text = strings.Join(strings.Fields(strings.ReplaceAll(text, "\"", "'")), " ")
+	r := []rune(text)
+	if len(r) <= n {
+		return text
+	}
+	return strings.TrimRight(string(r[:n]), " ") + "…"
 }

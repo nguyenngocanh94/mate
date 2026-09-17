@@ -44,10 +44,10 @@ func awaitingBox(n int) query.Field[query.BoxView] {
 		entries = append(entries, query.BoxEntry{
 			Seq: i, At: sessionTestClock(10, i), Kind: query.BoxStatus,
 			Crew: fmt.Sprintf("k%d", i+1), Source: "crew", Verb: "needs-decision",
-			Text: "does this fit?", Attention: true, Signal: query.BoxStatusSignal(fmt.Sprintf("/Users/dev/work/acme/.matev2/projects/payments-api/crews/k%d.status", i+1)),
+			Text: "does this fit?", Attention: true, Resolve: testResolveLine(fmt.Sprintf("k%d", i+1), "does this fit?"),
 		})
 	}
-	return query.KnownField(query.BoxView{Entries: entries, Crews: n, Awaiting: n})
+	return query.KnownField(query.BoxView{Entries: entries, Inbox: entries, Crews: n, Awaiting: n})
 }
 
 // TestNarrowMateDigestHeightIsReservedBeforeSizingThePTY is the s5 follow-up's
@@ -80,7 +80,7 @@ func TestNarrowMateDigestHeightIsReservedBeforeSizingThePTY(t *testing.T) {
 			m, _ = send(t, m, sessionStreamMetadataMsg{gen: m.sess.gen, snapshot: snap})
 
 			wantRows := StreamTranscriptCapacity(SessionTargetMate, 80, 24) -
-				sessionStreamReservedLines(snap, SessionTargetMate, 80)
+				sessionStreamReservedLines(snap, SessionTargetMate, 80, false)
 			bufRows := m.sess.terminal.Height()
 			if bufRows != wantRows {
 				t.Fatalf("PTY rows with %d box entries = %d, want %d", entries, bufRows, wantRows)
@@ -93,9 +93,9 @@ func TestNarrowMateDigestHeightIsReservedBeforeSizingThePTY(t *testing.T) {
 				t.Fatalf("entries=%d: CROP - %d of %d buffer rows drawn, frame starts at ROW%02d\n%s",
 					entries, count, bufRows, first, view)
 			}
-			want := "none needing attention"
+			want := "nothing to resolve"
 			if entries > 0 {
-				want = fmt.Sprintf("%d attention", entries)
+				want = fmt.Sprintf("%d to resolve", entries)
 			}
 			if !containsLine(view, want) {
 				t.Errorf("the digest does not report %q:\n%s", want, view)
@@ -113,14 +113,14 @@ func TestSessionDigestHeightMatchesWhatTheDigestDraws(t *testing.T) {
 	for n := 0; n <= 8; n++ {
 		box := awaitingBox(n)
 		got := len(sessionDigestLines(box, boxRail{sel: -1}, g, p, 78))
-		if want := sessionDigestHeight(box); got != want {
+		if want := sessionDigestHeight(boxList{field: box}); got != want {
 			t.Errorf("entries=%d: sessionDigestLines drew %d lines, sessionDigestHeight reserved %d", n, got, want)
 		}
 	}
 	// A box nobody could read reserves the same two lines it draws: the
 	// header, and the line that says the read failed.
 	unread := query.UnknownField[query.BoxView]("sent.log is unreadable")
-	if got, want := len(sessionDigestLines(unread, boxRail{sel: -1}, g, p, 78)), sessionDigestHeight(unread); got != want {
+	if got, want := len(sessionDigestLines(unread, boxRail{sel: -1}, g, p, 78)), sessionDigestHeight(boxList{field: unread}); got != want {
 		t.Errorf("unreadable box: drew %d lines, reserved %d", got, want)
 	}
 }

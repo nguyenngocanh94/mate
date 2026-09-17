@@ -36,7 +36,8 @@ func railRowOf(t *testing.T, m Model, i int) int {
 	t.Helper()
 	geo := m.sessionGeom()
 	for row := 0; row < geo.railBodyH; row++ {
-		if got, ok := sessionEntryAt(m.sess.snapshot.Box, m.sessionRailState().sel, geo.railBodyH, row); ok && got == i {
+		b, _ := m.sessionBoxList()
+		if got, ok := sessionEntryAt(b, m.sessionRailState().sel, geo.railBodyH, row, geo.railW); ok && got == i {
 			return geo.railBodyTop + row
 		}
 	}
@@ -92,7 +93,7 @@ func TestDoubleClickOnARailEntryOpensPeek(t *testing.T) {
 	m, _ := mouseBoxFixture(t)
 	action := &recordingAction{out: "pane text"}
 	m.action = action.run
-	row := railRowOf(t, m, 0) // the k3 working entry, which names a crew
+	row := railRowOf(t, m, 0) // the k3 needs-decision item, which names a crew
 
 	m, _ = send(t, m, press(2, row))
 	m, cmd := send(t, m, press(2, row))
@@ -349,12 +350,12 @@ func TestEachActionStripButtonRunsItsOwnAction(t *testing.T) {
 	for _, tc := range []struct {
 		id   labelID
 		want Action
-	}{{labelForward, ActionForward}, {labelPeek, ActionPeek}} {
+	}{{labelResolve, ActionResolve}, {labelPeek, ActionPeek}} {
 		t.Run(labelName(tc.id), func(t *testing.T) {
 			m, _ := mouseBoxFixture(t)
 			action := &recordingAction{out: "done"}
 			m.action = action.run
-			const attention = 2 // the needs-decision entry
+			const attention = 0 // the needs-decision item, first in the inbox
 			m.sess.zone, m.sess.boxSel = zoneBox, attention
 			row := railRowOf(t, m, attention)
 
@@ -364,7 +365,8 @@ func TestEachActionStripButtonRunsItsOwnAction(t *testing.T) {
 			if m.boxHover != attention {
 				t.Fatalf("hover = %d, want the entry under the pointer (%d)", m.boxHover, attention)
 			}
-			strip, ok := sessionEntryStrip(m.sess.snapshot.Box, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
+			inbox, _ := m.sessionBoxList()
+			strip, ok := sessionEntryStrip(inbox, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
 			if !ok {
 				t.Fatal("the hovered attention entry drew no action strip")
 			}
@@ -388,10 +390,11 @@ func TestEachActionStripButtonRunsItsOwnAction(t *testing.T) {
 // field rather than running an action.
 func TestTheReplyStripButtonOpensTheInput(t *testing.T) {
 	m, _ := mouseBoxFixture(t)
-	const attention = 2
+	const attention = 0
 	m.sess.zone, m.sess.boxSel, m.boxHover = zoneBox, attention, attention
 	row := railRowOf(t, m, attention)
-	strip, ok := sessionEntryStrip(m.sess.snapshot.Box, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
+	inbox, _ := m.sessionBoxList()
+	strip, ok := sessionEntryStrip(inbox, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
 	if !ok {
 		t.Fatal("the selected attention entry drew no action strip")
 	}
@@ -469,7 +472,7 @@ func TestClickOnTheProjectFrameBoxPanelFocusesAndSelectsIt(t *testing.T) {
 	if !ok {
 		t.Fatal("setup: the project frame draws no box panel at 120x36")
 	}
-	v, has := m.projectBox()
+	b, has := m.projectBox()
 	if !has {
 		t.Fatal("setup: the fixture project has no box entries")
 	}
@@ -477,7 +480,7 @@ func TestClickOnTheProjectFrameBoxPanelFocusesAndSelectsIt(t *testing.T) {
 	// row that certainly carries one is the oldest drawn, not the first.
 	row, want := -1, 0
 	for i := 0; i < h; i++ {
-		if got, drawn := sessionEntryAt(v, m.projectBoxSelection(), h, i); drawn {
+		if got, drawn := sessionEntryAt(b, m.projectBoxSelection(), h, i, m.w); drawn {
 			row, want = i, got
 			break
 		}
@@ -537,8 +540,10 @@ func labelName(id labelID) string {
 		return "restart"
 	case labelClear:
 		return "clear"
-	case labelForward:
-		return "forward"
+	case labelAll:
+		return "all"
+	case labelResolve:
+		return "resolve"
 	case labelReply:
 		return "reply"
 	case labelPeek:
