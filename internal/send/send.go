@@ -32,10 +32,24 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 )
 
-// Marker is the byte every line matev2 sends on its own initiative carries,
-// so a Mate can tell an app-generated digest from something its human typed
-// (docs/mvp.md sections 4 and 5).
-const Marker = "\x1f"
+// Marker is the sentinel every line matev2 sends on its own initiative
+// carries, so a Mate can tell an app-generated digest from something its
+// human typed (docs/mvp.md sections 4 and 5).
+//
+// This used to be the single control byte 0x1f. A task 15 live run found
+// that byte never reaching Claude's own UserPromptSubmit payload: it typed
+// into the pane fine (herdr's own `pane send-text` preserves it, proved
+// against a bare shell), but something between the terminal and Claude
+// Code's composer ate it before the model ever saw a prompt, so the hook
+// recorded the line as the user's own typing. Measured 2026-09-17 against
+// Herdr 0.8.2 and Claude Code 2.1.274 (internal/send's
+// TestLiveMarkerSurvivesToTheHook): the 0x1f byte was stripped every time;
+// this bracket sentinel and a plain "[matev2] " ASCII fallback both arrived
+// byte for byte. The bracket form was kept because U+27E6/U+27E7 are
+// mathematical bracket glyphs nobody types by hand, while still being
+// ordinary printable UTF-8 that survives typing, tmux and Claude's own
+// input handling.
+const Marker = "⟦matev2⟧ "
 
 // Sentinel reasons a send did not deliver. Each is wrapped in a coded
 // observability.Error, so callers may match with errors.Is and the CLI still
@@ -106,7 +120,7 @@ type Options struct {
 	// off by default because a queued line is not an answered line, and a
 	// caller that wants that has to say so.
 	QueueWhileBusy bool
-	// Marker prefixes the 0x1f from-app byte.
+	// Marker prefixes the from-app sentinel.
 	Marker bool
 	// Settle overrides the pause between typing and the first enter.
 	Settle time.Duration

@@ -97,7 +97,8 @@ Không có file box riêng.
 
 Gửi vào pane Mate là trường hợp đặc biệt vì người dùng cùng sở hữu composer.
 Chỉ gửi khi người dùng bấm (chế độ giám sát) hoặc khi chế độ tự động đang bật.
-Mọi dòng app tự gửi vào Mate có prefix byte `0x1f` để Mate phân biệt với người gõ.
+Mọi dòng app tự gửi vào Mate có prefix sentinel `⟦matev2⟧ ` để Mate phân biệt với người gõ.
+Byte điều khiển `0x1f` từng được dùng cho việc này nhưng không tới được payload `UserPromptSubmit` của Claude (đo ngày 2026-09-17, Herdr 0.8.2, Claude Code 2.1.274); sentinel in được thì sống sót nguyên vẹn.
 
 ## 5. Hai chế độ
 
@@ -105,12 +106,12 @@ Cờ là file `.matev2/projects/<p>/mate/.auto`.
 
 Chế độ giám sát (mặc định):
 
-- Không byte nào tự đi vào pane Mate.
-- Trên một dòng trong box: Enter gửi `\x1f signal: crews/<id>.status` vào Mate; `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
+- Không dòng nào tự đi vào pane Mate.
+- Trên một dòng trong box: Enter gửi `⟦matev2⟧ signal: <đường dẫn tuyệt đối tới status file>` vào Mate (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
 
 Chế độ tự động:
 
-- Daemon trong console gom tín hiệu đáng chú ý trong cửa sổ 90 giây thành một digest một dòng, gửi vào Mate có kiểm chứng với prefix `0x1f`.
+- Daemon trong console gom tín hiệu đáng chú ý trong cửa sổ 90 giây thành một digest một dòng, gửi vào Mate có kiểm chứng với prefix sentinel `⟦matev2⟧ `.
 - Mate thấy marker thì tự quyết theo policy trong AGENTS.md. Merge vẫn chờ người dùng trừ khi project bật `yolo`.
 - Hook `UserPromptSubmit` của Mate thấy prompt không có marker thì xoá `.auto`. Console thấy file mất thì dừng daemon.
 - Gửi thất bại quá lâu thì ghi flag wedged và hiện trong box.
