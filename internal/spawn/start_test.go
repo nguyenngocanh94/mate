@@ -48,8 +48,15 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("settings.json: %v", err)
 	}
-	if strings.TrimSpace(string(settings)) != "{}" {
-		t.Fatalf("settings.json = %q, want an empty object for task 08 to fill", settings)
+	wantSettings, err := spawn.ClaudeSettings(deps.Binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(settings) != string(wantSettings) {
+		t.Fatalf("settings.json = %s, want %s", settings, wantSettings)
+	}
+	if !strings.Contains(string(settings), "hook mate-prompt") || !strings.Contains(string(settings), "hook mate-stop") {
+		t.Fatalf("settings.json %s does not wire both hooks", settings)
 	}
 
 	meta := readMeta(t, w, "shop")

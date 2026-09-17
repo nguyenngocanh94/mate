@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/matev2' hook mate-stop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/matev2' hook mate-prompt",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
