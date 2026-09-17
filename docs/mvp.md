@@ -206,7 +206,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 | 14 | `internal/box`: gộp thành view, phân loại verb. | Unit trên fixture. Đã xong 2026-09-17. |
 | 15 | Box rail trong console: Enter, `r`, `p`. | Live vòng: crew hỏi, người dùng `r`, crew tiếp tục. Đã xong 2026-09-17. |
 | 16 | `matev2 crew stop` và teardown: xác nhận agent chết, xoá tab và worktree, giữ `crews/<id>/`. | Live test. Đã xong 2026-09-17. |
-| 17 | AGENTS.md: intake, ship/scout, brief, spawn, supervise. Skill `harness-adapters`, `stuck-crew-recovery`. | Acceptance: một yêu cầu đi đến `done:`. |
+| 17 | AGENTS.md: intake, ship/scout, brief, spawn, supervise. Skill `harness-adapters`, `stuck-crew-recovery`. | Acceptance: một yêu cầu đi đến `done:`. Đã xong 2026-09-17, evidence `docs/evidence/m2-acceptance-2026-09-17.md`. |
 
 ### M3. Chế độ tự động
 
