@@ -23,17 +23,19 @@ import (
 // TestLiveConsoleBoxRoundTrip is the mvp.md task 15 proof, and it is the
 // loop the task row asks for: a crew asks, the reader answers with `r`, the
 // crew continues, and the reader hands the result to the Mate with Enter.
+// TestLiveConsoleInboxResolve is the other half - the Mate answering a crew
+// on its own - and this one deliberately keeps the human in the loop.
 //
 //  1. a real Claude Mate and a real Codex crew
 //  2. the crew writes `needs-decision:` and stops its turn
 //  3. the box - the same query.BoxView the rail draws - shows that entry
 //  4. the reply action types "A" into the crew's own pane
 //  5. the crew continues and writes `done: chose A`
-//  6. the forward action hands `signal: <absolute status file path>` to the
-//     Mate
+//  6. the resolve action hands the `resolve:` line - the question, the
+//     status file and the `matev2 send` that answers the crew - to the Mate
 //  7. sent.log carries app -> mate, and the Mate's own Stop hook then
 //     records a mate line - which it only can after reading the file the
-//     signal pointed it at
+//     resolve line pointed it at
 //
 // Everything runs through the seams cmdConsole wires (consoleAction over the
 // real Herdr adapter). The Bubble Tea Program is not run - it needs a
@@ -136,13 +138,13 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	ask := waitForBoxEntry(t, ctx, w, 180*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "needs-decision"
 	})
-	t.Logf("box shows: %s %s %s (attention=%v, signal=%q)", e2s(ask), ask.Verb, ask.Text, ask.Attention, ask.Signal)
+	t.Logf("box shows: %s %s %s (attention=%v, resolve=%q)", e2s(ask), ask.Verb, ask.Text, ask.Attention, ask.Resolve)
 	if !ask.Attention {
 		t.Fatalf("a needs-decision entry is not marked attention: %+v", ask)
 	}
-	wantSignal := query.BoxStatusSignal(w.CrewStatus("shop", "k3"))
-	if ask.Signal != wantSignal {
-		t.Fatalf("signal = %q, want %q", ask.Signal, wantSignal)
+	wantResolve := query.BoxResolveLine("shop", "k3", ask.Text, w.CrewStatus("shop", "k3"))
+	if ask.Resolve != wantResolve {
+		t.Fatalf("resolve line = %q, want %q", ask.Resolve, wantResolve)
 	}
 
 	// 4. The `r` key's action: one line into the crew's own composer. The
@@ -174,15 +176,15 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	})
 	t.Logf("crew continued: %s %s", done.Verb, done.Text)
 
-	// 6. Enter on that entry: the signal line into the Mate's composer.
-	forwardOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionForward, Target: "shop", TargetKind: "project",
-		Crew: done.Crew, Input: done.Signal})
+	// 6. Enter on that entry: the resolve line into the Mate's composer.
+	resolveOut, err := action(ctx, console.ActionRequest{
+		Action: console.ActionResolve, Target: "shop", TargetKind: "project",
+		Crew: done.Crew, Input: done.Resolve})
 	if err != nil {
-		t.Fatalf("forward action: %v", err)
+		t.Fatalf("resolve action: %v", err)
 	}
-	t.Logf("forward action: %s", forwardOut)
-	assertSentLine(t, w, store.SourceApp, store.TargetMate, done.Signal)
+	t.Logf("resolve action: %s", resolveOut)
+	assertSentLine(t, w, store.SourceApp, store.TargetMate, done.Resolve)
 
 	// 7. The Mate answers. Its Stop hook (mvp.md task 08) appends a mate
 	// line to sent.log at the end of the turn, and the turn only started

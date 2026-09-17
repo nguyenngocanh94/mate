@@ -4,8 +4,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 // The Console's mouse. Every event is resolved against sessionGeometry
@@ -86,6 +84,8 @@ func (m Model) onSessionLabel(id labelID) (tea.Model, tea.Cmd) {
 		return m.endSession()
 	case labelMode:
 		return m.beginModeToggle(project)
+	case labelAll:
+		return m.toggleBoxAll(), nil
 	case labelRestart:
 		return m.beginRestartMate(project), nil
 	case labelClear:
@@ -108,17 +108,17 @@ func (m Model) onSessionLabel(id labelID) (tea.Model, tea.Cmd) {
 // on one of that entry's buttons runs it, and a second press on the same
 // entry opens the peek overlay.
 func (m Model) onSessionRailMouse(ev tea.MouseEvent, geo sessionGeom) (tea.Model, tea.Cmd) {
-	v, has := m.sessionBoxView()
+	b, has := m.sessionBoxList()
 	sel := m.sessionRailState().sel
 	switch ev.Button {
 	case tea.MouseButtonWheelUp:
-		return m.scrollBoxSelection(v, has, sel, -1), nil
+		return m.scrollBoxSelection(b, has, sel, -1), nil
 	case tea.MouseButtonWheelDown:
-		return m.scrollBoxSelection(v, has, sel, 1), nil
+		return m.scrollBoxSelection(b, has, sel, 1), nil
 	}
 	index, onEntry := -1, false
 	if has && geo.railBodyH > 0 {
-		index, onEntry = sessionEntryAt(v, sel, geo.railBodyH, ev.Y-geo.railBodyTop)
+		index, onEntry = sessionEntryAt(b, sel, geo.railBodyH, ev.Y-geo.railBodyTop, geo.railW)
 	}
 	if ev.Action == tea.MouseActionMotion {
 		m.boxHover = -1
@@ -134,18 +134,18 @@ func (m Model) onSessionRailMouse(ev tea.MouseEvent, geo sessionGeom) (tea.Model
 	if !onEntry {
 		return m, nil
 	}
-	if strip, ok := sessionEntryStrip(v, sel, m.boxHover, index, 0, ev.Y, geo.railW, m.g); ok {
-		for _, b := range strip {
-			if b.hit(ev.X, ev.Y) {
+	if strip, ok := sessionEntryStrip(b, sel, m.boxHover, index, 0, ev.Y, geo.railW, m.g); ok {
+		for _, button := range strip {
+			if button.hit(ev.X, ev.Y) {
 				m.sess.boxSel = index
-				return m.runBoxEntryAction(b.id, m.sess.target.ProjectID, v, index)
+				return m.runBoxEntryAction(button.id, m.sess.target.ProjectID, b, index)
 			}
 		}
 	}
 	double := m.isDoubleClick(clickSurfaceRail, index)
 	m.sess.boxSel, m.boxMsg = index, footerMsg{}
 	if double {
-		return m.beginBoxPeek(m.sess.target.ProjectID, v, index)
+		return m.beginBoxPeek(m.sess.target.ProjectID, b, index)
 	}
 	return m, nil
 }
@@ -192,7 +192,7 @@ func (m Model) dragRailTo(x int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	size := streamTerminalSize(m.sess.target.Kind, m.w, m.h,
-		sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w), m.railWidth)
+		sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w, m.boxAll), m.railWidth)
 	m.sess.terminal.Resize(size.Cols, size.Rows)
 	return m, sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, m.sess.gen)
 }
@@ -200,24 +200,24 @@ func (m Model) dragRailTo(x int) (tea.Model, tea.Cmd) {
 // scrollBoxSelection is what the wheel does over a box: move the cursor,
 // which is also what moves the pane's own scroll (boxSelectionTop derives
 // the offset from the selection). It does not change focus.
-func (m Model) scrollBoxSelection(v query.Field[query.BoxView], has bool, sel, delta int) Model {
+func (m Model) scrollBoxSelection(b boxList, has bool, sel, delta int) Model {
 	if !has {
 		return m
 	}
-	m.sess.boxSel = clampInt(sel+delta, 0, len(v.Value.Entries)-1)
+	m.sess.boxSel = clampInt(sel+delta, 0, len(b.rows())-1)
 	m.boxMsg = footerMsg{}
 	return m
 }
 
 // runBoxEntryAction is one action strip button.
-func (m Model) runBoxEntryAction(id labelID, project string, v query.Field[query.BoxView], index int) (tea.Model, tea.Cmd) {
+func (m Model) runBoxEntryAction(id labelID, project string, b boxList, index int) (tea.Model, tea.Cmd) {
 	switch id {
-	case labelForward:
-		return m.beginBoxForward(project, v, index)
+	case labelResolve:
+		return m.beginBoxResolve(project, b, index)
 	case labelReply:
-		return m.beginBoxReply(project, v, index), nil
+		return m.beginBoxReply(project, b, index), nil
 	case labelPeek:
-		return m.beginBoxPeek(project, v, index)
+		return m.beginBoxPeek(project, b, index)
 	}
 	return m, nil
 }
@@ -257,23 +257,23 @@ func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if !ok || ev.Y < top || ev.Y >= top+h {
 		return m, nil
 	}
-	v, has := m.projectBox()
+	b, has := m.projectBox()
 	sel := m.projectBoxSelection()
 	switch ev.Button {
 	case tea.MouseButtonWheelUp:
 		if has {
-			m.boxSel = clampInt(sel-1, 0, len(v.Value.Entries)-1)
+			m.boxSel = clampInt(sel-1, 0, len(b.rows())-1)
 		}
 		return m, nil
 	case tea.MouseButtonWheelDown:
 		if has {
-			m.boxSel = clampInt(sel+1, 0, len(v.Value.Entries)-1)
+			m.boxSel = clampInt(sel+1, 0, len(b.rows())-1)
 		}
 		return m, nil
 	}
 	index, onEntry := -1, false
 	if has {
-		index, onEntry = sessionEntryAt(v, sel, h, ev.Y-top)
+		index, onEntry = sessionEntryAt(b, sel, h, ev.Y-top, m.w)
 	}
 	if ev.Action == tea.MouseActionMotion {
 		m.boxHover = -1
@@ -289,18 +289,18 @@ func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if !onEntry {
 		return m, nil
 	}
-	if strip, ok := sessionEntryStrip(v, sel, m.boxHover, index, 0, ev.Y, m.w, m.g); ok {
-		for _, b := range strip {
-			if b.hit(ev.X, ev.Y) {
+	if strip, ok := sessionEntryStrip(b, sel, m.boxHover, index, 0, ev.Y, m.w, m.g); ok {
+		for _, button := range strip {
+			if button.hit(ev.X, ev.Y) {
 				m.boxSel = index
-				return m.runBoxEntryAction(b.id, m.currentProject().ProjectID, v, index)
+				return m.runBoxEntryAction(button.id, m.currentProject().ProjectID, b, index)
 			}
 		}
 	}
 	double := m.isDoubleClick(clickSurfacePanel, index)
 	m.boxSel, m.msg, m.boxMsg = index, footerMsg{}, footerMsg{}
 	if double {
-		return m.beginBoxPeek(m.currentProject().ProjectID, v, index)
+		return m.beginBoxPeek(m.currentProject().ProjectID, b, index)
 	}
 	return m, nil
 }

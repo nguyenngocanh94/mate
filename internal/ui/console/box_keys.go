@@ -8,14 +8,17 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-// The three box keys (mvp.md section 5, task 15) and the peek overlay.
+// The four box keys (mvp.md section 5, task 15) and the peek overlay.
 //
-//	Enter  hand the selected entry to the Mate - one verified line into its
-//	       composer, `signal: <absolute status file path>` or
-//	       `signal: incident ...`.
+//	Enter  resolve: hand the selected item to the Mate - one verified line
+//	       into its composer, naming the crew's question, the status file to
+//	       read and the `matev2 send` that answers the crew.
 //	r      reply to the crew directly, through the same send path
 //	       `matev2 send` uses, recorded in sent.log with Source: user.
 //	p      peek: the crew's own pane, 40 lines, in a scrollable overlay.
+//	a      toggle `[all]`: the whole merged log instead of the inbox. It is
+//	       a debugging view, off every time the Console starts - what the
+//	       rail is for is the things somebody still has to decide on.
 //	j/k    move the selection.
 //
 // They are bare everywhere, and they are live exactly while the box has
@@ -56,32 +59,33 @@ func boxOutcomeLine(msg footerMsg, g glyphSet, p palette, w int) *line {
 	return newLine().add(" "+prefix+msg.text, style).cut(w, g)
 }
 
-// sessionBoxView is the box the session rail is showing, and whether there
-// is one to act on at all.
-func (m Model) sessionBoxView() (query.Field[query.BoxView], bool) {
+// sessionBoxList is the box the session rail is showing - the inbox, or the
+// whole log while `[all]` is on - and whether there is a row to act on.
+func (m Model) sessionBoxList() (boxList, bool) {
 	if m.sess.target.Kind != SessionTargetMate {
-		return query.Field[query.BoxView]{}, false
+		return boxList{}, false
 	}
-	v := m.sess.snapshot.Box
-	return v, v.IsKnown() && len(v.Value.Entries) > 0
+	b := boxList{field: m.sess.snapshot.Box, all: m.boxAll}
+	return b, b.known() && len(b.rows()) > 0
 }
 
 // sessionRailState assembles what the renderer needs from the flow. The
 // selection is resolved here rather than stored resolved, so "follow the
 // newest" (-1) keeps following as a crew appends.
 func (m Model) sessionRailState() boxRail {
-	v, _ := m.sessionBoxView()
+	b, _ := m.sessionBoxList()
 	sel := m.sess.boxSel
 	if sel < 0 {
-		sel = boxDefaultSelection(v)
-	} else if v.IsKnown() {
-		sel = clampInt(sel, 0, len(v.Value.Entries)-1)
+		sel = boxDefaultSelection(b)
+	} else if n := len(b.rows()); n > 0 {
+		sel = clampInt(sel, 0, n-1)
 	}
 	hover := -1
 	if m.sess.zone == zoneBox {
 		hover = m.boxHover
 	}
 	return boxRail{
+		all:         m.boxAll,
 		sel:         sel,
 		hover:       hover,
 		zone:        m.sess.zone,
@@ -177,30 +181,47 @@ func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		model, cmd := m.onBoxReplyKey(msg)
 		return model, cmd, true
 	}
-	v, ok := m.sessionBoxView()
+	if msg.String() == "a" {
+		return m.toggleBoxAll(), nil, true
+	}
+	b, ok := m.sessionBoxList()
 	if !ok {
 		return m, nil, false
 	}
 	rail := m.sessionRailState()
+	n := len(b.rows())
 	switch msg.String() {
 	case "j", "down":
-		m.sess.boxSel = clampInt(rail.sel+1, 0, len(v.Value.Entries)-1)
+		m.sess.boxSel = clampInt(rail.sel+1, 0, n-1)
 		m.boxMsg = footerMsg{}
 		return m, nil, true
 	case "k", "up":
-		m.sess.boxSel = clampInt(rail.sel-1, 0, len(v.Value.Entries)-1)
+		m.sess.boxSel = clampInt(rail.sel-1, 0, n-1)
 		m.boxMsg = footerMsg{}
 		return m, nil, true
 	case "enter":
-		model, cmd := m.beginBoxForward(m.sess.target.ProjectID, v, rail.sel)
+		model, cmd := m.beginBoxResolve(m.sess.target.ProjectID, b, rail.sel)
 		return model, cmd, true
 	case "r":
-		return m.beginBoxReply(m.sess.target.ProjectID, v, rail.sel), nil, true
+		return m.beginBoxReply(m.sess.target.ProjectID, b, rail.sel), nil, true
 	case "p":
-		model, cmd := m.beginBoxPeek(m.sess.target.ProjectID, v, rail.sel)
+		model, cmd := m.beginBoxPeek(m.sess.target.ProjectID, b, rail.sel)
 		return model, cmd, true
 	}
 	return m, nil, false
+}
+
+// toggleBoxAll flips the `[all]` view, from the `a` key and from the header
+// label alike. It is Console state for the run and is never persisted: a
+// debugging view that survived a restart would quietly become the default
+// again. The selection resets to "follow the newest" because the two lists
+// have different lengths, and an index carried across them names a row the
+// reader was not looking at.
+func (m Model) toggleBoxAll() Model {
+	m.boxAll = !m.boxAll
+	m.sess.boxSel, m.boxSel = -1, -1
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
+	return m
 }
 
 // onBoxReplyKey is the one-line reply input. It is the same shape as the
@@ -242,31 +263,32 @@ func (m Model) cancelBoxReply() Model {
 	return m
 }
 
-// beginBoxForward is Enter: hand the selected entry to the Mate. A message
-// entry is not forwardable - the Mate either sent it or was sent it, so
-// handing it back says nothing - and the refusal says so rather than
-// silently doing nothing, which is indistinguishable from a lost keystroke.
-func (m Model) beginBoxForward(project string, v query.Field[query.BoxView], sel int) (Model, tea.Cmd) {
-	e, ok := boxSelectedEntry(v, sel)
+// beginBoxResolve is Enter: hand the selected item to the Mate and ask it to
+// answer the crew. A message entry holds no question - the Mate either sent
+// it or was sent it - and the refusal says so rather than silently doing
+// nothing, which is indistinguishable from a lost keystroke. Only `[all]`
+// can put such a row under the cursor; every row of the inbox is resolvable.
+func (m Model) beginBoxResolve(project string, b boxList, sel int) (Model, tea.Cmd) {
+	e, ok := boxSelectedEntry(b, sel)
 	if !ok {
 		return m, nil
 	}
-	if !e.Forwardable() {
-		m.boxMsg = errMsg("Send refused: a " + string(e.Kind) + " entry is not forwardable; only a crew status or an incident is " +
+	if !e.Resolvable() {
+		m.boxMsg = errMsg("Resolve refused: a " + string(e.Kind) + " entry holds no question; only a crew status or an incident does " +
 			m.g.Dot + " nothing was sent")
 		return m, nil
 	}
 	if m.actionBusy {
 		return m, nil
 	}
-	return m.runAction(boxForwardChoice(project, e))
+	return m.runAction(boxResolveChoice(project, e))
 }
 
 // beginBoxReply is `r`: open the one-line input. It refuses on an entry
 // with no crew (a message to the Mate's own pane) rather than opening an
 // input with nowhere to send.
-func (m Model) beginBoxReply(project string, v query.Field[query.BoxView], sel int) Model {
-	e, ok := boxSelectedEntry(v, sel)
+func (m Model) beginBoxReply(project string, b boxList, sel int) Model {
+	e, ok := boxSelectedEntry(b, sel)
 	if !ok {
 		return m
 	}
@@ -280,8 +302,8 @@ func (m Model) beginBoxReply(project string, v query.Field[query.BoxView], sel i
 }
 
 // beginBoxPeek is `p`: read the crew's own pane into the overlay.
-func (m Model) beginBoxPeek(project string, v query.Field[query.BoxView], sel int) (Model, tea.Cmd) {
-	e, ok := boxSelectedEntry(v, sel)
+func (m Model) beginBoxPeek(project string, b boxList, sel int) (Model, tea.Cmd) {
+	e, ok := boxSelectedEntry(b, sel)
 	if !ok {
 		return m, nil
 	}
@@ -299,13 +321,13 @@ func (m Model) beginBoxPeek(project string, v query.Field[query.BoxView], sel in
 // because none of them acts on the *selected row* of a frame: they act on a
 // box entry, which is a different selection entirely.
 
-func boxForwardChoice(project string, e query.BoxEntry) actionChoice {
+func boxResolveChoice(project string, e query.BoxEntry) actionChoice {
 	return actionChoice{
-		action: ActionForward, enabled: true,
-		desc: "Hand " + e.Crew + "'s " + e.Verb + " to the Mate",
+		action: ActionResolve, enabled: true,
+		desc: "Ask the Mate to resolve " + e.Crew + "'s " + e.Verb,
 		req: ActionRequest{
-			Action: ActionForward, Target: project, TargetKind: "project",
-			Crew: e.Crew, Input: e.Signal,
+			Action: ActionResolve, Target: project, TargetKind: "project",
+			Crew: e.Crew, Input: e.Resolve,
 		},
 	}
 }
@@ -405,25 +427,31 @@ func (m Model) onPeekKey(key string) Model {
 // either of them under the list would be exactly the trap the `n` key's own
 // note (seams.go's actionHints) refuses to lay.
 
-// projectBox is the box of the project frame the reader is on, and whether
-// there is one with entries in it.
-func (m Model) projectBox() (query.Field[query.BoxView], bool) {
+// projectBoxList is the box of the project frame the reader is on: the same
+// inbox the rail draws, through the same boxList, so the panel and the rail
+// can never disagree about what is waiting.
+func (m Model) projectBoxList() boxList {
 	if m.cur().kind != frameProject {
-		return query.Field[query.BoxView]{}, false
+		return boxList{all: m.boxAll}
 	}
-	v := m.currentProject().Box
-	return v, v.IsKnown() && len(v.Value.Entries) > 0
+	return boxList{field: m.currentProject().Box, all: m.boxAll}
+}
+
+// projectBox adds "and is there a row to act on".
+func (m Model) projectBox() (boxList, bool) {
+	b := m.projectBoxList()
+	return b, b.known() && len(b.rows()) > 0
 }
 
 // projectBoxSelection resolves the panel's selection the same way
 // sessionRailState resolves the rail's.
 func (m Model) projectBoxSelection() int {
-	v, _ := m.projectBox()
+	b := m.projectBoxList()
 	if m.boxSel < 0 {
-		return boxDefaultSelection(v)
+		return boxDefaultSelection(b)
 	}
-	if v.IsKnown() {
-		return clampInt(m.boxSel, 0, len(v.Value.Entries)-1)
+	if n := len(b.rows()); n > 0 {
+		return clampInt(m.boxSel, 0, n-1)
 	}
 	return m.boxSel
 }
@@ -434,30 +462,33 @@ func (m Model) onProjectBoxKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.onBoxReplyKey(msg)
 	}
 	project := m.currentProject().ProjectID
-	v, ok := m.projectBox()
+	b, ok := m.projectBox()
 	sel := m.projectBoxSelection()
 	switch msg.String() {
 	case "esc", "tab":
 		m.focus = paneList
 		m.msg = footerMsg{}
 		return m, nil
+	case "a":
+		return m.toggleBoxAll(), nil
 	}
 	if !ok {
 		return m, nil
 	}
+	n := len(b.rows())
 	switch msg.String() {
 	case "j", "down":
-		m.boxSel = clampInt(sel+1, 0, len(v.Value.Entries)-1)
+		m.boxSel = clampInt(sel+1, 0, n-1)
 		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	case "k", "up":
-		m.boxSel = clampInt(sel-1, 0, len(v.Value.Entries)-1)
+		m.boxSel = clampInt(sel-1, 0, n-1)
 		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	case "enter":
-		return m.beginBoxForward(project, v, sel)
+		return m.beginBoxResolve(project, b, sel)
 	case "r":
-		return m.beginBoxReply(project, v, sel), nil
+		return m.beginBoxReply(project, b, sel), nil
 	case "p":
-		return m.beginBoxPeek(project, v, sel)
+		return m.beginBoxPeek(project, b, sel)
 	}
 	return m, nil
 }

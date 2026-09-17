@@ -475,7 +475,12 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	}
 	m.actionAfterRead = &result
 	m.msg = result
-	return m, loadCmd(m.load)
+	// A box action changes exactly what the box shows: a resolve or a reply
+	// records a line to the crew, and rule 2 of the inbox then drops the item
+	// on the next read. Waiting for the ordinary one-second metadata tick
+	// would leave the answered item under the reader's cursor long enough for
+	// them to act on it twice, so the session's own box is re-read now.
+	return m, tea.Batch(loadCmd(m.load), m.sessionBoxRefreshCmd())
 }
 
 func (m Model) actionObjectDescription(c actionChoice) (string, string, string) {
@@ -830,7 +835,7 @@ func (m Model) recordedHarness() query.HarnessKind {
 // boxAction reports whether an action came from the message box rather than
 // the action menu.
 func boxAction(a Action) bool {
-	return a == ActionForward || a == ActionReply || a == ActionPeek ||
+	return a == ActionResolve || a == ActionReply || a == ActionPeek ||
 		a == ActionRestartMate || a == ActionClearComposer
 }
 
@@ -842,7 +847,7 @@ func boxAction(a Action) bool {
 // detail that tells a reader whether to retry or to go look at the pane.
 func boxOutcome(msg actionDoneMsg, g glyphSet) footerMsg {
 	verb := map[Action]string{
-		ActionForward: "Send", ActionReply: "Reply", ActionPeek: "Peek",
+		ActionResolve: "Resolve", ActionReply: "Reply", ActionPeek: "Peek",
 		ActionRestartMate: "Restart", ActionClearComposer: "Clear",
 	}[msg.choice.action]
 	if msg.err != nil {

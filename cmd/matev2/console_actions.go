@@ -60,8 +60,8 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return status.Line(), nil
 		case console.ActionMode:
 			return toggleModeAction(ws, req.Target)
-		case console.ActionForward:
-			return boxForwardAction(ctx, ws, deps, req)
+		case console.ActionResolve:
+			return boxResolveAction(ctx, ws, deps, req)
 		case console.ActionReply:
 			return boxReplyAction(ctx, ws, deps, req)
 		case console.ActionPeek:

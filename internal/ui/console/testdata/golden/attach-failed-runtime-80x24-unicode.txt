@@ -18,7 +18,7 @@
                                                                                 
                                                                                 
                                                                                 
- BOX  1 attention · 4 entries · 1 awaiting · 1 crew · last 14:02:00             
+ BOX  1 to resolve · 4 entries · 1 crew · last 14:02:00                         
 ────────────────────────────────────────────────────────────────────────────────
  ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) ·…
  ↑↓ Move  a Actions  e Details  Enter Attach crew  Esc Back  r Refresh  q Quit  

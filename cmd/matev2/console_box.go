@@ -32,32 +32,35 @@ import (
 // is the window the composer classifier already judges a screen from.
 const peekLines = 40
 
-// boxForwardAction is Enter: hand one box entry to the Mate.
+// boxResolveAction is Enter and the `[resolve]` button: hand one inbox item
+// to the Mate and ask it to answer the crew.
 //
-// Only the signal line goes in - `signal: <absolute status file path>`,
-// never the status text itself - so the Mate reads the file rather than
-// trusting a copy the console made (mvp.md section 5). The path is
-// absolute because the Mate's cwd is its own workspace directory, not the
-// project's, so a path relative to the project resolves to nothing there.
-// The line carries the from-app marker sentinel, which is what lets the
-// Mate tell an app-generated line from something its human typed, and what
-// the Mate's UserPromptSubmit hook checks before clearing `.auto`.
+// The line is query.BoxResolveLine's, built next to the merge that produced
+// the item: the crew's own question, the absolute path of the status file to
+// read, and the `matev2 send` that answers the crew. It replaces the old
+// bare `signal: <path>`, which said only "here is a file" and left the Mate
+// to infer that answering was its job. The path is absolute because the
+// Mate's cwd is its own workspace directory, not the project's, so a path
+// relative to the project resolves to nothing there. The line carries the
+// from-app marker sentinel, which is what lets the Mate tell an
+// app-generated line from something its human typed, and what the Mate's
+// UserPromptSubmit hook checks before clearing `.auto`.
 //
 // A refused send is returned as it came back. internal/send already names
 // which composer state it observed and quotes the screen it read that from,
 // and the console prints that verbatim on its outcome line: a reader
 // deciding whether to retry or to go look at the pane needs the observation,
 // not a reworded summary of it.
-func boxForwardAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
-	signal := strings.TrimSpace(req.Input)
-	if signal == "" {
-		return "", observability.NewError(observability.CodeUsage, "no signal line was built for this entry")
+func boxResolveAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	resolve := strings.TrimSpace(req.Input)
+	if resolve == "" {
+		return "", observability.NewError(observability.CodeUsage, "no resolve line was built for this entry")
 	}
 	handle, kind, err := spawn.MateHandle(ctx, ws, deps, req.Target)
 	if err != nil {
 		return "", err
 	}
-	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime}, handle, kind, signal, send.Options{Marker: true})
+	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime}, handle, kind, resolve, send.Options{Marker: true})
 	if err != nil {
 		return "", err
 	}
@@ -67,11 +70,12 @@ func boxForwardAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps,
 	if err := ws.AppendSent(req.Target, store.SentEntry{
 		Source: store.SourceApp,
 		Target: store.TargetMate,
-		Text:   signal,
+		Text:   resolve,
 	}); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s delivered to %s in %d enter(s)", signal, report.Agent, report.Presses), nil
+	return fmt.Sprintf("%s asked to decide in %d enter(s); the Mate answers the crew with matev2 send",
+		report.Agent, report.Presses), nil
 }
 
 // boxReplyAction is `r`: one line into the crew's own composer.

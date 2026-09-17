@@ -24,13 +24,13 @@
                                                                      │                  (2s) · r re-reads               
                                                                      │  ↓ 10 more                                       
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                            1 attention · 4 entries 
+ BOX                                                                                                       1 to resolve 
                                                                                                                         
                                                                                                                         
-   13:41  k3  working  reading the ticket                                                                               
-   13:52  user->mate  spawn a crew for the webhook fix                                                                  
- ! 14:01  k3  needs-decision  migration for idempotency_keys, or key off stripe_events?                                 
-▏  14:02  app->mate  signal: /Users/dev/work/acme/.matev2/projects/payments-api/crews/k3.status                         
+                                                                                                                        
+                                                                                                                        
+▏! 14:01  k3  needs-decision                                                                    [resolve] [reply] [peek]
+    migration for idempotency_keys, or key off stripe_events?                                                           
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ? 1 field unknown: worktree of crew 01J9P6Q6 (lookup timed out (2s))                                                   
  ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

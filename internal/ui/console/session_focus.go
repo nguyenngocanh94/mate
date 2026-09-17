@@ -44,11 +44,12 @@ func (z sessionZone) other() sessionZone {
 
 // railMinWidth and railMaxWidth bound the draggable splitter. Below 24 the
 // rail cannot hold a timestamp, a crew name and a verb on one line; above
-// 60 it is taking columns from the agent's own screen for no extra
-// information.
+// 72 it is taking columns from the agent's own screen for no extra
+// information - the rail's widest content is a wrapped crew question, and
+// past 72 cells that wraps no better, it just reflows.
 const (
 	railMinWidth = 24
-	railMaxWidth = 60
+	railMaxWidth = 72
 	// railMinPane is how much of the frame the PTY keeps whatever the
 	// splitter is dragged to: a terminal narrower than this is not a
 	// terminal any harness draws usefully.
@@ -86,9 +87,10 @@ const (
 	labelNone labelID = iota
 	labelProject
 	labelMode
+	labelAll
 	labelRestart
 	labelClear
-	labelForward
+	labelResolve
 	labelReply
 	labelPeek
 	labelSend
@@ -114,19 +116,30 @@ func (l placedLabel) hit(x, y int) bool {
 	return y == l.y && x >= l.x && x < l.x+cells(l.text)
 }
 
-// sessionHeaderLabels are the rail header's four affordances. They are
+// sessionHeaderLabels are the rail header's five affordances. They are
 // labels rather than key hints because every one of them is a recovery from
 // a state the reader is already unhappy in - the wrong view, the wrong
-// mode, a wedged Mate, a composer full of junk - and a recovery that needs
-// a remembered keystroke is one a reader will not find.
-func sessionHeaderLabels(mode query.Mode, g glyphSet) []labelSpec {
+// mode, the wrong list, a wedged Mate, a composer full of junk - and a
+// recovery that needs a remembered keystroke is one a reader will not find.
+//
+// The `[all]` label names the state it is in rather than the one it offers,
+// the way `[supervised]`/`[auto]` does: "[all on]" is the only way a reader
+// looking at a rail full of `working` lines can tell that they turned the
+// debugging view on rather than that the inbox filter broke. The words
+// carry it, not the colour, so a monochrome terminal says the same thing.
+func sessionHeaderLabels(mode query.Mode, all bool, g glyphSet) []labelSpec {
 	modeText := string(mode)
 	if modeText == "" {
 		modeText = "mode"
 	}
+	allText := "[all]"
+	if all {
+		allText = "[all on]"
+	}
 	return []labelSpec{
 		{labelProject, "[" + g.Back + " project]"},
 		{labelMode, "[" + modeText + "]"},
+		{labelAll, allText},
 		{labelRestart, "[restart mate]"},
 		{labelClear, "[clear composer]"},
 	}
@@ -163,7 +176,7 @@ func packLabels(specs []labelSpec, w int) [][]placedLabel {
 // crew that is waiting on them, as buttons rather than as remembered keys.
 func boxStripButtons(g glyphSet) []labelSpec {
 	return []labelSpec{
-		{labelForward, "[" + g.Arrow + " mate]"},
+		{labelResolve, "[resolve]"},
 		{labelReply, "[reply]"},
 		{labelPeek, "[peek]"},
 	}
@@ -301,7 +314,7 @@ func sessionGeometry(snapshot SessionSnapshot, rail boxRail, stream bool, w, h i
 		geo.railW, geo.splitX = railW, railW
 		geo.paneX, geo.paneW = railW+1, w-railW-1
 		geo.bodyH = max0(rest)
-		labelRows := packLabels(sessionHeaderLabels(snapshot.Target.Mode, g), railW)
+		labelRows := packLabels(sessionHeaderLabels(snapshot.Target.Mode, rail.all, g), railW)
 		for y, row := range labelRows {
 			for _, l := range row {
 				if l.x+cells(l.text) > railW {
@@ -323,7 +336,7 @@ func sessionGeometry(snapshot SessionSnapshot, rail boxRail, stream bool, w, h i
 		geo.railBodyH = max0(geo.bodyH - geo.railHdrH - geo.railFootH)
 		geo.labels = append(geo.labels, sessionFooterLabels(geo, rail)...)
 	case snapshot.Target.Kind == SessionTargetMate:
-		digest := sessionDigestHeight(snapshot.Box)
+		digest := sessionDigestHeight(boxList{field: snapshot.Box, all: rail.all})
 		geo.digestTop, geo.digestH = geo.bodyTop, digest
 		geo.bodyTop = 2 + digest + 1
 		geo.bodyH = max0(rest - digest - 1)
@@ -383,18 +396,18 @@ func rightAlignLabels(specs []labelSpec, x0, y, w int) []placedLabel {
 }
 
 // sessionEntryAt maps a body row of a box pane back to the entry drawn on
-// it. It mirrors boxBodyLines' own windowing - the same scroll offset, the
-// same top padding - rather than storing what was drawn, so a click
-// resolves against the frame the reader is actually looking at.
-func sessionEntryAt(v query.Field[query.BoxView], sel, h, row int) (int, bool) {
-	if h <= 0 || row < 0 || row >= h || !v.IsKnown() {
+// it. It mirrors boxBodyLines' own windowing - the same plan, the same
+// scroll offset, the same top padding - rather than storing what was drawn,
+// so a click resolves against the frame the reader is actually looking at.
+// A click on one of the wrapped question lines under the selected item
+// resolves to that item, because the block is one thing on screen and a
+// reader who clicks the words they are reading means the row they belong to.
+func sessionEntryAt(b boxList, sel, h, row, w int) (int, bool) {
+	if h <= 0 || row < 0 || row >= h || !b.known() || len(b.rows()) == 0 {
 		return 0, false
 	}
-	total := len(v.Value.Entries)
-	if total == 0 {
-		return 0, false
-	}
-	start, end := window(total, boxSelectionTop(total, sel, h), h)
+	plan := boxPlan(b, sel, w)
+	start, end := window(len(plan), boxPlanTop(plan, sel, h), h)
 	pad := h - (end - start)
 	if row < pad {
 		return 0, false
@@ -403,14 +416,14 @@ func sessionEntryAt(v query.Field[query.BoxView], sel, h, row int) (int, bool) {
 	if i >= end {
 		return 0, false
 	}
-	return i, true
+	return plan[i].index, true
 }
 
 // sessionEntryStrip is the action strip of the entry at one index, when
 // that entry has one: only an attention entry that is selected or hovered
 // grows buttons, which is the same condition boxEntryLine draws them under.
-func sessionEntryStrip(v query.Field[query.BoxView], sel, hover, index, x0, row, w int, g glyphSet) ([]placedLabel, bool) {
-	e, ok := boxSelectedEntry(v, index)
+func sessionEntryStrip(b boxList, sel, hover, index, x0, row, w int, g glyphSet) ([]placedLabel, bool) {
+	e, ok := boxSelectedEntry(b, index)
 	if !ok || !boxEntryHasStrip(e, index == sel, index == hover) {
 		return nil, false
 	}

@@ -1,10 +1,11 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [supervised] [all] [restart mate]        │                                                                 
+ [← project] [supervised] [all on] [restart mate]     │                                                                 
  [clear composer]                                     │                                                                 
  CREW › MATE                                          │                                                                 
- 2 to resolve                                         │                                                                 
+ all · 5 entries                                      │                                                                 
 ──────────────────────────────────────────────────────│                                                                 
+                                                      │                                                                 
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
@@ -26,11 +27,10 @@
                                                       │                                                                 
                                                       │⏺ 1 crew question still needs an answer. Oldest first: the       
                                                       │  rebase conflict on "Upgrade database adapter".                 
-▌! 14:01  k3  needs-decision  [resolve] [reply] [peek]│                                                                 
-    migration for idempotency_keys, or key off        │✻ Waiting for the completion report from crew-payments-api-2 (esc
-    stripe_events?                                    │╭───────────────────────────────────────────────────────────────╮
- ! 14:06  k9  blocked                                 ││ >                                                             │
-──────────────────────────────────────────────────────│╰───────────────────────────────────────────────────────────────╯
- reply k3 > A_                         [send] [cancel]│? for shortcuts                                ⏵⏵ accept edits on
- ! Send refused: composer holds unsubmitted text · nothing was sent                                                     
- REPLY  Enter send  Esc cancel                                                                                          
+   13:41  k3  working  reading the ticket             │                                                                 
+   13:52  user->mate  spawn a crew for the webhook fix│✻ Waiting for the completion report from crew-payments-api-2 (esc
+ ! 14:01  k3  needs-decision  migration for idempoten…│╭───────────────────────────────────────────────────────────────╮
+ ! 14:06  k9  blocked  the staging database refuses t…││ >                                                             │
+▌! 14:09  k2  done  PR ready… [resolve] [reply] [peek]│╰───────────────────────────────────────────────────────────────╯
+──────────────────────────────────────────────────────│? for shortcuts                                ⏵⏵ accept edits on
+ BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal     

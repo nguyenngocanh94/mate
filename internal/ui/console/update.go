@@ -14,7 +14,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = m.relayout()
 		if m.sess.stream != nil && m.sess.phase == sessionActive {
 			size := streamTerminalSize(m.sess.target.Kind, m.w, m.h,
-				sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w), m.railWidth)
+				sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w, m.boxAll), m.railWidth)
 			m.sess.terminal.Resize(size.Cols, size.Rows)
 			return m, sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, m.sess.gen)
 		}

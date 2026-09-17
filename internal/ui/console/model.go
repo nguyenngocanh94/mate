@@ -46,12 +46,13 @@ const (
 	// ActionRequest carries a Crew of its own: the entry names a crew, and
 	// the Project frame's selected row usually does not.
 	//
-	// ActionForward hands one entry to the Mate as a `signal:` line, typed
-	// into its composer with the from-app marker byte. ActionReply types one
-	// line into the crew's own composer. ActionPeek reads the crew's pane
-	// and returns it as text for the overlay - the only one of the three
-	// that writes nothing.
-	ActionForward Action = "forward"
+	// ActionResolve hands one inbox item to the Mate as a `resolve:` line,
+	// typed into its composer behind the from-app sentinel: the crew's
+	// question, the status file to read, and the `matev2 send` that answers
+	// the crew. ActionReply types one line into the crew's own composer.
+	// ActionPeek reads the crew's pane and returns it as text for the
+	// overlay - the only one of the three that writes nothing.
+	ActionResolve Action = "resolve"
 	ActionReply   Action = "reply"
 	ActionPeek    Action = "peek"
 	// The two recovery actions. They exist because a Mate is a live
@@ -297,6 +298,12 @@ type Model struct {
 	// boxSel is the project frame's own box-panel selection, the panel's
 	// counterpart to sessionFlow.boxSel; -1 follows the newest entry.
 	boxSel int
+	// boxAll is the `[all]` toggle: draw the whole merged log instead of the
+	// inbox, on every box surface at once. It is a debugging view, it lives
+	// for the Console's run only, and it defaults to off - the box exists to
+	// show what somebody still has to decide on, and a filter a reader has to
+	// re-apply on every start is a filter that is not the default.
+	boxAll bool
 	// The one-line reply input ('r'). It lives on the Model rather than in
 	// sessionFlow because both box surfaces open it, and because it is a
 	// Console-drawn field with a visible caret: while it is open every

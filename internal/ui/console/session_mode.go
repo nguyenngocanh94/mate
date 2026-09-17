@@ -216,7 +216,7 @@ func (m Model) beginSession(r row, target SessionTarget) (Model, tea.Cmd) {
 		openCtx, cancel := context.WithCancel(m.baseCtx())
 		m.sess.openCancel = cancel
 		m.msg = infoMsg("Opening live session view for " + sessionLabel(target) + m.g.Ellipsis)
-		return m, sessionStreamOpenCmd(openCtx, m.sessionStream, target, streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w), m.railWidth), gen)
+		return m, sessionStreamOpenCmd(openCtx, m.sessionStream, target, streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w, m.boxAll), m.railWidth), gen)
 	}
 	m.msg = infoMsg("Opening session view for " + sessionLabel(target) + m.g.Ellipsis)
 	return m, sessionReadCmd(m.baseCtx(), m.sessionReader, target, gen)
@@ -347,7 +347,7 @@ func (m Model) onSessionStreamOpened(msg sessionStreamOpenedMsg) (Model, tea.Cmd
 		return m.beginStreamFallback(msg.err)
 	}
 	target := m.sess.target
-	size := streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w), m.railWidth)
+	size := streamTerminalSize(target.Kind, m.w, m.h, sessionStreamReservedLines(m.sess.snapshot, target.Kind, m.w, m.boxAll), m.railWidth)
 	stream := newStreamSession(m.baseCtx(), msg.channel, size)
 	m.sess.stream = stream
 	if m.sess.openCancel != nil {
@@ -482,7 +482,7 @@ func (m Model) onSessionStreamMetadata(msg sessionStreamMetadataMsg) (Model, tea
 	if msg.gen != m.sess.gen || m.sess.phase != sessionActive || m.sess.stream == nil || m.sess.fallback {
 		return m, nil
 	}
-	previousReservedLines := sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w)
+	previousReservedLines := sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w, m.boxAll)
 	if msg.err != nil {
 		m.sess.snapshot.Runtime = SessionRuntime{Status: query.Unknown, Reason: sessionErrorReason(msg.err)}
 		return m, m.resizeStreamForReserve(previousReservedLines, msg.gen)
@@ -505,7 +505,7 @@ func (m Model) onSessionStreamMetadata(msg sessionStreamMetadataMsg) (Model, tea
 // is unchanged there is nothing to resize and no Cmd to issue beyond the next
 // metadata tick.
 func (m Model) resizeStreamForReserve(previousReservedLines, gen int) tea.Cmd {
-	currentReservedLines := sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w)
+	currentReservedLines := sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w, m.boxAll)
 	if currentReservedLines == previousReservedLines || m.sess.stream == nil {
 		return sessionStreamMetadataTickCmd(sessionMetadataInterval, gen)
 	}
@@ -513,6 +513,21 @@ func (m Model) resizeStreamForReserve(previousReservedLines, gen int) tea.Cmd {
 	m.sess.terminal.Resize(size.Cols, size.Rows)
 	return tea.Batch(sessionStreamMetadataTickCmd(sessionMetadataInterval, gen),
 		sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, gen))
+}
+
+// sessionBoxRefreshCmd re-reads the open session's metadata now, without
+// waiting for the next tick. A box action is the one thing that changes what
+// the box shows as a direct result of a keystroke - a resolve or a reply
+// records a line to the crew, and the inbox's rule 2 then drops the item -
+// and an answered question left under the reader's cursor for a whole tick
+// is a question they can answer twice. Nil when no session is streaming:
+// there is then no rail to refresh, and the project frame's own re-read
+// (loadCmd) already covers the panel.
+func (m Model) sessionBoxRefreshCmd() tea.Cmd {
+	if m.sess.phase != sessionActive || m.sess.stream == nil || m.sess.fallback || m.sessionMetadata == nil {
+		return nil
+	}
+	return sessionStreamMetadataCmd(m.baseCtx(), m.sessionMetadata, m.sess.target, m.sess.gen)
 }
 
 func (m Model) onSessionStreamMetadataTick(msg sessionStreamMetadataTickMsg) (Model, tea.Cmd) {
@@ -639,10 +654,10 @@ func streamTerminalSize(kind SessionTargetKind, w, h, reservedLines, railWidth i
 // both the PTY sizing at open and the resize decision on every metadata poll,
 // so the two can never disagree about how much chrome the reader is looking
 // at above the agent.
-func sessionStreamReservedLines(snapshot SessionSnapshot, kind SessionTargetKind, w int) int {
+func sessionStreamReservedLines(snapshot SessionSnapshot, kind SessionTargetKind, w int, all bool) int {
 	reserved := sessionBannerLineCount(snapshot, true)
 	if kind == SessionTargetMate && sessionRailWidth(kind, w) == 0 {
-		reserved += sessionDigestHeight(snapshot.Box)
+		reserved += sessionDigestHeight(boxList{field: snapshot.Box, all: all})
 	}
 	return reserved
 }

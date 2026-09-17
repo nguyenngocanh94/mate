@@ -144,9 +144,9 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	t.Logf("frame 1 - terminal focus:\n%s", terminalFrame)
 	assertFrameSays(t, terminalFrame, "TERMINAL", "every key goes to the agent", "F2")
 
-	// The attention entry is the row carrying the action strip: the rail cuts
-	// an entry's own words to fit the buttons, so matching on "needs-decision"
-	// would depend on the rail being wide enough to spell it out.
+	// The inbox item is the row carrying the action strip. It is matched on
+	// the strip rather than on the verb because the strip is what the click
+	// below is aimed at, and a row without one has no buttons to hit.
 	entryRow, ok := frameRowOf(terminalFrame, "[reply]")
 	if !ok {
 		t.Fatalf("no entry with an action strip in the console frame:\n%s", terminalFrame)
@@ -161,7 +161,12 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	selectEntry := fmt.Sprintf(`1200:@move:3,%d;300:@click:3,%d`, entryRow, entryRow)
 	selectedFrame := runPtysmoke(t, smoke, binary, root, enterSession+";"+selectEntry, 3*time.Second)
 	t.Logf("frame 2 - box focus, entry selected:\n%s", selectedFrame)
-	assertFrameSays(t, selectedFrame, "BOX", "[→ mate] [reply] [peek]", "F2 terminal")
+	assertFrameSays(t, selectedFrame, "BOX", "[resolve] [reply] [peek]", "F2 terminal")
+	// The selected item expands: its whole question is wrapped on the rows
+	// under it, which is what makes the inbox readable without a peek.
+	if !strings.Contains(selectedFrame, ask.Text) {
+		t.Fatalf("the selected item does not show its question %q:\n%s", ask.Text, selectedFrame)
+	}
 	if row, ok := frameRowOf(selectedFrame, "[reply]"); !ok || row != entryRow {
 		t.Fatalf("the action strip moved from row %d to %d between frames:\n%s", entryRow, row, selectedFrame)
 	}

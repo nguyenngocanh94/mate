@@ -24,8 +24,8 @@
                                                                      │                                                  
                                                                      │                                                  
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                 none needing attention · 0 entries 
- no crew has written a status line yet                                                                                  
+ BOX                                                                                                 nothing to resolve 
+ nothing to resolve                                                                                                     
                                                                                                                         
                                                                                                                         
                                                                                                                         
