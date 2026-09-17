@@ -30,6 +30,15 @@ const (
 	// DeliveryInstructionFile is Codex 0.151.0 cwd discovery of
 	// AGENTS.override.md (not tracked AGENTS.md).
 	DeliveryInstructionFile Delivery = "instruction_file"
+	// DeliveryCwdManual is "the harness already loads the manual from the
+	// directory it runs in, so no flag carries it". Claude Code reads
+	// `CLAUDE.md` in its cwd on its own, and matev2's Mate cwd holds a
+	// `CLAUDE.md` that is exactly `@AGENTS.md` (docs/mvp.md section 3), so
+	// also passing that same manual as --append-system-prompt-file put it in
+	// the model's context twice. A spec with this delivery carries no
+	// context path and no context flag: the caller asserts, with
+	// AgentSpec.ManualInCwd, that the cwd is doing the work.
+	DeliveryCwdManual Delivery = "cwd_manual"
 )
 
 const (

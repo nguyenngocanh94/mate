@@ -91,6 +91,11 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 	if !slices.Contains(argv, "--session-id") || !slices.Contains(argv, "11111111-2222-3333-4444-555555555555") {
 		t.Fatalf("argv %v carries no --session-id", argv)
 	}
+	// The manual reaches the Mate exactly once, through the CLAUDE.md its
+	// cwd already loads, so no context flag is passed (docs/mvp.md task 17).
+	if slices.Contains(argv, "--append-system-prompt-file") || slices.Contains(argv, "--append-system-prompt") {
+		t.Fatalf("argv %v carries a context flag; the cwd's CLAUDE.md already loads the manual", argv)
+	}
 	tab, ok := rt.Tabs[res.Pane]
 	if !ok {
 		t.Fatalf("pane %s is not a live tab", res.Pane)

@@ -227,6 +227,6 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 
 Nợ kỹ thuật đã biết:
 
-- `harness.Claude.BuildLaunchSpec` bắt buộc có `ContextPath`, nên `spawn` truyền chính `mate/AGENTS.md` qua `--append-system-prompt-file` trong khi `CLAUDE.md` cũng đã nạp nó từ cwd. Manual vào context hai lần. Với Codex, `spawn` ghi thêm `AGENTS.override.md`. Sửa ở task 17 bằng cách cho phép launch spec không có context file khi cwd đã có manual.
+- ~~`harness.Claude.BuildLaunchSpec` bắt buộc có `ContextPath`, nên `spawn` truyền chính `mate/AGENTS.md` qua `--append-system-prompt-file` trong khi `CLAUDE.md` cũng đã nạp nó từ cwd. Manual vào context hai lần.~~ Trả xong ở task 17: `AgentSpec.ManualInCwd` cho phép `ContextPath` rỗng, launch spec dùng `DeliveryCwdManual` và không truyền cờ context nào; `spawn` bật cờ đó cho Mate Claude. Với Codex thì không có nợ: Codex không tự nạp `CLAUDE.md` từ cwd, cơ chế nạp duy nhất của nó chính là file ở cwd, và nó ưu tiên `AGENTS.override.md` hơn `AGENTS.md`, nên manual vào context đúng một lần. `spawn` vẫn ghi `AGENTS.override.md` cho Mate Codex: đó là tên file Codex đọc, và giữ nguyên quy tắc "override che AGENTS.md tracked" mà crew worktree bắt buộc phải có.
 
 Sau MVP: token monitor gồm locator theo `session_id`, copy parser transcript v1, `usage.jsonl` và view, tín hiệu `budget`.
