@@ -5,14 +5,16 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
 // mvp.md task 09 step 3: the communication mode is on screen and there is a
 // key that flips it. These tests pin the three things that can silently go
 // wrong: the key reaching the ActionFunc with the Project it is looking at,
-// the stream-mode binding living behind the detach prefix (a bare 'm' would
-// be eaten by the agent's own terminal), and the header naming the mode.
+// the stream-mode binding living under box focus only (a bare 'm' belongs to
+// the agent's own terminal), and the header naming the mode.
 
 // hasModeHint reports whether the key line offers the mode toggle by name.
 // The description matters: mvp.md task 09 requires it to read "Mode" and
@@ -69,10 +71,10 @@ func TestTheModeKeyAsksTheActionFuncToFlipTheSelectedProject(t *testing.T) {
 	}
 }
 
-// TestStreamModeBindsTheModeKeyBehindTheDetachPrefix: stream mode hands
-// every unprefixed key to the agent, so 'm' alone must reach the PTY and
-// only "ctrl+b m" may flip the mode.
-func TestStreamModeBindsTheModeKeyBehindTheDetachPrefix(t *testing.T) {
+// TestStreamModeBindsTheModeKeyToBoxFocusOnly: with the terminal focused
+// every key reaches the agent, so a bare 'm' is a character the harness
+// receives; the mode key only exists once the box has focus.
+func TestStreamModeBindsTheModeKeyToBoxFocusOnly(t *testing.T) {
 	factory := &controllerTestFactory{}
 	m, channel := enterStreamMode(t, factory)
 	var got []ActionRequest
@@ -93,28 +95,28 @@ func TestStreamModeBindsTheModeKeyBehindTheDetachPrefix(t *testing.T) {
 		t.Fatalf("bare m wrote %q to the PTY, want \"m\"", writes[0])
 	}
 
-	prefixed, cmd := send(t, bare, key("ctrl+b"))
-	if cmd != nil || !prefixed.sess.awaitingDetach {
-		t.Fatal("ctrl+b did not arm the prefix")
+	focused, cmd := send(t, bare, tea.KeyMsg{Type: tea.KeyF2})
+	if cmd != nil || focused.sess.zone != zoneBox {
+		t.Fatal("F2 did not move focus to the box")
 	}
-	prefixed, cmd = send(t, prefixed, key("m"))
+	focused, cmd = send(t, focused, key("m"))
 	if cmd == nil {
-		t.Fatal("ctrl+b m produced no command")
+		t.Fatal("m under box focus produced no command")
 	}
-	if prefixed.sess.phase != sessionActive {
-		t.Fatalf("ctrl+b m left stream mode (phase %v); only ctrl+b q does", prefixed.sess.phase)
+	if focused.sess.phase != sessionActive {
+		t.Fatalf("m under box focus left stream mode (phase %v); only Esc does", focused.sess.phase)
 	}
-	prefixed, _ = send(t, prefixed, cmd())
+	focused, _ = send(t, focused, cmd())
 	if len(got) != 1 || got[0].Action != ActionMode {
-		t.Fatalf("ctrl+b m requests = %+v, want one mode request", got)
+		t.Fatalf("m under box focus requests = %+v, want one mode request", got)
 	}
 	if got[0].Target != m.sess.target.ProjectID {
 		t.Fatalf("mode target = %q, want the streamed session's Project %q", got[0].Target, m.sess.target.ProjectID)
 	}
 	if len(channel.writtenBytes()) != 1 {
-		t.Fatalf("ctrl+b m forwarded bytes to the PTY: %q", channel.writtenBytes())
+		t.Fatalf("m under box focus forwarded bytes to the PTY: %q", channel.writtenBytes())
 	}
-	_ = prefixed
+	_ = focused
 }
 
 // TestTheSessionHeaderNamesTheCommunicationMode: the header is where a

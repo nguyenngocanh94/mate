@@ -1,48 +1,48 @@
  claude-code · mate-payments-api · supervised                                                                                                                   
-──────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- CREW › MATE                              │                                                                                                                     
- 1 attention · 3 entries                  │                                                                                                                     
-──────────────────────────────────────────│                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │                                                                                                                     
-                                          │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. Reading its report before reviewing  
-                                          │  attempt 2.                                                                                                         
-                                          │                                                                                                                     
-                                          │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                                                       
-                                          │  ⎟  Read 84 lines (ctrl+o to expand)                                                                                
-                                          │                                                                                                                     
-                                          │⏺ Reply(a1 · Upgrade database adapter)                                                                               
-                                          │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."                                        
-                                          │                                                                                                                     
-                                          │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on "Upgrade database adapter".            
-   13:41  k3  working  reading the ticket │                                                                                                                     
-   13:52  user->mate  spawn a crew for th…│✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)                                      
- ! 14:01  k3  needs-decision  migration f…│╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-──────────────────────────────────────────││ >                                                                                                                 │
- Enter send  r reply  p peek              │╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- j/k move  Esc detach                     │? for shortcuts                                                                                    ⏵⏵ accept edits on
+──────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ [← project] [mode] [restart mate]                │                                                                                                             
+ [clear composer]                                 │                                                                                                             
+ CREW › MATE                                      │                                                                                                             
+ 1 attention · 3 entries                          │                                                                                                             
+──────────────────────────────────────────────────│                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │                                                                                                             
+                                                  │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. Reading its report before    
+                                                  │  reviewing attempt 2.                                                                                       
+                                                  │                                                                                                             
+                                                  │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                                               
+                                                  │  ⎟  Read 84 lines (ctrl+o to expand)                                                                        
+                                                  │                                                                                                             
+                                                  │⏺ Reply(a1 · Upgrade database adapter)                                                                       
+                                                  │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."                                
+                                                  │                                                                                                             
+                                                  │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on "Upgrade database adapter".    
+                                                  │                                                                                                             
+                                                  │✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)                              
+   13:41  k3  working  reading the ticket         │╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+   13:52  user->mate  spawn a crew for the webhoo…││ >                                                                                                         │
+ ! 14:01  k3  needs-decision  migration for idemp…│╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+──────────────────────────────────────────────────│? for shortcuts                                                                            ⏵⏵ accept edits on
+ TERMINAL  every key goes to the agent  ·  F2 box                                                                                                               

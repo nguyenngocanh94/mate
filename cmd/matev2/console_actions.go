@@ -66,6 +66,10 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return boxReplyAction(ctx, ws, deps, req)
 		case console.ActionPeek:
 			return boxPeekAction(ctx, ws, deps, req)
+		case console.ActionRestartMate:
+			return restartMateAction(ctx, ws, deps, req)
+		case console.ActionClearComposer:
+			return clearComposerAction(ctx, ws, deps, req)
 		default:
 			return "", observability.NewError(observability.CodeUsage,
 				fmt.Sprintf("%s is not wired in this build", req.Action))

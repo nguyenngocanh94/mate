@@ -13,7 +13,6 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
-                                                                                                                        
 ⏺ Making the Stripe webhook handler replay-safe: an idempotency-key store keyed by event id, plus tests for a duplicate 
   delivery.                                                                                                             
                                                                                                                         
@@ -34,3 +33,4 @@
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ? for shortcuts                                                                                       ⏵⏵ accept edits on
+ TERMINAL  every key goes to the agent  ·  F2 console                                                                   

@@ -20,6 +20,7 @@ type controllerTestChannel struct {
 	readDone chan struct{}
 	writes   [][]byte
 	writeErr error
+	resizes  []TerminalSize
 }
 
 func (c *controllerTestChannel) Read(ctx context.Context) ([]byte, error) {
@@ -55,7 +56,18 @@ func (c *controllerTestChannel) writtenBytes() [][]byte {
 	return out
 }
 
-func (c *controllerTestChannel) Resize(context.Context, TerminalSize) error { return nil }
+func (c *controllerTestChannel) Resize(_ context.Context, size TerminalSize) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resizes = append(c.resizes, size)
+	return nil
+}
+
+func (c *controllerTestChannel) resizedTo() []TerminalSize {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]TerminalSize(nil), c.resizes...)
+}
 
 func (c *controllerTestChannel) Close(context.Context) error {
 	c.mu.Lock()
@@ -216,12 +228,11 @@ func TestStaleStreamReadCannotRenderAfterReentry(t *testing.T) {
 	m, cmd = send(t, m, cmd())
 	staleRead := cmd
 	oldGeneration := m.sess.gen
-	// ADR 0026 step 6: Esc is forwarded to the agent in stream mode, not the
-	// detach key (session-view-contract.md, "Esc semantics invert") - this
-	// fixture must leave through the stream's own detach, Ctrl+b then q, the
-	// same way a real reader would.
-	m, cmd = send(t, m, key("ctrl+b"))
-	m, closeCmd := send(t, m, key("q"))
+	// Esc is forwarded to the agent while the terminal zone has focus
+	// (session-view-contract.md, "Esc semantics invert"), so this fixture
+	// leaves the way a real reader does: F2 to the box, then Esc.
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	m, closeCmd := send(t, m, key("esc"))
 	if closeCmd != nil {
 		m, _ = send(t, m, closeCmd())
 	}

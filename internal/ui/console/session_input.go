@@ -12,8 +12,10 @@ import (
 // sequence a real terminal would have sent for it, so onSessionStreamKey/
 // onSessionStreamMouse (session_mode.go) can write it straight to the
 // SessionChannel. It never decides whether a key reaches the agent at all -
-// that policy (the Ctrl+b detach prefix, the sole Ctrl+b q exception) stays
-// in session_mode.go, which is the only caller.
+// that policy is the focus model (session_focus.go), applied in
+// session_mode.go's onSessionZoneKey, which is the only caller: with the
+// terminal zone focused every key is encoded here, and with the box zone
+// focused nothing is.
 //
 // The control-key encoding below relies on a real, load-bearing fact about
 // bubbletea's own KeyType values: every control key's KeyType constant (see

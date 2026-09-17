@@ -392,38 +392,41 @@ func TestEscLeavesSessionModeAndCallsSessionClose(t *testing.T) {
 	}
 }
 
-func TestCtrlBThenQLeavesSessionModeWithoutStoppingTheAgent(t *testing.T) {
+// TestEscFromBoxFocusLeavesSessionModeWithoutStoppingTheAgent is the detach
+// the Ctrl+b prefix used to carry: with the box focused, Esc is the way back
+// to the project frame. Leaving is never a stop.
+func TestEscFromBoxFocusLeavesSessionModeWithoutStoppingTheAgent(t *testing.T) {
 	ctrl := &recordingSessionController{snap: SessionSnapshot{Runtime: SessionRuntime{Status: query.Known}}}
 	m := sessionFixture(t, ctrl)
 	m, cmd := send(t, m, key("enter"))
 	m, _ = send(t, m, cmd().(sessionSnapshotMsg))
 
-	m, _ = send(t, m, key("ctrl+b"))
-	if !m.sess.awaitingDetach {
-		t.Fatalf("ctrl+b did not arm the detach sequence")
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
+	if m.sess.zone != zoneBox {
+		t.Fatalf("F2 did not focus the box (zone %v)", m.sess.zone)
 	}
-	m, _ = send(t, m, key("q"))
+	m, _ = send(t, m, key("esc"))
 	if m.sess.phase == sessionActive {
-		t.Fatalf("ctrl+b q did not leave session mode")
+		t.Fatalf("Esc under box focus did not leave session mode")
 	}
-	// Leaving session mode must never itself be a stop: nothing about this
-	// path calls PromptAgent/StopAgent, only SessionClose (checked above,
-	// separately, for Esc).
 }
 
-func TestCtrlBFollowedByAnyOtherKeyStaysInSessionModeAndIsNotForwarded(t *testing.T) {
+// TestAKeyTheBoxDoesNotBindIsSwallowedUnderBoxFocus: nothing reaches the
+// composer or the PTY while the box has focus, so an unbound key changes
+// nothing rather than landing somewhere the reader cannot see.
+func TestAKeyTheBoxDoesNotBindIsSwallowedUnderBoxFocus(t *testing.T) {
 	ctrl := &recordingSessionController{snap: SessionSnapshot{Runtime: SessionRuntime{Status: query.Known}}}
 	m := sessionFixture(t, ctrl)
 	m, cmd := send(t, m, key("enter"))
 	m, _ = send(t, m, cmd().(sessionSnapshotMsg))
 
-	m, _ = send(t, m, key("ctrl+b"))
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
 	m, _ = send(t, m, key("x"))
 	if m.sess.phase != sessionActive {
-		t.Fatalf("ctrl+b followed by a key other than q must not leave session mode")
+		t.Fatalf("an unbound key under box focus left session mode")
 	}
 	if m.sess.composer != "" {
-		t.Fatalf("composer = %q, want empty: ctrl+b's follow-up key must not be forwarded as composer input", m.sess.composer)
+		t.Fatalf("composer = %q, want empty: a key under box focus never reaches the composer", m.sess.composer)
 	}
 }
 

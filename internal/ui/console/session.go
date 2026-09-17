@@ -254,7 +254,7 @@ type SessionReader func(context.Context, SessionTarget) (SessionSnapshot, error)
 type SessionPrompt func(context.Context, SessionTarget, string) error
 
 // SessionClose releases whatever the snapshot controller holds open for a
-// target once session mode is left (Esc / Ctrl+b q). Stream mode closes its
+// target once session mode is left (Esc under box focus). Stream mode closes its
 // raw channel through SessionChannel and uses this only for compatibility
 // with the existing snapshot path.
 type SessionClose func(context.Context, SessionTarget) error

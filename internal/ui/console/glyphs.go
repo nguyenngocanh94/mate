@@ -25,6 +25,8 @@ type glyphSet struct {
 	Down     string // "n more below" indicator
 	UpDown   string // the key-line name for the movement keys
 	Dot      string // inline separator between items
+	Back     string // the "leave this view" arrow on a clickable label
+	Arrow    string // the "hand this to" arrow on a clickable label
 
 	// Transcript glyphs. The Console does not draw a transcript itself
 	// (that surface belongs to the harness after attach), but the set
@@ -51,6 +53,8 @@ var unicodeGlyphs = glyphSet{
 	Down:      "↓",
 	UpDown:    "↑↓",
 	Dot:       "·",
+	Back:      "←",
+	Arrow:     "→",
 	Bullet:    "⏺",
 	Elbow:     "⎟",
 	Spark:     "✻",
@@ -75,6 +79,8 @@ var asciiGlyphs = glyphSet{
 	Down:      "v",
 	UpDown:    "j/k",
 	Dot:       ".",
+	Back:      "<-",
+	Arrow:     "->",
 	Bullet:    "*",
 	Elbow:     "\\_",
 	Spark:     "*",

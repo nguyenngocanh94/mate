@@ -1,7 +1,6 @@
  claude-code · crew-payments-api-2 · .worktrees/crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 
                                                                                 
                                                                                 
-                                                                                
 ⏺ Making the Stripe webhook handler replay-safe: an idempotency-key store keyed 
   by event id, plus tests for a duplicate delivery.                             
                                                                                 
@@ -22,3 +21,4 @@
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ? for shortcuts                                               ⏵⏵ accept edits on
+ TERMINAL  every key goes to the agent  ·  F2 console                           

@@ -32,7 +32,11 @@ import (
 // alone) and the "!" is the attention signal, for the same reason - a
 // golden fixture is rendered with plainPalette, so a state carried only by
 // amber would be invisible to a reader with a monochrome terminal.
-func boxEntryLine(e query.BoxEntry, selected, focused bool, g glyphSet, p palette, w int) *line {
+// An attention entry grows a trailing action strip - "[→ mate] [reply]
+// [peek]" - while it is selected or while the pointer is over it, so the
+// three things a reader does with a waiting crew are on screen as buttons
+// rather than as keys they have to remember (session_focus.go).
+func boxEntryLine(e query.BoxEntry, selected, hovered, focused bool, g glyphSet, p palette, w int) *line {
 	l := selectRow(newLine(), selected, p)
 	l.addSpan(markerSpan(selected, focused, g, p))
 	if e.Attention {
@@ -41,7 +45,22 @@ func boxEntryLine(e query.BoxEntry, selected, focused bool, g glyphSet, p palett
 		l.add(" ", p.Dim)
 	}
 	l.add(" ", p.Dim)
-	l.add(truncateEnd(boxEntryText(e, g), max0(w-3), g), boxEntryStyle(e, p))
+	strip := boxEntryHasStrip(e, selected, hovered) && boxStripFits(w, g)
+	textW := max0(w - boxEntryLead)
+	if strip {
+		textW = max0(w - boxEntryLead - boxStripWidth(g))
+	}
+	text := truncateEnd(boxEntryText(e, g), textW, g)
+	l.add(text, boxEntryStyle(e, p))
+	if strip {
+		l.add(strings.Repeat(" ", max0(textW-cells(text))+1), p.Dim)
+		for i, b := range boxStripButtons(g) {
+			if i > 0 {
+				l.add(" ", p.Dim)
+			}
+			l.add(b.text, p.Acc)
+		}
+	}
 	return l
 }
 
@@ -140,7 +159,7 @@ func boxDigestLine(v query.Field[query.BoxView], g glyphSet, p palette) *line {
 // caller: it is a pure function of the selection and the pane height, and a
 // stored offset would be one more thing to reconcile every time the window
 // resized or a crew appended a line.
-func boxBodyLines(v query.Field[query.BoxView], sel int, focused bool, g glyphSet, p palette, w, h int) []*line {
+func boxBodyLines(v query.Field[query.BoxView], sel, hover int, focused bool, g glyphSet, p palette, w, h int) []*line {
 	if h <= 0 {
 		return nil
 	}
@@ -154,7 +173,7 @@ func boxBodyLines(v query.Field[query.BoxView], sel int, focused bool, g glyphSe
 	start, end := window(len(entries), boxSelectionTop(len(entries), sel, h), h)
 	out := make([]*line, 0, h)
 	for i := start; i < end; i++ {
-		out = append(out, boxEntryLine(entries[i], i == sel, focused, g, p, w))
+		out = append(out, boxEntryLine(entries[i], i == sel, i == hover, focused, g, p, w))
 	}
 	// Pad at the top, not the bottom: a box with fewer entries than rows
 	// still reads newest-last if its lines sit on the bottom edge.
@@ -249,7 +268,11 @@ func (m Model) boxPanelLines(l frameLayout, h int) []*line {
 		l.Cols, m.g,
 	)
 	out := []*line{newLine().add(strings.Repeat(m.g.HRule, l.Cols), m.p.Faint), head}
-	out = append(out, boxBodyLines(v, m.projectBoxSelection(), focused, m.g, m.p, l.Cols, max0(h-len(out)))...)
+	hover := -1
+	if focused {
+		hover = m.boxHover
+	}
+	out = append(out, boxBodyLines(v, m.projectBoxSelection(), hover, focused, m.g, m.p, l.Cols, max0(h-len(out)))...)
 	return fitLines(out, h)
 }
 

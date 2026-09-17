@@ -830,7 +830,8 @@ func (m Model) recordedHarness() query.HarnessKind {
 // boxAction reports whether an action came from the message box rather than
 // the action menu.
 func boxAction(a Action) bool {
-	return a == ActionForward || a == ActionReply || a == ActionPeek
+	return a == ActionForward || a == ActionReply || a == ActionPeek ||
+		a == ActionRestartMate || a == ActionClearComposer
 }
 
 // boxOutcome is the one line a box action leaves on the outcome line. A
@@ -840,9 +841,16 @@ func boxAction(a Action) bool {
 // screen it read that from, and rewording it here would drop exactly the
 // detail that tells a reader whether to retry or to go look at the pane.
 func boxOutcome(msg actionDoneMsg, g glyphSet) footerMsg {
-	verb := map[Action]string{ActionForward: "Send", ActionReply: "Reply", ActionPeek: "Peek"}[msg.choice.action]
+	verb := map[Action]string{
+		ActionForward: "Send", ActionReply: "Reply", ActionPeek: "Peek",
+		ActionRestartMate: "Restart", ActionClearComposer: "Clear",
+	}[msg.choice.action]
 	if msg.err != nil {
-		return errMsg(verb + " refused: " + msg.err.Error() + " " + g.Dot + " nothing was sent")
+		tail := " nothing was sent"
+		if msg.choice.action == ActionRestartMate || msg.choice.action == ActionClearComposer {
+			tail = " nothing was changed"
+		}
+		return errMsg(verb + " refused: " + msg.err.Error() + " " + g.Dot + tail)
 	}
 	text := msg.text
 	if text == "" {
