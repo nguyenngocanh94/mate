@@ -1,0 +1,12 @@
+erics@Ericss-Mac-mini claude % claude
+ ▐▛███▛█   Claude Code v2.1.274
+▝▜██████▀  Sonnet 5 with medium effort · Claude Team
+  ▝▝ ▝▝    /private/tmp/matev2-12-cap/claude
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯ half typed
+─────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with C…
+  Sonnet 5 · medium | tok 0 in / 0 out | ctx n/a
+  ⏵⏵ auto mode on (shift+tab to cycle)

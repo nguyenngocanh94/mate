@@ -1,0 +1,40 @@
+  1. Validate inputs.
+  2. Set safe execution behavior where appropriate.
+  3. Call focused tools.
+  4. Check failures explicitly.
+  5. Keep data handling simple.
+  6. Quote values carefully.
+  7. Leave complicated logic to a more suitable language.
+
+  This is less glamorous than treating shell scripting as a clever puzzle, but it reflects
+  decades of hard-earned Unix experience.
+
+  ## Conclusion
+
+  The history of Unix shells is the history of an interface becoming a language, then becoming
+  a culture. The Thompson shell established command execution and redirection. Pipes turned
+  separate utilities into a composable system. The Bourne shell made shell scripting a durable
+  programming practice. C shell prioritized interactive convenience. KornShell sought a
+  synthesis. POSIX defined a portable common ground. Bash brought a powerful free shell to GNU
+  and Linux systems. Zsh and Fish reimagined what an interactive command line could feel like.
+
+  All of these shells share a central Unix insight: useful software does not need to be
+  monolithic. Small programs can be connected, redirected, and orchestrated into larger
+  workflows. The shell is the place where that composition becomes immediate and human-
+  readable.
+
+  Its syntax can be quirky, its historical baggage is real, and its limitations are well
+  known. But a Unix shell remains one of computing’s most durable ideas: a compact language
+  for telling a machine how existing tools should work together.
+
+
+  Select Model and Effort
+  Access legacy models by running codex -m <model_name> or in your config.toml
+
+  1. gpt-5.6-sol (default)    Reliable agentic workhorse for everyday tasks.
+› 2. gpt-5.6-terra (current)  Balanced agentic coding model for everyday work.
+  3. gpt-5.6-luna             Fast and affordable agentic coding model.
+  4. gpt-6-astra              Our most capable model for complex, demanding work.
+  5. gpt-5.5                  Proven previous-generation model for coding and general work.
+
+  Press enter to confirm or esc to go back
