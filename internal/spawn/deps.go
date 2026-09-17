@@ -77,9 +77,14 @@ type Deps struct {
 	NewSessionID func() string
 }
 
-// LiveDeps is what the CLI uses: the real Herdr adapter over os/exec.
+// LiveDeps is what the CLI uses: the real Herdr adapter over os/exec. The
+// name registry is shared with the adapter, which re-reserves the name at
+// start; without one StartAgent refuses outright.
 func LiveDeps() Deps {
-	return Deps{Runtime: runtime.NewHerdr(process.ExecRunner{})}
+	names := runtime.NewMemoryNameRegistry()
+	rt := runtime.NewHerdr(process.ExecRunner{})
+	rt.Names = names
+	return Deps{Runtime: rt, Names: names}
 }
 
 func (d Deps) names() runtime.LiveNameRegistry {
