@@ -70,7 +70,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
 Quy ước:
 
 - Repo nằm ngang hàng với `.matev2/`, không bắt buộc nằm trong thư mục con nào.
-- Worktree gom ở `.worktrees/<project>-<crew>/`. Trust dialog của harness thừa kế từ repo chính nên crew không bị hỏi.
+- Worktree gom ở `.worktrees/<project>-<crew>/`. Codex vẫn hỏi trust cho worktree mới (đo 2026-09-17), nên spawn luôn chạy settle step.
 - `.meta` là `key=value` mỗi dòng một khoá. `.status` là text thuần `state: một dòng`.
 - Xoá `.matev2/` là xoá toàn bộ state của app. `crews/<id>/` giữ mãi sau teardown, chỉ người dùng xoá tay.
 - Mọi đường dẫn ghi ra phải nằm trong workspace; symlink trỏ ra ngoài bị từ chối.
@@ -131,7 +131,9 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 
 ## 7. Bài học v1 phải giữ
 
-- Trust dialog: Claude highlight mặc định là "No, exit"; gửi Enter mù là chết agent. Nhận diện dialog theo shape, một phím một lần, đọc lại giữa các lần. Worktree liên kết thừa kế trust của repo chính.
+- Trust dialog: Claude highlight mặc định là "No, exit"; gửi Enter mù là chết agent. Nhận diện dialog theo shape, một phím một lần, đọc lại giữa các lần.
+  Worktree liên kết KHÔNG thừa kế trust với Codex: đo 2026-09-17 (task 11, Codex 0.154), crew trong `.worktrees/<p>-<id>` vẫn hiện directory-trust dialog vì Codex xác nhận theo từng absolute path.
+  ADR 0028 của v1 nói ngược lại; settle step là bắt buộc cho crew, không phải thủ tục.
 - `herdr agent prompt` báo thành công dù prompt rơi vào modal hoặc nối vào text gõ dở. Dùng `--wait` và kiểm chứng composer.
 - Hook `Stop` của Claude và `notify` của Codex không bắn mọi turn. Fallback theo thời gian, `unknown` là trạng thái hợp lệ.
 - Test xanh với fake Herdr không chứng minh gì. Mỗi milestone có live test trên Herdr lab session riêng, tên `TestLive*`, chạy khi `MATEV2_LIVE=1`.
@@ -197,7 +199,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 11 | Brief template, skill `brief-writing`, `matev2 crew spawn`: worktree, tab, launch, trust, brief làm prompt đầu, ghi `.meta`. | Live test: crew Codex nhận brief. |
+| 11 | Brief template, skill `brief-writing`, `matev2 crew spawn`: worktree, tab, launch, trust, brief làm prompt đầu, ghi `.meta`. | Live test: crew Codex nhận brief. Đã xong 2026-09-17. |
 | 12 ∥ | `internal/send`: phân loại composer `empty/pending/unknown`, gõ một lần, retry Enter, settle cho slash command, prefix `0x1f` tuỳ chọn. | Live test ba case: trống, text dở, popup slash. |
 | 13 ∥ | `matev2 send`, `matev2 peek`, `matev2 state`. | Unit với pane giả, live với crew thật. |
 | 14 | `internal/box`: gộp thành view, phân loại verb. | Unit trên fixture. |

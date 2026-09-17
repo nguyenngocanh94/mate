@@ -16,8 +16,15 @@ const (
 	EnvTaskID           = "MATEV2_TASK_ID"
 	EnvCrewID           = "MATEV2_CREW_ID"
 	EnvRuntimeSessionID = "MATEV2_RUNTIME_SESSION_ID"
-	EnvClaudeConfigDir  = "CLAUDE_CONFIG_DIR"
-	EnvCodexHome        = "CODEX_HOME"
+	// EnvStatusFile is the absolute path of `crews/<id>.status`, the one
+	// channel a Crew has back to the Mate (docs/mvp.md section 4:
+	// `echo "state: one line" >> $MATEV2_STATUS`). It is injected into the
+	// Crew pane at tab create, because the brief tells the Crew to echo into
+	// it by name and a pane without it would make every status append write
+	// to a file called the empty string.
+	EnvStatusFile      = "MATEV2_STATUS"
+	EnvClaudeConfigDir = "CLAUDE_CONFIG_DIR"
+	EnvCodexHome       = "CODEX_HOME"
 )
 
 // ParseLogLevel maps debug/info/warn/error to slog levels. Empty or unknown
@@ -48,6 +55,7 @@ func IdentityEnvKeys() []string {
 		EnvTaskID,
 		EnvCrewID,
 		EnvRuntimeSessionID,
+		EnvStatusFile,
 	}
 }
 

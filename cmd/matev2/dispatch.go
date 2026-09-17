@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|--version> ...")
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -48,6 +48,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdProject(args[1:], stdout, stderr)
 	case "mate":
 		return cmdMate(args[1:], stdout, stderr)
+	case "crew":
+		return cmdCrew(args[1:], os.Stdin, stdout, stderr)
 	case "hook":
 		return cmdHook(args[1:], os.Stdin, stdout, stderr)
 	}
