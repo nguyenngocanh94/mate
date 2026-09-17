@@ -423,3 +423,26 @@ func (m Model) listLayout() frameLayout {
 	}
 	return l
 }
+
+// RenderInboxRail draws the Mate rail's own lines for one project's box, at
+// w cells wide and h lines tall, with the cursor on the sel'th inbox item
+// (-1 for the newest). Colour is stripped, the way a golden fixture renders,
+// so what comes back is the words a reader sees and nothing else.
+//
+// It is exported for one caller: the live proof in cmd/matev2, which has to
+// assert that a crew's actual question is legible in the rail. That is a
+// claim only the renderer can settle - boxRail and the palette are Console
+// state - and a live test that asserted on the DTO instead would pass while
+// the rail showed a row cut at "need…".
+func RenderInboxRail(box query.Field[query.BoxView], sel, w, h int) []string {
+	b := boxList{field: box}
+	if sel < 0 {
+		sel = boxDefaultSelection(b)
+	}
+	g, p := unicodeGlyphs, plainPalette()
+	out := []string{boxCountLine(b, g, p).render(w)}
+	for _, l := range boxBodyLines(b, sel, -1, true, g, p, w, max0(h-1)) {
+		out = append(out, l.render(w))
+	}
+	return out
+}
