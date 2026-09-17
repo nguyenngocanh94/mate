@@ -85,7 +85,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	t.Cleanup(func() {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer stopCancel()
-		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3")
+		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3", true)
 		_, _ = spawn.StopMate(stopCtx, w, deps, "shop")
 	})
 
@@ -187,7 +187,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	}
 
 	// 8. Stop both, through the seams that own them.
-	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3"); err != nil {
+	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
 		t.Fatalf("StopCrew: %v", err)
 	}
 	stopOut, err := action(ctx, console.ActionRequest{Action: console.ActionStop, Target: "shop", TargetKind: "mate"})

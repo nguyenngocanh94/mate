@@ -25,11 +25,10 @@ import (
 // against Claude Code 2.1.274 (its own testdata/screens): a composer inside
 // a ruled box, empty or holding somebody else's half-typed line.
 const (
-	claudeRule          = "─────────────────────────────────────────────"
-	claudeEmptyScreen   = claudeRule + "\n" + harness.ClaudeComposerMarker + "\n" + claudeRule + "\n"
-	claudePendingScreen = claudeRule + "\n" + harness.ClaudeComposerMarker + " half typed\n" + claudeRule + "\n"
-	codexEmptyScreen    = "› Ask Codex to do anything\n\n  gpt-5.6-terra high · /tmp/x\n"
-	codexPendingScreen  = "› rebase onto main\n\n  gpt-5.6-terra high · /tmp/x\n"
+	claudeRule            = "─────────────────────────────────────────────"
+	claudeEmptyScreen     = claudeRule + "\n" + harness.ClaudeComposerMarker + "\n" + claudeRule + "\n"
+	claudePendingScreen   = claudeRule + "\n" + harness.ClaudeComposerMarker + " half typed\n" + claudeRule + "\n"
+	codexBoxPendingScreen = "› rebase onto main\n\n  gpt-5.6-terra high · /tmp/x\n"
 )
 
 // boxFixture is a workspace with a started Mate and one recorded crew whose
@@ -260,7 +259,7 @@ func TestConsoleBoxReplyTypesIntoTheCrewAndRecordsTheUser(t *testing.T) {
 // crew whose own half-line would be concatenated with the reply.
 func TestConsoleBoxReplyRefusedOnAPendingCrewComposer(t *testing.T) {
 	f := newBoxFixture(t)
-	f.rt.SetReadOutput(f.crew, codexPendingScreen)
+	f.rt.SetReadOutput(f.crew, codexBoxPendingScreen)
 
 	_, err := f.action(context.Background(), console.ActionRequest{
 		Action: console.ActionReply, Target: "shop", TargetKind: "project",
