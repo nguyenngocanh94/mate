@@ -1,0 +1,48 @@
+ matev2 console   workspace ws_1                                                                                              Recorded snapshot  As of 14:02:11 
+ ws_1 › acme                                                                                                                                   Project · 1 crew 
+───────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────
+  MATE                                               HARNESS      STATUS         BINDING           │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB                      
+  none assigned                                                                  ! no mate         │                                                            
+                                                                                                   │ ID               crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB           
+  CREWS  1          TASK                                  STATUS           NOTE          UPDATED   │ Task                                                       
+▌ crew_01J9P8…Z0AB                                        awaiting_review  ? unknown     12:05:33  │                                                            
+                                                                                                   │ Recorded status  awaiting_review                           
+                                                                                                   │ Harness          claude                                    
+                                                                                                   │ Agent            crew-payments-api-1                       
+                                                                                                   │ Binding          none · session ended after completion     
+                                                                                                   │                  report                                    
+                                                                                                   │                                                            
+                                                                                                   │ Repo             payments-api                              
+                                                                                                   │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH           
+                                                                                                   │ Branch           crew/task_1/attempt-1                     
+                                                                                                   │ Worktree         /Users/dev/work/acme/repos/payments-api/  
+                                                                                                   │                  .worktrees/                               
+                                                                                                   │                  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB/a1        
+                                                                                                   │ Worktree status  created                                   
+                                                                                                   │                                                            
+                                                                                                   │ Last event       12:05:33  crew.reported_done              
+                                                                                                   │ Reason           none · the recorded status of this        
+                                                                                                   │                  attempt is not an error state             
+                                                                                                   │ Attention        unknown · r re-reads                      
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+───────────────────────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
+                                                                                                                                                                
+ ↑↓ Move  a Actions  Enter Attach crew (unavailable)  Esc Back  Tab Inspector  r Refresh  q Quit                                                                

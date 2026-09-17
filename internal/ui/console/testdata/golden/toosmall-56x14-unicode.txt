@@ -1,0 +1,14 @@
+ Terminal too small: 56x14                              
+ matev2 console needs at least 60x16.                   
+ Resize the window, or press q to quit.                 
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        
+                                                        

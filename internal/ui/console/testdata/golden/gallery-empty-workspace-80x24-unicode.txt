@@ -1,0 +1,24 @@
+ matev2 console   workspace ws_acme                              As of 14:02:11 
+ ws_acme                                                 Workspace · 0 projects 
+────────────────────────────────────────────────────────────────────────────────
+  PROJECTS  0                      MATE                    CREWS  ATTENTION     
+                                                                                
+  No projects recorded in workspace acme.                                       
+  Press n to add a Project, then s to create its Mate.                          
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ a Actions  n New project  r Refresh  q Quit                                    

@@ -1,0 +1,36 @@
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme                                                                                         Workspace · 2 projects 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  NEW PROJECT                                                                                                           
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+  Name    sqlite-queue_                                                                                                 
+  Create a Project record; no runtime agent is started.                                                                 
+                                                                                                                        
+  Enter Create project  Esc Cancel                                                                                      
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ Enter Create project  Esc Cancel  Ctrl+C Quit                                                                          

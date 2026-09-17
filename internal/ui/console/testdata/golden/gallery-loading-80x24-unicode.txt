@@ -1,0 +1,24 @@
+ matev2 console                                              Loading snapshot … 
+ ws_acme                                                                        
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ Loading snapshot                                                               
+                                                                                
+ Nothing is shown until the read completes.                                     
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ q Quit                                                                         

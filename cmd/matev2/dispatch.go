@@ -28,8 +28,16 @@ func newUsageErrorf(format string, a ...any) error { return &usageError{fmt.Erro
 // independently testable function of the form
 // func(args []string, stdout, stderr io.Writer) error.
 func run(args []string, stdout, stderr io.Writer) error {
+	// `matev2` with no arguments opens the console on the workspace the
+	// current directory sits in. A subcommand always wins over a directory
+	// of the same name: the subcommand names are reserved words, and an
+	// explicit `./init` still reaches the console.
 	if len(args) == 0 {
-		return newUsageError("usage: matev2 <init|project|mate|--version> ...")
+		dir, err := findWorkspaceDir("")
+		if err != nil {
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|--version> ...")
+		}
+		return cmdConsole(dir, stdout, stderr)
 	}
 	switch args[0] {
 	case "--version", "-V":
@@ -42,9 +50,19 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdMate(args[1:], stdout, stderr)
 	case "hook":
 		return cmdHook(args[1:], os.Stdin, stdout, stderr)
-	default:
-		return newUsageErrorf("unknown command %q", args[0])
 	}
+	// A single argument naming an existing directory is a workspace to open.
+	if len(args) == 1 && isDir(args[0]) {
+		return cmdConsole(args[0], stdout, stderr)
+	}
+	return newUsageErrorf("unknown command %q", args[0])
+}
+
+// isDir reports whether path names an existing directory, following
+// symlinks the way every other path in the CLI does.
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 // cmdProject dispatches `matev2 project <add|list|remove>`.

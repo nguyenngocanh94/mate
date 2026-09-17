@@ -1,0 +1,24 @@
+ matev2 console                                              No snapshot loaded 
+ (unknown)                                                                      
+────────────────────────────────────────────────────────────────────────────────
+                                                                                
+ Could not read snapshot                                                        
+                                                                                
+ runtime_unavailable: open /Users/dev/work/acme/.matev2/workspace.yaml:         
+ permission denied                                                              
+                                                                                
+ No earlier snapshot is loaded, so nothing else is shown.                       
+ r retries the read; q quits.                                                   
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+ ! Snapshot read failed                                                         
+ r Retry  q Quit                                                                

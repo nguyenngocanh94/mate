@@ -1,0 +1,36 @@
+ claude-code · mate-payments-api                                                                                        
+────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────
+ CREW › MATE                        │                                                                                   
+ 4 awaiting reply · 6 recorded      │                                                                                   
+────────────────────────────────────│                                                                                   
+ 14:01               awaiting reply │                                                                                   
+  attempt 2 · Fix webhook           │                                                                                   
+  idempotency                       │                                                                                   
+  Migration for idempotency_keys,   │                                                                                   
+  or key off stripe_events directly?│                                                                                   
+                                    │                                                                                   
+ 13:52                    attention │                                                                                   
+  attempt 2 · Fix webhook           │                                                                                   
+  idempotency                       │                                                                                   
+  Re-running go test ./... after a  │                                                                                   
+  flaky failure on the first pass.  │                                                                                   
+                                    │                                                                                   
+ 13:41               awaiting reply │                                                                                   
+  attempt 1 · Fix webhook           │                                                                                   
+  idempotency                       │⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook.    
+  Rebase conflict on Upgrade        │  Reading its report before reviewing attempt 2.                                   
+  database adapter: keep the pool   │                                                                                   
+  wrapper, or drop it?              │⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                     
+                                    │  ⎟  Read 84 lines (ctrl+o to expand)                                              
+ 12:58                     recorded │                                                                                   
+  attempt 1 · Fix webhook           │⏺ Reply(a1 · Upgrade database adapter)                                             
+  idempotency                       │  ⎟  "Keep the pool wrapper in this attempt; dropping it is a separate task."      
+  Reported failed: harness exited 1 │                                                                                   
+  before reporting.                 │⏺ 1 crew question still needs an answer. Oldest first: the rebase conflict on      
+  · reply was recorded before the   │  "Upgrade database adapter".                                                      
+  crew stopped                      │                                                                                   
+ ↓ 2 older requests                 │✻ Waiting for the completion report from crew-payments-api-2 (esc to interrupt)    
+                                    │╭─────────────────────────────────────────────────────────────────────────────────╮
+                                    ││ >                                                                               │
+────────────────────────────────────│╰─────────────────────────────────────────────────────────────────────────────────╯
+ Ctrl+b then q  detach              │? for shortcuts                                                  ⏵⏵ accept edits on

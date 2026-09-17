@@ -1,0 +1,36 @@
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 crews 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
+  mate-payments-api    claude       running        active            │                                                  
+                                                                     │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
+  CREWS  1          TASK              STATUS           NOTE          │ Task             Add idempotency-key index       
+▌ crew_01J9P6…B8DT  Add idempotency-k…running                        │                                                  
+  ↓ Completed (1)                                      ! failed      │ Recorded status  running                         
+                                                                     │ Harness          claude                          
+                                                                     │ Agent            crew-payments-api-2             
+                                                                     │ Binding          active                          
+                                                                     │                  recorded active; this does not  
+                                                                     │                  prove the agent is alive        
+                                                                     │ Runtime          herdr · mate-acme · tab crew/   
+                                                                     │                  01J9P6Q6 · pane p-7c1e          
+                                                                     │ Bound since      13:41:05                        
+                                                                     │                                                  
+                                                                     │ Repo             payments-api                    
+                                                                     │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
+                                                                     │ Branch           unknown · lookup timed out      
+                                                                     │                  (2s) · r re-reads               
+                                                                     │ Worktree         unknown · lookup timed out      
+                                                                     │                  (2s) · r re-reads               
+                                                                     │ Worktree status  unknown · lookup timed out      
+                                                                     │                  (2s) · r re-reads               
+                                                                     │                                                  
+                                                                     │ Last event       14:01:58  agent.tool_call       
+                                                                     │ Reason           none · not an error state       
+                                                                     │ Attention        none · crew                     
+                                                                     │                  crew_01J9P6Q6W0E5V8XK2M4B8DT    
+                                                                     │                  is recorded running and         
+                                                                     │  ↓ 2 more                                        
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+ ? 1 field unknown: worktree of crew 01J9P6Q6 (lookup timed out (2s))                                                   
+ ↑↓ Move  a Actions  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                                      

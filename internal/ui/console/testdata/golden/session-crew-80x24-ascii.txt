@@ -1,0 +1,24 @@
+ claude-code . crew-payments-api-2 . .worktrees/crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 
+                                                                                
+                                                                                
+                                                                                
+* Making the Stripe webhook handler replay-safe: an idempotency-key store keyed 
+  by event id, plus tests for a duplicate delivery.                             
+                                                                                
+* Read(internal/webhook/handler.go)                                             
+  \_  Read 212 lines (ctrl+o to expand)                                         
+                                                                                
+* Write(internal/webhook/idempotency.go)                                        
+  \_  Wrote 74 lines                                                            
+                                                                                
+* Ask(mate . migration for idempotency_keys, or key off stripe_events?)         
+  \_  Waiting for the Mate to answer                                            
+                                                                                
+* Bash(go test ./internal/webhook/...)                                          
+  \_  ok  payments-api/internal/webhook  0.412s                                 
+                                                                                
+* Running go test ./... (esc to interrupt)                                      
++------------------------------------------------------------------------------+
+| >                                                                            |
++------------------------------------------------------------------------------+
+? for shortcuts                                               >> accept edits on

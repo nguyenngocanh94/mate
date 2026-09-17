@@ -1,0 +1,36 @@
+ matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ ws_acme › payments-api                                                                               Project · 2 crews 
+─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  MATE                 HARNESS      STATUS         BINDING           │ COMPLETED                                        
+  mate-payments-api    claude       running        active            │                                                  
+                                                                     │ Finished         1 of 2 crews                    
+  CREWS  1          TASK              STATUS           NOTE          │                  Finished crews stay in the      
+  crew_01J9P6…B8DT  Add idempotency-k…running                        │                  snapshot. Enter shows or hides  
+▌ ↑ Completed (1)                                      ! failed      │                  them in this list.              
+  crew_01J9P4…A7CS  Fix webhook idemp…failed           ! failed      │                                                  
+                                                                     │ Needs attention  ! failed                        
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
+                                                                                                                        
+ ↑↓ Move  a Actions  Enter Hide completed  Esc Back  Tab Inspector  r Refresh  q Quit                                   

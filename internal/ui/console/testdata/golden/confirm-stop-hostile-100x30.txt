@@ -1,0 +1,30 @@
+ matev2 console   workspace 支払い ‼️ payments-api-payments-api-… Recorded snapshot  As of 14:02:11 
+ ws_xxxxxx…xxxx › 支払いのべき等性を修正する é payments-api-payments-api-payment… Project · 3 crews 
+─────────────────────────────────────────────────┬──────────────────────────────────────────────────
+  CONFIRM stop?                                                                                     
+  ────────────────────────────────────────────────────────────────────────────────────────────────  
+  Object  crew_ 修正tail‼️more                                                                      
+  Scope   The recorded runtime agent only; the Crew's worktree and branch are untouched.            
+  Effect  The runtime binding is released only after the service confirms its outcome.              
+                                                                                                    
+  Enter stop crew_ 修正tail‼️more  Esc Cancel                                                       
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+─────────────────────────────────────────────────┴──────────────────────────────────────────────────
+ ? 1 field unknown: worktree of 修正 payments-api-payments-api-payments-api-payments-api-payments-a…
+ Enter stop crew_ 修正tail‼️more  Esc Cancel  q Quit                                                

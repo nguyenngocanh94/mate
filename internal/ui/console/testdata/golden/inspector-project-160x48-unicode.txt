@@ -1,0 +1,48 @@
+ matev2 console   workspace acme  /Users/dev/work/acme                                                                        Recorded snapshot  As of 14:02:11 
+ ws_acme                                                                                                                                 Workspace · 2 projects 
+───────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────
+  PROJECTS  2                               MATE                    CREWS  ATTENTION     UPDATED   │ PROJECT                                                    
+▌ payments-api                              claude · running        2      ! 1 crew      13:41:05  │                                                            
+  ledger-worker                             none                    0      ! no mate               │ ID               proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ           
+                                                                                                   │ Name             payments-api                              
+                                                                                                   │                                                            
+                                                                                                   │ Mate             mate-payments-api · claude · running      
+                                                                                                   │ Repos            1                                         
+                                                                                                   │                  payments-api  /Users/dev/work/acme/       
+                                                                                                   │                  repos/payments-api  main                  
+                                                                                                   │ Crews            2 · 1 crew needs attention                
+                                                                                                   │                                                            
+                                                                                                   │ Last event       13:41:05  crew.started                    
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+                                                                                                   │                                                            
+───────────────────────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────
+                                                                                                                                                                
+ ↑↓ Move  a Actions  n New project  Enter Open project  Tab Inspector  r Refresh  q Quit                                                                        
