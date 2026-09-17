@@ -54,13 +54,16 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 		WithContext(ctx).
 		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps))
 
-	// tea.WithMouseCellMotion is a Program-level terminal mode, so it is on
-	// for the Console's whole run rather than only while a stream is open
-	// (console.Model.onMouse drops every event outside stream mode). Cell
-	// motion, not all motion: all-motion reports every idle mouse move, and
-	// each report would redraw the frame and enqueue a PTY write.
+	// tea.WithMouseAllMotion is a Program-level terminal mode, so it is on
+	// for the Console's whole run. All motion, not cell motion: cell motion
+	// reports a move only while a button is held, and the box rail needs to
+	// know which entry the pointer is over before the reader presses
+	// anything, so that entry can show its action buttons. The cost that
+	// argued for cell motion - a PTY write per idle pointer cell - is paid
+	// off in console.Model.onSessionPaneMouse instead, which drops bare
+	// motion rather than forwarding it.
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx),
-		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseCellMotion())
+		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseAllMotion())
 	final, err := program.Run()
 	if err != nil {
 		return fmt.Errorf("console exited with an error: %w", err)

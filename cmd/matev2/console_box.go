@@ -124,6 +124,65 @@ func boxPeekAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, re
 	return screen, nil
 }
 
+// restartMateAction is the rail's [restart mate] label and its `R` key: stop
+// the Mate, then start it again, through the same spawn seams the action
+// menu's own Stop and Start use. It is one action rather than two keystrokes
+// because the state it exists for - a Mate that no longer answers - is one a
+// reader wants out of in one gesture, and a stop that is not followed by a
+// start leaves the project with no Mate at all.
+//
+// A Mate that was already gone is not an error: StopMate reports it and the
+// start proceeds, which is exactly the case a reader reaching for a restart
+// is most often in. The returned line names both halves, so the outcome line
+// says what actually happened rather than only that something did.
+func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" {
+		return "", observability.NewError(observability.CodeUsage, "no Project was named for the restart")
+	}
+	stopped, err := spawn.StopMate(ctx, ws, deps, req.Target)
+	if err != nil {
+		return "", err
+	}
+	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Resume: true})
+	if err != nil {
+		return "", err
+	}
+	was := "stopped " + stopped.Agent
+	if stopped.AlreadyGone {
+		was = "the previous Mate was already gone"
+	}
+	return fmt.Sprintf("%s; Mate %s is running on %s in pane %s", was, res.Agent, res.Harness, res.Pane), nil
+}
+
+// clearComposerAction is [clear composer] and its `u` key: one Ctrl+U into
+// the Mate's pane.
+//
+// It goes through runtime.SendKeys, not internal/send: send.Send types a
+// line and verifies the composer cleared afterwards, which is the wrong
+// shape entirely for a key whose whole purpose is that the composer is in a
+// state nobody can classify. Nothing is typed, nothing is submitted and
+// nothing is recorded in sent.log - a keypress that removes half-typed text
+// is not a message the Mate was sent.
+func clearComposerAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" {
+		return "", observability.NewError(observability.CodeUsage, "no Project was named for the composer clear")
+	}
+	handle, _, err := spawn.MateHandle(ctx, ws, deps, req.Target)
+	if err != nil {
+		return "", err
+	}
+	if err := deps.Runtime.SendKeys(ctx, handle, []string{clearComposerKey}); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s pressed in %s's pane; nothing was sent", clearComposerKey, handle.Name), nil
+}
+
+// clearComposerKey is the one key [clear composer] presses. Ctrl+U is the
+// readline kill-line every harness composer inherits (Claude Code and Codex
+// both run their input through one), so it clears the line without
+// submitting it.
+const clearComposerKey = "ctrl+u"
+
 // boxSendRefusal reports whether an error is one of internal/send's three
 // "nothing was typed" refusals. The console shows all three the same way -
 // the reason on the outcome line and nothing else done - so this exists for
