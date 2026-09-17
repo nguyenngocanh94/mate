@@ -28,6 +28,12 @@ const (
 	// (docs/mvp.md decision 9: ".meta ghi transcript= và session_id= từ
 	// ngày đầu"). Task 08's mate-stop hook writes it; StartMate does not.
 	MetaTranscript = "transcript"
+	// MetaResumed and MetaResumedFrom record task 10's resume decision.
+	// Both are written only when this start resumed a previous harness
+	// session; a fresh start's meta rewrite (StartMate always writes a
+	// brand new map) leaves them absent, not "false"/"".
+	MetaResumed     = "resumed"
+	MetaResumedFrom = "resumed_from"
 )
 
 // AgentNamePrefix is the first half of a Mate's live Herdr agent name; the

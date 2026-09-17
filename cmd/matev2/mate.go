@@ -27,15 +27,16 @@ func cmdMate(args []string, stdout, stderr io.Writer) error {
 	}
 }
 
-// cmdMateStart implements `matev2 mate start <project> [--harness claude|codex]`.
+// cmdMateStart implements `matev2 mate start <project> [--harness claude|codex] [--fresh]`.
 func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mate start", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: matev2 mate start <project> [--workspace <dir>] [--harness claude|codex]")
+		fmt.Fprintln(stderr, "usage: matev2 mate start <project> [--workspace <dir>] [--harness claude|codex] [--fresh]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	harnessFlag := fs.String("harness", "", "harness to launch (claude or codex; default: the workspace default)")
+	freshFlag := fs.Bool("fresh", false, "start a brand new harness session instead of resuming mate.meta's session_id")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -43,7 +44,7 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 		fs.Usage()
 		return newUsageError("matev2 mate start: want exactly 1 argument: <project>")
 	}
-	req := spawn.StartRequest{Project: fs.Arg(0)}
+	req := spawn.StartRequest{Project: fs.Arg(0), Resume: true, Fresh: *freshFlag}
 	if *harnessFlag != "" {
 		kind, err := harness.ParseKind(*harnessFlag)
 		if err != nil {
@@ -65,8 +66,15 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	if res.TrustDialog {
 		fmt.Fprintf(stderr, "note: answered the %s directory-trust dialog for %s\n", res.Harness, res.MateDir)
 	}
-	fmt.Fprintf(stdout, "started %s: agent %s in pane %s (session %s, harness %s)\n",
-		res.Project, res.Agent, res.Pane, res.Session, res.Harness)
+	if res.ResumeNote != "" {
+		fmt.Fprintf(stderr, "note: %s\n", res.ResumeNote)
+	}
+	resumed := "fresh session"
+	if res.Resumed {
+		resumed = fmt.Sprintf("resumed session %s", res.ResumedFrom)
+	}
+	fmt.Fprintf(stdout, "started %s: agent %s in pane %s (session %s, harness %s, %s)\n",
+		res.Project, res.Agent, res.Pane, res.Session, res.Harness, resumed)
 	return nil
 }
 
