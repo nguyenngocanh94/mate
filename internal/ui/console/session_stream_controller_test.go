@@ -20,6 +20,7 @@ type controllerTestChannel struct {
 	readDone chan struct{}
 	writes   [][]byte
 	writeErr error
+	resizes  []TerminalSize
 }
 
 func (c *controllerTestChannel) Read(ctx context.Context) ([]byte, error) {
@@ -55,7 +56,18 @@ func (c *controllerTestChannel) writtenBytes() [][]byte {
 	return out
 }
 
-func (c *controllerTestChannel) Resize(context.Context, TerminalSize) error { return nil }
+func (c *controllerTestChannel) Resize(_ context.Context, size TerminalSize) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resizes = append(c.resizes, size)
+	return nil
+}
+
+func (c *controllerTestChannel) resizedTo() []TerminalSize {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]TerminalSize(nil), c.resizes...)
+}
 
 func (c *controllerTestChannel) Close(context.Context) error {
 	c.mu.Lock()
