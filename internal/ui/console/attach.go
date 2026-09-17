@@ -318,6 +318,11 @@ func (m Model) attachRefusal(r row) (string, bool) {
 			// domain's own predicate for "this Mate holds the Project's one
 			// active slot" (internal/domain/status.go), which is exactly the
 			// set of statuses a session can exist for.
+			// The stopped state is not a failure. It is not reworded to add
+			// "press s to start it" because the 80-column budget this line
+			// is held to (TestEveryAttachMessageFitsAnEightyColumnFrame)
+			// has no room for both that and "no session to attach", and the
+			// key line directly beneath already offers 's Resume mate'.
 			return "Mate recorded " + string(mate.Designated.Value.Status) + ", no session to attach", true
 		}
 		binding = mate.Binding

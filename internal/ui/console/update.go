@@ -102,7 +102,25 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 		return m.applyActionAfterRead()
 	}
 	m = m.reconcileSelection()
-	return m.applyActionAfterRead()
+	return m.refreshSessionMode().applyActionAfterRead()
+}
+
+// refreshSessionMode re-reads the open session's communication mode off the
+// snapshot that just landed. The session view keeps its own target while it
+// is open - session mode never touches the navigation stack - so without
+// this the header would keep naming the mode the target carried at entry,
+// which is exactly the value 'Ctrl+b m' just changed.
+func (m Model) refreshSessionMode() Model {
+	if m.sess.target.ProjectID == "" {
+		return m
+	}
+	p, ok := m.projectByID(m.sess.target.ProjectID)
+	if !ok {
+		return m
+	}
+	m.sess.target.Mode = p.Mode
+	m.sess.snapshot.Target.Mode = p.Mode
+	return m
 }
 
 func (m Model) applyActionAfterRead() Model {
@@ -287,6 +305,15 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginNewProject(), nil
 	case "s":
 		return m.beginMateStart()
+	case "m":
+		// The communication mode is a Project setting, so the key is offered
+		// on the Project frame only - there is nothing for it to act on at
+		// the Workspace level, where the selection is a Project row but the
+		// frame lists several.
+		if m.cur().kind != frameProject {
+			return m, nil
+		}
+		return m.beginModeToggle(m.currentProject().ProjectID)
 	case "r":
 		m.msg = footerMsg{}
 		return m, loadCmd(m.load)

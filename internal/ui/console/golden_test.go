@@ -333,6 +333,7 @@ func sampleTree() query.Snapshot {
 		Projects: []query.ProjectNode{
 			{
 				ProjectID: "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ",
+				Mode:      query.ModeSupervised,
 				Name:      "payments-api",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{
@@ -416,6 +417,7 @@ func sampleTree() query.Snapshot {
 			},
 			{
 				ProjectID: "proj_01J9M4H7K9L1M3N5P7Q9R1S3TU",
+				Mode:      query.ModeAuto,
 				Name:      "ledger-worker",
 				Mate:      absentMate("this project has no designated Mate"),
 				Attention: query.KnownField(query.ProjectAttention{

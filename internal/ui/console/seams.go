@@ -722,6 +722,13 @@ func (m Model) actionHints() []keyHint {
 		// TODO(task 10): the 'h' Change harness hint went here. Restarting
 		// a Mate under another harness is task 10's surface.
 	}
+	// 'm' acts on the Project, so it is offered anywhere on a Project frame
+	// rather than only on the Mate row. It is optional: flipping a flag
+	// whose daemon is still mvp.md task 19 is worth less at 80 columns than
+	// the keys a reader needs to move and get out.
+	if m.cur().kind == frameProject {
+		out = append(out, keyHint{key: "m", desc: "Mode", optional: true, sacrifice: keyAction})
+	}
 	if r, ok := m.selectedRow(); ok {
 		out = append(out, keyHint{key: "Enter", desc: m.enterLabel(r), sacrifice: keyAction})
 	}

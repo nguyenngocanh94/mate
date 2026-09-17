@@ -23,11 +23,18 @@ const (
 	colCrewsCount  = 7  // Workspace level: this Project's Crew count
 	colAttention   = 14
 	colUpdated     = 10
-	colHarness     = 13
-	colMateStatus  = 15 // the Project's Mate row: recorded status
-	colBinding     = 18 // the Project's Mate row: binding status
-	colStatus      = 17 // a Crew row: recorded status
-	colCrewID      = 18 // a Crew row: abbreviated id
+	colHarness     = 11
+	colMateStatus  = 11 // the Project's Mate row: recorded status
+	// colMode is the Project's Mate row: communication mode (mvp.md
+	// section 5). "supervised" is the longest value it ever holds. Its
+	// twelve cells came out of the three columns beside it - each of which
+	// held six or more cells of padding over its longest value - rather
+	// than out of the agent name, which is the one cell on this row that
+	// has to be able to show a whole `mate-<project>` at 120 columns.
+	colMode    = 12
+	colBinding = 12 // the Project's Mate row: binding status
+	colStatus  = 17 // a Crew row: recorded status
+	colCrewID  = 18 // a Crew row: abbreviated id
 
 	// listWideMin is the list pane's own width (not the terminal's), at or
 	// above which the UPDATED column appears.
@@ -348,13 +355,14 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 	g, p := m.g, m.p
 	proj := m.currentProject()
 	iw := w - 2
-	agentW := iw - colHarness - colMateStatus - colBinding
+	agentW := iw - colHarness - colMateStatus - colMode - colBinding
 
 	items := []listLine{headerListLine(func(focused bool) *line {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan("MATE", focused, p)}, agentW)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("HARNESS", p)}, colHarness)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colMateStatus)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("MODE", p)}, colMode)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("BINDING", p)}, colBinding)...)
 		return l
 	})}
@@ -364,7 +372,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		items = append(items, rowListLine(0, func(selected, focused bool) *line {
 			l := selectRow(newLine(), selected, p)
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
-			l.addSpans(mateRowSpans(proj.Mate, agentW, g, p)...)
+			l.addSpans(mateRowSpans(proj.Mate, proj.Mode, agentW, g, p)...)
 			return l
 		}))
 	}
@@ -483,7 +491,10 @@ func completedGroupTitle(n int, open bool, g glyphSet) string {
 // found no Mate (Absent): the former must say "unknown" in the Agent cell,
 // never the confident "none assigned" - an unreadable designation has not
 // established that there is no Mate.
-func mateRowSpans(mate query.MateNode, agentW int, g glyphSet, p palette) []span {
+// mode is the Project's, not the Mate's: it is drawn on this row even when
+// there is no Mate yet, because the flag is a Project setting that survives
+// every start and stop, and a blank cell there would read as "no mode".
+func mateRowSpans(mate query.MateNode, mode query.Mode, agentW int, g glyphSet, p palette) []span {
 	if mate.Designated.State == query.Known && mate.Designated.Value.MateID != "" {
 		v := mate.Designated.Value
 		agent := v.MateID
@@ -493,6 +504,7 @@ func mateRowSpans(mate query.MateNode, agentW int, g glyphSet, p palette) []span
 		out := titleCell(agent, agentW, p.Fg, g)
 		out = append(out, fitCell([]span{{text: string(v.HarnessKind), style: p.Fg}}, colHarness)...)
 		out = append(out, fitCell([]span{statusSpan(string(v.Status), p)}, colMateStatus)...)
+		out = append(out, fitCell(modeSpans(mode, p), colMode)...)
 		out = append(out, fitCell(bindingSpans(mate.Binding, p), colBinding)...)
 		return out
 	}
@@ -504,8 +516,22 @@ func mateRowSpans(mate query.MateNode, agentW int, g glyphSet, p palette) []span
 	out := fitCell(agentSpans, agentW)
 	out = append(out, fitCell(nil, colHarness)...)
 	out = append(out, fitCell(nil, colMateStatus)...)
+	out = append(out, fitCell(modeSpans(mode, p), colMode)...)
 	out = append(out, fitCell(mateMissingBindingSpans(mate, p), colBinding)...)
 	return out
+}
+
+// modeSpans renders the communication mode. Auto takes the accent style
+// because it is the mode in which the Console may type into the Mate's pane
+// without the reader; supervised, the default, is plain.
+func modeSpans(mode query.Mode, p palette) []span {
+	if mode == "" {
+		return nil
+	}
+	if mode == query.ModeAuto {
+		return []span{{text: string(mode), style: p.Acc}}
+	}
+	return []span{{text: string(mode), style: p.Fg}}
 }
 
 // mateMissingBindingSpans is the Binding cell for a Project with no

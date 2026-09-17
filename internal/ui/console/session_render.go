@@ -187,6 +187,13 @@ func sessionHeaderLine(target SessionTarget, recorded query.Field[string], g gly
 	if target.Kind == SessionTargetCrew && target.Worktree != "" {
 		l.add(" "+g.Dot+" "+target.Worktree, p.Dim)
 	}
+	// The communication mode (mvp.md section 5). It is on the header rather
+	// than in the rail because it governs whether anything may be typed into
+	// this pane on the reader's behalf at all, which is the first thing a
+	// reader looking at a live Mate needs to know.
+	if target.Mode != "" {
+		l.add(" "+g.Dot+" "+string(target.Mode), p.Dim)
+	}
 	if recorded.State != query.Known {
 		l.add(" "+g.Dot+" ", p.Dim)
 		l.addSpans(availabilitySpans(recorded.State, recorded.Value, recorded.Reason, p.Fg, g, p)...)
@@ -668,7 +675,14 @@ func sessionComposerChrome(g glyphSet, p palette, w int, composer string) []*lin
 // way out of the Console a reader has not already been told about
 // elsewhere on screen.
 func streamDetachHintLine(g glyphSet, p palette) *line {
-	return newLine().add(" Ctrl+b then q", p.Fg).add("  detach", p.Dim)
+	// Ctrl+b m, not a bare "m": stream mode hands every other key to the
+	// agent's own terminal (the captain's ruling, ADR 0026), so the mode
+	// toggle has to live behind the same prefix the detach does, or it would
+	// swallow a letter the reader meant for the harness.
+	return newLine().
+		add(" Ctrl+b then q", p.Fg).add("  detach", p.Dim).
+		add("  "+g.Dot+"  ", p.Faint).
+		add("Ctrl+b m", p.Fg).add("  Mode", p.Dim)
 }
 
 func max0(n int) int {

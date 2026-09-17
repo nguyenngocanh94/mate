@@ -158,6 +158,7 @@ func (m Model) sessionTargetFor(r row) (SessionTarget, bool) {
 			ProjectID:   m.currentProject().ProjectID,
 			HarnessKind: mate.Designated.Value.HarnessKind,
 			AgentName:   agent,
+			Mode:        m.currentProject().Mode,
 		}, true
 	case rowCrew:
 		c, ok := m.crewByID(r.id)
@@ -172,6 +173,10 @@ func (m Model) sessionTargetFor(r row) (SessionTarget, bool) {
 		if c.Worktree.IsKnown() {
 			worktree = c.Worktree.Value.Path
 		}
+		mode := query.Mode("")
+		if p, ok := m.projectByID(c.ProjectID); ok {
+			mode = p.Mode
+		}
 		return SessionTarget{
 			Kind:        SessionTargetCrew,
 			ID:          c.CrewID,
@@ -179,6 +184,7 @@ func (m Model) sessionTargetFor(r row) (SessionTarget, bool) {
 			HarnessKind: c.HarnessKind,
 			AgentName:   agent,
 			Worktree:    worktree,
+			Mode:        mode,
 		}, true
 	default:
 		return SessionTarget{}, false
@@ -648,6 +654,9 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if key == "q" {
 			return m.endSession()
 		}
+		if key == "m" {
+			return m.beginModeToggle(m.sess.target.ProjectID)
+		}
 		return m, nil
 	}
 	switch key {
@@ -707,8 +716,15 @@ func (m Model) onSessionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.sess.awaitingDetach {
 		m.sess.awaitingDetach = false
-		if msg.String() == "q" {
+		switch msg.String() {
+		case "q":
 			return m.endSession()
+		case "m":
+			// The one other key the prefix claims. A bare 'm' cannot be it:
+			// stream mode forwards every unprefixed key to the agent's own
+			// terminal, so binding the letter itself would eat a character
+			// the reader meant to type to the harness.
+			return m.beginModeToggle(m.sess.target.ProjectID)
 		}
 		return m, nil
 	}

@@ -1,8 +1,8 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  MATE                 HARNESS      STATUS         BINDING           │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
-  mate-payments-api    claude       running        active            │                                                  
+  MATE                 HARNESS    STATUS     MODE        BINDING     │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
+  mate-payments-api    claude     running    supervised  active      │                                                  
                                                                      │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
   CREWS  1          TASK              STATUS           NOTE          │ Task             Add idempotency-key index       
 ▌ crew_01J9P6…B8DT  Add idempotency-k…running                        │                                                  
@@ -33,4 +33,4 @@
                                                                      │  ↓ 2 more                                        
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
  ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) · snapshot re-read                        
- ↑↓ Move  a Actions  e Details  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                           
+ ↑↓ Move  a Actions  e Details  m Mode  Enter Attach crew  Esc Back  Tab Inspector  r Refresh  q Quit                   
