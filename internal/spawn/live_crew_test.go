@@ -2,6 +2,7 @@ package spawn_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,10 +90,12 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
 	t.Cleanup(func() {
-		// Whatever this test asserts, the lab must not be left with a crew.
+		// Whatever this test asserts, the lab must not be left with a crew,
+		// nor with its worktree or branch: this is task 11's live test, not
+		// task 16's, so any unlanded work here is discarded on purpose.
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer stopCancel()
-		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3")
+		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3", true)
 	})
 	t.Logf("spawned crew %s in pane %s (session %s, branch %s)", res.Agent, res.Pane, res.Session, res.Branch)
 	t.Logf("worktree %s\nbrief %s\nstatus %s", res.Worktree, res.BriefPath, res.StatusPath)
@@ -111,7 +114,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		RawID:   "k3",
 		Kind:    harness.KindCodex,
 	}
-	status := waitForStatus(t, ctx, w, "done:", 120*time.Second, func() string {
+	status := waitForStatus(t, ctx, w, "k3", "done:", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
@@ -134,12 +137,18 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 	}
 	t.Logf("README.md in the worktree:\n%s", readme)
 
-	stopped, err := spawn.StopCrew(ctx, w, deps, "shop", "k3")
-	if err != nil {
-		t.Fatalf("StopCrew: %v", err)
+	// The crew committed, so its branch is ahead of main: a stop without
+	// --discard must confirm the agent gone and the tab closed, but must
+	// refuse to remove work task 16 has not been told to discard.
+	stopped, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", false)
+	if !errors.Is(err, spawn.ErrUnlandedWork) {
+		t.Fatalf("StopCrew: err = %v, want ErrUnlandedWork", err)
 	}
 	if !stopped.TabClosed {
 		t.Fatal("StopCrew did not close the crew tab")
+	}
+	if stopped.Ahead < 1 {
+		t.Fatalf("stopped.Ahead = %d, want at least 1 commit", stopped.Ahead)
 	}
 	listed, err := rt.ListAgents(ctx, runtime.SessionHandle{Name: session, ConfigHome: configHome})
 	if err != nil {
@@ -150,21 +159,22 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 			t.Fatalf("agent %s is still listed after StopCrew", res.Agent)
 		}
 	}
-	// The work survives the stop; only task 16 may remove it.
+	// The unlanded work survives the refusal; the deferred cleanup discards
+	// it once this test is done looking at it.
 	if _, err := os.Stat(res.Worktree); err != nil {
-		t.Fatalf("StopCrew removed the worktree: %v", err)
+		t.Fatalf("a refused StopCrew removed the worktree: %v", err)
 	}
 }
 
-// waitForStatus polls the crew's status file until it contains want. The
+// waitForStatus polls crew's status file until it contains want. The
 // failure carries both the status file and the pane, because a crew that
 // never reported is a question about what its screen is showing.
-func waitForStatus(t *testing.T, ctx context.Context, w *store.Workspace, want string, budget time.Duration, pane func() string) string {
+func waitForStatus(t *testing.T, ctx context.Context, w *store.Workspace, crew, want string, budget time.Duration, pane func() string) string {
 	t.Helper()
 	deadline := time.Now().Add(budget)
 	var text string
 	for {
-		entries, _, err := w.ReadStatus("shop", "k3", 0)
+		entries, _, err := w.ReadStatus("shop", crew, 0)
 		if err != nil {
 			t.Fatalf("ReadStatus: %v", err)
 		}
@@ -177,7 +187,7 @@ func waitForStatus(t *testing.T, ctx context.Context, w *store.Workspace, want s
 			return text
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("crew k3 did not report %q within %s\nstatus file:\n%s\npane:\n%s", want, budget, text, pane())
+			t.Fatalf("crew %s did not report %q within %s\nstatus file:\n%s\npane:\n%s", crew, want, budget, text, pane())
 		}
 		select {
 		case <-ctx.Done():

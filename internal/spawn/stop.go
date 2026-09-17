@@ -24,8 +24,35 @@ type StopResult struct {
 	// AlreadyGone is true when Herdr had no such agent before the stop: the
 	// meta was stale and nothing had to be killed.
 	AlreadyGone bool
-	// TabClosed is true when the Mate's tab was removed (or was already).
+	// TabClosed is true when the tab was removed (or was already).
 	TabClosed bool
+
+	// The fields below are set only by StopCrew; a Mate has no worktree or
+	// branch of its own.
+
+	// Branch and Worktree are the crew's, as recorded in its meta before
+	// this stop's teardown decision.
+	Branch   string
+	Worktree string
+	// Unlanded is true when the branch was not fully contained in the
+	// project's default branch, or the worktree had uncommitted changes.
+	Unlanded bool
+	// Ahead is the commit count the branch had over the default branch.
+	// Only meaningful when Unlanded is true because of the branch.
+	Ahead int
+	// DirtyFiles is the `git status --porcelain` line count of the
+	// worktree. Only meaningful when Unlanded is true because of the
+	// worktree.
+	DirtyFiles int
+	// Teardown is TeardownClean, TeardownDiscarded or
+	// TeardownRefusedUnlanded once StopCrew has decided.
+	Teardown string
+	// WorktreeRemoved and BranchRemoved report what a teardown actually did,
+	// as distinct from what it decided: a crew whose worktree or branch had
+	// already been removed by an earlier call leaves these false even on a
+	// successful (idempotent) teardown.
+	WorktreeRemoved bool
+	BranchRemoved   bool
 }
 
 // StopMate stops the Mate of one project and proves it is gone.
