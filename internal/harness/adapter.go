@@ -52,6 +52,15 @@ type AgentSpec struct {
 	// the same argv passed through Herdr.
 	ClaudeSessionID    string
 	ClaudeSettingsPath string
+	// ResumeSessionID requests resuming a previous harness session instead
+	// of starting a fresh one (docs/mvp.md task 10). It is mutually
+	// exclusive with ClaudeSessionID: a fresh id names the session a start
+	// creates, a resume id names one that already exists. Claude resumes
+	// with `--resume <id>` (still paired with --settings so the Stop hook
+	// wires up the same as a fresh start); Codex has no proven
+	// non-interactive resume path, so BuildLaunchSpec refuses with
+	// ErrResumeUnsupported.
+	ResumeSessionID string
 	// InlineFallback requests Claude's bounded --append-system-prompt path.
 	// Ignored for Codex. The constructor still fails closed if the file is
 	// missing, empty, relative, or over budget.

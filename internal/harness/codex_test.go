@@ -23,6 +23,22 @@ func TestCodexRefusesMissingOverride(t *testing.T) {
 	}
 }
 
+func TestCodexRefusesResumeRequest(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+		Kind:            KindCodex,
+		Cwd:             cwd,
+		ResumeSessionID: "some-thread-id",
+	})
+	if !errors.Is(err, ErrResumeUnsupported) {
+		t.Fatalf("err = %v, want ErrResumeUnsupported", err)
+	}
+}
+
 func TestCodexRefusesEmptyOverride(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()

@@ -69,4 +69,22 @@ func TestMateStatusPrintsOneLineForAStoppedProject(t *testing.T) {
 	if !strings.HasPrefix(line, "shop: "+string(spawn.StateStopped)) {
 		t.Fatalf("out = %q, want the project and its state", line)
 	}
+	if !strings.Contains(line, "session_id=none") {
+		t.Fatalf("out = %q, want session_id=none for a project that never started", line)
+	}
+	if !strings.Contains(line, "last start: fresh") {
+		t.Fatalf("out = %q, want the last-start resume state", line)
+	}
+}
+
+// mate start accepts --fresh alongside the project argument; this only
+// checks flag parsing (the rest needs a Herdr server), consistent with
+// TestMateStartRejectsAnUnknownHarness below.
+func TestMateStartAcceptsFreshFlag(t *testing.T) {
+	var out, errw bytes.Buffer
+	err := run([]string{"mate", "start", "shop", "--fresh", "--workspace", t.TempDir()}, &out, &errw)
+	var ue *usageError
+	if errors.As(err, &ue) {
+		t.Fatalf("--fresh must be a recognised flag, got usage error: %v", err)
+	}
 }

@@ -29,6 +29,14 @@ type Status struct {
 	Session string
 	Pane    string
 	Harness string
+	// SessionID is the harness session `mate.meta` carries: the one a
+	// stopped Mate resumes into, or the one currently live.
+	SessionID string
+	// Resumed and ResumedFrom report task 10's last start decision, read
+	// straight from `mate.meta`'s resumed=/resumed_from= (absent, not
+	// "false", when the last start went fresh).
+	Resumed     bool
+	ResumedFrom string
 	// Observed is the Herdr agent status behind StateRunning.
 	Observed runtime.AgentStatus
 	// Detail is the Herdr observation in words, for the one-line report.
@@ -37,7 +45,15 @@ type Status struct {
 
 // Line is the single line `matev2 mate status` prints.
 func (s Status) Line() string {
-	return fmt.Sprintf("%s: %s (%s)", s.Project, s.State, s.Detail)
+	session := s.SessionID
+	if session == "" {
+		session = "none"
+	}
+	resume := "fresh"
+	if s.Resumed {
+		resume = fmt.Sprintf("resumed from %s", s.ResumedFrom)
+	}
+	return fmt.Sprintf("%s: %s (%s), session_id=%s, last start: %s", s.Project, s.State, s.Detail, session, resume)
 }
 
 // MateStatus reads `mate.meta` and asks Herdr whether the agent it names is
@@ -57,11 +73,14 @@ func MateStatus(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		return Status{}, err
 	}
 	out := Status{
-		Project: project,
-		Agent:   meta[MetaAgent],
-		Session: meta[MetaSession],
-		Pane:    meta[MetaPane],
-		Harness: meta[MetaHarness],
+		Project:     project,
+		Agent:       meta[MetaAgent],
+		Session:     meta[MetaSession],
+		Pane:        meta[MetaPane],
+		Harness:     meta[MetaHarness],
+		SessionID:   meta[MetaSessionID],
+		Resumed:     meta[MetaResumed] == "true",
+		ResumedFrom: meta[MetaResumedFrom],
 	}
 	if out.Agent == "" {
 		out.State = StateStopped

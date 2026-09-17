@@ -80,6 +80,65 @@ func TestClaudeLaunchArgsCarryTranscriptLocator(t *testing.T) {
 	}
 }
 
+func TestClaudeResumeUsesResumeFlagNotSessionID(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
+	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
+	resumeID := "22222222-2222-4222-8222-222222222222"
+	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+		Kind:               KindClaude,
+		Cwd:                cwd,
+		ContextPath:        contextPath,
+		ResumeSessionID:    resumeID,
+		ClaudeSettingsPath: settingsPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"--dangerously-skip-permissions", "--resume", resumeID, "--settings", settingsPath, "--append-system-prompt-file", contextPath}
+	got := spec.Args()
+	if !slices.Equal(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+	if slices.Contains(got, "--session-id") {
+		t.Fatalf("resume args must never carry --session-id: %#v", got)
+	}
+}
+
+func TestClaudeResumeAndSessionIDAreMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
+	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
+	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+		Kind:               KindClaude,
+		Cwd:                cwd,
+		ContextPath:        contextPath,
+		ClaudeSessionID:    "11111111-1111-4111-8111-111111111111",
+		ResumeSessionID:    "22222222-2222-4222-8222-222222222222",
+		ClaudeSettingsPath: settingsPath,
+	})
+	if !errors.Is(err, ErrContextRequired) {
+		t.Fatalf("err = %v, want ErrContextRequired", err)
+	}
+}
+
+func TestClaudeResumeRequiresSettingsPath(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
+	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+		Kind:            KindClaude,
+		Cwd:             cwd,
+		ContextPath:     contextPath,
+		ResumeSessionID: "22222222-2222-4222-8222-222222222222",
+	})
+	if !errors.Is(err, ErrContextRequired) {
+		t.Fatalf("err = %v, want ErrContextRequired", err)
+	}
+}
+
 func TestClaudeLaunchArgsRequireCompleteTranscriptLocator(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()

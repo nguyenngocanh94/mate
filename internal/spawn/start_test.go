@@ -230,6 +230,147 @@ func TestStartMateCodexWritesTheDiscoveryFile(t *testing.T) {
 	}
 }
 
+// TestStartMateResumesRecordedSessionID covers task 10: a start after a
+// stop must resume the harness session mate.meta kept, passing --resume
+// (never --session-id) and keeping session_id= unchanged.
+func TestStartMateResumesRecordedSessionID(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Resume: true})
+	if err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if first.Resumed {
+		t.Fatal("a first start has nothing to resume")
+	}
+	if _, err := spawn.StopMate(context.Background(), w, deps, "shop"); err != nil {
+		t.Fatalf("StopMate: %v", err)
+	}
+
+	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Resume: true})
+	if err != nil {
+		t.Fatalf("second StartMate: %v", err)
+	}
+	if !second.Resumed {
+		t.Fatal("a start after stop must resume the recorded session")
+	}
+	if second.ResumedFrom != first.SessionID {
+		t.Fatalf("resumed from %q, want %q", second.ResumedFrom, first.SessionID)
+	}
+	if second.SessionID != first.SessionID {
+		t.Fatalf("session_id changed on resume: %q -> %q", first.SessionID, second.SessionID)
+	}
+
+	argv := rt.StartArgv[len(rt.StartArgv)-1]
+	if !slices.Contains(argv, "--resume") || !slices.Contains(argv, first.SessionID) {
+		t.Fatalf("resumed argv %v carries no --resume %s", argv, first.SessionID)
+	}
+	if slices.Contains(argv, "--session-id") {
+		t.Fatalf("resumed argv %v must never carry --session-id", argv)
+	}
+
+	meta := readMeta(t, w, "shop")
+	if meta[spawn.MetaSessionID] != first.SessionID {
+		t.Fatalf("meta session_id = %q, want %q", meta[spawn.MetaSessionID], first.SessionID)
+	}
+	if meta[spawn.MetaResumed] != "true" || meta[spawn.MetaResumedFrom] != first.SessionID {
+		t.Fatalf("meta resumed/resumed_from = %q/%q", meta[spawn.MetaResumed], meta[spawn.MetaResumedFrom])
+	}
+}
+
+// TestStartMateFreshMintsANewSessionID covers `matev2 mate start --fresh`:
+// it must overwrite the recorded session_id with a brand new one rather
+// than resuming, even though mate.meta still carries one to resume.
+func TestStartMateFreshMintsANewSessionID(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.NewSessionID = idSequence(t, "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222")
+
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Resume: true})
+	if err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if _, err := spawn.StopMate(context.Background(), w, deps, "shop"); err != nil {
+		t.Fatalf("StopMate: %v", err)
+	}
+
+	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Fresh: true})
+	if err != nil {
+		t.Fatalf("fresh StartMate: %v", err)
+	}
+	if second.Resumed {
+		t.Fatal("--fresh must never resume")
+	}
+	if second.SessionID == first.SessionID {
+		t.Fatal("--fresh must mint a session id different from the recorded one")
+	}
+
+	argv := rt.StartArgv[len(rt.StartArgv)-1]
+	if !slices.Contains(argv, "--session-id") || !slices.Contains(argv, second.SessionID) {
+		t.Fatalf("fresh argv %v carries no --session-id %s", argv, second.SessionID)
+	}
+	if slices.Contains(argv, "--resume") {
+		t.Fatalf("fresh argv %v must never carry --resume", argv)
+	}
+
+	meta := readMeta(t, w, "shop")
+	if meta[spawn.MetaSessionID] != second.SessionID {
+		t.Fatalf("meta session_id = %q, want the fresh id %q", meta[spawn.MetaSessionID], second.SessionID)
+	}
+	if meta[spawn.MetaResumed] != "" || meta[spawn.MetaResumedFrom] != "" {
+		t.Fatalf("a fresh start must not leave resumed=/resumed_from=, got %q/%q", meta[spawn.MetaResumed], meta[spawn.MetaResumedFrom])
+	}
+}
+
+// TestStartMateHarnessMismatchFallsBackToFresh covers task 10's rule that a
+// recorded session_id from one harness is never handed to a different one:
+// mate.meta's harness disagreeing with the requested start must start fresh
+// and say so, not silently resume (or fail).
+func TestStartMateHarnessMismatchFallsBackToFresh(t *testing.T) {
+	w := newWorkspace(t, "blog")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindClaude, Resume: true})
+	if err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if _, err := spawn.StopMate(context.Background(), w, deps, "blog"); err != nil {
+		t.Fatalf("StopMate: %v", err)
+	}
+
+	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	if err != nil {
+		t.Fatalf("StartMate with a different harness: %v", err)
+	}
+	if second.Resumed {
+		t.Fatal("a harness mismatch must never resume")
+	}
+	if second.ResumeNote == "" {
+		t.Fatal("a harness mismatch must say why this start went fresh")
+	}
+	if second.SessionID != "" {
+		t.Fatalf("session id = %q, want empty for Codex", second.SessionID)
+	}
+	_ = first
+}
+
+func idSequence(t *testing.T, ids ...string) func() string {
+	t.Helper()
+	i := 0
+	return func() string {
+		if i >= len(ids) {
+			t.Fatalf("idSequence exhausted after %d ids", len(ids))
+		}
+		v := ids[i]
+		i++
+		return v
+	}
+}
+
 func TestStartMateRefusesAnUnregisteredProject(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()

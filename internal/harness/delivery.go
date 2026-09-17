@@ -54,6 +54,12 @@ var (
 	// ErrContextTooLarge is returned when context exceeds the delivery limit
 	// or would be silently truncated.
 	ErrContextTooLarge = errors.New("required context exceeds delivery limit")
+	// ErrResumeUnsupported is returned when AgentSpec.ResumeSessionID is set
+	// for a harness whose CLI has no proven non-interactive resume path
+	// (docs/mvp.md task 10: Codex's `resume` subcommand opens an
+	// interactive picker; mate cannot drive it, so a resume request is
+	// refused rather than silently started fresh under this error).
+	ErrResumeUnsupported = errors.New("harness resume is not supported")
 )
 
 // EnvVar is a harness-level environment assignment.

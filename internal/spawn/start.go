@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +40,15 @@ type StartRequest struct {
 	// Harness is the harness kind to launch. Empty means the workspace
 	// default for a Mate (Claude Code).
 	Harness harness.Kind
+	// Resume asks StartMate to resume the harness session recorded in
+	// `mate.meta` (task 10) when one is there. The CLI defaults this true;
+	// it only matters when Fresh is false, and only takes effect when
+	// `mate.meta`'s session_id was recorded under the same harness this
+	// start is launching.
+	Resume bool
+	// Fresh forces a brand new harness session even when `mate.meta`
+	// carries one to resume: `matev2 mate start --fresh`.
+	Fresh bool
 }
 
 // StartResult is what a successful start recorded. Every field is also a
@@ -58,6 +68,15 @@ type StartResult struct {
 	Status      runtime.AgentStatus
 	StaleMeta   bool
 	TrustDialog bool
+	// Resumed is true when this start resumed the harness session recorded
+	// in `mate.meta` (task 10) instead of minting a fresh one.
+	Resumed bool
+	// ResumedFrom is the session id resumed from. Empty unless Resumed.
+	ResumedFrom string
+	// ResumeNote explains why a resume that was requested did not happen
+	// (harness mismatch, or the harness has no non-interactive resume),
+	// so this start went fresh instead. Empty when nothing needed saying.
+	ResumeNote string
 }
 
 // StartMate starts the Mate of one project: it refreshes the Mate's
@@ -104,11 +123,19 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 		return StartResult{}, err
 	}
 
+	// 1b. Task 10: whether this start can resume the harness session
+	// `mate.meta` still carries from before the last stop. Read before
+	// prepareMateDir/startInTab touch anything.
+	priorMeta, err := w.ReadMateMeta(project)
+	if err != nil {
+		return StartResult{}, err
+	}
+	decision := decideResume(priorMeta, kind, req)
+
 	// 2. The Mate's directory: the manual, rendered again on every start,
 	// and the settings file Claude launches with.
 	mateDir := w.MateDir(project)
-	sessionID, err := prepareMateDir(w, deps, project, cfg, kind, mateDir)
-	if err != nil {
+	if err := prepareMateDir(w, deps, project, cfg, kind, mateDir); err != nil {
 		return StartResult{}, err
 	}
 
@@ -136,7 +163,7 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	}
 
 	// From here on every failure must undo the tab and leave no meta.
-	result, err := startInTab(ctx, w, deps, project, kind, mateDir, sessionID, session, tab)
+	result, err := startInTab(ctx, w, deps, project, kind, mateDir, decision, session, tab)
 	if err != nil {
 		compensate(ctx, deps, w, project, session, tab)
 		return StartResult{}, err
@@ -145,12 +172,74 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	return result, nil
 }
 
+// resumeDecision is what task 10's resume logic concluded before a single
+// Herdr call is made: whether this start resumes a recorded session, and if
+// not, why not (so the caller can say so instead of silently going fresh).
+type resumeDecision struct {
+	Resume    bool
+	SessionID string
+	Note      string
+}
+
+// decideResume applies task 10's rule: resume only when the caller did not
+// force Fresh, asked to Resume, `mate.meta` still carries a non-empty
+// session_id from a previous stop, and that id was recorded under the same
+// harness this start is launching. A harness mismatch is reported, not
+// silently overridden - Stop keeps session_id= across a harness switch, so
+// meta alone cannot tell a stale id from a live one.
+func decideResume(meta map[string]string, kind harness.Kind, req StartRequest) resumeDecision {
+	if req.Fresh || !req.Resume {
+		return resumeDecision{}
+	}
+	priorID := strings.TrimSpace(meta[MetaSessionID])
+	if priorID == "" {
+		return resumeDecision{}
+	}
+	if priorHarness := meta[MetaHarness]; priorHarness != "" && priorHarness != string(kind) {
+		return resumeDecision{Note: fmt.Sprintf(
+			"mate.meta recorded harness %q but this start is launching %q; starting a fresh %s session instead of resuming",
+			priorHarness, kind, kind,
+		)}
+	}
+	return resumeDecision{Resume: true, SessionID: priorID}
+}
+
+// freshSessionID mints the Claude session uuid a non-resuming start needs;
+// every other harness has no launch-time session identity (start_test.go's
+// TestStartMateCodexWritesTheDiscoveryFile).
+func freshSessionID(deps Deps, kind harness.Kind) string {
+	if kind != harness.KindClaude {
+		return ""
+	}
+	if deps.NewSessionID != nil {
+		return deps.NewSessionID()
+	}
+	return uuid.NewString()
+}
+
 // startInTab is everything a failure has to compensate for: the launch spec,
 // the agent, its startup screen, the readiness wait and the meta.
-func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir, sessionID string, session runtime.SessionHandle, tab runtime.TabHandle) (StartResult, error) {
-	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID)
+func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle) (StartResult, error) {
+	sessionID, resume := decision.SessionID, decision.Resume
+	if !resume {
+		sessionID = freshSessionID(deps, kind)
+	}
+	resumeNote := decision.Note
+	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume)
 	if err != nil {
-		return StartResult{}, err
+		if resume && errors.Is(err, harness.ErrResumeUnsupported) {
+			// Documented in docs/mvp.md task 10: a harness with no proven
+			// non-interactive resume path (Codex's `resume` opens an
+			// interactive picker) falls back to a fresh session rather
+			// than failing the start outright.
+			resumeNote = fmt.Sprintf("resume not supported for %s: %v; started a fresh session instead", kind, err)
+			resume = false
+			sessionID = freshSessionID(deps, kind)
+			launch, err = buildLaunchSpec(ctx, project, kind, mateDir, sessionID, false)
+		}
+		if err != nil {
+			return StartResult{}, err
+		}
 	}
 	reservation, err := runtime.AllocateAgentName(deps.Names, session.Name, AgentNamePrefix, project, runtime.FailOnCollision)
 	if err != nil {
@@ -187,6 +276,12 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		MetaSessionID: sessionID,
 		MetaStartedAt: startedAt.Format(time.RFC3339),
 	}
+	var resumedFrom string
+	if resume {
+		resumedFrom = decision.SessionID
+		meta[MetaResumed] = "true"
+		meta[MetaResumedFrom] = resumedFrom
+	}
 	if err := w.WriteMateMeta(project, meta); err != nil {
 		return StartResult{}, err
 	}
@@ -203,6 +298,9 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		MateDir:     mateDir,
 		Status:      observed.Status,
 		TrustDialog: settled.TrustDialogAnswered,
+		Resumed:     resume,
+		ResumedFrom: resumedFrom,
+		ResumeNote:  resumeNote,
 	}, nil
 }
 
@@ -244,13 +342,13 @@ func refuseIfLive(ctx context.Context, w *store.Workspace, deps Deps, project st
 // and backlog files mateassets creates only when missing, and the Claude
 // settings file. It returns the Claude session uuid for this launch (empty
 // for a harness that has none).
-func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.ProjectConfig, kind harness.Kind, mateDir string) (string, error) {
+func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.ProjectConfig, kind harness.Kind, mateDir string) error {
 	if err := os.MkdirAll(mateDir, 0o755); err != nil {
-		return "", err
+		return err
 	}
 	binary, err := deps.binary()
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := mateassets.Write(mateDir, mateassets.Params{
 		ProjectName:   project,
@@ -266,26 +364,20 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		BacklogFile:   w.BacklogFile(project),
 		MatevBin:      binary,
 	}); err != nil {
-		return "", err
+		return err
 	}
 	if err := ensureClaudeSettings(mateDir, binary); err != nil {
-		return "", err
+		return err
 	}
 	if kind == harness.KindCodex {
 		// Codex discovers AGENTS.override.md, in preference to a tracked
 		// AGENTS.md, at the directory it runs in. The manual is the same
 		// text either way; this is the name Codex reads it under.
 		if err := writeCodexOverride(mateDir); err != nil {
-			return "", err
+			return err
 		}
 	}
-	if kind == harness.KindClaude {
-		if deps.NewSessionID != nil {
-			return deps.NewSessionID(), nil
-		}
-		return uuid.NewString(), nil
-	}
-	return "", nil
+	return nil
 }
 
 // ensureClaudeSettings creates `<mate>/.claude/settings.json` if it is not
@@ -323,7 +415,7 @@ func writeCodexOverride(mateDir string) error {
 // directory, which is also where the manual is: the adapters require a
 // context path, so the path they are given is that same manual, never a
 // separate generated file.
-func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string) (harness.LaunchSpec, error) {
+func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool) (harness.LaunchSpec, error) {
 	adapter, err := harness.AdapterFor(kind)
 	if err != nil {
 		return harness.LaunchSpec{}, err
@@ -341,13 +433,20 @@ func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mat
 	switch kind {
 	case harness.KindClaude:
 		spec.ContextPath = filepath.Join(mateDir, "AGENTS.md")
-		// A fresh session id is what task 10's `--resume` will name, and
-		// the settings file is where task 08's hooks go. Claude refuses one
-		// without the other.
-		spec.ClaudeSessionID = sessionID
+		// A fresh session id is what a first start names for a later
+		// `--resume` (task 10); the settings file is where task 08's hooks
+		// go. Claude refuses either without the other, fresh or resumed.
+		if resume {
+			spec.ResumeSessionID = sessionID
+		} else {
+			spec.ClaudeSessionID = sessionID
+		}
 		spec.ClaudeSettingsPath = filepath.Join(mateDir, ClaudeSettingsDir, ClaudeSettingsFile)
 	case harness.KindCodex:
 		spec.ContextPath = harness.CodexInstructionPath(mateDir)
+		if resume {
+			spec.ResumeSessionID = sessionID
+		}
 	}
 	return adapter.BuildLaunchSpec(ctx, spec)
 }
