@@ -99,5 +99,5 @@ func spawnFakeCrew(t *testing.T, w *store.Workspace, deps spawn.Deps, project, c
 // recorded" state send/peek/state all have to handle.
 func stopFakeCrew(t *testing.T, w *store.Workspace, deps spawn.Deps, project, crew string) (spawn.StopResult, error) {
 	t.Helper()
-	return spawn.StopCrew(context.Background(), w, deps, project, crew)
+	return spawn.StopCrew(context.Background(), w, deps, project, crew, true)
 }

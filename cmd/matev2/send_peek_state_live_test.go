@@ -89,7 +89,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 	t.Cleanup(func() {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer stopCancel()
-		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3")
+		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3", true)
 	})
 	t.Logf("spawned crew %s in pane %s (branch %s)", res.Agent, res.Pane, res.Branch)
 	if res.DeliveryWarning != "" {
@@ -158,7 +158,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 	line = waitForStateLine(t, root, "state: done", 60*time.Second)
 	t.Logf("matev2 state (after done): %s", line)
 
-	stopped, err := spawn.StopCrew(ctx, w, deps, "shop", "k3")
+	stopped, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true)
 	if err != nil {
 		t.Fatalf("StopCrew: %v", err)
 	}
