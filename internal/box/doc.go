@@ -18,6 +18,7 @@
 // what the file format can support.
 //
 // sent.log entries carry a real RFC3339 timestamp and need no such
-// approximation. Incidents are supplied by the caller (the observer produces
-// them; this package only merges them in) and are trusted as given.
+// approximation, and neither do the incidents: `incidents.log` is written by
+// the observer (internal/watch) with a timestamp per line. This package only
+// reads that file; it never detects an incident and never writes one.
 package box

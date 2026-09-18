@@ -187,6 +187,15 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Test xanh với fake Herdr không chứng minh gì. Mỗi milestone có live test trên Herdr lab session riêng, tên `TestLive*`, chạy khi `MATEV2_LIVE=1`.
 - Lệnh báo thành công phải kiểm tra lại hệ thống thật, không tin handle cũ.
 - Live test runtime cần một lab session do người chạy cấp qua `MATEV2_HERDR_LIVE_SESSION=fm-lab-...` và `TMPDIR` không đi qua symlink (macOS `/var` → `/private/var`). Herdr báo cwd của pane đã resolve symlink, nên guard so cwd trong `runtime` dùng `samePath` thay vì so chuỗi (sửa 2026-09-17, v1 có cùng lỗi).
+- Crew đang chạy lệnh shell KHÔNG phải là crew treo.
+  Đo 2026-09-18 (task 18, codex-cli 0.154.0, Herdr 0.8.2): Codex vẽ `• Working (Ns • esc to interrupt)` suốt thời gian lệnh chạy, và `send.ClassifyComposer` xếp đúng là Busy, nên một crew được bảo `sleep 400` không bao giờ thành `stale`.
+  Trạng thái mà luật `stale` thật sự nói tới là crew đã kết thúc turn: composer trống, pane đứng yên, `.status` không có dòng mới.
+  Live test vì thế dùng brief "trả lời đúng một từ ok và không làm gì khác".
+  Cùng lần đo: snapshot 40 dòng cuối của pane Codex rảnh giống nhau từng byte giữa các vòng poll, nên hash pane là tín hiệu "đứng yên" dùng được; với ngưỡng rút ngắn 20s, incident `stale` mở ở 21s, một dòng gửi vào pane gỡ nó ngay vòng sau, và `agent stop` làm `InspectAgent` trả `agent_not_found` nên `runtime_lost` mở trong cùng vòng.
+- Observer không bao giờ kết luận từ một lần đọc hỏng.
+  Herdr không trả lời, pane không đọc được, `.meta` chưa có agent: cả ba đều là "không nhìn được", không phải bằng chứng crew có vấn đề, nên không mở incident và không ghi health (đúng tinh thần quyết định 8).
+  Chỉ câu trả lời dứt khoát `agent_not_found` của Herdr mới mở `runtime_lost`.
+  Giá phải trả: mỗi crew mỗi vòng tốn ba lệnh `herdr` (lookup session, inspect, read), nên poll 5s với nhiều crew là chỗ cần đo lại khi số crew tăng.
 - Nested-session env (đo 2026-09-17, Claude Code 2.1.274): một Claude Code đang chạy export `CLAUDECODE=1`, `CLAUDE_CODE_SESSION_ID`, và các biến `CLAUDE_CODE_*` khác cho process con. Nếu Herdr server được khởi động từ shell đó thì mọi pane kế thừa chúng, và Claude trong pane coi mình là session con: hook `Stop` vẫn bắn nhưng transcript không bao giờ được ghi. Runtime gỡ `harness.NestedSessionEnv` khỏi env của server lúc spawn và khỏi pane ngay trước `agent start`. Bài học chung: không tin env kế thừa qua Herdr server, mọi biến harness cần đúng phải được set hoặc unset ở pane.
 
 ## 8. Tái sử dụng từ v1
@@ -259,7 +268,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 18 ∥ | Observer `internal/watch`: mỗi crew mở của mọi project, poll `.status`, inventory Herdr, composer classifier, hash pane, clock tiêm được. Mở/đóng incident `stale`, `runtime_lost` vào `incidents.log` theo hợp đồng mục 4b. `box.Load` đọc `incidents.log`, `View.OpenIncidents(crew)`. Console khởi động observer khi mở workspace và vẽ cột sức khỏe từ nó. | Unit với clock giả và pane giả cho từng chuyển tiếp mở/đóng. Live: crew Codex thật bị treo (prompt bảo nó `sleep`) thành `blocked` rồi tự gỡ khi chạy lại; agent bị giết thành `runtime_lost`. |
+| 18 ∥ | Observer `internal/watch`: mỗi crew mở của mọi project, poll `.status`, inventory Herdr, composer classifier, hash pane, clock tiêm được. Mở/đóng incident `stale`, `runtime_lost` vào `incidents.log` theo hợp đồng mục 4b. `box.Load` đọc `incidents.log`, `View.OpenIncidents(crew)`. Console khởi động observer khi mở workspace và vẽ cột sức khỏe từ nó. | Unit với clock giả và pane giả cho từng chuyển tiếp mở/đóng. Live: crew Codex thật đứng im thành `blocked` rồi tự gỡ khi có dòng gửi vào pane; agent bị giết thành `runtime_lost`. Đã xong 2026-09-18; brief `sleep` trong ô này không dùng được, xem mục 7. |
 | 18b ∥ | Từ vựng trạng thái theo mục 4b: `crewstate` in `state · health`, `query` bỏ hẳn từ vựng v1 (`succeeded`, `awaiting_review`, `IsFinished`...), `spawn` ghi `state=spawned` lúc spawn, `state=failed` khi spawn thất bại, `crew stop` từ chối trước khi giết và ghi `state=finished|failed`, `box` verb crew là `working`/`needs-decision`/`wait-mate`, brief template, manual Mate (mục 4, 8, 9, 12 và skill stuck-crew-recovery), spec, mọi live test đang chờ `done:`. Tương thích ngược: `.meta` có `stopped_at` mà không có `state=` đọc là `finished`; dòng `done:` cũ đọc là `wait-mate`. | Unit từng quy tắc suy trạng thái; acceptance M2 chạy lại và đi đến `wait-mate:` rồi `crew stop` → `finished`. |
 | 19 | Daemon auto trong console: digest 90 giây từ inbox và incident, gửi có kiểm chứng với marker, wedged, dừng khi `.auto` mất, phím bật tắt. | Live: crew hỏi, Mate tự trả lời, người dùng gõ thì tự tắt. |
 | 20 | Policy auto trong AGENTS.md, kể cả cách Mate xử lý `blocked` và `wait-mate` trong digest. | Acceptance có kịch bản. |

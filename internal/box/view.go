@@ -9,13 +9,19 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// Cursor is a set of per-file read offsets: one for sent.log and one per
-// crew status file. LoadSince uses it to read only what is new since a
-// previous Load or LoadSince; a caller (the observer) keeps the Cursor a
-// View returns and passes it back on the next poll.
+// Cursor is a set of per-file read offsets: one for sent.log, one for
+// incidents.log, and one per crew status file. LoadSince uses it to read
+// only what is new since a previous Load or LoadSince; a caller (the
+// observer) keeps the Cursor a View returns and passes it back on the next
+// poll.
 type Cursor struct {
-	Sent   int64
-	Status map[string]int64
+	Sent int64
+	// Incidents is the resume offset of incidents.log. Only the entries
+	// after it are returned, but the whole file is always read: whether an
+	// incident is still open is decided by the last line of its (crew,
+	// kind) pair, which can sit on either side of the cursor.
+	Incidents int64
+	Status    map[string]int64
 }
 
 // View is a project's communication, merged and sorted by time.
@@ -50,22 +56,21 @@ type Summary struct {
 	LastAt time.Time
 }
 
-// Load reads every crew status file and sent.log for project from the
-// start, merges in the given incidents, and returns the full View.
-func Load(ws *store.Workspace, project string, incidents []Incident) (View, error) {
-	return load(ws, project, incidents, Cursor{})
+// Load reads every crew status file, sent.log and incidents.log for project
+// from the start, and returns the full View.
+func Load(ws *store.Workspace, project string) (View, error) {
+	return load(ws, project, Cursor{})
 }
 
-// LoadSince reads only what is new since a previous Load or LoadSince,
-// using since's per-file offsets, and merges in the given incidents (the
-// observer's own new findings; box keeps no incident history of its own).
-// The returned View's Entries hold only the new lines - a caller wanting the
-// full history keeps its own accumulation across calls.
-func LoadSince(ws *store.Workspace, project string, incidents []Incident, since Cursor) (View, error) {
-	return load(ws, project, incidents, since)
+// LoadSince reads only what is new since a previous Load or LoadSince, using
+// since's per-file offsets. The returned View's Entries hold only the new
+// lines - a caller wanting the full history keeps its own accumulation
+// across calls.
+func LoadSince(ws *store.Workspace, project string, since Cursor) (View, error) {
+	return load(ws, project, since)
 }
 
-func load(ws *store.Workspace, project string, incidents []Incident, cursor Cursor) (View, error) {
+func load(ws *store.Workspace, project string, cursor Cursor) (View, error) {
 	crews, err := listCrews(ws, project)
 	if err != nil {
 		return View{}, err
@@ -127,17 +132,12 @@ func load(ws *store.Workspace, project string, incidents []Incident, cursor Curs
 		})
 	}
 
-	for i := range incidents {
-		inc := incidents[i]
-		entries = append(entries, Entry{
-			At:       inc.At,
-			Source:   SourceObserver,
-			Kind:     KindIncident,
-			Crew:     inc.Crew,
-			Text:     incidentText(inc.Kind, inc.Text),
-			Incident: &inc,
-		})
+	incidentEntries, incidentNext, err := loadIncidents(ws, project, cursor.Incidents)
+	if err != nil {
+		return View{}, err
 	}
+	newCursor.Incidents = incidentNext
+	entries = append(entries, incidentEntries...)
 
 	sort.SliceStable(entries, func(i, j int) bool {
 		a, b := entries[i], entries[j]

@@ -55,7 +55,7 @@ func TestLoadMergesStatusAndSentByTime(t *testing.T) {
 		t.Fatalf("AppendStatus: %v", err)
 	}
 
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLoadSinceReturnsOnlyAppendedLines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, err := box.Load(w, "shop", nil)
+	first, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestLoadSinceReturnsOnlyAppendedLines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second, err := box.LoadSince(w, "shop", nil, first.Cursor)
+	second, err := box.LoadSince(w, "shop", first.Cursor)
 	if err != nil {
 		t.Fatalf("LoadSince: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestLoadSinceReturnsOnlyAppendedLines(t *testing.T) {
 	}
 
 	// A further poll with no new writes returns nothing.
-	third, err := box.LoadSince(w, "shop", nil, second.Cursor)
+	third, err := box.LoadSince(w, "shop", second.Cursor)
 	if err != nil {
 		t.Fatalf("LoadSince: %v", err)
 	}
@@ -161,10 +161,13 @@ func TestLoadMergesIncidents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	incidents := []box.Incident{
-		{At: time.Now(), Crew: "k3", Kind: box.IncidentStale, Text: "no status in 20m"},
+	if err := w.AppendIncident("shop", store.IncidentEntry{
+		Time: time.Now(), Crew: "k3", Kind: string(box.IncidentStale),
+		State: store.IncidentOpen, Text: "no status in 20m",
+	}); err != nil {
+		t.Fatal(err)
 	}
-	v, err := box.Load(w, "shop", incidents)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -230,7 +233,7 @@ func TestLatestStatusAndSummarize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

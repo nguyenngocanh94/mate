@@ -3,6 +3,7 @@ package console
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
@@ -59,9 +60,88 @@ func TestCrewNoteSpansDistinguishesRemovedWorktreeFromLive(t *testing.T) {
 
 }
 
-// TODO(task 18): a health-warning half of the test above, and
-// TestCrewRowNoteSpansHealthLastMeansWorkOutcomeSurvivesAtNarrowWidth,
-// lived here. The health observer is mvp.md's task 18.
+// TestCrewRowNoteSpansDrawsTheObserversHealth is the health column of
+// mvp.md section 4b: a reading of the pane beside the Crew's state, in the
+// words the design's NOTE cell has room for. An agent Herdr no longer has is
+// the one reading that must be unmistakable.
+func TestCrewRowNoteSpansDrawsTheObserversHealth(t *testing.T) {
+	m := noteModel()
+	crew := func(h query.CrewHealth) query.CrewNode {
+		return query.CrewNode{
+			CrewID:    "c1",
+			Attention: query.AbsentField[query.Attention]("nothing about this crew needs attention"),
+			Health:    query.KnownField(h),
+		}
+	}
+	cases := []struct {
+		name   string
+		health query.CrewHealth
+		want   string
+	}{
+		{"busy", query.CrewHealth{AgentPresent: true, Composer: query.ComposerBusy, QuietFor: 12 * time.Second}, "pane busy 12s"},
+		{"idle", query.CrewHealth{AgentPresent: true, Composer: query.ComposerEmpty, QuietFor: 4 * time.Minute}, "pane idle 4m"},
+		{"pending is idle too", query.CrewHealth{AgentPresent: true, Composer: query.ComposerPending, QuietFor: 90 * time.Second}, "pane idle 1m"},
+		{"unreadable pane", query.CrewHealth{AgentPresent: true, Composer: query.ComposerUnknown}, "pane unreadable"},
+		{"agent gone", query.CrewHealth{Composer: query.ComposerUnknown, QuietFor: time.Hour}, "agent gone"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := strings.TrimRight(renderSpans(m.crewRowNoteSpans(crew(tc.health), 40), 40), " ")
+			if got != tc.want {
+				t.Fatalf("note = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCrewRowNoteSpansDrawsNothingWithoutAnObservation: a Crew nobody has
+// observed - every one-shot read of the tree, and a console whose observer
+// has not polled yet - says nothing at all. It must never render as if the
+// observer had looked and found something.
+func TestCrewRowNoteSpansDrawsNothingWithoutAnObservation(t *testing.T) {
+	m := noteModel()
+	for name, c := range map[string]query.CrewNode{
+		"absent": {
+			CrewID:    "c1",
+			Attention: query.AbsentField[query.Attention]("nothing about this crew needs attention"),
+			Health:    query.AbsentField[query.CrewHealth]("no observer has looked at this crew yet"),
+		},
+		"unset": {
+			CrewID:    "c1",
+			Attention: query.AbsentField[query.Attention]("nothing about this crew needs attention"),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := strings.TrimSpace(renderSpans(m.crewRowNoteSpans(c, 40), 40)); got != "" {
+				t.Fatalf("note = %q, want nothing", got)
+			}
+		})
+	}
+}
+
+// TestCrewRowNoteSpansHealthLastMeansWorkOutcomeSurvivesAtNarrowWidth: the
+// health reading is the lowest-priority item, so a column too narrow for
+// both drops it and keeps the recorded outcome. The pane can be looked at
+// directly; the outcome cannot.
+func TestCrewRowNoteSpansHealthLastMeansWorkOutcomeSurvivesAtNarrowWidth(t *testing.T) {
+	m := noteModel()
+	c := query.CrewNode{
+		CrewID:    "c1",
+		Attention: query.AbsentField[query.Attention]("nothing about this crew needs attention"),
+		Worktree: query.KnownField(query.WorktreeValue{
+			Path: "/w", Branch: "crew/c1", Status: query.WorktreeRecordedRemoved,
+		}),
+		Health: query.KnownField(query.CrewHealth{AgentPresent: true, Composer: query.ComposerEmpty, QuietFor: 4 * time.Minute}),
+	}
+	full := strings.TrimRight(renderSpans(m.crewRowNoteSpans(c, 40), 40), " ")
+	if !strings.Contains(full, "worktree missing") || !strings.Contains(full, "pane idle 4m") {
+		t.Fatalf("full-width note = %q, want both items", full)
+	}
+	narrow := strings.TrimRight(renderSpans(m.crewRowNoteSpans(c, 18), 18), " ")
+	if narrow != "worktree missing" {
+		t.Fatalf("narrow note = %q, want the work outcome kept and the health dropped", narrow)
+	}
+}
 
 // TestCrewNoteSpansDropsWholeItemsNotHalfWords is the drop-priority rule
 // (design/mate-console-design-notes.html, "Rut gon"): when the ATTENTION

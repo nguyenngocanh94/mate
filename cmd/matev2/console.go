@@ -38,14 +38,33 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	}
 
 	ctx := context.Background()
-	load := func(loadCtx context.Context) (query.Snapshot, error) {
-		return query.Load(loadCtx, ws)
-	}
 	// One set of live dependencies for the whole Console run: the Herdr
 	// adapter and the agent-name registry it shares, so a Mate started from
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
 	deps := spawn.LiveDeps()
+
+	// The observer of mvp.md section 4b runs for as long as the workspace is
+	// open, and only then: it lives in this process, so quitting the console
+	// means nobody is watching the crews and no new incident is opened. What
+	// it already wrote stays in `incidents.log`.
+	watcher, err := consoleWatcher(dir, deps)
+	if err != nil {
+		return err
+	}
+	watcher.Start(ctx)
+	defer watcher.Stop()
+
+	load := func(loadCtx context.Context) (query.Snapshot, error) {
+		snap, err := query.Load(loadCtx, ws)
+		if err != nil {
+			return snap, err
+		}
+		// query.Load reads files; the health column is an observation. The
+		// snapshot picks up whatever the observer has seen by now, and the
+		// crews it has not seen keep their Absent health.
+		return withCrewHealth(snap, watcher.Snapshot()), nil
+	}
 	var stream runtime.SessionStream
 	if s, ok := deps.Runtime.(runtime.SessionStream); ok {
 		stream = s
