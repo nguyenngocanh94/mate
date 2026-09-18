@@ -1,4 +1,4 @@
- matev2 console   workspace ws_xxxxxx…xxxx                       As of 14:02:11 
+ matev2 console   workspace ws_xxxxxx…xxxx                      live · 14:02:11 
  ws_xxxxxx…xxxx › 支払いのべき等性を修正する é payments-api-… Project · 3 crews 
 ────────────────────────────────────────────────────────────────────────────────
   CONFIRM stop?                                                                 

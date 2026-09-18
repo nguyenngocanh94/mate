@@ -483,21 +483,20 @@ func TestKeyLineDropsOptionalHintsThenAbbreviatesUnavailable(t *testing.T) {
 	}
 }
 
-// TestHeaderAlwaysSaysTheSnapshotIsRecordedAndHowOld: the redesign drops
-// the verbose "recorded-status=" prefix from the columns, so the chrome is
-// what carries the claim. It must never read as a live view.
-func TestHeaderAlwaysSaysTheSnapshotIsRecordedAndHowOld(t *testing.T) {
+// TestHeaderAlwaysSaysLiveAndHowOld: the tree now auto-refreshes
+// (model.go's treeTickInterval), so "live · HH:MM:SS" is an honest claim
+// rather than the redesign's former "Recorded snapshot ... As of", which
+// this test used to require to keep the screen from reading as live. It
+// must always say the time of the last successful read, at every width.
+func TestHeaderAlwaysSaysLiveAndHowOld(t *testing.T) {
 	for _, size := range frameSizes {
 		if layout(size.w, size.h).TooSmall {
 			continue
 		}
 		m := newFixture(t, sampleTree(), size.w, size.h, unicodeGlyphs)
 		header := strings.Split(renderFrame(t, m), "\n")[0]
-		if !strings.Contains(header, "As of "+goldenAsOf.Format("15:04:05")) {
-			t.Fatalf("at %s the header does not say how old the read is: %q", size.name, header)
-		}
-		if size.w >= 100 && !strings.Contains(header, "Recorded snapshot") {
-			t.Fatalf("at %s the header does not say the snapshot is recorded: %q", size.name, header)
+		if !strings.Contains(header, "live "+m.g.Dot+" "+goldenAsOf.Format("15:04:05")) {
+			t.Fatalf("at %s the header does not say the read is live and how old it is: %q", size.name, header)
 		}
 	}
 }
@@ -801,6 +800,9 @@ func TestNewPicksTheGlyphSetFromTheEnvironment(t *testing.T) {
 // side of the header. The old rule dropped the right side on a collision,
 // so the frame lost "Recorded snapshot" and "As of" - the two pieces of
 // chrome that stop the screen reading as live - on every real workspace.
+// The current wording ("live · HH:MM:SS") is short enough that it no longer
+// needs to be dropped at any width this suite exercises, so this guards the
+// read time and the id abbreviation rather than a claim that gets dropped.
 func TestHeaderKeepsTheRecordedClaimAgainstARealWorkspaceID(t *testing.T) {
 	tree := sampleTree()
 	tree.WorkspaceID = "ws_cb29a22edd5f283052238d69ee94bbc95bcd19b56854333e02be8c81800ddd25"
@@ -816,11 +818,8 @@ func TestHeaderKeepsTheRecordedClaimAgainstARealWorkspaceID(t *testing.T) {
 		}
 		m := newFixture(t, tree, size.w, size.h, unicodeGlyphs)
 		lines := strings.Split(renderFrame(t, m), "\n")
-		if !strings.Contains(lines[0], "As of "+goldenAsOf.Format("15:04:05")) {
-			t.Errorf("at %s a 67-character workspace id pushed the read time off the header:\n%q", size.name, lines[0])
-		}
-		if size.w >= 100 && !strings.Contains(lines[0], "Recorded snapshot") {
-			t.Errorf("at %s a 67-character workspace id pushed the recorded-snapshot claim off the header:\n%q", size.name, lines[0])
+		if !strings.Contains(lines[0], "live "+m.g.Dot+" "+goldenAsOf.Format("15:04:05")) {
+			t.Errorf("at %s a 67-character workspace id pushed the live claim off the header:\n%q", size.name, lines[0])
 		}
 		if !strings.Contains(lines[1], "project") {
 			t.Errorf("at %s the breadcrumb lost its level count:\n%q", size.name, lines[1])

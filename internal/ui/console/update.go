@@ -23,7 +23,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// attachReadNote runs after onTreeLoaded so that, on the one read
 		// that follows a hand-over, what happened to the attach is what the
 		// message line says (attach.go).
-		return m.onTreeLoaded(msg).attachReadNote(msg.err), nil
+		m = m.onTreeLoaded(msg).attachReadNote(msg.err)
+		// The auto-refresh chain starts here, once, on the first
+		// treeLoadedMsg the Console ever sees - see Init's own comment for
+		// why not there directly. Every later treeLoadedMsg (a manual 'r',
+		// an attach return, an action's own re-read, or the chain's own
+		// tick) finds treeTickStarted already true and this is a no-op.
+		if !m.treeTickStarted {
+			m.treeTickStarted = true
+			return m, treeTickCmd(m.treeTickInterval(), m.treeGen)
+		}
+		return m, nil
+	case treeTickMsg:
+		return m.onTreeTick(msg)
 	case AttachHandedOverMsg:
 		return m.onAttachHandedOver()
 	case AttachFinishedMsg:
@@ -65,8 +77,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // navigation stack by identity instead of discarding it, then clamps
 // whatever the new tree no longer contains (see reconcileSelection).
 func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
+	m.treeLoadInFlight = false
 	if msg.err != nil {
 		if m.hasLoaded {
+			// The header's "stale" wording (frame.go) reads this rather than
+			// m.msg: the footer line below is cleared by the reader's very
+			// next keystroke, but the tree on screen stays exactly what the
+			// last successful load said until another one succeeds, so the
+			// header keeps saying so for exactly as long as that is true.
+			m.lastLoadErr = msg.err
 			if m.actionAfterRead != nil {
 				m.msg = *m.actionAfterRead
 				m.actionAfterRead = nil
@@ -76,8 +95,8 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 			// A refresh that failed does not throw away the snapshot that is
 			// already on screen: the error page says "no earlier snapshot is
 			// loaded", which would be false, and the reader would lose a
-			// usable picture over a transient read. The header's "As of"
-			// already says how old what they are looking at is; the message
+			// usable picture over a transient read. The header already says
+			// "stale" and how old what they are looking at is; the message
 			// line says the refresh did not happen.
 			m.msg = errMsg("Refresh failed: " + msg.err.Error() + " " + m.g.Dot +
 				" still showing the snapshot from " + m.tree.AsOf.Format("15:04:05"))
@@ -91,6 +110,7 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 	first := !m.hasLoaded
 	m.phase = phaseReady
 	m.loadErr = nil
+	m.lastLoadErr = nil
 	m.tree = msg.tree
 	m.hasLoaded = true
 	if first {
@@ -122,6 +142,36 @@ func (m Model) refreshSessionMode() Model {
 	m.sess.target.Mode = p.Mode
 	m.sess.snapshot.Target.Mode = p.Mode
 	return m
+}
+
+// startLoad issues a tree load and marks it in flight, whether it was asked
+// for by the reader ('r'), the failed-phase retry, or a background tick
+// (onTreeTick). Every call site that can issue a loadCmd goes through this
+// rather than calling loadCmd directly, so treeLoadInFlight always reflects
+// whether a load is actually outstanding.
+func (m Model) startLoad() (Model, tea.Cmd) {
+	m.treeLoadInFlight = true
+	return m, loadCmd(m.load)
+}
+
+// onTreeTick is the auto-refresh chain (Init, treeTickCmd): every
+// treeTickInterval it starts a background load unless one is already in
+// flight, then always reschedules itself so the chain never stops on its
+// own. A tick whose gen no longer matches m.treeGen is a leftover from a
+// chain Init did not start (never happens in production - see Init's own
+// comment - but the same defence session_mode.go's ticks carry) and is
+// dropped without rescheduling, since the chain that owns treeGen is
+// already rescheduling itself.
+func (m Model) onTreeTick(msg treeTickMsg) (Model, tea.Cmd) {
+	if msg.gen != m.treeGen {
+		return m, nil
+	}
+	next := treeTickCmd(m.treeTickInterval(), m.treeGen)
+	if m.treeLoadInFlight {
+		return m, next
+	}
+	m, load := m.startLoad()
+	return m, tea.Batch(load, next)
 }
 
 func (m Model) applyActionAfterRead() Model {
@@ -317,7 +367,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case phaseFailed:
 		if key == "r" {
 			m.msg = infoMsg("Retrying snapshot read " + m.g.Ellipsis)
-			return m, loadCmd(m.load)
+			return m.startLoad()
 		}
 		return m, nil
 	}
@@ -355,7 +405,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginModeToggle(m.currentProject().ProjectID)
 	case "r":
 		m.msg = footerMsg{}
-		return m, loadCmd(m.load)
+		return m.startLoad()
 	case "tab":
 		return m.onTab(l), nil
 	case "esc", "backspace":

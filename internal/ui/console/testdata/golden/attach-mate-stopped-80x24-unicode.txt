@@ -1,4 +1,4 @@
- matev2 console   workspace ws_acme                              As of 14:02:11 
+ matev2 console   workspace ws_acme                             live · 14:02:11 
  ws_acme › docs-site                                          Project · 0 crews 
 ────────────────────────────────────────────────────────────────────────────────
   MATE                            HARNESS    STATUS     MODE        BINDING     

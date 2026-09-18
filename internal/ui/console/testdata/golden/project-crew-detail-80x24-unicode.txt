@@ -1,4 +1,4 @@
- matev2 console   workspace ws_acme                              As of 14:02:11 
+ matev2 console   workspace ws_acme                             live · 14:02:11 
  ws_acme › payments-api                          Detail view · Esc back to list 
 ────────────────────────────────────────────────────────────────────────────────
  CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT                                             

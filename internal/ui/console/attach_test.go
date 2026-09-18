@@ -296,7 +296,7 @@ func TestDetachSaysTheAgentWasNotStoppedAndNamesTheNewSnapshot(t *testing.T) {
 		"Detached from crew-payments-api-2",
 		"agent not stopped",
 		"re-read " + later.Format("15:04:05"),
-		"As of " + later.Format("15:04:05"),
+		"live · " + later.Format("15:04:05"),
 	} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("the frame after a detach does not say %q:\n%s", want, view)
@@ -331,8 +331,8 @@ func TestADetachWhoseReReadFailsKeepsBothFacts(t *testing.T) {
 			t.Fatalf("message = %q, want it to say %q", m.msg.text, want)
 		}
 	}
-	if !strings.Contains(renderFrame(t, m), "As of "+goldenAsOf.Format("15:04:05")) {
-		t.Fatalf("the header must still say how old the snapshot on screen is")
+	if !strings.Contains(renderFrame(t, m), "stale · "+goldenAsOf.Format("15:04:05")) {
+		t.Fatalf("the header must still say how old the snapshot on screen is, and that the re-read failed")
 	}
 }
 
@@ -366,7 +366,7 @@ func TestAFailureWhoseReReadFailsKeepsTheCause(t *testing.T) {
 	if strings.Contains(m.msg.text, "snapshot re-read") {
 		t.Fatalf("message = %q, must not claim a re-read that failed", m.msg.text)
 	}
-	if m.phase != phaseReady || !strings.Contains(renderFrame(t, m), "As of "+goldenAsOf.Format("15:04:05")) {
+	if m.phase != phaseReady || !strings.Contains(renderFrame(t, m), "stale · "+goldenAsOf.Format("15:04:05")) {
 		t.Fatalf("the frame must still show the snapshot it has, and say how old it is")
 	}
 	// The full evidence is one keystroke away, and it is what makes the
@@ -1250,7 +1250,7 @@ func attachGallery() []attachGalleryState {
 		says: []string{
 			"Detached from crew-payments-api-2", "agent not stopped",
 			"re-read " + goldenAsOf.Add(3*time.Minute+time.Second).Format("15:04:05"),
-			"As of " + goldenAsOf.Add(3*time.Minute+time.Second).Format("15:04:05"),
+			"live · " + goldenAsOf.Add(3*time.Minute+time.Second).Format("15:04:05"),
 		},
 		// A detach is neither of the two bad outcomes, and it establishes
 		// nothing about the agent beyond "not stopped by this".

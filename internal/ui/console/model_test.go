@@ -351,7 +351,7 @@ func TestRefreshUpdatesAsOf(t *testing.T) {
 	if m.tree.AsOf != later {
 		t.Fatalf("AsOf after a refresh = %v, want %v", m.tree.AsOf, later)
 	}
-	if !strings.Contains(renderFrame(t, m), "As of "+later.Format("15:04:05")) {
+	if !strings.Contains(renderFrame(t, m), "live "+m.g.Dot+" "+later.Format("15:04:05")) {
 		t.Fatalf("header does not show the new read time")
 	}
 }

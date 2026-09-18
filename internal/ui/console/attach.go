@@ -425,7 +425,7 @@ func (m Model) onAttachFinished(msg AttachFinishedMsg) (tea.Model, tea.Cmd) {
 		m.att.ret = returnDetached
 	}
 	m.msg = m.attachReturnMessage("", false)
-	return m, loadCmd(m.load)
+	return m.startLoad()
 }
 
 // attachReadNote completes the return message once the single re-read that
