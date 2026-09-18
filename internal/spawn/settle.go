@@ -19,9 +19,16 @@ import (
 // behind a question nobody would answer.
 //
 // This step runs between StartAgent and the readiness wait: it reads the
-// pane, answers exactly one recognised dialog (select, re-read, verify the
-// highlight is on the accept option, only then confirm), and refuses - with
-// no key pressed - anything it cannot name.
+// pane, answers each recognised dialog once (select, re-read, verify the
+// highlight is on the option matev2 means to confirm, only then confirm),
+// and refuses - with no key pressed - anything it cannot name.
+//
+// Codex draws a sequence, not a single modal: measured 2026-09-18 with
+// codex-cli 0.154.0 and 0.155.0 published, a launch in an unseen directory
+// shows the release-update prompt first and only reaches the directory-trust
+// dialog after it is answered. Each is answered with the same discipline, and
+// startupMaxDialogs bounds the sequence so a harness that redraws a dialog
+// forever cannot turn this into a keypress loop.
 
 const (
 	// startupScreenLines bounds each pane read. The dialogs are under 20
@@ -37,6 +44,11 @@ const (
 	startupKeySettle = 400 * time.Millisecond
 	// startupErrorTailLines bounds the screen excerpt carried in a refusal.
 	startupErrorTailLines = 12
+	// startupMaxDialogs caps how many startup dialogs one launch answers.
+	// Two are measured (Codex's update prompt then the directory-trust
+	// dialog); the cap leaves room for a third without ever letting a
+	// redrawing harness be answered indefinitely.
+	startupMaxDialogs = 3
 )
 
 // sleeper is the wait between polls; tests shorten it.
@@ -59,8 +71,51 @@ type Settlement struct {
 	// TrustDialogAnswered is true when the harness's directory-trust dialog
 	// was on screen and matev2 accepted it.
 	TrustDialogAnswered bool
+	// UpdateDialogAnswered is true when the harness's release-update prompt
+	// was on screen and matev2 skipped it until the next version.
+	UpdateDialogAnswered bool
 	// Presses is the key sequence sent, one entry per press.
 	Presses []string
+}
+
+// markAnswered records one answered dialog and reports whether the state is
+// already set - the harness redrew a dialog matev2 had confirmed.
+func (s *Settlement) markAnswered(screen harness.StartupScreen) bool {
+	switch screen {
+	case harness.StartupScreenTrustDialog:
+		if s.TrustDialogAnswered {
+			return true
+		}
+		s.TrustDialogAnswered = true
+	case harness.StartupScreenUpdateDialog:
+		if s.UpdateDialogAnswered {
+			return true
+		}
+		s.UpdateDialogAnswered = true
+	}
+	return false
+}
+
+// startupDialog describes how one recognised dialog is answered: its keys and
+// the check that the highlight is on the option the confirm key will take.
+type startupDialog struct {
+	answer   func(harness.Kind) (harness.StartupDialogAnswer, error)
+	selected func(harness.Kind, string) (bool, error)
+	// what names the dialog in refusals.
+	what string
+}
+
+var startupDialogs = map[harness.StartupScreen]startupDialog{
+	harness.StartupScreenTrustDialog: {
+		answer:   harness.TrustDialogAnswerFor,
+		selected: harness.TrustDialogAcceptSelected,
+		what:     "trust dialog",
+	},
+	harness.StartupScreenUpdateDialog: {
+		answer:   harness.UpdateDialogAnswerFor,
+		selected: harness.UpdateDialogSkipSelected,
+		what:     "update dialog",
+	},
 }
 
 // settleStartupPrompt polls the agent's pane until it shows the harness's
@@ -80,6 +135,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 	}
 	deadline := time.Now().Add(budget)
 	var settled Settlement
+	answered := 0
 	for {
 		screen, err := rt.ReadAgent(ctx, handle, startupScreenLines)
 		if err != nil {
@@ -89,26 +145,29 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err != nil {
 			return settled, err
 		}
-		switch class {
-		case harness.StartupScreenReady:
+		if class == harness.StartupScreenReady {
 			return settled, nil
-		case harness.StartupScreenTrustDialog:
-			if settled.TrustDialogAnswered {
+		}
+		if dialog, ok := startupDialogs[class]; ok {
+			if settled.markAnswered(class) {
 				return settled, startupRefusal(handle, kind, screen,
-					fmt.Sprintf("%s trust dialog is still on screen after matev2 confirmed the accept option; not pressing anything further", kind))
+					fmt.Sprintf("%s %s is still on screen after matev2 confirmed its selection; not pressing anything further", kind, dialog.what))
 			}
-			presses, err := answerTrustDialog(ctx, rt, handle, kind, sleep)
+			answered++
+			if answered > startupMaxDialogs {
+				return settled, startupRefusal(handle, kind, screen,
+					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; matev2 stops answering rather than press keys in a loop", kind, startupMaxDialogs))
+			}
+			presses, err := answerStartupDialog(ctx, rt, handle, kind, dialog, sleep)
 			settled.Presses = append(settled.Presses, presses...)
 			if err != nil {
 				return settled, err
 			}
-			settled.TrustDialogAnswered = true
-			// Fall through to the next poll, which must find the composer.
-		case harness.StartupScreenUnrecognized:
-			if time.Now().After(deadline) {
-				return settled, startupRefusal(handle, kind, screen,
-					fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not the measured directory-trust dialog; matev2 refuses to press keys into a screen it cannot name", kind, budget.Round(time.Millisecond)))
-			}
+			// Fall through to the next poll, which must find the next
+			// dialog or the composer.
+		} else if time.Now().After(deadline) {
+			return settled, startupRefusal(handle, kind, screen,
+				fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not a measured startup dialog; matev2 refuses to press keys into a screen it cannot name", kind, budget.Round(time.Millisecond)))
 		}
 		if err := sleep(ctx, startupPollInterval); err != nil {
 			return settled, err
@@ -116,13 +175,15 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 	}
 }
 
-// answerTrustDialog performs the measured accept sequence for one harness:
-// every select press is its own Herdr call followed by a re-read, and the
-// confirm press is sent only once the highlight marker is on the accept
-// option. Claude's default highlight is "No, exit", so this order is the
-// difference between accepting and killing the agent.
-func answerTrustDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, sleep sleeper) ([]string, error) {
-	answer, err := harness.TrustDialogAnswerFor(kind)
+// answerStartupDialog performs one dialog's measured sequence for one
+// harness: every select press is its own Herdr call followed by a re-read,
+// and the confirm press is sent only once the highlight marker is on the
+// option matev2 means to take. Claude's trust highlight opens on "No, exit"
+// and Codex's update highlight opens on "1. Update now", so this order is the
+// difference between settling the pane and killing the agent or starting a
+// package install under it.
+func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, dialog startupDialog, sleep sleeper) ([]string, error) {
+	answer, err := dialog.answer(kind)
 	if err != nil {
 		return nil, err
 	}
@@ -150,13 +211,13 @@ func answerTrustDialog(ctx context.Context, rt runtime.Adapter, handle runtime.A
 			return presses, err
 		}
 	}
-	selected, err := harness.TrustDialogAcceptSelected(kind, screen)
+	selected, err := dialog.selected(kind, screen)
 	if err != nil {
 		return presses, err
 	}
 	if !selected {
 		return presses, startupRefusal(handle, kind, screen,
-			fmt.Sprintf("%s trust dialog: after pressing %s the highlight is not on %q; refusing to confirm a selection matev2 cannot see", kind, strings.Join(answer.SelectKeys, ", "), answer.AcceptLabel))
+			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection matev2 cannot see", kind, dialog.what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
 	}
 	if err := rt.SendKeys(ctx, handle, []string{answer.ConfirmKey}); err != nil {
 		return presses, err

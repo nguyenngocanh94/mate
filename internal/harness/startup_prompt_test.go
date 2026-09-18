@@ -113,14 +113,14 @@ func TestTrustDialogAnswersSelectBeforeConfirming(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(claude.SelectKeys) != 1 || claude.SelectKeys[0] != "down" || claude.ConfirmKey != "enter" || claude.AcceptLabel != "Yes, I trust this folder" {
+	if len(claude.SelectKeys) != 1 || claude.SelectKeys[0] != "down" || claude.ConfirmKey != "enter" || claude.TargetLabel != "Yes, I trust this folder" {
 		t.Fatalf("claude answer = %+v", claude)
 	}
 	codex, err := TrustDialogAnswerFor(KindCodex)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codex.SelectKeys) != 1 || codex.SelectKeys[0] != "1" || codex.ConfirmKey != "enter" || codex.AcceptLabel != "1. Yes, continue" {
+	if len(codex.SelectKeys) != 1 || codex.SelectKeys[0] != "1" || codex.ConfirmKey != "enter" || codex.TargetLabel != "1. Yes, continue" {
 		t.Fatalf("codex answer = %+v", codex)
 	}
 }
@@ -262,5 +262,149 @@ func TestClassifyStartupScreenQuotedDialogAboveTheComposerIsReady(t *testing.T) 
 	got, err = ClassifyStartupScreen(KindClaude, claude)
 	if err != nil || got != StartupScreenReady {
 		t.Fatalf("claude quoted dialog over composer = %s err=%v, want ready", got, err)
+	}
+}
+
+// Codex's release-update prompt, measured 2026-09-18 with 0.154.0 installed
+// and 0.155.0 published. It is drawn before the directory-trust dialog, so a
+// launch that cannot name it never reaches the composer at all.
+func TestClassifyStartupScreenOnCapturedUpdateDialogScreens(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		kind    Kind
+		fixture string
+		want    StartupScreen
+	}{
+		{KindCodex, "codex_update_dialog.txt", StartupScreenUpdateDialog},
+		{KindCodex, "codex_update_dialog_skip_selected.txt", StartupScreenUpdateDialog},
+		// What the pane showed after Enter on "3. Skip until next version":
+		// the directory-trust dialog for a directory codex had not seen.
+		{KindCodex, "codex_update_dialog_after_enter.txt", StartupScreenTrustDialog},
+		// The composer, with the update notice still in the scrollback as a
+		// banner. The words are there; the shape is not.
+		{KindCodex, "codex_update_banner_ready.txt", StartupScreenReady},
+		// Claude has no measured update prompt, so Codex's is not its dialog.
+		{KindClaude, "codex_update_dialog.txt", StartupScreenUnrecognized},
+	}
+	for _, tc := range cases {
+		got, err := ClassifyStartupScreen(tc.kind, startupFixture(t, tc.fixture))
+		if err != nil {
+			t.Fatalf("%s/%s: %v", tc.kind, tc.fixture, err)
+		}
+		if got != tc.want {
+			t.Fatalf("%s/%s = %s, want %s", tc.kind, tc.fixture, got, tc.want)
+		}
+	}
+}
+
+// "2. Skip" returns on the very next launch and "1. Update now" runs a
+// package install under the agent, so the answer is "3. Skip until next
+// version" and the presses are measured, not guessed.
+func TestUpdateDialogAnswerSkipsUntilTheNextVersion(t *testing.T) {
+	t.Parallel()
+	answer, err := UpdateDialogAnswerFor(KindCodex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(answer.SelectKeys) != 2 || answer.SelectKeys[0] != "down" || answer.SelectKeys[1] != "down" {
+		t.Fatalf("select keys = %v, want two downs (the highlight opens on option 1)", answer.SelectKeys)
+	}
+	if answer.ConfirmKey != "enter" || answer.TargetLabel != "3. Skip until next version" {
+		t.Fatalf("update answer = %+v", answer)
+	}
+	if _, err := UpdateDialogAnswerFor(KindClaude); err == nil {
+		t.Fatal("Claude has no measured update prompt; no answer may be invented for it")
+	}
+	if _, err := UpdateDialogAnswerFor(Kind("gemini")); err == nil {
+		t.Fatal("a harness with no profile must be refused")
+	}
+}
+
+func TestUpdateDialogSkipSelectedReadsTheHighlightMarker(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		kind    Kind
+		fixture string
+		want    bool
+	}{
+		// As drawn: the highlight is on "1. Update now".
+		{KindCodex, "codex_update_dialog.txt", false},
+		// After the two measured downs.
+		{KindCodex, "codex_update_dialog_skip_selected.txt", true},
+		// Neither the trust dialog nor the composer has anything selected.
+		{KindCodex, "codex_update_dialog_after_enter.txt", false},
+		{KindCodex, "codex_update_banner_ready.txt", false},
+		{KindClaude, "codex_update_dialog.txt", false},
+	}
+	for _, tc := range cases {
+		got, err := UpdateDialogSkipSelected(tc.kind, startupFixture(t, tc.fixture))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != tc.want {
+			t.Fatalf("%s/%s skip selected = %v, want %v", tc.kind, tc.fixture, got, tc.want)
+		}
+	}
+}
+
+// The update prompt is recognised by the same shape rule as the trust
+// dialog: the footer is the last non-empty line, the three numbered options
+// sit on the rows directly above it with exactly one highlighted, and the
+// "Update available!" headline is within the measured window above them.
+// Every screen below carries the words without the shape, and a keypress
+// into any of them would land in ordinary content.
+func TestClassifyStartupScreenUpdateRefusesTheWordsWithoutTheShape(t *testing.T) {
+	t.Parallel()
+	dialog := startupFixture(t, "codex_update_dialog.txt")
+	cases := []struct {
+		name   string
+		screen string
+	}{
+		// The dialog quoted in a transcript above a live composer: ready.
+		{"quoted above the composer", dialog + "\n› Ask Codex to do anything\n"},
+		{"capture then shell prompt", dialog + "\n  /Users/x/proj   main ❯ cat capture\n"},
+		{"drawn twice", dialog + "\n" + dialog},
+		{"no highlight", strings.Replace(dialog, "› 1. Update now", "  1. Update now", 1)},
+		{"two highlights", strings.Replace(dialog, "  3. Skip until next version", "› 3. Skip until next version", 1)},
+		{"options separated", strings.Replace(dialog, "  2. Skip\n", "\n  2. Skip\n", 1)},
+		{"footer missing", strings.Replace(dialog, "Press enter to continue", "", 1)},
+		{"headline missing", strings.Replace(dialog, "Update available!", "News!", 1)},
+		{"an option reworded", strings.Replace(dialog, "3. Skip until next version", "3. Skip for now", 1)},
+		{"options inside prose", "✨ Update available! 0.154.0 -> 0.155.0\nit offered › 1. Update now and\n2. Skip, or 3. Skip until next version\nPress enter to continue\n"},
+	}
+	for _, tc := range cases {
+		got, err := ClassifyStartupScreen(KindCodex, tc.screen)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got == StartupScreenUpdateDialog {
+			t.Fatalf("%s: classified as update_dialog; a key would have been pressed into it:\n%s", tc.name, tc.screen)
+		}
+		selected, err := UpdateDialogSkipSelected(KindCodex, tc.screen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if selected {
+			t.Fatalf("%s: skip reported selected on a screen that is not the dialog", tc.name)
+		}
+	}
+}
+
+// Option 1's tail names the install command, which differs by install
+// method (npm here, a package manager elsewhere). The head anchors the
+// option line; the tail is not matched.
+func TestClassifyStartupScreenUpdateDialogToleratesTheInstallCommand(t *testing.T) {
+	t.Parallel()
+	dialog := startupFixture(t, "codex_update_dialog.txt")
+	brew := strings.Replace(dialog, "1. Update now (runs `npm install -g @openai/codex`)", "1. Update now (runs `brew upgrade codex`)", 1)
+	if brew == dialog {
+		t.Fatal("fixture no longer carries the npm install command")
+	}
+	got, err := ClassifyStartupScreen(KindCodex, brew)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != StartupScreenUpdateDialog {
+		t.Fatalf("update dialog with another install command = %s, want update_dialog", got)
 	}
 }
