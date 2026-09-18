@@ -242,3 +242,34 @@ func TestInboxDoesNotShrinkTheView(t *testing.T) {
 		t.Fatalf("inbox = %v, want empty: the crew moved on twice", itemStates(got))
 	}
 }
+
+// TestInboxDropsAClosedCrewsQuestion: once the Mate or the captain has run
+// `crew stop` (stopped_at in the meta) there is no pane to answer into, so
+// the crew's open question leaves the inbox. The line stays in Entries: the
+// box is still the history.
+func TestInboxDropsAClosedCrewsQuestion(t *testing.T) {
+	w := newFixtureWorkspace(t)
+	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AppendStatus("shop", "k4", "blocked: need the API key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"stopped_at": "2026-09-18T10:00:00Z", "teardown": "clean"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := box.Load(w, "shop", nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !v.Closed["k3"] || v.Closed["k4"] {
+		t.Fatalf("closed = %v, want k3 only", v.Closed)
+	}
+	if len(v.ByCrew["k3"]) != 1 {
+		t.Fatalf("the closed crew's line left the history: %+v", v.ByCrew)
+	}
+	items := box.Inbox(v)
+	if len(items) != 1 || items[0].Entry.Crew != "k4" {
+		t.Fatalf("inbox = %+v, want only the open crew's question", items)
+	}
+}

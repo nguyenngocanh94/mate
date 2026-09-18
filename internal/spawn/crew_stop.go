@@ -274,6 +274,10 @@ type CrewSummary struct {
 	Status string
 	Pane   string
 	Task   string
+	// Closed is `stopped_at` in the meta: `matev2 crew stop` ran, by the
+	// Mate's or the captain's decision. `crew list` hides closed crews
+	// unless asked for them; the console never shows them.
+	Closed bool
 }
 
 // crewListStatus derives the STATUS column from a crew's meta first, since
@@ -331,6 +335,7 @@ func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 			Status:  crewListStatus(meta, last),
 			Pane:    meta[MetaPane],
 			Task:    meta[MetaTask],
+			Closed:  meta[MetaStoppedAt] != "",
 		})
 	}
 	return out, nil

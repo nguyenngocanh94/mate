@@ -100,9 +100,10 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew list", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: matev2 crew list <project> [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: matev2 crew list <project> [--all] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	allFlag := fs.Bool("all", false, "include closed crews (those `crew stop` has run on)")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -114,12 +115,29 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	crews, err := spawn.ListCrews(w, fs.Arg(0))
+	all, err := spawn.ListCrews(w, fs.Arg(0))
 	if err != nil {
 		return err
 	}
+	crews := all
+	closed := 0
+	if !*allFlag {
+		crews = crews[:0:0]
+		for _, c := range all {
+			if c.Closed {
+				closed++
+				continue
+			}
+			crews = append(crews, c)
+		}
+	}
 	if len(crews) == 0 {
-		fmt.Fprintf(stdout, "no crews recorded for %s\n", fs.Arg(0))
+		switch {
+		case closed > 0:
+			fmt.Fprintf(stdout, "no open crews for %s (%d closed; --all lists them)\n", fs.Arg(0), closed)
+		default:
+			fmt.Fprintf(stdout, "no crews recorded for %s\n", fs.Arg(0))
+		}
 		return nil
 	}
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
@@ -135,7 +153,13 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", c.Crew, c.Harness, c.Branch, status, pane)
 	}
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	if closed > 0 {
+		fmt.Fprintf(stdout, "(%d closed crew(s) not shown; --all lists them)\n", closed)
+	}
+	return nil
 }
 
 // cmdCrewStop implements `matev2 crew stop <project> <id> [--discard]`. It

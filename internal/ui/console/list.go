@@ -394,12 +394,10 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		taskW -= colUpdated
 	}
 
-	activeCrews := 0
-	for _, c := range proj.Crews {
-		if !c.Status.IsFinished() {
-			activeCrews++
-		}
-	}
+	// Every listed Crew is open: the snapshot already dropped the closed
+	// ones (query.ProjectNode.Crews), and a `done` Crew is still in flight
+	// until the Mate or the captain closes it.
+	activeCrews := len(proj.Crews)
 	items = append(items, headerListLine(func(focused bool) *line {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREWS  %d", activeCrews), focused, p)}, colCrewID)...)

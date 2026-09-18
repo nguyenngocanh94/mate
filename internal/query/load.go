@@ -90,7 +90,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	}
 
 	p.Mate = loadMate(ws, ref.Name, w)
-	p.Crews = loadCrews(ws, ref.Name, p.Repos, w)
+	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, w)
 	for i := range p.Crews {
 		p.Crews[i].Attention = crewAttention(p.Crews[i])
 	}
@@ -193,7 +193,13 @@ const notAnErrorState = "the recorded status is not an error state"
 // section 4 are what a crew actually writes; CrewStatus is a string type
 // precisely so an unrecognised word renders as itself rather than as a
 // blank cell.
-func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], w *warnings) []CrewNode {
+//
+// Closed Crews - meta carries `stopped_at`, which only `matev2 crew stop`
+// writes - are counted and dropped: the tree is the list of work in
+// flight, and closing is the decision that ends a task (ProjectNode.Crews).
+// A Crew whose meta could not be read is kept, as an unknown row, because
+// an unreadable record is not evidence of a closed one.
+func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], w *warnings) ([]CrewNode, int) {
 	ids, err := crewIDs(ws.CrewsDir(project))
 	if err != nil {
 		// A project whose crews directory cannot be listed gets no Crew
@@ -201,13 +207,19 @@ func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], w 
 		// presented as "this project has no crews".
 		note(w, UnknownField[[]CrewNode](readFailureReason(err)), "crews",
 			RowRef{Kind: RowProject, ID: project, Label: project})
-		return nil
+		return nil, 0
 	}
 	out := make([]CrewNode, 0, len(ids))
+	closed := 0
 	for _, id := range ids {
-		out = append(out, loadCrew(ws, project, id, repos, w))
+		c := loadCrew(ws, project, id, repos, w)
+		if c.Closed {
+			closed++
+			continue
+		}
+		out = append(out, c)
 	}
-	return out
+	return out, closed
 }
 
 func crewIDs(dir string) ([]string, error) {
@@ -291,6 +303,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		}, "recorded in crews/"+id+".meta; this does not prove the agent is alive")
 	}
 
+	c.Closed = meta["stopped_at"] != ""
 	c.Status = crewStatus(ws, project, id, w, row)
 	if c.Status == CrewReserved && meta["agent"] == "" && meta["stopped_at"] != "" {
 		// Torn down before it ever wrote a status line. `reserved` would

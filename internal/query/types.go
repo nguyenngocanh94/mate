@@ -69,9 +69,18 @@ type ProjectNode struct {
 	// through a per-row read, so a Project with many Crews still costs one
 	// repo read.
 	Repos Field[[]RepoValue]
-	// Crews are the Project's Crews, oldest first.
-	Crews     []CrewNode
-	Attention Field[ProjectAttention]
+	// Crews are the Project's open Crews, oldest first. A Crew is open
+	// until the Mate or the captain closes it with `matev2 crew stop`
+	// (mvp.md section 4): a `done:` line is the Crew's report, not the end
+	// of its task - a scout ends when the captain accepts the report, a
+	// ship ends when its branch is merged - so a Crew that said `done`
+	// stays listed until somebody closes it.
+	Crews []CrewNode
+	// ClosedCrews is how many of the Project's recorded Crews have been
+	// closed (`stopped_at` in their meta). Their records stay under
+	// `crews/`; they are not rows.
+	ClosedCrews int
+	Attention   Field[ProjectAttention]
 	// Box is the Project's message box (mvp.md section 4): crew status
 	// lines, sent.log and observer incidents merged in time order. It is
 	// read per Project rather than per Crew because that is what it is - a
@@ -118,6 +127,11 @@ type MateIdentity struct {
 // crews/<id>.status, which is why CrewStatus is a string type and an
 // unrecognised word renders as itself rather than as a blank cell.
 type CrewNode struct {
+	// Closed is `stopped_at` in the Crew's meta: the Mate or the captain
+	// ran `matev2 crew stop`. Load drops closed Crews from ProjectNode.Crews
+	// and counts them in ClosedCrews; the field is here for readers that
+	// load a single Crew.
+	Closed    bool
 	CrewID    string
 	Actions   []ActionAvailability
 	ProjectID string

@@ -102,6 +102,11 @@ func Inbox(v View) []Item {
 
 	var out []Item
 	for _, e := range v.Entries {
+		if e.Crew != "" && v.Closed[e.Crew] {
+			// A closed crew's open question is moot: the Mate or the
+			// captain ended the task, and there is no pane to answer into.
+			continue
+		}
 		item, ok := inboxItem(e)
 		if !ok || inboxResolved(e, lastStatus, replies) {
 			continue

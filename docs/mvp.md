@@ -98,6 +98,12 @@ Không có file box riêng.
 Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần chưa được giải quyết - gọi là inbox: một status `needs-decision`/`blocked`, hoặc một incident, mà chưa có ai trả lời.
 Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật chính xác, dựa trên thứ tự byte trong file), hoặc khi `sent.log` có một dòng gửi tới `crew:<id>` sau thời điểm của câu hỏi (luật xấp xỉ, vì status không có timestamp riêng).
 `done`/`failed` không nằm trong inbox: cột STATUS của bảng crew đã mang chúng.
+
+**Đóng crew là quyết định của người dùng hoặc Mate, không phải của crew** (quyết định 2026-09-18).
+`done:` chỉ là báo cáo của crew.
+Task kết thúc khi `matev2 crew stop` chạy: scout đóng khi người dùng nhận report và hài lòng (chủ động bảo Mate đóng), ship đóng khi branch đã merge (người dùng merge, sau này `matev2 merge`).
+Crew đã đóng (`stopped_at` trong meta) biến khỏi cây console, khỏi inbox và khỏi `crew list` mặc định (`--all` để xem); `crews/<id>/` giữ nguyên.
+Cây console vì thế chỉ hiện việc đang chạy, kể cả crew đã nói `done` mà chưa ai đóng.
 Phím `a` dưới focus box bật `[all]`, hiện lại toàn bộ log để debug; mặc định tắt và không lưu lại.
 
 Gửi vào pane Mate là trường hợp đặc biệt vì người dùng cùng sở hữu composer.

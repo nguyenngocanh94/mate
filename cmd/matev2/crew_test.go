@@ -114,9 +114,18 @@ func TestCrewListStatusColumnShowsTeardown(t *testing.T) {
 		}
 	}
 
+	// Every crew here is closed, so the default listing is the hint alone
+	// and --all is what shows the rows.
 	var out, errw bytes.Buffer
 	if err := run([]string{"crew", "list", "shop", "--workspace", w.Root()}, &out, &errw); err != nil {
 		t.Fatalf("crew list: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, "no open crews") || !strings.Contains(got, "4 closed") || !strings.Contains(got, "--all") {
+		t.Fatalf("default crew list over closed crews = %q, want the count and the --all hint", got)
+	}
+	out.Reset()
+	if err := run([]string{"crew", "list", "shop", "--all", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatalf("crew list --all: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 	rows := map[string]string{}
@@ -200,5 +209,48 @@ func TestCrewStopRequiresProjectAndID(t *testing.T) {
 		if !errors.As(err, &ue) {
 			t.Fatalf("%v: err = %v, want *usageError", args, err)
 		}
+	}
+}
+
+// TestCrewListShowsOnlyOpenCrewsByDefault: a `done:` line is the crew's
+// report, not the end of its task - the Mate or the captain ends it with
+// `crew stop` (2026-09-18). So a crew that said done is still listed, a
+// stopped one is not, and the footer says how many are hidden.
+func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
+	w, err := store.Init(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(w.Root(), "shop")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initGitRepo(t, repo)
+	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship it", "agent": "crew-k1", "pane": "w1:p2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AppendStatus("shop", "k1", "done: ready in branch matev2/k1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k2", map[string]string{"task": "old", "teardown": "clean", "stopped_at": "2026-09-18T10:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errw bytes.Buffer
+	if err := run([]string{"crew", "list", "shop", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatalf("crew list: %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "k1") || !strings.Contains(got, "done: ready") {
+		t.Fatalf("crew list = %q, want the done-but-open crew listed with its own line", got)
+	}
+	if strings.Contains(got, "k2") {
+		t.Fatalf("crew list = %q, want the closed crew hidden", got)
+	}
+	if !strings.Contains(got, "1 closed") {
+		t.Fatalf("crew list = %q, want the hidden count", got)
 	}
 }

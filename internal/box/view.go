@@ -30,6 +30,11 @@ type View struct {
 	// Attention is the subset that needs a human or Mate's eyes: a status
 	// entry whose state is Attention, or any incident. Newest first.
 	Attention []Entry
+	// Closed is the set of crews whose meta carries `stopped_at`: the Mate
+	// or the captain closed them with `matev2 crew stop`. Their lines stay
+	// in Entries as history; Inbox skips them, because nobody can answer a
+	// crew that is gone.
+	Closed map[string]bool
 	// Cursor resumes a later LoadSince from exactly where this View ended.
 	Cursor Cursor
 }
@@ -67,9 +72,13 @@ func load(ws *store.Workspace, project string, incidents []Incident, cursor Curs
 	}
 
 	newCursor := Cursor{Status: make(map[string]int64, len(crews))}
+	closed := make(map[string]bool)
 	var entries []Entry
 
 	for _, crew := range crews {
+		if meta, err := ws.ReadCrewMeta(project, crew); err == nil && meta["stopped_at"] != "" {
+			closed[crew] = true
+		}
 		from := int64(0)
 		if cursor.Status != nil {
 			from = cursor.Status[crew]
@@ -160,7 +169,7 @@ func load(ws *store.Workspace, project string, incidents []Incident, cursor Curs
 		attention[i], attention[j] = attention[j], attention[i]
 	}
 
-	return View{Entries: entries, ByCrew: byCrew, Attention: attention, Cursor: newCursor}, nil
+	return View{Entries: entries, ByCrew: byCrew, Attention: attention, Closed: closed, Cursor: newCursor}, nil
 }
 
 // listCrews returns the crew ids of a project, from the `<id>.status`

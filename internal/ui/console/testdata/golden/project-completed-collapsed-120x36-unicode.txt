@@ -4,7 +4,7 @@
   MATE                 HARNESS    STATUS     MODE        BINDING     │ COMPLETED                                        
   mate-payments-api    claude     running    supervised  active      │                                                  
                                                                      │ Finished         1 of 2 crews                    
-  CREWS  1          TASK              STATUS           NOTE          │                  Finished crews stay in the      
+  CREWS  2          TASK              STATUS           NOTE          │                  Finished crews stay in the      
   crew_01J9P6…B8DT  Add idempotency-k…running                        │                  snapshot. Enter shows or hides  
 ▌ ↓ Completed (1)                                      ! failed      │                  them in this list.              
                                                                      │                                                  

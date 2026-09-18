@@ -112,7 +112,9 @@ The brief line is the app's own copy of your brief, rendered into the Crew's tem
 A `note:` or `warning:` line on stderr is information, not failure: a stale record replaced, a trust dialog answered, or a first prompt whose delivery could not be confirmed.
 The last of those is worth a `matev2 peek` before you assume the Crew started.
 
-`crew list` prints one row per crew ever spawned in this project, with its id, harness, branch, last status line, and pane.
+`crew list` prints one row per open crew in this project, with its id, harness, branch, last status line, and pane.
+A crew is open until `crew stop` has run on it; a crew that appended `done:` is still open, because `done:` is its report, not the end of its task (section 9, "Closing a Crew").
+`--all` includes closed crews.
 It is the cheapest way to answer "what is in flight" and the input to the bootstrap reconciliation in section 3.
 
 `crew stop` confirms the Crew's agent has exited, closes its pane, and then removes the worktree and branch only when the branch is already landed in `main` and the worktree is clean.
@@ -297,6 +299,16 @@ If the diff does not do what the brief asked, send the Crew one corrective line 
 When the branch is good, report to the captain in outcome language that the work is ready, naming the branch, for example "the README line is in place and ready in branch `matev2/k3`".
 Then stop and wait; the captain merges it.
 Do not merge, rebase, cherry-pick, or fast-forward anything yourself, and do not tear the Crew down before the captain has the work - a torn-down Crew's branch may be gone.
+
+**Closing a Crew.** A Crew's task ends when the captain or you decide it has, never when the Crew says so.
+`done:` is the Crew's report; closing is `/usr/local/bin/matev2 crew stop shop <id>`, and until it runs the Crew stays in the captain's console and in `crew list` as work in flight.
+
+- A **scout** is closed when the captain has the report and says they are satisfied with it (or tells you to close it). Not before: the captain may want a follow-up question answered by the same Crew, with its context intact.
+- A **ship** is closed when its branch has been merged into `main` - by the captain today, by `matev2 merge` once it exists. Only then run `crew stop`; it will find the branch landed and remove the worktree and branch cleanly.
+- A Crew whose work the captain rejects outright is closed with `--discard`, and only on the captain's explicit word.
+
+Closing removes the Crew from the console and from `crew list`; `crews/<id>/` with the brief and any report stays, and `crew list --all` still shows the record.
+Never close a Crew on your own initiative because it went quiet or said `done`; if you think a Crew should be closed, say so to the captain in one line and let them decide.
 
 ## 10. Two modes and the sentinel
 

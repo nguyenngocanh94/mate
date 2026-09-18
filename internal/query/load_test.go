@@ -179,12 +179,18 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 	}
 }
 
-// TestLoadGivesATornDownSilentCrewTheStoppedStatus: StopCrew leaves the
-// meta with stopped_at and no agent. A crew that never wrote a status
-// line is then stopped, not reserved - reserved is the promise of a start
-// (2026-09-18: the tree showed a discarded test crew as reserved).
-func TestLoadGivesATornDownSilentCrewTheStoppedStatus(t *testing.T) {
+// TestLoadHidesClosedCrewsAndCountsThem: closing is the decision that ends
+// a task and it is `matev2 crew stop`'s stopped_at, not the crew's own
+// `done:` line (2026-09-18). A crew that said done is still a row; a
+// stopped one is not, and ClosedCrews says how many were dropped.
+func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 	ws := newWorkspace(t, "shop")
+	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship", "agent": "crew-k1", "pane": "w1:p2"}); err != nil {
+		t.Fatalf("write crew meta: %v", err)
+	}
+	if err := ws.AppendStatus("shop", "k1", "done: ready in branch matev2/k1"); err != nil {
+		t.Fatalf("append: %v", err)
+	}
 	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{
 		"task": "scout", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
@@ -193,17 +199,14 @@ func TestLoadGivesATornDownSilentCrewTheStoppedStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if got := snap.Projects[0].Crews[0].Status; got != CrewStopped {
-		t.Fatalf("status = %q, want %q", got, CrewStopped)
+	p := snap.Projects[0]
+	if len(p.Crews) != 1 || p.Crews[0].CrewID != "k1" {
+		t.Fatalf("crews = %+v, want only the open k1", p.Crews)
 	}
-	// One that wrote before it was stopped keeps its own last word.
-	if err := ws.AppendStatus("shop", "k9", "done: report ready"); err != nil {
-		t.Fatalf("append: %v", err)
+	if p.Crews[0].Status != CrewStatus("done") || p.Crews[0].Closed {
+		t.Fatalf("k1 = status %q closed %v, want done and open", p.Crews[0].Status, p.Crews[0].Closed)
 	}
-	if snap, err = Load(context.Background(), ws); err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if got := snap.Projects[0].Crews[0].Status; got != CrewStatus("done") {
-		t.Fatalf("status = %q, want done", got)
+	if p.ClosedCrews != 1 {
+		t.Fatalf("closed = %d, want 1", p.ClosedCrews)
 	}
 }
