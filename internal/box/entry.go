@@ -24,8 +24,9 @@ const (
 
 // Ref points an Entry back at the file and byte offset it came from, so a
 // caller can act on the exact line (for example, jump the pane cursor or
-// re-read from that point). An Entry with no file backing - an incident,
-// which is supplied in memory - leaves Ref zero.
+// re-read from that point). Every kind has one: a status line in
+// `crews/<id>.status`, a message in `sent.log`, an incident in the `open`
+// line of `incidents.log` that opened it.
 type Ref struct {
 	File   string
 	Offset int64

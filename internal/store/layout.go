@@ -15,6 +15,7 @@ const (
 	projectFileName   = "project.yaml"
 	projectDocName    = "PROJECT.md"
 	sentLogName       = "sent.log"
+	incidentsLogName  = "incidents.log"
 	mateDirName       = "mate"
 	mateMetaName      = "mate.meta"
 	autoFlagName      = ".auto"
@@ -66,6 +67,13 @@ func (w *Workspace) ProjectDoc(project string) string {
 // SentLog is `projects/<project>/sent.log`.
 func (w *Workspace) SentLog(project string) string {
 	return filepath.Join(w.ProjectDir(project), sentLogName)
+}
+
+// IncidentsLog is `projects/<project>/incidents.log`, the observer's
+// append-only record of the incidents it opened and resolved (docs/mvp.md
+// section 4b). Only internal/watch writes it; internal/box reads it.
+func (w *Workspace) IncidentsLog(project string) string {
+	return filepath.Join(w.ProjectDir(project), incidentsLogName)
 }
 
 // MateDir is `projects/<project>/mate`, the working directory of Mate.

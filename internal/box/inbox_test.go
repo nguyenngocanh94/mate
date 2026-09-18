@@ -27,9 +27,14 @@ type step struct {
 	at     time.Time
 }
 
-func runInbox(t *testing.T, incidents []box.Incident, steps ...step) []box.Item {
+func runInbox(t *testing.T, incidents []store.IncidentEntry, steps ...step) []box.Item {
 	t.Helper()
 	w := newFixtureWorkspace(t)
+	for _, inc := range incidents {
+		if err := w.AppendIncident("shop", inc); err != nil {
+			t.Fatalf("AppendIncident: %v", err)
+		}
+	}
 	for _, s := range steps {
 		if s.crew != "" {
 			if err := w.AppendStatus("shop", s.crew, s.status); err != nil {
@@ -53,7 +58,7 @@ func runInbox(t *testing.T, incidents []box.Incident, steps ...step) []box.Item 
 		}
 		time.Sleep(15 * time.Millisecond)
 	}
-	v, err := box.Load(w, "shop", incidents)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -189,8 +194,9 @@ func TestInboxSeparatesCrews(t *testing.T) {
 // TestInboxIncidentIsOpenUntilTheCrewSpeaks: an incident has no answer of
 // its own, so the crew writing anything at all is what closes it.
 func TestInboxIncidentIsOpenUntilTheCrewSpeaks(t *testing.T) {
-	open := runInbox(t, []box.Incident{{
-		At: time.Now().Add(-time.Hour), Crew: "k3", Kind: box.IncidentStale, Text: "no status for 20m",
+	open := runInbox(t, []store.IncidentEntry{{
+		Time: time.Now().Add(-time.Hour), Crew: "k3", Kind: string(box.IncidentStale),
+		State: store.IncidentOpen, Text: "no status for 20m",
 	}},
 		step{crew: "k3", status: "working: reading the ticket"},
 	)
@@ -198,8 +204,9 @@ func TestInboxIncidentIsOpenUntilTheCrewSpeaks(t *testing.T) {
 	assertInbox(t, open)
 
 	// The other way round: the incident is the newest thing about k3.
-	still := runInbox(t, []box.Incident{{
-		At: time.Now().Add(time.Hour), Crew: "k3", Kind: box.IncidentStale, Text: "no status for 20m",
+	still := runInbox(t, []store.IncidentEntry{{
+		Time: time.Now().Add(time.Hour), Crew: "k3", Kind: string(box.IncidentStale),
+		State: store.IncidentOpen, Text: "no status for 20m",
 	}},
 		step{crew: "k3", status: "working: reading the ticket"},
 	)
@@ -231,7 +238,7 @@ func TestInboxDoesNotShrinkTheView(t *testing.T) {
 			t.Fatalf("AppendStatus: %v", err)
 		}
 	}
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -258,7 +265,7 @@ func TestInboxDropsAClosedCrewsQuestion(t *testing.T) {
 	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"stopped_at": "2026-09-18T10:00:00Z", "teardown": "clean"}); err != nil {
 		t.Fatal(err)
 	}
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

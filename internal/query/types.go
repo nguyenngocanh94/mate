@@ -152,7 +152,55 @@ type CrewNode struct {
 	LastEvent Field[EventValue]
 	Error     Field[ErrorReason]
 	Attention Field[Attention]
+	// Health is the observer's live observation of this Crew (mvp.md
+	// section 4b: "Bên cạnh trạng thái luôn có một cột sức khỏe do quan
+	// sát, không phải trạng thái"). It is the one field in this package
+	// that is not recorded state, and it is deliberately not filled by
+	// Load: this package only reads `.matev2/`, and an observation comes
+	// from Herdr. The Console's wiring (cmd/matev2) asks internal/watch for
+	// its latest snapshot and fills this in after Load returns, so a Crew
+	// nobody is watching keeps the Absent field Load left - never a zero
+	// value that would render as "the agent is gone".
+	//
+	// It is a display column and never a state: whatever it says, the
+	// Crew's Status comes from the meta, the incidents and the status file,
+	// in that order.
+	Health Field[CrewHealth]
 }
+
+// CrewHealth is one observation of a Crew's pane and of Herdr's inventory,
+// made by the observer (internal/watch) rather than read from a file.
+//
+// Composer is a string type here for the reason CrewStatus is: internal/ui/
+// console may not import internal/send (its boundary test), so the measured
+// composer states travel as their own words and an unrecognised one renders
+// as itself.
+type CrewHealth struct {
+	// AgentPresent is whether Herdr still lists the agent the Crew's meta
+	// records. False is a positive answer from Herdr - the agent is gone -
+	// not a failed read: a lookup the observer could not complete leaves
+	// the whole Field Absent instead.
+	AgentPresent bool
+	// Composer is what the pane was showing: empty, pending, busy, unknown.
+	Composer CrewComposer
+	// QuietFor is how long the pane's contents and the Crew's status file
+	// have both been unchanged, as of ObservedAt.
+	QuietFor time.Duration
+	// ObservedAt is when the observation was made. It is not the snapshot's
+	// AsOf: the observer polls on its own interval, so this can be older.
+	ObservedAt time.Time
+}
+
+// CrewComposer is the composer state of a Crew's pane, as internal/send
+// classified it.
+type CrewComposer string
+
+const (
+	ComposerEmpty   CrewComposer = "empty"
+	ComposerPending CrewComposer = "pending"
+	ComposerBusy    CrewComposer = "busy"
+	ComposerUnknown CrewComposer = "unknown"
+)
 
 // RepoValue is one registered repo as the inspector renders it.
 type RepoValue struct {

@@ -18,8 +18,9 @@ import "time"
 //
 //   - a status entry whose state is needs-decision or blocked - the crew
 //     asked and stopped its turn (mvp.md section 4);
-//   - an incident - the observer noticed something the crew itself cannot
-//     report.
+//   - an open incident - the observer noticed something the crew itself
+//     cannot report, and has not yet written the `resolved` line that ends
+//     it (mvp.md section 4b).
 //
 // # When a thing stops being in the inbox
 //
@@ -128,6 +129,12 @@ func inboxItem(e Entry) (Item, bool) {
 		}
 		return Item{Entry: e, State: st.State, Text: st.Text}, true
 	case KindIncident:
+		if e.Incident != nil && e.Incident.Resolved {
+			// The observer wrote a `resolved` line for it: the condition
+			// cleared, and mvp.md section 4b says that is exactly when the
+			// incident leaves the inbox.
+			return Item{}, false
+		}
 		kind, text := ParseIncidentText(e.Text)
 		return Item{Entry: e, Kind: kind, Text: text}, true
 	default:
