@@ -27,4 +27,24 @@ type Incident struct {
 	Crew string
 	Kind IncidentKind
 	Text string
+	// Resolved is set when the observer has since written a `resolved`
+	// line for this (crew, kind) in incidents.log (mvp.md section 4b): the
+	// condition cleared. A resolved incident is history, not an inbox item
+	// and not a `blocked` state.
+	Resolved bool
+}
+
+// OpenIncidents is the observer's unresolved findings for one crew, oldest
+// first. A non-empty result is what makes the crew's displayed state
+// `blocked` (mvp.md section 4b); the observer is the only writer of the
+// incidents this reads, so a crew's own status lines never affect it.
+func OpenIncidents(v View, crew string) []Incident {
+	var out []Incident
+	for _, e := range v.Entries {
+		if e.Kind != KindIncident || e.Crew != crew || e.Incident == nil || e.Incident.Resolved {
+			continue
+		}
+		out = append(out, *e.Incident)
+	}
+	return out
 }

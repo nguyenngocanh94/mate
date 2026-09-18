@@ -49,4 +49,7 @@ type Entry struct {
 	Crew   string
 	Text   string
 	Ref    Ref
+	// Incident is the observer finding behind a KindIncident entry, nil for
+	// every other kind. It carries the Resolved flag OpenIncidents reads.
+	Incident *Incident
 }

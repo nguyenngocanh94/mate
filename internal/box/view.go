@@ -127,13 +127,15 @@ func load(ws *store.Workspace, project string, incidents []Incident, cursor Curs
 		})
 	}
 
-	for _, inc := range incidents {
+	for i := range incidents {
+		inc := incidents[i]
 		entries = append(entries, Entry{
-			At:     inc.At,
-			Source: SourceObserver,
-			Kind:   KindIncident,
-			Crew:   inc.Crew,
-			Text:   incidentText(inc.Kind, inc.Text),
+			At:       inc.At,
+			Source:   SourceObserver,
+			Kind:     KindIncident,
+			Crew:     inc.Crew,
+			Text:     incidentText(inc.Kind, inc.Text),
+			Incident: &inc,
 		})
 	}
 
