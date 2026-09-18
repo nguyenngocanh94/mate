@@ -32,6 +32,13 @@ var forbiddenImports = []string{
 	"github.com/nguyenngocanh94/matev2/internal/box",
 	"github.com/nguyenngocanh94/matev2/internal/send",
 	"github.com/nguyenngocanh94/matev2/internal/spawn",
+	// internal/watch observes crews over Herdr and internal/autopilot types
+	// into the Mate's pane. The Console draws what both produce - the health
+	// column, the MODE cell's daemon indicator, the daemon's refusal on the
+	// message line - and sees all of it as query DTOs that cmd/matev2 merges
+	// into the snapshot (mvp.md tasks 18 and 19).
+	"github.com/nguyenngocanh94/matev2/internal/watch",
+	"github.com/nguyenngocanh94/matev2/internal/autopilot",
 }
 
 func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {

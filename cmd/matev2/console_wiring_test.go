@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
@@ -150,9 +151,10 @@ func TestConsoleActionRepairReportsWhatHerdrSays(t *testing.T) {
 }
 
 // TestConsoleActionModeTogglesTheAutoFlagAndTheLabel: 'm' only moves the
-// flag and what the header says - the daemon that acts on auto mode is
-// mvp.md task 19, and the outcome line must say so rather than implying
-// the Console has started answering the Mate.
+// flag. The daemon (mvp.md task 19) re-reads that file every tick and again
+// at the moment it types, so the keystroke needs no channel to it, and the
+// outcome line names the window rather than only the word - "auto" alone
+// does not tell a reader when the first line might land in the Mate's pane.
 func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	action := consoleAction(w, deps)
@@ -168,8 +170,8 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	if !w.Auto("shop") {
 		t.Fatal("the .auto flag was not created")
 	}
-	if !strings.Contains(out, string(query.ModeAuto)) || !strings.Contains(out, "task 19") {
-		t.Fatalf("mode outcome = %q, want the new label and the task that makes it act", out)
+	if !strings.Contains(out, string(query.ModeAuto)) || !strings.Contains(out, autopilot.DefaultInterval.String()) {
+		t.Fatalf("mode outcome = %q, want the new label and the digest window", out)
 	}
 
 	out, err = action(ctx, console.ActionRequest{Action: console.ActionMode, Target: "shop", TargetKind: "project"})

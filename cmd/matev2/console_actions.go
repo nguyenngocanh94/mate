@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -105,10 +106,14 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 	return line, nil
 }
 
-// toggleModeAction flips `mate/.auto` (mvp.md section 5). Only the flag and
-// the label move: the daemon that acts on auto mode is mvp.md task 19, and
-// the returned line says so rather than implying the Console has started
-// answering the Mate.
+// toggleModeAction flips `mate/.auto` (mvp.md section 5). The flag is the
+// whole of the mode: the daemon re-reads it every tick and at the moment it
+// types, so the keystroke takes effect within one window in both directions
+// without the Console telling the daemon anything.
+//
+// The line it returns names what the flag now permits, and the digest window
+// with it, because "auto" on its own does not tell a reader when the first
+// line might land in the Mate's pane.
 func toggleModeAction(ws *store.Workspace, project string) (string, error) {
 	if project == "" {
 		return "", observability.NewError(observability.CodeUsage, "no Project was named for mode")
@@ -125,7 +130,8 @@ func toggleModeAction(ws *store.Workspace, project string) (string, error) {
 	}
 	mode := query.ModeFor(next)
 	if next {
-		return fmt.Sprintf("%s is now %s; the digest daemon arrives in mvp.md task 19", project, mode), nil
+		return fmt.Sprintf("%s is now %s; the daemon digests the inbox into the Mate's pane every %s",
+			project, mode, autopilot.DefaultInterval), nil
 	}
 	return fmt.Sprintf("%s is now %s; nothing is sent to the Mate without a keystroke", project, mode), nil
 }

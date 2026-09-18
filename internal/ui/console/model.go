@@ -208,6 +208,7 @@ type footerMsg struct {
 }
 
 func okMsg(text string) footerMsg      { return footerMsg{tone: toneOK, text: text} }
+func warnMsg(text string) footerMsg    { return footerMsg{tone: toneWarn, text: text} }
 func errMsg(text string) footerMsg     { return footerMsg{tone: toneError, text: text} }
 func infoMsg(text string) footerMsg    { return footerMsg{tone: toneInfo, text: text} }
 func unknownMsg(text string) footerMsg { return footerMsg{tone: toneUnknown, text: text} }

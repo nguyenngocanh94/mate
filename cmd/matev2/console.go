@@ -55,6 +55,18 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	watcher.Start(ctx)
 	defer watcher.Stop()
 
+	// The auto daemon of mvp.md section 5 runs beside it, and like it only
+	// while the workspace is open: a closed console sends nothing, which is
+	// the honest shape of a feature whose whole point is that it types into
+	// somebody's composer. It sends only for the projects whose `mate/.auto`
+	// exists, and it re-reads that flag every tick.
+	pilot, err := consolePilot(dir, deps)
+	if err != nil {
+		return err
+	}
+	pilot.Start(ctx)
+	defer pilot.Stop()
+
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
 		snap, err := query.Load(loadCtx, ws)
 		if err != nil {
@@ -62,8 +74,10 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 		}
 		// query.Load reads files; the health column is an observation. The
 		// snapshot picks up whatever the observer has seen by now, and the
-		// crews it has not seen keep their Absent health.
-		return withCrewHealth(snap, watcher.Snapshot()), nil
+		// crews it has not seen keep their Absent health. The daemon's own
+		// state - when it last sent, why it last could not - rides along the
+		// same way.
+		return withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), nil
 	}
 	var stream runtime.SessionStream
 	if s, ok := deps.Runtime.(runtime.SessionStream); ok {

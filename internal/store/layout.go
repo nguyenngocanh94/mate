@@ -19,6 +19,7 @@ const (
 	mateDirName       = "mate"
 	mateMetaName      = "mate.meta"
 	autoFlagName      = ".auto"
+	autoCursorName    = ".auto-cursor"
 	memoryFileName    = "memory.md"
 	backlogFileName   = "backlog.md"
 	crewsDirName      = "crews"
@@ -89,6 +90,12 @@ func (w *Workspace) MateMeta(project string) string {
 // AutoFlag is `projects/<project>/mate/.auto`; its presence means auto mode.
 func (w *Workspace) AutoFlag(project string) string {
 	return filepath.Join(w.MateDir(project), autoFlagName)
+}
+
+// AutoCursorFile is `projects/<project>/mate/.auto-cursor`; it records how
+// far the auto daemon has digested (mvp.md section 5).
+func (w *Workspace) AutoCursorFile(project string) string {
+	return filepath.Join(w.MateDir(project), autoCursorName)
 }
 
 // MemoryFile is `projects/<project>/mate/memory.md`.

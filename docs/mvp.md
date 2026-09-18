@@ -55,6 +55,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
             │   ├── backlog.md            In flight / Queued / Done
             │   ├── mate.meta             harness= session_id= pane=
             │   ├── .auto                 có mặt = chế độ tự động
+            │   ├── .auto-cursor          daemon auto đã digest tới đâu (task 19)
             │   └── .claude/
             │       ├── settings.json     hook UserPromptSubmit, Stop
             │       └── skills/
@@ -152,12 +153,47 @@ Chế độ giám sát (mặc định):
 - Trên một mục trong inbox: Enter (`[resolve]`) gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
 - `resolve` chỉ giao việc, không đóng câu hỏi. Mục rời inbox khi crew thật sự nhận được câu trả lời - `matev2 send` của Mate ghi `Source: mate` vào `sent.log` - hoặc khi crew tự ghi dòng status mới.
 
-Chế độ tự động:
+Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở task 19):
 
-- Daemon trong console gom tín hiệu đáng chú ý trong cửa sổ 90 giây thành một digest một dòng, gửi vào Mate có kiểm chứng với prefix sentinel `⟦matev2⟧ `.
+- Daemon sống trong tiến trình console, cạnh observer. Đóng console thì không có dòng nào tự đi vào pane Mate; đó là hình dạng thành thật của một tính năng mà cả điểm là nó gõ vào composer của người khác.
+- Mỗi 90 giây (đồng hồ tiêm được), với mỗi project có `mate/.auto`, daemon gom những gì mới kể từ con trỏ: inbox chưa giải quyết (`needs-decision` của crew, incident đang mở) cộng dòng status **mới nhất** của mỗi crew đang mở nếu dòng đó là `wait-mate`.
+  `wait-mate` không nằm trong inbox (mục 4b) nhưng ở chế độ tự động không có người đọc bảng crew, nên Mate là người phải xem nó.
+  Chỉ lấy dòng mới nhất: một `wait-mate` mà crew đã ghi đè lên bằng dòng khác là lịch sử, và luật này chặn luôn trường hợp bật `.auto` trên một project đã chạy cả tuần.
+- Không có gì mới thì không gửi. Daemon không phải heartbeat.
+- Có gì mới thì thành **đúng một dòng**, gửi bằng `send.Send` (kiểm chứng composer, không bao giờ `herdr agent prompt`):
+
+  ```text
+  ⟦matev2⟧ digest: <k> item(s) — <mục> · <mục> · … — status files under <đường dẫn tuyệt đối tới crews/>; act per AGENTS.md section 10
+  ```
+
+  Mỗi `<mục>` là một trong ba dạng, và chỉ ba dạng đó:
+
+  ```text
+  <crew> needs-decision: "<text crew viết, ≤ 120 rune, gộp khoảng trắng, " đổi thành '>"
+  <crew> blocked: <incident kind>, quiet for <thời gian>
+  <crew> wait-mate: "<text crew viết, cùng luật cắt>"
+  ```
+
+  `<k>` luôn là số mục thật. Dòng chỉ trải tối đa 5 mục rồi ghi `· +<n> more`, vì một composer nhận dòng quá dài sẽ wrap và chính `send.Send` không đọc lại được.
+  `quiet for` đo từ dòng `open` của incident, tức là cận dưới: observer chỉ mở `stale` sau khi ngưỡng của nó đã trôi qua.
+  Incident không gán được cho crew nào in `-` ở chỗ tên crew; app không bịa ra tên.
+  Đường dẫn là tuyệt đối vì cwd của Mate là `mate/` của chính nó (cùng lý do với dòng `resolve:`).
+  Ví dụ:
+
+  ```text
+  ⟦matev2⟧ digest: 3 item(s) — k3 needs-decision: "pick A or B" · k9 blocked: stale, quiet for 4m0s · k7 wait-mate: "report.md is ready" — status files under /w/.matev2/projects/shop/crews; act per AGENTS.md section 10
+  ```
+
 - Mate thấy marker thì tự quyết theo policy trong AGENTS.md. Merge vẫn chờ người dùng trừ khi project bật `yolo`.
-- Hook `UserPromptSubmit` của Mate thấy prompt không có marker thì xoá `.auto`. Console thấy file mất thì dừng daemon.
-- Gửi thất bại quá lâu thì ghi flag wedged và hiện trong box.
+- Con trỏ digest là `mate/.auto-cursor`: một offset byte cho mỗi file nguồn, ghi ở dạng `<đường dẫn tương đối project>=<offset>`.
+  Nó là file riêng chứ không nằm trong `.auto` vì `.auto` có ba người xoá (hook của Mate, phím `m`, tay người dùng); con trỏ nằm trong đó sẽ chết theo mỗi lần tắt auto, và lần bật lại sẽ gửi lại toàn bộ câu hỏi cũ.
+  Chỉ một lần gửi đã kiểm chứng mới đẩy con trỏ, nên digest bị từ chối được chào lại nguyên vẹn ở vòng sau chứ không mất.
+  `sent.log` ghi trước, con trỏ ghi sau: hỏng ở giữa thì tốn một digest lặp, ngược lại thì mất mục.
+- Hook `UserPromptSubmit` của Mate thấy prompt không có marker thì xoá `.auto`. Daemon đọc lại cờ ở đầu lượt của mỗi project **và** ngay trước khi gõ, nên người dùng giành composer giữa lượt không bị máy trả lời ngay sau đó.
+- Gửi không tới được Mate quá 5 phút thì mở incident `wedged` với crew là `mate`; một lần gửi thành công đóng nó. Incident là nửa bền vững: dòng footer chết theo console, inbox thì không.
+  Đồng hồ 5 phút chạy cho cả hai kiểu hỏng - composer bận/đang có chữ của người dùng, và Mate không chạy - vì auto mode âm thầm không giao gì suốt một tiếng đúng là trạng thái incident này sinh ra để lộ; text của incident luôn nói rõ là nửa nào hỏng.
+  Digest bỏ qua chính incident `(mate, wedged)` của mình: báo cáo một lỗi giao hàng qua chính đường giao hàng vừa hỏng là vô nghĩa, và người dùng đã thấy nó trong inbox.
+- Lý do từ chối của lượt gần nhất hiện trên dòng thông báo của console, một lần mỗi lượt chứ không phải mỗi mục, và tự biến mất ở lượt gửi được. Ô `MODE` thêm `auto · sent 14:32:10` khi daemon đã gửi ít nhất một lần.
 
 ## 6. Trí nhớ của Mate
 
@@ -198,6 +234,14 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   Giá phải trả: mỗi crew mỗi vòng tốn ba lệnh `herdr` (lookup session, inspect, read), nên poll 5s với nhiều crew là chỗ cần đo lại khi số crew tăng.
 - AGENTS.md của Mate đã vượt trần mặc định `project_doc_max_bytes` của Codex (32768) khi thêm bảng bảy trạng thái (đo 2026-09-18 ở task 18b): `mate start --harness codex` chết với `required context exceeds delivery limit`, vì `spawn` từ chối thay vì để Codex cắt đuôi im lặng. Sửa: launch Codex truyền `-c project_doc_max_bytes=131072` (khoá có trong tài liệu, 0.154.0 nhận dưới `--strict-config`, khoá lạ thì bị từ chối ngay), và bộ đo của `harness` dùng cùng hằng số `CodexDefaultMaxBytes`, nên cờ và bộ đo không thể lệch nhau. `internal/mateassets` có test ngân sách cách trần 8 KiB, hỏng ngay tại nơi sửa template. Manual còn ghi 26 lần đường dẫn workspace, nên workspace sâu vẫn ăn thêm vài trăm byte.
 - Nested-session env (đo 2026-09-17, Claude Code 2.1.274): một Claude Code đang chạy export `CLAUDECODE=1`, `CLAUDE_CODE_SESSION_ID`, và các biến `CLAUDE_CODE_*` khác cho process con. Nếu Herdr server được khởi động từ shell đó thì mọi pane kế thừa chúng, và Claude trong pane coi mình là session con: hook `Stop` vẫn bắn nhưng transcript không bao giờ được ghi. Runtime gỡ `harness.NestedSessionEnv` khỏi env của server lúc spawn và khỏi pane ngay trước `agent start`. Bài học chung: không tin env kế thừa qua Herdr server, mọi biến harness cần đúng phải được set hoặc unset ở pane.
+- Composer của Mate thực sự bị chiếm sau mỗi digest, và đó là lý do luật "từ chối rồi thử lại vòng sau" không phải lý thuyết.
+  Đo 2026-09-18 (task 19, `TestLiveAutoDigestReachesTheMate`, Claude Code 2.1.274, Herdr 0.8.2): ngay sau khi digest vào composer, Mate vào turn và `send.ClassifyComposer` xếp là Busy suốt hơn 20 giây (`✽ Misting… (3s · thinking…)` rồi `(13s · ↓ 1.1k tokens …)`); dòng của người dùng gõ vào cùng composer bị `send.Send` từ chối hai lần với `target_blocked: agent is mid-turn` trước khi vào được.
+  Một daemon dùng `QueueWhileBusy` hoặc `herdr agent prompt` sẽ xếp digest sau turn đang chạy và không ai biết; daemon này để nguyên mục chưa digest, không đẩy con trỏ, và chào lại nguyên vẹn ở vòng sau.
+  Hệ quả cho cửa sổ 90 giây: một turn của Mate dài hơn một vòng là bình thường, nên số vòng bị từ chối liên tiếp không phải tín hiệu hỏng - chỉ 5 phút liên tục mới là `wedged`.
+- Sentinel `⟦matev2⟧ ` sống sót cả với dòng digest chứ không chỉ dòng ngắn.
+  Cùng lần đo: dòng `digest: 1 item(s) — k3 needs-decision: "pick A or B" — status files under /private/tmp/…/crews; act per AGENTS.md section 10` (có `—`, `·`, dấu nháy kép và một đường dẫn tuyệt đối dài) tới `UserPromptSubmit` của Claude nguyên vẹn, nên hook ghi `Source: app` và không xoá `.auto`.
+  Bằng chứng dùng được là `sent.log` có **hai** bản cùng một dòng - một do daemon ghi sau khi composer sạch, một do hook ghi khi model đọc được - còn một bản chỉ chứng minh chữ tới pane.
+  Ngay sau đó một dòng người dùng gõ không có marker xoá `.auto` trong vòng poll đầu tiên, và vòng tick kế tiếp không gửi gì dù đã có câu hỏi mới chờ sẵn.
 
 ## 8. Tái sử dụng từ v1
 
@@ -222,6 +266,7 @@ internal/store/          đọc ghi .matev2/, khoá append, layout, ranh giới 
 internal/box/            gộp status + sent.log + incident thành view
 internal/send/           gửi một dòng vào pane agent qua Herdr, kiểm chứng composer
 internal/watch/          observer và triage
+internal/autopilot/      daemon chế độ tự động: digest 90 giây, gửi có kiểm chứng vào pane Mate
 internal/spawn/          start Mate, spawn Crew
 internal/runtime/        copy v1
 internal/harness/        copy v1
@@ -271,7 +316,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 | --- | --- | --- |
 | 18 ∥ | Observer `internal/watch`: mỗi crew mở của mọi project, poll `.status`, inventory Herdr, composer classifier, hash pane, clock tiêm được. Mở/đóng incident `stale`, `runtime_lost` vào `incidents.log` theo hợp đồng mục 4b. `box.Load` đọc `incidents.log`, `View.OpenIncidents(crew)`. Console khởi động observer khi mở workspace và vẽ cột sức khỏe từ nó. | Unit với clock giả và pane giả cho từng chuyển tiếp mở/đóng. Live: crew Codex thật đứng im thành `blocked` rồi tự gỡ khi có dòng gửi vào pane; agent bị giết thành `runtime_lost`. Đã xong 2026-09-18; brief `sleep` trong ô này không dùng được, xem mục 7. |
 | 18b ∥ | Từ vựng trạng thái theo mục 4b: `crewstate` in `state · health`, `query` bỏ hẳn từ vựng v1 (`succeeded`, `awaiting_review`, `IsFinished`...), `spawn` ghi `state=spawned` lúc spawn, `state=failed` khi spawn thất bại, `crew stop` từ chối trước khi giết và ghi `state=finished|failed`, `box` verb crew là `working`/`needs-decision`/`wait-mate`, brief template, manual Mate (mục 4, 8, 9, 12 và skill stuck-crew-recovery), spec, mọi live test đang chờ `done:`. Tương thích ngược: `.meta` có `stopped_at` mà không có `state=` đọc là `finished`; dòng `done:` cũ đọc là `wait-mate`. | Unit từng quy tắc suy trạng thái; acceptance M2 chạy lại và đi đến `wait-mate:` rồi `crew stop` → `finished`. Đã xong 2026-09-18, evidence `docs/evidence/m3-state-vocabulary-2026-09-18.md`. |
-| 19 | Daemon auto trong console: digest 90 giây từ inbox và incident, gửi có kiểm chứng với marker, wedged, dừng khi `.auto` mất, phím bật tắt. | Live: crew hỏi, Mate tự trả lời, người dùng gõ thì tự tắt. |
+| 19 | Daemon auto trong console (`internal/autopilot`): digest 90 giây từ inbox, incident và `wait-mate`, gửi có kiểm chứng với marker, con trỏ `mate/.auto-cursor` để restart không gửi lại, `wedged` trên crew `mate` sau 5 phút, dừng khi `.auto` mất, chỉ báo `auto · sent hh:mm:ss` ở cột MODE và lý do từ chối ở dòng thông báo. | Unit từng luật với clock giả và pane giả. Live `TestLiveAutoDigestReachesTheMate`: crew Codex hỏi, digest tới `UserPromptSubmit` của Mate Claude (hai dòng `Source: app` trong `sent.log`), người dùng gõ một dòng không marker thì `.auto` mất và vòng sau không gửi gì. Đã xong 2026-09-18. |
 | 20 | Policy auto trong AGENTS.md, kể cả cách Mate xử lý `blocked` và `wait-mate` trong digest. | Acceptance có kịch bản. |
 
 ### M4. Review và merge
