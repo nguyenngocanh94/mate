@@ -1,0 +1,11 @@
+erics@Ericss-Mac-mini upd-lab % codex --dangerously-bypass-approvals-and-sandbox
+> You are in /private/tmp/upd-lab
+
+  Do you trust the contents of this directory? Working with untrusted contents comes with
+  higher risk of prompt injection. Trusting the directory allows project-local config, hooks,
+  and exec policies to load.
+
+› 1. Yes, continue
+  2. No, quit
+
+  Press enter to continue

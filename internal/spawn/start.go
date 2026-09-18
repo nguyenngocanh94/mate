@@ -68,6 +68,9 @@ type StartResult struct {
 	Status      runtime.AgentStatus
 	StaleMeta   bool
 	TrustDialog bool
+	// UpdateDialog is true when the startup settle skipped the harness's
+	// release-update prompt (Codex, measured 2026-09-18).
+	UpdateDialog bool
 	// Resumed is true when this start resumed the harness session recorded
 	// in `mate.meta` (task 10) instead of minting a fresh one.
 	Resumed bool
@@ -286,21 +289,22 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		return StartResult{}, err
 	}
 	return StartResult{
-		Project:     project,
-		Harness:     kind,
-		Agent:       handle.Name,
-		Session:     session.Name,
-		Workspace:   tab.WorkspaceID,
-		Tab:         tab.TabID,
-		Pane:        tab.PaneID,
-		SessionID:   sessionID,
-		StartedAt:   startedAt,
-		MateDir:     mateDir,
-		Status:      observed.Status,
-		TrustDialog: settled.TrustDialogAnswered,
-		Resumed:     resume,
-		ResumedFrom: resumedFrom,
-		ResumeNote:  resumeNote,
+		Project:      project,
+		Harness:      kind,
+		Agent:        handle.Name,
+		Session:      session.Name,
+		Workspace:    tab.WorkspaceID,
+		Tab:          tab.TabID,
+		Pane:         tab.PaneID,
+		SessionID:    sessionID,
+		StartedAt:    startedAt,
+		MateDir:      mateDir,
+		Status:       observed.Status,
+		TrustDialog:  settled.TrustDialogAnswered,
+		UpdateDialog: settled.UpdateDialogAnswered,
+		Resumed:      resume,
+		ResumedFrom:  resumedFrom,
+		ResumeNote:   resumeNote,
 	}, nil
 }
 

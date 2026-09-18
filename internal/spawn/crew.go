@@ -110,6 +110,12 @@ type CrewResult struct {
 	// crew worktree is always a path it has never seen. The settle step is
 	// therefore load-bearing for crews, not a formality.
 	TrustDialog bool
+	// UpdateDialog is true when the startup settle skipped the harness's
+	// release-update prompt. Codex draws it before the trust dialog on every
+	// launch after a new release is published until the operator dismisses
+	// that version (measured 2026-09-18), so a crew spawn that could not
+	// answer it never reached the composer at all.
+	UpdateDialog bool
 	// BriefDelivered is true when the pane was observed to leave idle after
 	// the brief prompt was sent.
 	BriefDelivered bool
@@ -361,6 +367,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		StatusPath:      statusPath,
 		StartedAt:       startedAt,
 		TrustDialog:     settled.TrustDialogAnswered,
+		UpdateDialog:    settled.UpdateDialogAnswered,
 		BriefDelivered:  delivered,
 		DeliveryWarning: warning,
 		PaneTail:        tail,

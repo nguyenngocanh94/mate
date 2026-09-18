@@ -120,7 +120,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	}
 	out := LaunchSpec{
 		kind:            string(KindCodex),
-		args:            []string{"--dangerously-bypass-approvals-and-sandbox"},
+		args:            []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck},
 		cwd:             cwd,
 		env:             env,
 		contextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
@@ -136,6 +136,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 			"this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.matev2/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit",
 			"this puts gomate in the same posture firstmate's own tooling already runs Codex in",
 			"this does not clear Codex's per-absolute-path directory-trust confirmation; that dialog is a separate wall no flag removes, measured 2026-09-14",
+			"the launch also carries -c check_for_update_on_startup=false: codex-cli draws a three-option release-update prompt ahead of everything else while a newer version is published, which blocks the composer (measured 2026-09-18 with 0.154.0 installed and 0.155.0 out); the key is documented and the override is per-launch, so the operator's own config.toml is never written",
 			"the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation",
 			"Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered)",
 			"missing or empty project files do not fail Codex; mate refuses to start instead",
@@ -145,6 +146,24 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	}
 	return finalize(out)
 }
+
+// CodexDisableUpdateCheck is the `-c key=value` override that turns off
+// codex-cli's startup release check for one launch.
+// `check_for_update_on_startup` is a documented boolean in the Codex
+// configuration reference
+// ("Check for Codex updates on startup (set to false only when updates are
+// centrally managed)"), and codex-cli 0.154.0 accepts it under
+// --strict-config, which errors on keys this build does not know.
+//
+// Without it a launch made while a newer release is published stops on a
+// three-option update prompt before the directory-trust dialog, and a Crew
+// spawn never reaches the composer (measured 2026-09-18, 0.154.0 installed
+// with 0.155.0 published). It is passed on the command line rather than
+// written into the operator's config.toml: mate never edits files codex
+// owns, and the operator keeps their own update notices everywhere else.
+// The prompt is still recognised and answered by the startup settle, because
+// a flag is a prediction and the pane is the measurement.
+const CodexDisableUpdateCheck = "check_for_update_on_startup=false"
 
 // DiscoverRequest is the cwd-relative view Codex will use at start.
 type DiscoverRequest struct {

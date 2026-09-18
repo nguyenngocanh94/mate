@@ -19,3 +19,24 @@ changed) so the selection check has a negative and a positive case for each harn
 - `claude-2.1.270-trust-dialog-accept-selected.txt` - what `down` produced live
   (the marker on **Yes, I trust this folder**), re-derived from the capture.
 - `codex-0.154.0-trust-dialog-quit-selected.txt` - the marker on **2. No, quit**.
+
+Captured 2026-09-18 the same way, against codex-cli 0.154.0 with 0.155.0 published,
+in a throwaway `/private/tmp` directory codex had never seen. These are one launch
+read four times, in order:
+
+- `codex_update_dialog.txt` - the release-update prompt as drawn. It comes up before
+  the directory-trust dialog and blocks the composer; the highlight opens on
+  **1. Update now**, which would run `npm install -g @openai/codex` under the agent.
+- `codex_update_dialog_skip_selected.txt` - the same pane after two `down` presses,
+  with the highlight on **3. Skip until next version**.
+- `codex_update_dialog_after_enter.txt` - what Enter on that option produced: the
+  directory-trust dialog, for the same directory.
+- `codex_update_banner_ready.txt` - the composer a few seconds after `1`, `enter`.
+  The update notice is still in the scrollback as a box banner, so this screen
+  carries "Update available!" without the dialog's shape and must classify as ready.
+
+Answering the prompt with **3. Skip until next version** writes
+`dismissed_version` into `$CODEX_HOME/version.json`, which is why the prompt does
+not come back until the next release. mate does not rely on that: the launch passes
+`-c check_for_update_on_startup=false` so the prompt is not drawn at all, and the
+recogniser stays as defence for the launches that flag does not cover.
