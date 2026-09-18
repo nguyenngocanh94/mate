@@ -9,6 +9,8 @@ Use this when a Crew has stopped making progress: a `blocked` state, a pane that
 
 `blocked` is the app's watcher speaking, not the Crew: it means the Crew can no longer report for itself - the pane is frozen, its agent left the harness, it is stuck on a dialog. A Crew never writes that word, so seeing it always means nobody is going to explain the situation to you and you have to look.
 
+You may learn a Crew is `blocked` from an auto-mode `digest:` line in your own pane (manual section 10) instead of from `crew list` or a direct `state` check. It is the same open incident either way - the digest only changed how you found out - so start at step 0 exactly as below, and never send that Crew a question just because the digest asked you to act.
+
 Every command below is run with the binary's absolute path, `{{.MatevBin}}`, from your own working directory.
 Load `harness-adapters` before you judge what is on a pane.
 

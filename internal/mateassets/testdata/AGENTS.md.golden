@@ -271,9 +271,9 @@ There is no acknowledgement, no correlation id, no waiting for a reply to arrive
 
 ## 9. Supervision, review and delivery
 
-**Waiting is your job, not someone else's.**
-Nothing wakes you on its own today; the console watcher that will do that lands in a later task.
-So while a Crew is in flight you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
+**Waiting is your job, not someone else's, in supervised mode.**
+No delivery reaches your pane on its own in that mode (section 10): the app's watcher and, on a project with auto mode on, its daemon both keep running regardless of mode, but only the captain moves anything either one found into your pane here.
+So while a Crew is in flight and you are in supervised mode, you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
 Check it about every twenty seconds with one command:
 
 ```text
@@ -284,6 +284,7 @@ Repeat that while the state says `working` or `spawned`.
 Real work takes minutes, so expect to run it many times over; each run costs one line of output, and that is the whole cost of supervising.
 Stop repeating when the state says something else, and act on it: `needs-decision` means answer it, `wait-mate` means review it, `blocked` means the watcher says the Crew cannot speak - peek it and go to section 12.
 If a Crew is genuinely quiet for many minutes with nothing to show for it - `working` with a `health: idle` reading that does not move - load `stuck-crew-recovery` rather than continuing to poll.
+None of this polling loop applies in auto mode; section 10 says exactly what replaces it there, and it is not this loop.
 
 You are also woken when something about a Crew needs attention: a `needs-decision:` line nobody has answered, or an open incident (`blocked`).
 On a wake, read the named status file first; that is usually enough.
@@ -351,6 +352,48 @@ The other form is `resolve: incident <kind> <crew> — <text>`, which names a Cr
 
 Never echo a `resolve:` line back, and never send one to a Crew.
 
+### The digest line
+
+The other sentinel-marked event in auto mode is a `digest:` line: the daemon's own batch of everything new since it last delivered, so your pane wakes at most once per cycle instead of once per Crew event.
+
+```text
+⟦matev2⟧ digest: 3 item(s) — k3 needs-decision: "pick A or B" · k9 blocked: stale, quiet for 4m0s · k7 wait-mate: "report.md is ready" — status files under /ws/.matev2/projects/shop/crews; act per AGENTS.md section 10
+```
+
+`<k>` right after `digest:` is always the true number of items this tick has to report, whether or not the line spells all of them out.
+Everything between that count and `status files under` is one or more items, each exactly one of three shapes and no other:
+
+```text
+<crew> needs-decision: "<text the Crew wrote, at most 120 runes, runs of whitespace collapsed to one space, any " turned into '>"
+<crew> blocked: <incident kind>, quiet for <duration>
+<crew> wait-mate: "<text the Crew wrote, the same truncation rule as needs-decision>"
+```
+
+A line lists at most 5 items; past that it ends the list with `· +N more`, and `N` plus the 5 shown always add up to `<k>` - do not assume 5 items is the whole story just because no `+N more` was appended.
+The quoted text on a `needs-decision` or `wait-mate` item is the Crew's own words, cut down to fit one line so you can tell items apart at a glance; it is never the record.
+Always read the status file at the absolute path this line names before you act on any item - never decide from the excerpt.
+`quiet for` on a `blocked` item is a lower bound, not the true duration: it is measured from the incident's own `open` line, and the watcher only opens one after its own threshold has already passed, so the Crew has been quiet for at least that long.
+A `blocked` item can show `-` where the crew name would be, when the watcher's finding cannot be attributed to any Crew; it still needs handling, just without a status file behind it.
+`status files under <dir>` is always this project's absolute crews directory, `/ws/.matev2/projects/shop/crews`, for the same reason the `resolve:` line's path is absolute (above): your cwd is your own directory, not the project's.
+
+### Acting on a digest
+
+Work through a digest's items in this fixed order, because the order tracks what happens to a Crew if you do not get to it: a `blocked` Crew may be actively dying, a `needs-decision` Crew is idle and waiting on you, and a `wait-mate` Crew has already finished and is going nowhere.
+
+1. **`blocked` first.** The Crew cannot speak for itself. Run `matev2 state`, then `matev2 peek`, then load `stuck-crew-recovery` (section 12) and follow its ladder - it is the same incident the ladder already handles, arriving to you by a different route. Never send a `blocked` Crew a question; there is nothing reliably on the other end to read it. If the ladder does not recover it, report the failure to the captain in your own pane and let them decide whether to close it with `crew stop`; closing a Crew because it went quiet is never yours to decide on your own (section 4b, section 9's "Closing a Crew").
+2. **`needs-decision` second.** Read the status file at the absolute path the digest names, never decide from the ≤120-rune excerpt on the digest line itself. Decide within the brief you wrote, exactly as a `resolve:` line asks (above): a decision genuinely yours you make, and you answer it with one `matev2 send shop <crew> "<line>"`. A decision that belongs to the captain - a merge, a scope change, money, anything the captain owns (section 13) - is reported in your own pane, not guessed into the Crew's.
+3. **`wait-mate` third.** Review it exactly as section 9's "On `wait-mate`:" describes - peek the pane, read the commits, read the diff - and report the outcome to the captain in outcome language, per section 9's "Delivery" and section 13. Section 4b still holds in auto mode: closing the Crew is the captain's word, not yours, with one exception. If this project's `yolo` flag is on, you may merge a ship Crew's landed branch yourself and then run `crew stop`, because `yolo` is specifically permission to skip the captain's merge word for a branch that is otherwise ready. `yolo` changes nothing else: it does not let you discard work, decide anything destructive, or close a scout Crew before the captain has seen its report.
+
+A `wedged` incident on the crew named `mate` is the daemon reporting trouble delivering to your own pane, not a Crew problem, and it never appears in a digest - reporting a delivery failure through the delivery that just failed would tell you nothing, and the captain already sees it in their own inbox. Do nothing about it; it is not yours to act on.
+
+However many items a digest carried, send the captain exactly one reply once you have worked through all of them, summarising what you did - never one message per item. Routine items you resolved yourself stay out of that message per section 13; a decision you escalated, a Crew you closed as failed, or a branch that is now ready belong in it.
+
+Once you have acted on a digest, stop your turn.
+Do not poll for the next one: section 9's "Waiting is your job" paragraph and its `sleep 20` loop describe supervised mode, where nothing else is watching a Crew on your behalf.
+In auto mode the daemon is that watcher, and its next digest - delivered to your pane exactly as this one was - is your wake-up; polling in between only means two things checking the same Crew for no reason.
+
+Any prompt that reaches your pane without the sentinel ends auto mode immediately, whatever it says - the app deletes the flag on its own. Do not try to turn auto mode back on, and do not mention that it changed unless the captain asks; it is exactly what the captain did by typing to you directly, and treating it as news would be telling them about their own action.
+
 In auto mode, decide on sentinel-marked events yourself within the policy above - except a merge, which still waits for the captain's explicit word unless the project's `yolo` flag is on.
 In supervised mode, never act on a Crew event on your own; wait until the captain hands it to you, by typing it, forwarding it, or telling you to look.
 
@@ -369,6 +412,7 @@ Treat it as a failed spawn: tell the captain the Crew could not start and what i
 ## 12. Stuck-crew recovery
 
 Load the `stuck-crew-recovery` skill when a Crew reads `blocked`, loops, repeats the same confusion, asks a question its own brief already answered, or does not respond to a steer.
+A `blocked` item you learn about from an auto-mode digest (section 10) is the same open incident, found by a different route, not a different problem; work it on the same ladder as a `blocked` you noticed yourself in `crew list` or `state`.
 The short version, which the skill expands: peek, then one specific steering line, then a relaunch with what was already tried, then closing the Crew as failed and telling the captain so.
 Never leave a task silently stuck; each step either recovers it or moves it one step closer to an honest failure you report.
 `failed` is a state only you can set, with `crew stop --discard`: a stuck Crew cannot declare itself failed.
