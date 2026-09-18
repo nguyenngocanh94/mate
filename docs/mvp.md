@@ -141,6 +141,10 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Trust dialog: Claude highlight mặc định là "No, exit"; gửi Enter mù là chết agent. Nhận diện dialog theo shape, một phím một lần, đọc lại giữa các lần.
   Worktree liên kết KHÔNG thừa kế trust với Codex: đo 2026-09-17 (task 11, Codex 0.154), crew trong `.worktrees/<p>-<id>` vẫn hiện directory-trust dialog vì Codex xác nhận theo từng absolute path.
   ADR 0028 của v1 nói ngược lại; settle step là bắt buộc cho crew, không phải thủ tục.
+- Startup không chỉ có một modal. Đo 2026-09-18 (codex-cli 0.154.0 đã cài, 0.155.0 vừa ra): Codex vẽ prompt cập nhật ba lựa chọn TRƯỚC trust dialog, mọi `crew spawn` chết với `target_blocked: startup screen not recognised`.
+  Settle phải xử lý một chuỗi dialog (cập nhật → trust → composer), mỗi cái vẫn một phím một lần và xác minh highlight trước Enter, với trần 3 dialog mỗi lần khởi động.
+  Trả lời `3. Skip until next version` (không phải `2. Skip`, sẽ hiện lại ngay lần sau; không phải `1. Update now`, chạy `npm install` dưới agent).
+  Phòng ngừa: launch mang `-c check_for_update_on_startup=false` (khoá có tài liệu, Codex nhận dưới `--strict-config`) nên prompt không được vẽ; bộ nhận dạng vẫn giữ làm lớp phòng thủ, vì cờ là dự đoán còn pane mới là phép đo.
 - `herdr agent prompt` báo thành công dù prompt rơi vào modal hoặc nối vào text gõ dở. Dùng `--wait` và kiểm chứng composer.
 - Hook `Stop` của Claude và `notify` của Codex không bắn mọi turn. Fallback theo thời gian, `unknown` là trạng thái hợp lệ.
 - Test xanh với fake Herdr không chứng minh gì. Mỗi milestone có live test trên Herdr lab session riêng, tên `TestLive*`, chạy khi `MATEV2_LIVE=1`.
