@@ -25,7 +25,7 @@ import (
 // healthy machine the prompt is never drawn and UpdateDialog is false. The
 // test asserts what it observed rather than a fixed answer: what it proves
 // either way is that the crew reached its composer, did the work and reported
-// `done:`, which is exactly what the failure prevented. The recogniser itself
+// `wait-mate:`, which is exactly what the failure prevented. The recogniser itself
 // is covered by the captured screens in internal/harness/testdata/startup.
 func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 	requireLive(t)
@@ -88,7 +88,7 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 		Crew:    "u1",
 		Harness: harness.KindCodex,
 		BriefText: `Append the line "hello from crew" to README.md, commit it, ` +
-			`then append done: ready in branch to the status file`,
+			`then append wait-mate: ready in branch to the status file`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -113,7 +113,7 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 		RawID:   "u1",
 		Kind:    harness.KindCodex,
 	}
-	status := waitForStatus(t, ctx, w, "u1", "done:", 150*time.Second, func() string {
+	status := waitForStatus(t, ctx, w, "u1", "wait-mate:", 150*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"

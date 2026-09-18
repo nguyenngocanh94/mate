@@ -17,7 +17,7 @@ import (
 )
 
 // TestLiveCrewTeardownRefusesThenDiscards is task 16's live proof: a real
-// Codex crew that commits and reports `done:` leaves its branch ahead of
+// Codex crew that commits and reports `wait-mate:` leaves its branch ahead of
 // main, so a stop without --discard must refuse (ErrUnlandedWork) and leave
 // the worktree and branch standing; a second stop with --discard must then
 // remove both, while `crews/<id>/brief.md` survives every step.
@@ -79,7 +79,7 @@ func TestLiveCrewTeardownRefusesThenDiscards(t *testing.T) {
 		Crew:    "k9",
 		Harness: harness.KindCodex,
 		BriefText: `Append the line "hello from crew" to README.md, commit it, ` +
-			`then append done: ready in branch to the status file`,
+			`then append wait-mate: ready in branch to the status file`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -97,7 +97,7 @@ func TestLiveCrewTeardownRefusesThenDiscards(t *testing.T) {
 		RawID:   "k9",
 		Kind:    harness.KindCodex,
 	}
-	status := waitForStatus(t, ctx, w, "k9", "done:", 120*time.Second, func() string {
+	status := waitForStatus(t, ctx, w, "k9", "wait-mate:", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
