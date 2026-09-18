@@ -6,21 +6,38 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 )
 
-// TestStateOfCrewGathersTheFourInputs exercises stateOfCrew - the CLI's
-// gathering half of docs/mvp.md task 13 - end to end over a fake runtime.
-// internal/crewstate/state_test.go already covers Decide's full branch
-// table in isolation; these check that the CLI hands it the right inputs.
-func TestStateOfCrewGathersTheFourInputs(t *testing.T) {
+// TestStateOfCrewGathersTheInputs exercises stateOfCrew - the CLI's
+// gathering half of docs/mvp.md task 13, in the vocabulary of section 4b -
+// end to end over a fake runtime. internal/crewstate/state_test.go covers
+// Declare and Observe in isolation; these check that the CLI hands them the
+// right inputs, and in particular that the two columns stay independent.
+func TestStateOfCrewGathersTheInputs(t *testing.T) {
 	w := liveCrewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeSpawnDeps(t, rt)
 	res := spawnFakeCrew(t, w, deps, "shop", "k3")
 	handle := runtime.AgentHandle{Session: runtime.SessionHandle{Name: res.Session}, Name: res.Agent}
 
-	t.Run("busy pane overrides a stale needs-decision status line", func(t *testing.T) {
+	t.Run("a freshly spawned crew that has written nothing is spawned", func(t *testing.T) {
+		rt.SetReadOutput(handle, codexEmptyScreen)
+		got, err := stateOfCrew(context.Background(), w, deps, "shop", "k3")
+		if err != nil {
+			t.Fatalf("stateOfCrew: %v", err)
+		}
+		want := crewstate.Result{
+			State:  crewstate.StateSpawned,
+			Health: crewstate.Health{Kind: crewstate.HealthIdle, Detail: "composer empty"},
+		}
+		if got != want {
+			t.Fatalf("got = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("a busy pane is health, never a state", func(t *testing.T) {
 		rt.SetReadOutput(handle, codexBusyScreen)
 		if err := w.AppendStatus("shop", "k3", "needs-decision: pick a db"); err != nil {
 			t.Fatal(err)
@@ -29,27 +46,29 @@ func TestStateOfCrewGathersTheFourInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("stateOfCrew: %v", err)
 		}
-		if got.State != crewstate.StateWorking || got.Source != crewstate.SourcePane {
-			t.Fatalf("got = %+v, want working · pane", got)
+		// The crew asked and stopped its turn; that it is typing again does
+		// not answer the question, so the state stays needs-decision and
+		// the pane shows up in the other column (mvp.md section 4b).
+		if got.State != crewstate.StateNeedsDecision {
+			t.Fatalf("state = %q, want needs-decision: a pane reading never overrides the record", got.State)
+		}
+		if got.Health.Kind != crewstate.HealthBusy {
+			t.Fatalf("health = %+v, want busy", got.Health)
 		}
 	})
 
-	t.Run("idle pane with a needs-decision status is parked", func(t *testing.T) {
+	t.Run("an idle pane on an unanswered question", func(t *testing.T) {
 		rt.SetReadOutput(handle, codexEmptyScreen)
 		got, err := stateOfCrew(context.Background(), w, deps, "shop", "k3")
 		if err != nil {
 			t.Fatalf("stateOfCrew: %v", err)
 		}
-		want := crewstate.Result{State: crewstate.StateParked, Source: crewstate.SourceStatusLog, Detail: "pick a db"}
-		if got != want {
-			t.Fatalf("got = %+v, want %+v", got, want)
-		}
-		if got.Line() != "state: parked · source: status-log · pick a db" {
-			t.Fatalf("Line() = %q", got.Line())
+		if want := "state: needs-decision · health: idle (composer empty)"; got.Line() != want {
+			t.Fatalf("Line() = %q, want %q", got.Line(), want)
 		}
 	})
 
-	t.Run("done supersedes the parked status once the crew reports it", func(t *testing.T) {
+	t.Run("the legacy done verb reads as wait-mate", func(t *testing.T) {
 		rt.SetReadOutput(handle, codexEmptyScreen)
 		if err := w.AppendStatus("shop", "k3", "done: chose A"); err != nil {
 			t.Fatal(err)
@@ -58,13 +77,14 @@ func TestStateOfCrewGathersTheFourInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("stateOfCrew: %v", err)
 		}
-		want := crewstate.Result{State: crewstate.StateDone, Source: crewstate.SourceStatusLog, Detail: "chose A"}
-		if got != want {
-			t.Fatalf("got = %+v, want %+v", got, want)
+		if got.State != crewstate.StateWaitMate {
+			t.Fatalf("state = %q, want wait-mate", got.State)
 		}
 	})
 
-	t.Run("a stopped crew reports stopped from meta alone", func(t *testing.T) {
+	t.Run("a closed crew reports its terminal state and a no-agent health", func(t *testing.T) {
+		// stopFakeCrew passes --discard, which is the caller deciding the
+		// work will not land: `failed`, not `finished` (mvp.md section 4b).
 		if _, err := stopFakeCrew(t, w, deps, "shop", "k3"); err != nil {
 			t.Fatalf("StopCrew: %v", err)
 		}
@@ -72,25 +92,30 @@ func TestStateOfCrewGathersTheFourInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("stateOfCrew: %v", err)
 		}
-		if got.State != crewstate.StateStopped || got.Source != crewstate.SourceMeta {
-			t.Fatalf("got = %+v, want stopped · meta", got)
+		if got.State != crewstate.StateFailed {
+			t.Fatalf("state = %q, want failed", got.State)
+		}
+		if got.Health.Kind != crewstate.HealthNoAgent {
+			t.Fatalf("health = %+v, want no-agent", got.Health)
 		}
 	})
 }
 
-// TestStateOfCrewWithNoMetaAtAll is the "no crew has ever been recorded"
-// branch: an empty meta file, never a live agent.
+// TestStateOfCrewWithNoMetaAtAll: "there is no such crew" is not a state.
+// `unknown` left the vocabulary with mvp.md section 4b, so the command
+// refuses rather than inventing a seventh answer.
 func TestStateOfCrewWithNoMetaAtAll(t *testing.T) {
 	w := liveCrewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeSpawnDeps(t, rt)
 
-	got, err := stateOfCrew(context.Background(), w, deps, "shop", "ghost")
-	if err != nil {
-		t.Fatalf("stateOfCrew: %v", err)
+	_, err := stateOfCrew(context.Background(), w, deps, "shop", "ghost")
+	if err == nil {
+		t.Fatal("stateOfCrew on a crew that was never recorded must fail")
 	}
-	if got.State != crewstate.StateUnknown || got.Source != crewstate.SourceNone {
-		t.Fatalf("got = %+v, want unknown · none", got)
+	var oerr *observability.Error
+	if !errors.As(err, &oerr) || oerr.Code != observability.CodeNotFound {
+		t.Fatalf("err = %v, want a not-found refusal", err)
 	}
 }
 

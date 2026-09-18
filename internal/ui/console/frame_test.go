@@ -83,7 +83,7 @@ func hostileTree() query.Snapshot {
 					{
 						CrewID:    "crew_" + strings.Repeat("D", 40),
 						Task:      "修正\t" + long + " ‼️ tail",
-						Status:    query.CrewNeedsRepair,
+						Status:    query.CrewWorking,
 						Worktree:  query.UnknownField[query.WorktreeValue]("worktree lookup failed"),
 						AgentName: query.UnknownField[string]("binding lookup failed"),
 						Binding:   query.UnknownField[query.BindingValue]("binding lookup failed"),
@@ -100,6 +100,9 @@ func hostileTree() query.Snapshot {
 					{
 						CrewID: "crew_" + strings.Repeat("E", 40),
 						Status: query.CrewFailed,
+						// Terminal, so this is the row behind the Completed
+						// group the sweep below drills into.
+						Closed: true,
 						Worktree: query.KnownField(query.WorktreeValue{
 							Path:   "/repos/payments-api/.worktrees/crew_evil\nname/a1",
 							Branch: "fix/branch",

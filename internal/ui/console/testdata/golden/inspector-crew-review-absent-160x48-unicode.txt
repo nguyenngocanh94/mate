@@ -4,9 +4,9 @@
   MATE                                               HARNESS    STATUS     MODE        BINDING     │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB                      
   none assigned                                                                        ! no mate   │                                                            
                                                                                                    │ ID               crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB           
-  CREWS  1          TASK                                  STATUS           NOTE          UPDATED   │ Task                                                       
-▌ crew_01J9P8…Z0AB                                        awaiting_review  ? unknown     12:05:33  │                                                            
-                                                                                                   │ Recorded status  awaiting_review                           
+  CREWS  1          TASK                                  STATE            NOTE          UPDATED   │ Task                                                       
+▌ crew_01J9P8…Z0AB                                        wait-mate        ? unknown     12:05:33  │                                                            
+                                                                                                   │ Recorded status  wait-mate                                 
                                                                                                    │ Harness          claude                                    
                                                                                                    │ Agent            crew-payments-api-1                       
                                                                                                    │ Binding          none · session ended after completion     

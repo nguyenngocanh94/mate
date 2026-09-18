@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/matev2/internal/config"
+	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/mateassets"
@@ -43,6 +44,24 @@ const (
 	MetaWorktree = "worktree"
 	// MetaBranch is the branch the worktree is checked out on.
 	MetaBranch = "branch"
+	// MetaState is the crew's declared state (mvp.md section 4b). Only the
+	// app writes it, and only three values ever land in it: `spawned` at
+	// spawn, `finished` or `failed` at `crew stop`, and `failed` when a
+	// spawn could not finish. A crew's own `.status` is a different file and
+	// a different vocabulary; the two never overwrite each other.
+	MetaState = crewstate.MetaState
+	// MetaFailedReason is why a spawn failed, one line, written beside
+	// `state=failed` so a crew record that never came up still says what
+	// happened.
+	MetaFailedReason = "failed_reason"
+)
+
+// The values MetaState may hold. They are crewstate's, so the file the app
+// writes and the table that reads it cannot drift.
+const (
+	CrewStateSpawned  = string(crewstate.StateSpawned)
+	CrewStateFinished = string(crewstate.StateFinished)
+	CrewStateFailed   = string(crewstate.StateFailed)
 )
 
 // BriefPlaceholder is the token in the rendered brief template that the
@@ -131,10 +150,17 @@ type CrewResult struct {
 // the crew is to follow, a Herdr tab in the project's workspace, the harness
 // running in it, and `crews/<id>.meta` written last.
 //
+// A successful spawn records `state=spawned`: the crew exists and has said
+// nothing yet (mvp.md section 4b).
+//
 // Everything created after the worktree exists is compensated on failure:
 // the agent is stopped, the tab closed, the worktree removed and the branch
-// deleted, and no meta is written. `crews/<id>/brief.md` is deliberately
-// kept - it is the evidence of what was asked for.
+// deleted. `crews/<id>/brief.md` is deliberately kept - it is the evidence
+// of what was asked for - and because that directory survives, the meta is
+// written too, carrying `state=failed` and `failed_reason=`. A spawn that
+// could not come up must not leave a record that reads as a crew about to
+// start; `failed` is the honest word, and it is the app's to write (nothing
+// else can: the crew never existed to say so).
 func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrewRequest) (CrewResult, error) {
 	if w == nil {
 		return CrewResult{}, errUsage("spawn: a workspace is required")
@@ -207,10 +233,53 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	})
 	if err != nil {
 		saga.compensate(ctx)
+		recordFailedSpawn(w, project, crew, kind, task, branch, err)
 		return CrewResult{}, err
 	}
 	result.StaleMeta = staleMeta
 	return result, nil
+}
+
+// recordFailedSpawn writes `state=failed` over whatever the crew record is,
+// once the spawn has failed and been compensated - but only when
+// `crews/<id>/` exists, which is exactly the line between "nothing was
+// created" and "something was". Before the brief is written a failure is a
+// refusal and leaves no trace; after it, the directory survives compensation
+// and a record must say why (mvp.md section 4b: no orphan directory left at
+// `spawned`).
+//
+// It keeps only the facts that were settled before the failure. The agent,
+// pane and tab are deliberately absent: compensation removed them, and a
+// meta naming a pane nobody has is what `matev2 state` would then have to
+// explain away.
+//
+// Its own failure is swallowed. The caller must see why the spawn was
+// refused, not why the bookkeeping afterwards was untidy.
+func recordFailedSpawn(w *store.Workspace, project, crew string, kind harness.Kind, task, branch string, cause error) {
+	if _, err := os.Stat(w.CrewDir(project, crew)); err != nil {
+		return
+	}
+	_ = w.WriteCrewMeta(project, crew, map[string]string{
+		MetaTask:         task,
+		MetaHarness:      string(kind),
+		MetaBranch:       branch,
+		MetaState:        CrewStateFailed,
+		MetaFailedReason: oneLineReason(cause),
+	})
+}
+
+// oneLineReason flattens an error into the single line a `.meta` value is,
+// bounded the way `task=` is: the record is a label, and the caller already
+// has the error itself.
+func oneLineReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	reason := strings.Join(strings.Fields(err.Error()), " ")
+	if len(reason) > maxTaskLine {
+		reason = strings.TrimSpace(reason[:maxTaskLine]) + "..."
+	}
+	return reason
 }
 
 // crewPlan is the settled decision a spawn works from once the worktree
@@ -346,6 +415,10 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		MetaSessionID:  sessionID,
 		MetaTranscript: "",
 		MetaStartedAt:  startedAt.Format(time.RFC3339),
+		// The crew exists and has written nothing yet. It is not an
+		// override: the moment the crew appends its first `working:` line
+		// that verb is what the state resolves to (mvp.md section 4b).
+		MetaState: CrewStateSpawned,
 	}
 	if err := w.WriteCrewMeta(plan.project, plan.crew, meta); err != nil {
 		return CrewResult{}, err

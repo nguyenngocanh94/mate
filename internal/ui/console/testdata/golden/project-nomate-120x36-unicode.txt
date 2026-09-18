@@ -4,7 +4,7 @@
   MATE                 HARNESS    STATUS     MODE        BINDING     │ MATE  ledger-worker                              
 ▌ none assigned                              auto        ! no mate   │                                                  
                                                                      │ ID               none · this project has no      
-  CREWS  0          TASK              STATUS           NOTE          │                  designated Mate                 
+  CREWS  0          TASK              STATE            NOTE          │                  designated Mate                 
                                                                      │ Agent            none · this project has no      
   No crews recorded for ledger-worker.                               │                  designated Mate                 
   Crews are spawned by the Mate; press r to re-read.                 │ Harness          none · this project has no      

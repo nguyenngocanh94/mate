@@ -7,22 +7,22 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-func TestCrewIsFinishedHoldsOnlyTheRecordedOutcomes(t *testing.T) {
+// TestOnlyTheTwoTerminalStatesAreClosed: the Completed group holds crews
+// whose task is over, and mvp.md section 4b says that is `finished` and
+// `failed` - the two `crew stop` writes. `wait-mate` in particular is not
+// one: it is the crew's report, and closing is somebody's decision.
+func TestOnlyTheTwoTerminalStatesAreClosed(t *testing.T) {
 	active := []query.CrewStatus{
-		query.CrewReserved, query.CrewPreparing, query.CrewRunning,
-		query.CrewAwaitingReview, query.CrewBlocked,
-		query.CrewNeedsRebase, query.CrewNeedsRepair,
+		query.CrewSpawned, query.CrewWorking,
+		query.CrewNeedsDecision, query.CrewWaitMate, query.CrewBlocked,
 	}
 	for _, s := range active {
-		if s.IsFinished() {
+		if s.Closed() {
 			t.Fatalf("%s must stay in the active list", s)
 		}
 	}
-	if query.CrewAwaitingReview.IsFinished() {
-		t.Fatal("awaiting_review must stay in the active list; the captain still has to review it")
-	}
-	if !query.CrewSucceeded.IsFinished() || !query.CrewFailed.IsFinished() {
-		t.Fatal("succeeded and failed are the finished statuses the Completed group holds")
+	if !query.CrewFinished.Closed() || !query.CrewFailed.Closed() {
+		t.Fatal("finished and failed are the terminal states the Completed group holds")
 	}
 }
 
@@ -96,30 +96,36 @@ func TestJumpToFinishedCrewExpandsCompletedGroup(t *testing.T) {
 	}
 }
 
-func TestAwaitingReviewStaysInTheActiveCrewList(t *testing.T) {
+// TestWaitMateStaysInTheActiveCrewList is the decision of 2026-09-18: a
+// crew that has handed its work back is still work in flight until somebody
+// runs `crew stop`, so it keeps its own row rather than disappearing into
+// Completed.
+func TestWaitMateStaysInTheActiveCrewList(t *testing.T) {
 	tree := sampleTree()
-	tree.Projects[0].Crews[0].Status = query.CrewAwaitingReview
-	tree.Projects[0].Crews[0].Attention = query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "review"})
+	tree.Projects[0].Crews[0].Status = query.CrewWaitMate
+	tree.Projects[0].Crews[0].Closed = false
+	tree.Projects[0].Crews[0].Attention = query.AbsentField[query.Attention]("the crew reported and waits on the Mate")
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter"))
 	rows := m.currentRows()
 	if len(rows) != 3 || rows[1].kind != rowCrew || rows[2].kind != rowCrew {
-		t.Fatalf("rows = %+v, want both crews listed because awaiting_review is not finished", rows)
+		t.Fatalf("rows = %+v, want both crews listed because wait-mate is not closed", rows)
 	}
 	for _, r := range rows {
 		if r.kind == rowCompletedGroup {
-			t.Fatalf("awaiting_review must not be hidden in a Completed group: %+v", rows)
+			t.Fatalf("wait-mate must not be hidden in a Completed group: %+v", rows)
 		}
 	}
 }
 
-func TestCompletedGroupOfSucceededCrewsDoesNotClaimUnknownAttention(t *testing.T) {
+func TestCompletedGroupOfFinishedCrewsDoesNotClaimUnknownAttention(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Crews = []query.CrewNode{
 		{
-			CrewID:    "crew_succeeded",
-			Status:    query.CrewSucceeded,
-			Attention: query.AbsentField[query.Attention]("the crew succeeded and nothing about it needs attention"),
+			CrewID:    "crew_finished",
+			Status:    query.CrewFinished,
+			Closed:    true,
+			Attention: query.AbsentField[query.Attention]("the crew finished and nothing about it needs attention"),
 		},
 		tree.Projects[0].Crews[1],
 	}

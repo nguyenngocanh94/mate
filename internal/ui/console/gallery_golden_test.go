@@ -57,7 +57,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 				Crews: []query.CrewNode{{
 					CrewID:      "crew_01J9N3N4T8C3J0Q5G9P2A7Z6BR",
 					Task:        "Migrate email delivery to SES",
-					Status:      query.CrewRunning,
+					Status:      query.CrewWorking,
 					HarnessKind: query.HarnessCodex,
 					Error:       query.AbsentField[query.ErrorReason](notErrorState),
 				}},

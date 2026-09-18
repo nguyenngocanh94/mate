@@ -34,7 +34,7 @@ const (
 	// has to be able to show a whole `mate-<project>` at 120 columns.
 	colMode    = 12
 	colBinding = 12 // the Project's Mate row: binding status
-	colStatus  = 17 // a Crew row: recorded status
+	colStatus  = 17 // a Crew row: its declared state (mvp.md section 4b)
 	colCrewID  = 18 // a Crew row: abbreviated id
 
 	// listWideMin is the list pane's own width (not the terminal's), at or
@@ -403,7 +403,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREWS  %d", activeCrews), focused, p)}, colCrewID)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("TASK", p)}, taskW)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colStatus)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("STATE", p)}, colStatus)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("NOTE", p)}, colAttention)...)
 		if crewsWide {
 			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
@@ -464,10 +464,17 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 	return items
 }
 
+// finishedCrews is the Completed group's membership: Crews whose task is
+// over (`finished` or `failed`, mvp.md section 4b). The store-backed loader
+// already drops those from ProjectNode.Crews and counts them in
+// ClosedCrews, so in an ordinary snapshot this group is empty and the row
+// does not appear; it stays because the rule "a closed Crew is not work in
+// flight" belongs in the renderer too, and a caller-supplied LoadFunc is
+// free to hand the Console a closed row.
 func finishedCrews(p query.ProjectNode) []query.CrewNode {
 	out := make([]query.CrewNode, 0)
 	for _, c := range p.Crews {
-		if c.Status.IsFinished() {
+		if c.Closed {
 			out = append(out, c)
 		}
 	}

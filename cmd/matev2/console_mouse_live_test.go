@@ -32,7 +32,7 @@ import (
 //  1. a real Claude Mate and a real Codex crew with a needs-decision brief
 //  2. the Console is opened and navigated to the Mate's session view
 //  3. a click on the rail entry, a click on its [reply] button, "A", Enter -
-//     and the crew continues to `done: chose A`, which it can only do if the
+//     and the crew continues to `wait-mate: chose A`, which it can only do if the
 //     reply reached its pane
 //  4. a click in the terminal zone, then "say PONG" and Enter typed bare -
 //     and sent.log records a Mate turn, which it can only do if those
@@ -108,7 +108,7 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 		Crew:    "k3",
 		Harness: harness.KindCodex,
 		BriefText: `Append needs-decision: pick A or B to the status file and stop; ` +
-			`when answered, append done: chose <answer>`,
+			`when answered, append wait-mate: chose <answer>`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

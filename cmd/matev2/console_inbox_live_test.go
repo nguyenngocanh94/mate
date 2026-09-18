@@ -32,7 +32,7 @@ import (
 //     ActionFunc the `[resolve]` button uses
 //  5. the Mate answers the crew with `matev2 send`, which records
 //     `Source: mate` because spawn puts MATEV2_AGENT_ROLE=mate in its pane
-//  6. the crew takes that as a new prompt and reaches `done: chose <A|B>`
+//  6. the crew takes that as a new prompt and reaches `wait-mate: chose <A|B>`
 //  7. the inbox is empty again - by the rules in internal/box/inbox.go, from
 //     the Mate's own reply and from the crew moving on
 //
@@ -107,7 +107,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 		Crew:    "k3",
 		Harness: harness.KindCodex,
 		BriefText: `Append needs-decision: pick A or B to the status file and stop; ` +
-			`when answered, append done: chose <answer>`,
+			`when answered, append wait-mate: chose <answer>`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

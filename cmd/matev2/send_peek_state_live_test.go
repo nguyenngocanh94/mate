@@ -81,7 +81,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		Crew:    "k3",
 		Harness: harness.KindCodex,
 		BriefText: `Append needs-decision: pick A or B to the status file and stop. ` +
-			`When the Mate answers, append done: chose <answer> and stop.`,
+			`When the Mate answers, append wait-mate: chose <answer> and stop.`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -144,7 +144,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		t.Fatalf("sent.log = %+v, want one mate->crew:k3 \"A\" entry", sent)
 	}
 
-	done := waitForStatusLine(t, ctx, w, "done: chose A", 120*time.Second, func() string {
+	done := waitForStatusLine(t, ctx, w, "wait-mate: chose A", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"

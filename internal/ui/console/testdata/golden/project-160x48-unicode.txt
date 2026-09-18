@@ -4,8 +4,8 @@
   MATE                                               HARNESS    STATUS     MODE        BINDING     │ MATE  payments-api                                         
 ▌ mate-payments-api                                  claude     running    supervised  active      │                                                            
                                                                                                    │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK           
-  CREWS  2          TASK                                  STATUS           NOTE          UPDATED   │ Agent            mate-payments-api                         
-  crew_01J9P6…B8DT  Add idempotency-key index             running                        14:01:58  │ Harness          claude                                    
+  CREWS  2          TASK                                  STATE            NOTE          UPDATED   │ Agent            mate-payments-api                         
+  crew_01J9P6…B8DT  Add idempotency-key index             working                        14:01:58  │ Harness          claude                                    
   ↓ Completed (1)                                                          ! failed                │                                                            
                                                                                                    │ Recorded status  running                                   
                                                                                                    │ Binding          active                                    

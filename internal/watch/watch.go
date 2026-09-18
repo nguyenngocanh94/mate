@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
+	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
@@ -390,15 +391,15 @@ func staleCleared(paneMoved, statusMoved bool, composer send.ComposerState) (str
 }
 
 // waiting reports whether a status verb means the crew is waiting on a human
-// rather than stuck. A crew that asked a question, handed back to the Mate or
-// reported it was done is silent on purpose (mvp.md section 4b); calling that
-// stale would put the same crew in the inbox twice.
+// rather than stuck. A crew that asked a question or handed back to the Mate
+// is silent on purpose (mvp.md section 4b); calling that stale would put the
+// same crew in the inbox twice.
 //
-// `done` is here beside `wait-mate` because it is the same report under the
-// v1 word, which mvp.md task 18b is in the middle of retiring.
+// The vocabulary is box's, so there is one spelling of it in the codebase -
+// including the legacy `done:`, which box already reads as `wait-mate`.
 func waiting(verb string) bool {
-	switch verb {
-	case "needs-decision", "wait-mate", "done":
+	switch box.State(verb) {
+	case box.StateNeedsDecision, box.StateWaitMate:
 		return true
 	default:
 		return false
@@ -425,21 +426,17 @@ func (w *Watcher) readStatus(ref CrewRef, obs *observation) (bool, error) {
 	return true, nil
 }
 
-// statusVerb is the word before the colon of `state: one line`. The verbs
-// are not parsed through internal/box on purpose: the observer needs to
-// recognise `wait-mate` while mvp.md task 18b is still replacing box's v1
-// vocabulary, and an unrecognised word here must stay itself rather than
-// collapse into "unknown".
+// statusVerb is the crew verb of one `state: one line`, parsed by
+// internal/box so the observer reads exactly what the console and the CLI
+// read - the three verbs of mvp.md section 4b plus the pre-4b spellings box
+// maps onto them. A line box does not recognise yields "", and readStatus
+// then keeps the verb the crew last actually wrote: a malformed echo is not
+// a state change.
 func statusVerb(line string) string {
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return ""
+	if st := box.ParseStatus(line); st.State != box.StateUnknown {
+		return string(st.State)
 	}
-	verb, _, ok := strings.Cut(line, ":")
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(verb)
+	return ""
 }
 
 func (w *Watcher) observation(ref CrewRef) *observation {
@@ -538,22 +535,17 @@ func (w *Watcher) appendIncident(ref CrewRef, kind box.IncidentKind, state strin
 	})
 }
 
-// The two meta keys that close a crew (mvp.md section 4b). They are spelled
-// here rather than imported from internal/spawn so the observer depends on
-// nothing that can start or stop an agent; `state` is the key task 18b
-// writes, and `stopped_at` is what `crew stop` has always written.
-const (
-	metaState     = "state"
-	metaStoppedAt = "stopped_at"
-
-	stateFinished = "finished"
-	stateFailed   = "failed"
-)
-
 // openCrews lists the crews of a project that are still in flight: a
-// `crews/<id>.meta` whose state is neither final and which `crew stop` has
-// not closed. A meta that cannot be read is skipped rather than watched: an
-// unreadable record is not evidence of a running crew.
+// `crews/<id>.meta` whose declared state is not terminal. The decision is
+// crewstate.Declare's, which is the one resolution order in the codebase
+// (mvp.md section 4b) and a leaf package that can start nothing - so the
+// observer still depends on nothing that can start or stop an agent. An
+// incident is deliberately not an input here: `blocked` is a state the
+// observer itself produces, and a crew it has flagged is exactly the crew it
+// must keep watching so it can clear the flag again.
+//
+// A meta that cannot be read is skipped rather than watched: an unreadable
+// record is not evidence of a running crew.
 func openCrews(ws *store.Workspace, project string) ([]string, error) {
 	entries, err := os.ReadDir(ws.CrewsDir(project))
 	if err != nil {
@@ -575,10 +567,7 @@ func openCrews(ws *store.Workspace, project string) ([]string, error) {
 		if err != nil {
 			continue
 		}
-		if meta[metaStoppedAt] != "" {
-			continue
-		}
-		if state := meta[metaState]; state == stateFinished || state == stateFailed {
+		if crewstate.Declare(crewstate.Declaration{Meta: meta}).Closed() {
 			continue
 		}
 		out = append(out, id)

@@ -5,22 +5,24 @@ import "time"
 // The inbox: the subset of a View that a human or the Mate still has to
 // decide on.
 //
-// The View itself stays complete - every `working` line, every `done`, every
-// message in `sent.log` - because the merge is the record and a record that
-// drops lines is not one. The inbox is a filter over it, and only the
-// surfaces that ask a reader to *do* something use it. `done` and `failed`
-// are not in it: they are outcomes, not questions, and the crews table's
-// STATUS column already carries them.
+// The View itself stays complete - every `working` line, every `wait-mate`,
+// every message in `sent.log` - because the merge is the record and a
+// record that drops lines is not one. The inbox is a filter over it, and
+// only the surfaces that ask a reader to *do* something use it.
+// `wait-mate` is not in it (decision 2026-09-18, mvp.md section 4b): it is
+// the crew's report, the crews table's STATE column already carries it, and
+// the user can type into the crew's pane at any time without being told to.
 //
 // # What is in the inbox
 //
 // One Item per unresolved thing:
 //
-//   - a status entry whose state is needs-decision or blocked - the crew
-//     asked and stopped its turn (mvp.md section 4);
+//   - a status entry whose state is needs-decision - the crew asked and
+//     stopped its turn (mvp.md section 4b);
 //   - an open incident - the observer noticed something the crew itself
-//     cannot report, and has not yet written the `resolved` line that ends
-//     it (mvp.md section 4b).
+//     cannot report, which is what `blocked` means, and has not yet
+//     written the `resolved` line that ends it. A resolved incident is
+//     history and is not in the inbox.
 //
 // # When a thing stops being in the inbox
 //
@@ -56,6 +58,11 @@ import "time"
 // answer; a second question, or any further status line, closes that out
 // through rule 1.
 //
+// Neither rule touches an incident: the observer does not write `.status`,
+// so a crew's own line never resolves a finding about it, and only the
+// observer's own `resolved` line takes an incident out of the inbox
+// (mvp.md section 4b).
+//
 // An item with no crew (an incident the observer could not attribute) can be
 // resolved by neither rule and stays in the inbox until somebody deals with
 // it, which is the honest answer: nothing recorded says it was handled.
@@ -66,8 +73,8 @@ import "time"
 type Item struct {
 	// Entry is the merged line this item stands for, verbatim.
 	Entry Entry
-	// State is the status verb for a status item (needs-decision or
-	// blocked), empty for an incident.
+	// State is the status verb for a status item (needs-decision), empty
+	// for an incident.
 	State State
 	// Kind is the incident kind for an incident item, empty for a status.
 	Kind IncidentKind
@@ -124,7 +131,7 @@ func inboxItem(e Entry) (Item, bool) {
 	switch e.Kind {
 	case KindStatus:
 		st := ParseStatus(e.Text)
-		if st.State != StateNeedsDecision && st.State != StateBlocked {
+		if !Attention(st.State) {
 			return Item{}, false
 		}
 		return Item{Entry: e, State: st.State, Text: st.Text}, true
@@ -144,7 +151,7 @@ func inboxItem(e Entry) (Item, bool) {
 
 // inboxResolved applies the two rules above, in that order.
 func inboxResolved(e Entry, lastStatus map[string]int, replies map[string][]time.Time) bool {
-	if e.Crew == "" {
+	if e.Crew == "" || e.Kind == KindIncident {
 		return false
 	}
 	if seq, ok := lastStatus[e.Crew]; ok && seq > e.Seq {

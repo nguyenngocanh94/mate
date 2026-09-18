@@ -30,7 +30,7 @@ import (
 //  2. the crew writes `needs-decision:` and stops its turn
 //  3. the box - the same query.BoxView the rail draws - shows that entry
 //  4. the reply action types "A" into the crew's own pane
-//  5. the crew continues and writes `done: chose A`
+//  5. the crew continues and writes `wait-mate: chose A`
 //  6. the resolve action hands the `resolve:` line - the question, the
 //     status file and the `matev2 send` that answers the crew - to the Mate
 //  7. sent.log carries app -> mate, and the Mate's own Stop hook then
@@ -109,7 +109,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 		Crew:    "k3",
 		Harness: harness.KindCodex,
 		BriefText: `Append needs-decision: pick A or B to the status file and stop; ` +
-			`when answered, append done: chose <answer>`,
+			`when answered, append wait-mate: chose <answer>`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

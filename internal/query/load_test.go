@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
@@ -138,20 +139,158 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 	}
 }
 
-// TestLoadGivesACrewThatWroteNothingTheReservedStatus: the meta is what
-// records the crew, so a crew with no status line yet is reserved, not
-// blank and not unknown.
-func TestLoadGivesACrewThatWroteNothingTheReservedStatus(t *testing.T) {
+// TestLoadGivesACrewThatWroteNothingTheSpawnedState: the meta is what
+// records the crew, so a crew with no status line yet is `spawned` - the
+// last rule of mvp.md section 4b's resolution order, and not blank.
+func TestLoadGivesACrewThatWroteNothingTheSpawnedState(t *testing.T) {
 	ws := newWorkspace(t, "shop")
-	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{"task": "scout"}); err != nil {
+	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{"task": "scout", "state": "spawned"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
 	snap, err := Load(context.Background(), ws)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if got := snap.Projects[0].Crews[0].Status; got != CrewReserved {
-		t.Fatalf("status = %q, want %q", got, CrewReserved)
+	if got := snap.Projects[0].Crews[0].Status; got != CrewSpawned {
+		t.Fatalf("status = %q, want %q", got, CrewSpawned)
+	}
+}
+
+// TestLoadResolvesEachCrewStateInTheOrderOfSection4b walks the whole table
+// on real files: the meta first, then an open incident, then the crew's own
+// last verb, then `spawned`. The incident case is the one the observer
+// (task 18) will fill in for real; until then box.Load reads no
+// incidents.log, so this drives it through the box view the same way Load
+// does and asserts the rule, not the producer.
+func TestLoadResolvesEachCrewStateInTheOrderOfSection4b(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	write := func(crew string, meta map[string]string, status ...string) {
+		t.Helper()
+		if err := ws.WriteCrewMeta("shop", crew, meta); err != nil {
+			t.Fatalf("write crew meta %s: %v", crew, err)
+		}
+		for _, line := range status {
+			if err := ws.AppendStatus("shop", crew, line); err != nil {
+				t.Fatalf("append status %s: %v", crew, err)
+			}
+		}
+	}
+	// A crew's own last verb, including the legacy spellings.
+	write("k1", map[string]string{"state": "spawned"}, "working: reading the ticket")
+	write("k2", map[string]string{"state": "spawned"}, "working: a", "needs-decision: A or B?")
+	write("k3", map[string]string{"state": "spawned"}, "wait-mate: ready in branch matev2/k3")
+	write("k4", map[string]string{"state": "spawned"}, "done: ready in branch matev2/k4")
+	// Nothing written at all.
+	write("k5", map[string]string{"state": "spawned"})
+	// The meta's terminal state outranks whatever the crew last said.
+	write("k6", map[string]string{"state": "finished", "stopped_at": "2026-09-18T10:00:00Z"}, "working: mid-turn when it was closed")
+	write("k7", map[string]string{"state": "failed", "failed_reason": "startup screen not recognised"})
+	// Backward compatibility: stopped_at with no state= is finished.
+	write("k8", map[string]string{"stopped_at": "2026-09-17T10:00:00Z"})
+
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := snap.Projects[0]
+	got := map[string]CrewStatus{}
+	for _, c := range p.Crews {
+		got[c.CrewID] = c.Status
+	}
+	want := map[string]CrewStatus{
+		"k1": CrewWorking,
+		"k2": CrewNeedsDecision,
+		"k3": CrewWaitMate,
+		"k4": CrewWaitMate,
+		"k5": CrewSpawned,
+	}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("crew %s = %q, want %q", id, got[id], w)
+		}
+	}
+	// k6, k7 and k8 are closed and therefore not rows at all.
+	for _, id := range []string{"k6", "k7", "k8"} {
+		if _, ok := got[id]; ok {
+			t.Errorf("crew %s is closed and must not be a row", id)
+		}
+	}
+	if p.ClosedCrews != 3 {
+		t.Errorf("ClosedCrews = %d, want 3", p.ClosedCrews)
+	}
+}
+
+// TestLoadReadsBlockedFromTheObserversOpenIncidents drives the `blocked`
+// rule end to end over real files: the observer (internal/watch) appends to
+// `incidents.log`, box.Load merges it, and Load resolves the state from
+// there. Nothing is hand-built; the rule under test is the resolution.
+//
+// k1 has an open incident and is blocked even though it last said
+// `working:`; k2's incident was resolved, so it is back to its own verb;
+// k3 has none.
+func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	for _, id := range []string{"k1", "k2", "k3"} {
+		if err := ws.WriteCrewMeta("shop", id, map[string]string{"state": "spawned"}); err != nil {
+			t.Fatalf("write crew meta %s: %v", id, err)
+		}
+		if err := ws.AppendStatus("shop", id, "working: reading the ticket"); err != nil {
+			t.Fatalf("append status %s: %v", id, err)
+		}
+	}
+	for _, inc := range []store.IncidentEntry{
+		{Time: time.Now().Add(-time.Hour), Crew: "k1", Kind: "stale", State: store.IncidentOpen, Text: "no status for 20m"},
+		{Time: time.Now().Add(-time.Hour), Crew: "k2", Kind: "runtime_lost", State: store.IncidentOpen, Text: "the agent left herdr"},
+		{Time: time.Now(), Crew: "k2", Kind: "runtime_lost", State: store.IncidentResolved, Text: "the agent is back"},
+	} {
+		if err := ws.AppendIncident("shop", inc); err != nil {
+			t.Fatalf("AppendIncident: %v", err)
+		}
+	}
+
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := snap.Projects[0]
+	if p.ClosedCrews != 0 {
+		t.Fatalf("ClosedCrews = %d, want 0: an incident never closes a crew", p.ClosedCrews)
+	}
+	got := map[string]CrewStatus{}
+	attention := map[string]Field[Attention]{}
+	for _, c := range p.Crews {
+		got[c.CrewID] = c.Status
+		attention[c.CrewID] = c.Attention
+	}
+	want := map[string]CrewStatus{"k1": CrewBlocked, "k2": CrewWorking, "k3": CrewWorking}
+	for id, wantState := range want {
+		if got[id] != wantState {
+			t.Errorf("crew %s = %q, want %q", id, got[id], wantState)
+		}
+	}
+	// And `blocked` is attention, with a sentence naming the observer.
+	if a := attention["k1"]; a.State != Known || a.Value.Kind != AttentionBlocked {
+		t.Fatalf("k1 attention = %+v, want a Known blocked attention", a)
+	}
+	if a := attention["k3"]; a.State == Known {
+		t.Fatalf("k3 attention = %+v, want none: it is simply working", a)
+	}
+}
+
+// TestCrewStateOfBlocksOnAnOpenIncident: `blocked` is the observer's state
+// and the only way in is an unresolved incident, which outranks the crew's
+// own last verb but never a terminal meta state (mvp.md section 4b).
+func TestCrewStateOfBlocksOnAnOpenIncident(t *testing.T) {
+	spawned := map[string]string{"state": "spawned"}
+	if got := CrewStateOf(spawned, true, "working"); got != CrewBlocked {
+		t.Errorf("open incident over working = %q, want %q", got, CrewBlocked)
+	}
+	if got := CrewStateOf(spawned, false, "working"); got != CrewWorking {
+		t.Errorf("no incident = %q, want %q", got, CrewWorking)
+	}
+	closed := map[string]string{"state": "finished", "stopped_at": "2026-09-18T10:00:00Z"}
+	if got := CrewStateOf(closed, true, "working"); got != CrewFinished {
+		t.Errorf("open incident over a closed crew = %q, want %q", got, CrewFinished)
 	}
 }
 
@@ -180,19 +319,20 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 }
 
 // TestLoadHidesClosedCrewsAndCountsThem: closing is the decision that ends
-// a task and it is `matev2 crew stop`'s stopped_at, not the crew's own
-// `done:` line (2026-09-18). A crew that said done is still a row; a
-// stopped one is not, and ClosedCrews says how many were dropped.
+// a task and it is `matev2 crew stop`'s `state=finished|failed`, not the
+// crew's own report (2026-09-18). A crew that said `wait-mate` is still a
+// row; a closed one is not, and ClosedCrews says how many were dropped.
 func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 	ws := newWorkspace(t, "shop")
-	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship", "agent": "crew-k1", "pane": "w1:p2"}); err != nil {
+	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{
+		"task": "ship", "agent": "crew-k1", "pane": "w1:p2", "state": "spawned"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	if err := ws.AppendStatus("shop", "k1", "done: ready in branch matev2/k1"); err != nil {
+	if err := ws.AppendStatus("shop", "k1", "wait-mate: ready in branch matev2/k1"); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{
-		"task": "scout", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
+		"task": "scout", "state": "finished", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
 	snap, err := Load(context.Background(), ws)
@@ -203,8 +343,8 @@ func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 	if len(p.Crews) != 1 || p.Crews[0].CrewID != "k1" {
 		t.Fatalf("crews = %+v, want only the open k1", p.Crews)
 	}
-	if p.Crews[0].Status != CrewStatus("done") || p.Crews[0].Closed {
-		t.Fatalf("k1 = status %q closed %v, want done and open", p.Crews[0].Status, p.Crews[0].Closed)
+	if p.Crews[0].Status != CrewWaitMate || p.Crews[0].Closed {
+		t.Fatalf("k1 = status %q closed %v, want wait-mate and open", p.Crews[0].Status, p.Crews[0].Closed)
 	}
 	if p.ClosedCrews != 1 {
 		t.Fatalf("closed = %d, want 1", p.ClosedCrews)

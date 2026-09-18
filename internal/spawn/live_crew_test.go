@@ -19,7 +19,7 @@ import (
 
 // TestLiveSpawnCrewCodex is the task 11 proof: a real Codex crew in a real
 // Herdr pane, in its own git worktree, that reads the brief matev2 pointed it
-// at, commits in its branch, and reports `done:` through $MATEV2_STATUS.
+// at, commits in its branch, and reports `wait-mate:` through $MATEV2_STATUS.
 //
 // It asserts the work, not the screen: a new commit on the crew branch that
 // touches README.md, and a status file the crew itself appended to.
@@ -84,7 +84,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		Crew:    "k3",
 		Harness: harness.KindCodex,
 		BriefText: `Append the line "hello from crew" to README.md, commit it, ` +
-			`then append done: ready in branch to the status file`,
+			`then append wait-mate: ready in branch to the status file`,
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -114,7 +114,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		RawID:   "k3",
 		Kind:    harness.KindCodex,
 	}
-	status := waitForStatus(t, ctx, w, "k3", "done:", 120*time.Second, func() string {
+	status := waitForStatus(t, ctx, w, "k3", "wait-mate:", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"

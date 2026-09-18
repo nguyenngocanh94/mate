@@ -4,7 +4,7 @@
   MATE                            HARNESS    STATUS     MODE        BINDING     
 ▌ mate-docs-site                  claude     stopped                none        
                                                                                 
-  CREWS  0          TASK                         STATUS           NOTE          
+  CREWS  0          TASK                         STATE            NOTE          
                                                                                 
   No crews recorded for docs-site.                                              
   Crews are spawned by the Mate; press r to re-read.                            

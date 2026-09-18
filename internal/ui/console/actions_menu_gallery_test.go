@@ -30,7 +30,7 @@ type actionsMenuGalleryState struct {
 func unknownBindingRepairTree() query.Snapshot {
 	tree := sampleTree()
 	tree.Projects[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: query.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
+		{CrewID: "crew_target", Status: query.CrewWorking, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	return tree
 }

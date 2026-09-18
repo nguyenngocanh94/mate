@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
@@ -90,12 +91,16 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	}
 
 	p.Mate = loadMate(ws, ref.Name, w)
-	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, w)
+	// The box is read before the Crews because a Crew's state depends on
+	// it: `blocked` is an open incident in the merged view and nothing
+	// else (mvp.md section 4b).
+	view, viewOK, boxField := loadBox(ws, ref.Name)
+	p.Box = boxField
+	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, view, viewOK, w)
 	for i := range p.Crews {
 		p.Crews[i].Attention = crewAttention(p.Crews[i])
 	}
 	p.Attention = projectAttention(p)
-	p.Box = LoadBox(ws, ref.Name)
 	return p
 }
 
@@ -194,18 +199,16 @@ const notAnErrorState = "the recorded status is not an error state"
 // not polled yet.
 const noObserver = "no observer has looked at this crew yet"
 
-// loadCrews lists `crews/*.meta` and reads each one, with the last line of
-// `crews/<id>.status` as the Crew's status text. The five states of mvp.md
-// section 4 are what a crew actually writes; CrewStatus is a string type
-// precisely so an unrecognised word renders as itself rather than as a
-// blank cell.
+// loadCrews lists `crews/*.meta` and reads each one, resolving the Crew's
+// state through CrewStateOf - the one ordering of mvp.md section 4b.
 //
-// Closed Crews - meta carries `stopped_at`, which only `matev2 crew stop`
-// writes - are counted and dropped: the tree is the list of work in
-// flight, and closing is the decision that ends a task (ProjectNode.Crews).
-// A Crew whose meta could not be read is kept, as an unknown row, because
-// an unreadable record is not evidence of a closed one.
-func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], w *warnings) ([]CrewNode, int) {
+// Closed Crews - `state=finished|failed` in the meta, which only
+// `matev2 crew stop` and a failed spawn write - are counted and dropped:
+// the tree is the list of work in flight, and closing is the decision that
+// ends a task (ProjectNode.Crews). A Crew whose meta could not be read is
+// kept, as a row whose fields say they could not be read, because an
+// unreadable record is not evidence of a closed one.
+func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], view box.View, viewOK bool, w *warnings) ([]CrewNode, int) {
 	ids, err := crewIDs(ws.CrewsDir(project))
 	if err != nil {
 		// A project whose crews directory cannot be listed gets no Crew
@@ -218,7 +221,7 @@ func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], w 
 	out := make([]CrewNode, 0, len(ids))
 	closed := 0
 	for _, id := range ids {
-		c := loadCrew(ws, project, id, repos, w)
+		c := loadCrew(ws, project, id, repos, view, viewOK, w)
 		if c.Closed {
 			closed++
 			continue
@@ -251,7 +254,7 @@ func crewIDs(dir string) ([]string, error) {
 	return ids, nil
 }
 
-func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue], w *warnings) CrewNode {
+func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue], view box.View, viewOK bool, w *warnings) CrewNode {
 	row := RowRef{Kind: RowCrew, ID: id, Label: "crew " + id}
 	c := CrewNode{
 		CrewID:    id,
@@ -269,8 +272,12 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 
 	meta, err := ws.ReadCrewMeta(project, id)
 	if err != nil {
+		// An unreadable meta says nothing about the crew's state. It stays
+		// at `spawned` - the state of a crew nothing is recorded about -
+		// and the warning below is what tells the reader the record itself
+		// could not be read.
 		reason := readFailureReason(err)
-		c.Status = CrewStatus("unknown")
+		c.Status = CrewSpawned
 		c.AgentName = UnknownField[string](reason)
 		c.Binding = note(w, UnknownField[BindingValue](reason), "binding", row)
 		c.Worktree = note(w, UnknownField[WorktreeValue](reason), "worktree", row)
@@ -314,40 +321,31 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		}, "recorded in crews/"+id+".meta; this does not prove the agent is alive")
 	}
 
-	c.Closed = meta["stopped_at"] != ""
-	c.Status = crewStatus(ws, project, id, w, row)
-	if c.Status == CrewReserved && meta["agent"] == "" && meta["stopped_at"] != "" {
-		// Torn down before it ever wrote a status line. `reserved` would
-		// promise a crew that is about to start; nothing is.
-		c.Status = CrewStopped
-	}
+	openIncident := viewOK && len(box.OpenIncidents(view, id)) > 0
+	c.Status = CrewStateOf(meta, openIncident, lastStatusVerb(ws, project, id, w, row))
+	c.Closed = c.Status.Closed()
 	return c
 }
 
-// crewStatus is the last line of `crews/<id>.status`. A crew that has
-// written nothing yet is `reserved`: the meta exists, so the crew was
-// recorded, and nothing it wrote says otherwise.
-func crewStatus(ws *store.Workspace, project, id string, w *warnings, row RowRef) CrewStatus {
+// lastStatusVerb is the verb of the crew's most recent recognised status
+// line, "" when it has written none. It is one of the three inputs
+// CrewStateOf resolves a state from; box owns the parsing, including the
+// legacy verbs a status file written before 2026-09-18 may still carry.
+func lastStatusVerb(ws *store.Workspace, project, id string, w *warnings, row RowRef) string {
 	entries, _, err := ws.ReadStatus(project, id, 0)
 	if err != nil {
 		note(w, UnknownField[CrewStatus](readFailureReason(err)), "status", row)
-		return CrewStatus("unknown")
+		return ""
 	}
-	for i := len(entries) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(entries[i].Line)
-		if line == "" {
-			continue
-		}
-		// A status line is `state: one line` (mvp.md section 4); the state
-		// is the column word and the rest is the pointer.
-		if state, _, ok := strings.Cut(line, ":"); ok {
-			line = strings.TrimSpace(state)
-		}
-		if line != "" {
-			return CrewStatus(line)
-		}
+	lines := make([]string, 0, len(entries))
+	for _, e := range entries {
+		lines = append(lines, e.Line)
 	}
-	return CrewReserved
+	verb := box.LastVerb(lines)
+	if verb == box.StateUnknown {
+		return ""
+	}
+	return string(verb)
 }
 
 func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {

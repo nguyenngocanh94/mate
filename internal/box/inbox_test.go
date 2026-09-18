@@ -106,20 +106,30 @@ func TestInboxKeepsOnlyUnansweredQuestions(t *testing.T) {
 	}
 }
 
-// TestInboxBlockedIsAlsoAQuestion: blocked is the other verb that stops a
-// crew waiting on somebody.
-func TestInboxBlockedIsAlsoAQuestion(t *testing.T) {
-	assertInbox(t, runInbox(t, nil,
+// TestInboxLegacyBlockedFromACrewIsAQuestion: a crew that wrote `blocked:`
+// before 2026-09-18 could still speak, which is a needs-decision by the new
+// definition - so it is still an inbox item, under the verb that says who
+// owns it (mvp.md section 4b).
+func TestInboxLegacyBlockedFromACrewIsAQuestion(t *testing.T) {
+	items := runInbox(t, nil,
 		step{crew: "k3", status: "blocked: no credentials for the staging API"},
-	), "k3 blocked")
+	)
+	assertInbox(t, items, "k3 needs-decision")
+	if got := items[0].Text; got != "blocked: no credentials for the staging API" {
+		t.Fatalf("item text = %q, want the crew's own line with its own verb kept", got)
+	}
 }
 
-// TestInboxDoneAndFailedAreNotQuestions: an outcome is not a decision. The
-// crews table's STATUS column is where those belong.
-func TestInboxDoneAndFailedAreNotQuestions(t *testing.T) {
+// TestInboxWaitMateIsNotAQuestion: `wait-mate` is a report, not a decision,
+// and the decision of 2026-09-18 keeps it out of the inbox - the crews
+// table's STATE column carries it and the user can type into the pane at
+// any time. The legacy `done:`/`failed:` spellings map onto it and are out
+// for the same reason.
+func TestInboxWaitMateIsNotAQuestion(t *testing.T) {
 	assertInbox(t, runInbox(t, nil,
-		step{crew: "k3", status: "done: PR ready"},
-		step{crew: "k9", status: "failed: the build never went green"},
+		step{crew: "k3", status: "wait-mate: ready in branch matev2/k3"},
+		step{crew: "k9", status: "done: PR ready"},
+		step{crew: "z1", status: "failed: the build never went green"},
 	))
 }
 
@@ -177,43 +187,52 @@ func TestInboxResolvedByTheCrewMovingOn(t *testing.T) {
 func TestInboxKeepsTheNewestQuestionWhenTheCrewAsksTwice(t *testing.T) {
 	items := runInbox(t, nil,
 		step{crew: "k3", status: "needs-decision: A or B?"},
-		step{crew: "k3", status: "blocked: the staging API is down"},
+		step{crew: "k3", status: "needs-decision: the staging API is down, wait or mock it?"},
 	)
-	assertInbox(t, items, "k3 blocked")
+	assertInbox(t, items, "k3 needs-decision")
+	if got := items[0].Text; got != "the staging API is down, wait or mock it?" {
+		t.Fatalf("item text = %q, want the newest question", got)
+	}
 }
 
 // TestInboxSeparatesCrews: two crews, one answered and one not.
 func TestInboxSeparatesCrews(t *testing.T) {
 	assertInbox(t, runInbox(t, nil,
 		step{crew: "k3", status: "needs-decision: A or B?"},
-		step{crew: "k9", status: "blocked: waiting on review"},
+		step{crew: "k9", status: "needs-decision: which review gate?"},
 		step{source: store.SourceMate, target: store.CrewTarget("k3"), text: "A"},
-	), "k9 blocked")
+	), "k9 needs-decision")
 }
 
-// TestInboxIncidentIsOpenUntilTheCrewSpeaks: an incident has no answer of
-// its own, so the crew writing anything at all is what closes it.
-func TestInboxIncidentIsOpenUntilTheCrewSpeaks(t *testing.T) {
-	open := runInbox(t, []store.IncidentEntry{{
+// TestInboxIncidentLeavesOnlyWhenTheObserverResolvesIt is the rule of
+// mvp.md section 4b: an incident is the observer's, and only the observer's
+// own `resolved` line takes it out of the inbox. Nothing the crew says, and
+// nothing anybody sends the crew, closes it - if a status line did, the
+// crew would still read `blocked` (an open incident is what that state is)
+// while the inbox no longer listed the thing making it so.
+func TestInboxIncidentLeavesOnlyWhenTheObserverResolvesIt(t *testing.T) {
+	stale := store.IncidentEntry{
 		Time: time.Now().Add(-time.Hour), Crew: "k3", Kind: string(box.IncidentStale),
 		State: store.IncidentOpen, Text: "no status for 20m",
-	}},
-		step{crew: "k3", status: "working: reading the ticket"},
-	)
-	// The status line is newer than the incident, so it closed it.
-	assertInbox(t, open)
-
-	// The other way round: the incident is the newest thing about k3.
-	still := runInbox(t, []store.IncidentEntry{{
-		Time: time.Now().Add(time.Hour), Crew: "k3", Kind: string(box.IncidentStale),
-		State: store.IncidentOpen, Text: "no status for 20m",
-	}},
-		step{crew: "k3", status: "working: reading the ticket"},
-	)
-	assertInbox(t, still, "k3 incident:stale")
-	if still[0].Text != "no status for 20m" {
-		t.Fatalf("incident text = %q, want the observer's own", still[0].Text)
 	}
+
+	// The crew has spoken since, and been sent a line: neither matters.
+	open := runInbox(t, []store.IncidentEntry{stale},
+		step{crew: "k3", status: "working: reading the ticket"},
+		step{source: store.SourceMate, target: store.CrewTarget("k3"), text: "are you there?"},
+	)
+	assertInbox(t, open, "k3 incident:stale")
+	if open[0].Text != "no status for 20m" {
+		t.Fatalf("incident text = %q, want the observer's own", open[0].Text)
+	}
+
+	// The observer saw the crew running again and wrote `resolved`: history.
+	resolved := stale
+	resolved.Time = time.Now()
+	resolved.State = store.IncidentResolved
+	assertInbox(t, runInbox(t, []store.IncidentEntry{stale, resolved},
+		step{crew: "k3", status: "working: reading the ticket"},
+	))
 }
 
 // TestInboxIsOldestFirst: the rail draws the newest at the bottom, so the
@@ -221,9 +240,9 @@ func TestInboxIncidentIsOpenUntilTheCrewSpeaks(t *testing.T) {
 func TestInboxIsOldestFirst(t *testing.T) {
 	items := runInbox(t, nil,
 		step{crew: "k3", status: "needs-decision: A or B?"},
-		step{crew: "k9", status: "blocked: waiting on review"},
+		step{crew: "k9", status: "needs-decision: which review gate?"},
 	)
-	assertInbox(t, items, "k3 needs-decision", "k9 blocked")
+	assertInbox(t, items, "k3 needs-decision", "k9 needs-decision")
 	if !items[0].Entry.At.Before(items[1].Entry.At) && items[0].Entry.Seq > items[1].Entry.Seq {
 		t.Fatalf("inbox is not oldest-first: %+v", items)
 	}
@@ -251,26 +270,40 @@ func TestInboxDoesNotShrinkTheView(t *testing.T) {
 }
 
 // TestInboxDropsAClosedCrewsQuestion: once the Mate or the captain has run
-// `crew stop` (stopped_at in the meta) there is no pane to answer into, so
-// the crew's open question leaves the inbox. The line stays in Entries: the
-// box is still the history.
+// `crew stop` (`state=finished|failed` in the meta) there is no pane to
+// answer into, so the crew's open question leaves the inbox. The line stays
+// in Entries: the box is still the history.
+//
+// The third crew pins the backward-compatibility rule of mvp.md section 4b:
+// a meta written before the state key existed carries only `stopped_at`,
+// and that reads as finished.
 func TestInboxDropsAClosedCrewsQuestion(t *testing.T) {
 	w := newFixtureWorkspace(t)
-	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
+	for crew, line := range map[string]string{
+		"k3": "needs-decision: pick A or B",
+		"k4": "needs-decision: need the API key",
+		"k5": "needs-decision: which region?",
+	} {
+		if err := w.AppendStatus("shop", crew, line); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{
+		"state": "finished", "stopped_at": "2026-09-18T10:00:00Z", "teardown": "clean",
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.AppendStatus("shop", "k4", "blocked: need the API key"); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"stopped_at": "2026-09-18T10:00:00Z", "teardown": "clean"}); err != nil {
+	if err := w.WriteCrewMeta("shop", "k5", map[string]string{
+		"stopped_at": "2026-09-17T10:00:00Z", "teardown": "clean",
+	}); err != nil {
 		t.Fatal(err)
 	}
 	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if !v.Closed["k3"] || v.Closed["k4"] {
-		t.Fatalf("closed = %v, want k3 only", v.Closed)
+	if !v.Closed["k3"] || !v.Closed["k5"] || v.Closed["k4"] {
+		t.Fatalf("closed = %v, want k3 and k5 only", v.Closed)
 	}
 	if len(v.ByCrew["k3"]) != 1 {
 		t.Fatalf("the closed crew's line left the history: %+v", v.ByCrew)
@@ -278,5 +311,29 @@ func TestInboxDropsAClosedCrewsQuestion(t *testing.T) {
 	items := box.Inbox(v)
 	if len(items) != 1 || items[0].Entry.Crew != "k4" {
 		t.Fatalf("inbox = %+v, want only the open crew's question", items)
+	}
+}
+
+// TestInboxKeepsAQuestionFromACrewThatOnlyReportedWaitMate: `wait-mate` is
+// not a closed crew (mvp.md section 4b) - the task ends when somebody runs
+// `crew stop`, not when the crew says it is done - so a spawned crew's
+// question stays answerable.
+func TestInboxKeepsAQuestionFromACrewThatOnlyReportedWaitMate(t *testing.T) {
+	w := newFixtureWorkspace(t)
+	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"state": "spawned"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := box.Load(w, "shop")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if v.Closed["k3"] {
+		t.Fatalf("closed = %v, want k3 open", v.Closed)
+	}
+	if items := box.Inbox(v); len(items) != 1 {
+		t.Fatalf("inbox = %+v, want the crew's question", items)
 	}
 }

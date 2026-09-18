@@ -4,9 +4,9 @@
   MATE                                               HARNESS    STATUS     MODE        BINDING     │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS                      
   none assigned                                                                        ! no mate   │                                                            
                                                                                                    │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS           
-  CREWS  1          TASK                                  STATUS           NOTE          UPDATED   │ Task                                                       
-▌ crew_01J9P4…A7CS                                        needs_repair     ? unknown     11:30:44  │                                                            
-                                                                                                   │ Recorded status  needs_repair                              
+  CREWS  1          TASK                                  STATE            NOTE          UPDATED   │ Task                                                       
+▌ crew_01J9P4…A7CS                                        working          ? unknown     11:30:44  │                                                            
+                                                                                                   │ Recorded status  working                                   
                                                                                                    │ Harness          codex                                     
                                                                                                    │ Agent            none · no runtime binding has ever been   
                                                                                                    │                  held for this attempt                     
@@ -21,7 +21,7 @@
                                                                                                    │                  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS/a1        
                                                                                                    │ Worktree status  missing                                   
                                                                                                    │                                                            
-                                                                                                   │ Last event       11:30:44  crew.needs_repair               
+                                                                                                   │ Last event       11:30:44  crew.worktree_removed           
                                                                                                    │ Reason           worktree path missing on disk; branch     
                                                                                                    │                  mate/upgrade-database-adapter/a1 still    
                                                                                                    │                  exists. Cleanup not authorized while      

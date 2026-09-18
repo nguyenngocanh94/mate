@@ -51,7 +51,7 @@ func intoFirstCrew(t *testing.T, m Model) Model {
 func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 	const reason = "lookup timed out (2s)"
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Status: query.CrewNeedsRebase,
+		CrewID: "crew_1", Status: query.CrewWorking,
 		Worktree: query.UnknownField[query.WorktreeValue](reason),
 		Error:    query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -85,7 +85,7 @@ func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 // and not the same sentence as Absent's "not an error state".
 func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Status: query.CrewNeedsRebase,
+		CrewID: "crew_1", Status: query.CrewWorking,
 		Error: query.KnownField(query.ErrorReason("")),
 	})
 	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
@@ -107,7 +107,7 @@ func TestErrorReasonKnownButEmptySaysSoRatherThanBlank(t *testing.T) {
 // labels that do not apply.
 func TestBindingAbsentShowsOneFieldNoRuntimeOrBoundSince(t *testing.T) {
 	tree := oneCrewTree(query.CrewNode{
-		CrewID: "crew_1", Status: query.CrewNeedsRebase,
+		CrewID: "crew_1", Status: query.CrewWorking,
 		Binding: query.AbsentField[query.BindingValue]("session ended when rebase was required"),
 		Error:   query.AbsentField[query.ErrorReason](notErrorState),
 	})
@@ -137,9 +137,9 @@ func TestCrewAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
 			Crews: []query.CrewNode{{
-				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewAwaitingReview,
+				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewNeedsDecision,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
-				Attention: query.KnownField(query.Attention{Kind: query.AttentionReview, Why: "crew crew_1 is recorded awaiting_review and waits on a person"}),
+				Attention: query.KnownField(query.Attention{Kind: query.AttentionDecision, Why: "crew crew_1 asked a question and stopped its turn; it waits on an answer"}),
 			}},
 		}},
 	}
@@ -149,7 +149,7 @@ func TestCrewAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 	l := layout(m.w, m.h)
 	fields := fieldValueText(m.inspectorLines(l.Inspector, l.valueWidth(), l.Body, true), l.Inspector)
 	got := fields["Attention"]
-	if !strings.HasPrefix(got, "review") || !strings.Contains(got, "waits on a person") {
+	if !strings.HasPrefix(got, "needs-decision") || !strings.Contains(got, "waits on an answer") {
 		t.Fatalf("Attention = %q, want the kind and the full why sentence", got)
 	}
 
@@ -159,7 +159,7 @@ func TestCrewAttentionRendersKindAndWhyOrNoneWithReason(t *testing.T) {
 			ProjectID: "proj_1", Name: "acme",
 			Mate: absentMate("no mate"),
 			Crews: []query.CrewNode{{
-				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewReserved,
+				CrewID: "crew_1", Task: "Add refund audit trail", Status: query.CrewSpawned,
 				Error:     query.AbsentField[query.ErrorReason](notErrorState),
 				Attention: query.AbsentField[query.Attention]("no agent has been started and the crew is recorded reserved"),
 			}},

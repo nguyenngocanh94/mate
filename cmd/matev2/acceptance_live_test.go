@@ -30,7 +30,7 @@ const acceptanceLine = "Built with matev2"
 
 // TestLiveAcceptanceMateRunsATask is the M2 capstone (docs/mvp.md task 17): a
 // real Claude Mate, given one plain request, must write a brief, spawn a real
-// Crew, supervise it to `done:`, and report back - with no scripted commands
+// Crew, supervise it to `wait-mate:`, and report back - with no scripted commands
 // and no test-side nudging beyond that single line.
 //
 // The test asserts four things, and deliberately nothing about how the Mate
@@ -38,7 +38,7 @@ const acceptanceLine = "Built with matev2"
 //
 //  1. a crew record appeared (the Mate spawned a Crew instead of doing the
 //     work itself),
-//  2. that crew's status file reached `done:`,
+//  2. that crew's status file reached `wait-mate:`,
 //  3. the crew's branch carries a commit that puts the line in README.md,
 //  4. the Mate's own Stop hook wrote a mate → user line in sent.log naming
 //     the branch or saying the work is ready.
@@ -142,10 +142,10 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	worktree := filepath.Join(w.Root(), meta[spawn.MetaWorktree])
 	t.Logf("crew %s: branch %s, worktree %s, task %q", crew, branch, worktree, meta[spawn.MetaTask])
 
-	status := waitForCrewStatus(t, ctx, w, crew, "done:", budget, func() string { return acceptancePanes(ctx, rt, mate, w) })
+	status := waitForCrewStatus(t, ctx, w, crew, "wait-mate:", budget, func() string { return acceptancePanes(ctx, rt, mate, w) })
 	t.Logf("crew status file:\n%s", status)
 
-	// The branch must actually carry the change; a `done:` line is a claim,
+	// The branch must actually carry the change; a `wait-mate:` line is a claim,
 	// not evidence.
 	commits := gitOut(t, repo, "log", "--format=%H %s", "main.."+branch)
 	if strings.TrimSpace(commits) == "" {
@@ -296,7 +296,7 @@ func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.Agent
 		return b.String()
 	}
 	for _, c := range crews {
-		fmt.Fprintf(&b, "\n\ncrew %s (%s, status %q)", c.Crew, c.Harness, c.Status)
+		fmt.Fprintf(&b, "\n\ncrew %s (%s, state %s, note %q)", c.Crew, c.Harness, c.State, c.Note)
 	}
 	return b.String()
 }

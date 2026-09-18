@@ -132,9 +132,9 @@ func TestOnlyOnePaneIsAccentAtATime(t *testing.T) {
 func TestStatusIsAlwaysTheDomainWordNeverColourAlone(t *testing.T) {
 	plain := plainPalette()
 	statuses := []string{
-		string(query.CrewReserved), string(query.CrewPreparing), string(query.CrewRunning),
-		string(query.CrewAwaitingReview), string(query.CrewSucceeded), string(query.CrewFailed),
-		string(query.CrewBlocked), string(query.CrewNeedsRebase), string(query.CrewNeedsRepair),
+		string(query.CrewSpawned), string(query.CrewWorking), string(query.CrewNeedsDecision),
+		string(query.CrewWaitMate), string(query.CrewBlocked),
+		string(query.CrewFinished), string(query.CrewFailed),
 	}
 	seen := map[string]string{}
 	for _, s := range statuses {
@@ -147,20 +147,23 @@ func TestStatusIsAlwaysTheDomainWordNeverColourAlone(t *testing.T) {
 		}
 		seen[got.text] = s
 	}
-	// running is not green, and not a dot: it is a recorded status, not
-	// proof that an agent is alive.
+	// working is not green: it is a recorded status, not proof that an
+	// agent is alive. Green is reserved for the one terminal state that
+	// says the task landed.
 	coloured := ansiPalette()
-	if statusStyle("running", coloured).GetForeground() == coloured.Green.GetForeground() {
-		t.Errorf("running is drawn green; the design reserves green for succeeded")
+	if statusStyle(string(query.CrewWorking), coloured).GetForeground() == coloured.Green.GetForeground() {
+		t.Errorf("working is drawn green; the design reserves green for finished")
 	}
-	if statusStyle("awaiting_review", coloured).GetForeground() != coloured.Amber.GetForeground() {
-		t.Errorf("awaiting_review is not amber")
+	for _, word := range []query.CrewStatus{query.CrewNeedsDecision, query.CrewWaitMate, query.CrewBlocked} {
+		if statusStyle(string(word), coloured).GetForeground() != coloured.Amber.GetForeground() {
+			t.Errorf("%s is not amber; it is a state somebody has to act on", word)
+		}
 	}
-	if statusStyle("failed", coloured).GetForeground() != coloured.Red.GetForeground() {
+	if statusStyle(string(query.CrewFailed), coloured).GetForeground() != coloured.Red.GetForeground() {
 		t.Errorf("failed is not red")
 	}
-	if statusStyle("succeeded", coloured).GetForeground() != coloured.Green.GetForeground() {
-		t.Errorf("succeeded is not green")
+	if statusStyle(string(query.CrewFinished), coloured).GetForeground() != coloured.Green.GetForeground() {
+		t.Errorf("finished is not green")
 	}
 }
 
@@ -194,9 +197,9 @@ func TestTheAmberAndRedVocabulariesAreDisjoint(t *testing.T) {
 	coloured := ansiPalette()
 	amber, red := map[string]bool{}, map[string]bool{}
 	for _, word := range []string{
-		string(query.CrewReserved), string(query.CrewPreparing), string(query.CrewRunning),
-		string(query.CrewAwaitingReview), string(query.CrewSucceeded), string(query.CrewFailed),
-		string(query.CrewBlocked), string(query.CrewNeedsRebase), string(query.CrewNeedsRepair),
+		string(query.CrewSpawned), string(query.CrewWorking), string(query.CrewNeedsDecision),
+		string(query.CrewWaitMate), string(query.CrewBlocked),
+		string(query.CrewFinished), string(query.CrewFailed),
 		string(query.MateCreated), string(query.MateStarting), string(query.MateStopping),
 		string(query.MateStopped), string(query.MateUnknown),
 		string(query.BindingReserved), string(query.BindingActive), string(query.BindingStale),

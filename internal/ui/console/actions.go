@@ -192,9 +192,6 @@ func (m Model) repairChoice(r row) actionChoice {
 		c.desc = "unavailable · binding is unknown; refresh before repair"
 		return c
 	}
-	if crew.Status == query.CrewNeedsRepair {
-		c.desc = "unavailable · no stale binding is recorded; inspect worktree state before repair"
-	}
 	return c
 }
 

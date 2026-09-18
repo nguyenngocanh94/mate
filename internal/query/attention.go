@@ -15,16 +15,14 @@ import "fmt"
 type AttentionKind string
 
 const (
-	// AttentionFailed: the Crew is recorded failed.
+	// AttentionFailed: the Crew is recorded failed - its spawn never came
+	// up, or it was closed with --discard.
 	AttentionFailed AttentionKind = "failed"
-	// AttentionRebase: the Crew is recorded needs_rebase.
-	AttentionRebase AttentionKind = "rebase"
-	// AttentionRepair: the Crew is recorded needs_repair.
-	AttentionRepair AttentionKind = "repair"
-	// AttentionReview: the Crew is recorded awaiting_review and is waiting
-	// on a person. awaiting_review is never success.
-	AttentionReview AttentionKind = "review"
-	// AttentionBlocked: the Crew is recorded blocked.
+	// AttentionDecision: the Crew appended `needs-decision:` and stopped
+	// its turn. Nothing moves until somebody answers it.
+	AttentionDecision AttentionKind = "needs-decision"
+	// AttentionBlocked: the observer has an open incident for the Crew, so
+	// the Crew cannot report for itself any more (mvp.md section 4b).
 	AttentionBlocked AttentionKind = "blocked"
 	// AttentionStaleBinding: the Crew's status looks fine but its runtime
 	// binding is recorded stale, so matev2 could not confirm the agent
@@ -80,14 +78,10 @@ func crewAttention(c CrewNode) Field[Attention] {
 	switch c.Status {
 	case CrewFailed:
 		return KnownField(Attention{AttentionFailed, attemptWhy(c, "failed", c.Error)})
-	case CrewNeedsRepair:
-		return KnownField(Attention{AttentionRepair, attemptWhy(c, "needs repair", c.Error)})
-	case CrewNeedsRebase:
-		return KnownField(Attention{AttentionRebase, attemptWhy(c, "needs rebase", c.Error)})
 	case CrewBlocked:
-		return KnownField(Attention{AttentionBlocked, attemptWhy(c, "blocked", c.Error)})
-	case CrewAwaitingReview:
-		return KnownField(Attention{AttentionReview, fmt.Sprintf("crew %s is recorded awaiting_review and waits on a person", c.CrewID)})
+		return KnownField(Attention{AttentionBlocked, fmt.Sprintf("the observer has an open incident for crew %s; it cannot report for itself", c.CrewID)})
+	case CrewNeedsDecision:
+		return KnownField(Attention{AttentionDecision, fmt.Sprintf("crew %s asked a question and stopped its turn; it waits on an answer", c.CrewID)})
 	}
 	// A status that is not itself an error can still hide one: a binding
 	// nobody could read, or one recorded stale under a running attempt.

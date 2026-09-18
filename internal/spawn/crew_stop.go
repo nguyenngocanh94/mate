@@ -10,55 +10,63 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/box"
+	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// MetaTeardown records what a stop did with the worktree and the branch: one
-// of TeardownClean, TeardownDiscarded or TeardownRefusedUnlanded. It is
-// absent for a crew that has never been stopped, and absent for a Mate,
-// which has no worktree of its own.
+// MetaTeardown records what a stop did with the worktree and the branch:
+// TeardownClean or TeardownDiscarded. It is absent for a crew that has
+// never been stopped, and absent for a Mate, which has no worktree of its
+// own.
 const MetaTeardown = "teardown"
 
-// Teardown outcomes written to `teardown=`.
+// Teardown outcomes written to `teardown=`. There are only two, because a
+// stop now has only two outcomes: it tears the crew down, or it refuses and
+// changes nothing (mvp.md section 4b).
 const (
 	// TeardownClean means the worktree and branch were removed and neither
 	// held anything: the branch was already an ancestor of the project's
-	// default branch and the worktree was not dirty.
+	// default branch and the worktree was not dirty. The crew is finished.
 	TeardownClean = "clean"
 	// TeardownDiscarded means the worktree and branch were removed with
-	// unlanded work, because the caller passed --discard.
+	// unlanded work, because the caller passed --discard. The crew failed:
+	// the work was thrown away.
 	TeardownDiscarded = "discarded"
-	// TeardownRefusedUnlanded means the stop refused to remove the
-	// worktree and branch because they carried unlanded work and --discard
-	// was not given. The worktree and branch are still in place.
-	TeardownRefusedUnlanded = "refused_unlanded"
 )
 
 // ErrUnlandedWork is returned by StopCrew when the crew's branch is not
 // fully contained in the project's default branch, or the worktree has
-// uncommitted changes, and the caller did not pass discard=true. By the
-// time this error reaches the caller the agent is already stopped and the
-// tab already closed - only the worktree and the branch are left standing,
-// exactly as they were, so a human can look at them before deciding.
+// uncommitted changes, and the caller did not pass discard=true. It is a
+// refusal, checked before anything is touched: the agent is still running,
+// the tab still open, the worktree and branch exactly as they were, and the
+// meta unchanged. The previous shape of this - kill the agent, close the
+// tab, then refuse the cleanup - left a third outcome nobody could name,
+// where the crew was dead but the task was not closed (mvp.md section 4b
+// removes it).
 var ErrUnlandedWork = errors.New("crew has unlanded work")
 
-// StopCrew stops one crew's agent, closes its tab, and then tears down its
-// worktree and branch unless doing so would silently discard work: docs/mvp.md
-// task 16. `crews/<id>/` (brief, report, transcript) is never touched here -
-// only a human deleting it by hand removes it.
+// StopCrew closes one crew's task: docs/mvp.md task 16 and the state
+// machine of section 4b. `crews/<id>/` (brief, report, transcript) is never
+// touched here - only a human deleting it by hand removes it.
 //
-// The teardown decision is made from git facts, never from the status log:
-// unlanded means the branch carries a commit the project's default branch
-// does not have (`git merge-base --is-ancestor` false), or the worktree has
-// uncommitted changes (`git status --porcelain` non-empty). Unlanded work
-// without discard=true is refused with ErrUnlandedWork; the meta still
-// records the stop (stopped_at=, teardown=refused_unlanded) so a rerun with
-// discard=true can finish the job. Otherwise the worktree is force-removed
-// and the branch is deleted whenever it is an ancestor of default or discard
-// was given, and the meta records teardown=clean or teardown=discarded.
+// The order is the point. The teardown decision is made first, from git
+// facts and never from the status log: unlanded means the branch carries a
+// commit the project's default branch does not have (`git merge-base
+// --is-ancestor` false), or the worktree has uncommitted changes (`git
+// status --porcelain` non-empty). Unlanded work without discard=true is
+// refused with ErrUnlandedWork before a single byte changes, so the answer
+// to a refusal is to look at the branch - with the crew still alive to ask -
+// and then either land it or rerun with --discard.
+//
+// Only once the teardown is allowed does the agent get stopped, the tab
+// closed, the worktree removed and the branch deleted. The meta is written
+// last, in one write: stopped_at=, teardown=, and the state that ends the
+// task - `finished` for a clean stop, `failed` for a --discard, because
+// discarding is deciding the work will not land.
 //
 // Like StopMate, the proof the agent is gone is Herdr's own answer: absent
 // from `agent get` and from the session inventory. A tab Herdr already does
@@ -97,11 +105,70 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		SessionID: meta[MetaSessionID],
 	}
 
-	// 1 & 2. Stop the agent (if Herdr still has one) and close the tab. A
+	// 1. The teardown decision, from git facts, before anything is touched.
+	cfg, err := w.LoadProject(project)
+	if err != nil {
+		return StopResult{}, err
+	}
+	repo := w.RepoDir(cfg.Repo)
+	git := deps.git()
+
+	branch := meta[MetaBranch]
+	worktree := ""
+	if rel := meta[MetaWorktree]; rel != "" {
+		worktree = filepath.Join(w.Root(), filepath.FromSlash(rel))
+	}
+	out.Branch, out.Worktree = branch, worktree
+
+	branchExists := false
+	isAncestor := true
+	ahead := 0
+	if branch != "" {
+		branchExists, err = git.BranchExists(ctx, repo, branch)
+		if err != nil {
+			return StopResult{}, err
+		}
+		if branchExists {
+			isAncestor, err = git.IsAncestor(ctx, repo, branch, cfg.DefaultBranch)
+			if err != nil {
+				return StopResult{}, err
+			}
+			if !isAncestor {
+				ahead, err = git.AheadCount(ctx, repo, branch, cfg.DefaultBranch)
+				if err != nil {
+					return StopResult{}, err
+				}
+			}
+		}
+	}
+	dirty := 0
+	worktreeExists := false
+	if worktree != "" {
+		if _, statErr := os.Stat(worktree); statErr == nil {
+			worktreeExists = true
+			dirty, err = git.IsDirty(ctx, worktree)
+			if err != nil {
+				return StopResult{}, err
+			}
+		}
+	}
+	unlanded := !isAncestor || dirty > 0
+	out.Unlanded, out.Ahead, out.DirtyFiles = unlanded, ahead, dirty
+
+	if unlanded && !discard {
+		// Nothing has been changed and nothing will be: the crew is still
+		// running, its pane is still open, and the reader can go and look
+		// at the branch before deciding.
+		return out, observability.WrapError(observability.CodeStateConflict,
+			fmt.Sprintf("branch %s is %d commit(s) ahead of %s and the worktree has %d dirty file(s); nothing was stopped - land the branch, or rerun with --discard to throw the work away",
+				branch, ahead, cfg.DefaultBranch, dirty), ErrUnlandedWork).
+			WithDetails(map[string]any{"branch": branch, "ahead": ahead, "dirty_files": dirty})
+	}
+
+	// 2 & 3. Stop the agent (if Herdr still has one) and close the tab. A
 	// meta with no recorded agent is not an error here: it is either a crew
-	// that was already stopped by a previous call (including a previous
-	// refusal, which clears agent/pane/tab exactly as a full stop does) or
-	// one whose Herdr record never survived a crash.
+	// that was already stopped by a previous call or one whose Herdr record
+	// never survived a crash.
 	stoppedMeta := meta
 	if out.Agent == "" {
 		out.AlreadyGone, out.TabClosed = true, true
@@ -150,68 +217,6 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		stoppedMeta = clearCrewRunMeta(meta)
 	}
 
-	// 3. The teardown decision, from git facts.
-	cfg, err := w.LoadProject(project)
-	if err != nil {
-		return StopResult{}, err
-	}
-	repo := w.RepoDir(cfg.Repo)
-	git := deps.git()
-
-	branch := stoppedMeta[MetaBranch]
-	worktree := ""
-	if rel := stoppedMeta[MetaWorktree]; rel != "" {
-		worktree = filepath.Join(w.Root(), filepath.FromSlash(rel))
-	}
-	out.Branch, out.Worktree = branch, worktree
-
-	branchExists := false
-	isAncestor := true
-	ahead := 0
-	if branch != "" {
-		branchExists, err = git.BranchExists(ctx, repo, branch)
-		if err != nil {
-			return StopResult{}, err
-		}
-		if branchExists {
-			isAncestor, err = git.IsAncestor(ctx, repo, branch, cfg.DefaultBranch)
-			if err != nil {
-				return StopResult{}, err
-			}
-			if !isAncestor {
-				ahead, err = git.AheadCount(ctx, repo, branch, cfg.DefaultBranch)
-				if err != nil {
-					return StopResult{}, err
-				}
-			}
-		}
-	}
-	dirty := 0
-	worktreeExists := false
-	if worktree != "" {
-		if _, statErr := os.Stat(worktree); statErr == nil {
-			worktreeExists = true
-			dirty, err = git.IsDirty(ctx, worktree)
-			if err != nil {
-				return StopResult{}, err
-			}
-		}
-	}
-	unlanded := !isAncestor || dirty > 0
-	out.Unlanded, out.Ahead, out.DirtyFiles = unlanded, ahead, dirty
-	now := deps.now()
-
-	if unlanded && !discard {
-		out.Teardown = TeardownRefusedUnlanded
-		if metaErr := writeCrewTeardownMeta(w, project, crew, stoppedMeta, now, TeardownRefusedUnlanded); metaErr != nil {
-			return out, metaErr
-		}
-		return out, observability.WrapError(observability.CodeStateConflict,
-			fmt.Sprintf("branch %s is %d commit(s) ahead of %s and the worktree has %d dirty file(s); rerun with --discard to remove them",
-				branch, ahead, cfg.DefaultBranch, dirty), ErrUnlandedWork).
-			WithDetails(map[string]any{"branch": branch, "ahead": ahead, "dirty_files": dirty})
-	}
-
 	// 4. `git worktree remove --force`, then the branch - only when it is
 	// already contained in default or the caller accepted the loss.
 	if worktreeExists {
@@ -227,12 +232,24 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		out.BranchRemoved = true
 	}
 
-	teardown := TeardownClean
+	// 5. The one meta write: the task is over, and which way.
+	//
+	// The two words answer two different questions. `teardown=` is what
+	// happened to the worktree and branch, so it says `discarded` only when
+	// something was actually thrown away. `state=` is the caller's verdict
+	// on the task, and mvp.md section 4b assigns it by the flag: a stop is
+	// `finished`, a `--discard` is `failed`. Reaching for --discard is
+	// saying the work will not land, and that is true whether or not the
+	// branch happened to be clean when it was said.
+	teardown, state := TeardownClean, CrewStateFinished
 	if unlanded {
 		teardown = TeardownDiscarded
 	}
-	out.Teardown = teardown
-	return out, writeCrewTeardownMeta(w, project, crew, stoppedMeta, now, teardown)
+	if discard {
+		state = CrewStateFailed
+	}
+	out.Teardown, out.State = teardown, state
+	return out, writeCrewTeardownMeta(w, project, crew, stoppedMeta, deps.now(), teardown, state)
 }
 
 // clearCrewRunMeta drops the keys that named a live pane and keeps
@@ -249,57 +266,51 @@ func clearCrewRunMeta(meta map[string]string) map[string]string {
 }
 
 // writeCrewTeardownMeta writes the final `.meta` of a stop: whatever
-// clearCrewRunMeta kept, plus stopped_at= and teardown=. It is the single
-// meta write of a StopCrew call, so a crew always shows either its full
-// pre-stop meta or its full post-stop meta, never something in between.
-func writeCrewTeardownMeta(w *store.Workspace, project, crew string, meta map[string]string, now time.Time, teardown string) error {
-	next := make(map[string]string, len(meta)+2)
+// clearCrewRunMeta kept, plus stopped_at=, teardown= and state=. It is the
+// single meta write of a StopCrew call, so a crew always shows either its
+// full pre-stop meta or its full post-stop meta, never something in
+// between - and by the time it runs the teardown has already happened, so
+// the state it records is a fact rather than an intention.
+func writeCrewTeardownMeta(w *store.Workspace, project, crew string, meta map[string]string, now time.Time, teardown, state string) error {
+	next := make(map[string]string, len(meta)+3)
 	for k, v := range meta {
 		next[k] = v
 	}
 	next[MetaStoppedAt] = now.Format(time.RFC3339)
 	next[MetaTeardown] = teardown
+	next[MetaState] = state
 	return w.WriteCrewMeta(project, crew, next)
 }
 
-// CrewSummary is one row of `matev2 crew list`.
+// CrewSummary is one row of `matev2 crew list`: the crew's declared state,
+// and beside it the crew's own last word. They are two different things and
+// the table shows both - the state is who the crew is to the app, the note
+// is what it said about its work.
 type CrewSummary struct {
 	Crew    string
 	Harness string
 	Branch  string
-	// Status is what a review needs to see at a glance: `stopped
-	// (unlanded)` or `torn down` once a stop has run (from `teardown=`),
-	// `stopped` for an older stop that predates teardown, or otherwise the
-	// last line of `crews/<id>.status`.
-	Status string
-	Pane   string
-	Task   string
-	// Closed is `stopped_at` in the meta: `matev2 crew stop` ran, by the
-	// Mate's or the captain's decision. `crew list` hides closed crews
-	// unless asked for them; the console never shows them.
+	// State is the declared state of mvp.md section 4b, resolved in the
+	// fixed order: `.meta` state=, then an open incident, then the last
+	// status verb, then `spawned`.
+	State string
+	// Note is the text of the crew's last status line, verb stripped -
+	// empty for a crew that has written nothing. It is the NOTE column and
+	// never a state: a crew's own words are not the app's vocabulary.
+	Note string
+	Pane string
+	Task string
+	// Closed is whether State is terminal (`finished` or `failed`).
+	// `crew list` hides closed crews unless asked for them; the console
+	// never shows them.
 	Closed bool
 }
 
-// crewListStatus derives the STATUS column from a crew's meta first, since
-// the status log is what the crew claims about its own task, not what
-// happened to its worktree and branch.
-func crewListStatus(meta map[string]string, lastStatusLine string) string {
-	switch meta[MetaTeardown] {
-	case TeardownRefusedUnlanded:
-		return "stopped (unlanded)"
-	case TeardownClean, TeardownDiscarded:
-		return "torn down"
-	}
-	if meta[MetaStoppedAt] != "" {
-		return "stopped"
-	}
-	return lastStatusLine
-}
-
-// ListCrews reads every `crews/<id>.meta` of a project and the last line of
-// each crew's status file. It asks Herdr nothing: a list is a view of what
-// was recorded, and `matev2 state <crew>` (task 13) is where a live answer
-// comes from.
+// ListCrews reads every `crews/<id>.meta` of a project, the last line of
+// each crew's status file, and the observer's open incidents from the
+// project's box. It asks Herdr nothing: a list is a view of what was
+// recorded, and `matev2 state <crew>` (task 13) is where a live answer -
+// the health column - comes from.
 func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 	if w == nil {
 		return nil, errUsage("spawn: a workspace is required")
@@ -314,6 +325,15 @@ func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 	if err != nil {
 		return nil, err
 	}
+	// One box read for the whole list: `blocked` is an open incident and
+	// nothing else, and reading the file once per crew could report two
+	// different answers inside one table. A box that will not read leaves
+	// every crew without incidents, which is the honest degradation -
+	// `blocked` is a claim a failed read has not established.
+	view, viewOK := box.View{}, false
+	if v, err := box.Load(w, project); err == nil {
+		view, viewOK = v, true
+	}
 	out := make([]CrewSummary, 0, len(ids))
 	for _, id := range ids {
 		meta, err := w.ReadCrewMeta(project, id)
@@ -324,18 +344,32 @@ func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 		if err != nil {
 			return nil, err
 		}
-		last := ""
-		if len(entries) > 0 {
-			last = entries[len(entries)-1].Line
+		lines := make([]string, 0, len(entries))
+		for _, e := range entries {
+			lines = append(lines, e.Line)
 		}
+		verb := box.LastVerb(lines)
+		note := ""
+		if len(entries) > 0 {
+			note = box.ParseStatus(entries[len(entries)-1].Line).Text
+		}
+		if verb == box.StateUnknown {
+			verb = ""
+		}
+		state := crewstate.Declare(crewstate.Declaration{
+			Meta:         meta,
+			OpenIncident: viewOK && len(box.OpenIncidents(view, id)) > 0,
+			LastVerb:     crewstate.StatusVerb(verb),
+		})
 		out = append(out, CrewSummary{
 			Crew:    id,
 			Harness: meta[MetaHarness],
 			Branch:  meta[MetaBranch],
-			Status:  crewListStatus(meta, last),
+			State:   string(state),
+			Note:    note,
 			Pane:    meta[MetaPane],
 			Task:    meta[MetaTask],
-			Closed:  meta[MetaStoppedAt] != "",
+			Closed:  state.Closed(),
 		})
 	}
 	return out, nil

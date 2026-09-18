@@ -229,7 +229,7 @@ func TestConfirmationFrameSanitizesHostileRecordedIdentity(t *testing.T) {
 func TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Crews = []query.CrewNode{
-		{CrewID: "crew_target", Status: query.CrewNeedsRepair, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
+		{CrewID: "crew_target", Status: query.CrewWorking, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter")) // the one Project
