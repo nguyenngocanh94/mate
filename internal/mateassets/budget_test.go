@@ -13,8 +13,11 @@ import "testing"
 // This test is the early warning. It fails where the manual is edited, not
 // three packages away in a spawn test.
 const (
-	// codexProjectDocMaxBytes is Codex's observed default cap.
-	codexProjectDocMaxBytes = 32768
+	// codexProjectDocMaxBytes is the cap every matev2 Codex launch runs
+	// under: harness.CodexDefaultMaxBytes, which the launch also passes to
+	// Codex as `-c project_doc_max_bytes=`. Spelled here as a number so
+	// this package stays free of harness.
+	codexProjectDocMaxBytes = 128 * 1024
 
 	// agentsManualBudget is what the rendered manual may occupy. The
 	// headroom under the cap is not slack - it is spent on two things the
@@ -27,12 +30,8 @@ const (
 	//  2. Whatever Codex meters above the Mate's cwd. Those bytes come out
 	//     of the same cap before the manual gets any.
 	//
-	// The number is measured, not chosen: internal/spawn's Codex start
-	// tests run under a `t.TempDir()` whose path carries the test's own
-	// name, and the longest of them refused a manual of 28823 bytes by 31.
-	// That is the tightest real case in the tree, so this budget sits just
-	// under it.
-	agentsManualBudget = 28790
+	// 8 KiB covers both with room; the manual itself is ~29 KiB today.
+	agentsManualBudget = codexProjectDocMaxBytes - 8*1024
 )
 
 func TestRenderedManualFitsCodexProjectDocBudget(t *testing.T) {
@@ -42,7 +41,7 @@ func TestRenderedManualFitsCodexProjectDocBudget(t *testing.T) {
 	}
 	if len(out) > agentsManualBudget {
 		t.Fatalf("the rendered Mate manual is %d bytes, over the %d-byte budget (Codex's cap is %d, and the rest is spent on the real workspace path and on whatever Codex meters above the Mate's cwd).\n"+
-			"Cut prose from assets/mate/AGENTS.md.tmpl rather than raising this number: past the cap, `mate start --harness codex` refuses outright.",
+			"Raise harness.CodexDefaultMaxBytes (and this constant with it) or cut prose from assets/mate/AGENTS.md.tmpl: past the cap, `mate start --harness codex` refuses outright.",
 			len(out), agentsManualBudget, codexProjectDocMaxBytes)
 	}
 	t.Logf("rendered manual: %d bytes, %d under budget", len(out), agentsManualBudget-len(out))

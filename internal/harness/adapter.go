@@ -29,8 +29,8 @@ type Config struct {
 	// use the provider default for transcript discovery and leave the launch
 	// variable unset so Claude inherits its normal account identity.
 	ClaudeConfigDir string
-	// ProjectDocMaxBytes overrides Codex's silent truncation cap. Zero
-	// means the observed default 32768.
+	// ProjectDocMaxBytes overrides the instruction-file cap the launch
+	// meters against and hands Codex. Zero means CodexDefaultMaxBytes.
 	ProjectDocMaxBytes int
 	// FallbackFilenames are Codex project_doc_fallback_filenames. Empty
 	// means only AGENTS.override.md / AGENTS.md, never an assumed TEAM_GUIDE.md.

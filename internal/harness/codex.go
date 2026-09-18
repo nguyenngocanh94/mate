@@ -120,7 +120,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	}
 	out := LaunchSpec{
 		kind:            string(KindCodex),
-		args:            []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck},
+		args:            []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride},
 		cwd:             cwd,
 		env:             env,
 		contextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
@@ -138,7 +138,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 			"this does not clear Codex's per-absolute-path directory-trust confirmation; that dialog is a separate wall no flag removes, measured 2026-09-14",
 			"the launch also carries -c check_for_update_on_startup=false: codex-cli draws a three-option release-update prompt ahead of everything else while a newer version is published, which blocks the composer (measured 2026-09-18 with 0.154.0 installed and 0.155.0 out); the key is documented and the override is per-launch, so the operator's own config.toml is never written",
 			"the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation",
-			"Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered)",
+			"Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered); the launch raises that cap to CodexDefaultMaxBytes with -c project_doc_max_bytes= and mate meters against the same number",
 			"missing or empty project files do not fail Codex; mate refuses to start instead",
 		},
 		codexHome:     codexHome,
@@ -164,6 +164,15 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 // The prompt is still recognised and answered by the startup settle, because
 // a flag is a prediction and the pane is the measurement.
 const CodexDisableUpdateCheck = "check_for_update_on_startup=false"
+
+// CodexProjectDocMaxBytesOverride raises Codex's instruction-file cap to
+// CodexDefaultMaxBytes for one launch. `project_doc_max_bytes` is the
+// documented key ("Maximum number of bytes to read from AGENTS.md files"),
+// and codex-cli 0.154.0 accepts it under --strict-config (measured
+// 2026-09-18; an unknown key in the same position is refused with "unknown
+// configuration field"). Passed per launch, never written to config.toml,
+// for the same reason as CodexDisableUpdateCheck.
+var CodexProjectDocMaxBytesOverride = fmt.Sprintf("project_doc_max_bytes=%d", CodexDefaultMaxBytes)
 
 // DiscoverRequest is the cwd-relative view Codex will use at start.
 type DiscoverRequest struct {

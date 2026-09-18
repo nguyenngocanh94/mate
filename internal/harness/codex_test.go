@@ -92,7 +92,7 @@ func TestCodexBindsCwdAndOverride(t *testing.T) {
 	// The launch carries the permission bypass and the documented override
 	// that suppresses codex's startup release-update prompt; nothing else,
 	// because codex discovers its instruction chain from the cwd.
-	wantArgs := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck}
+	wantArgs := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride}
 	if !slices.Equal(spec.Args(), wantArgs) {
 		t.Fatalf("codex uses cwd discovery, args = %#v", spec.Args())
 	}
@@ -165,10 +165,13 @@ func TestCodexRefusesSilentChainTruncation(t *testing.T) {
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, CodexBaseName), []byte(strings.Repeat("R", 20*1024)), 0o644); err != nil {
+	// Two files that each fit but together cross the cap the launch runs
+	// under (CodexDefaultMaxBytes, which the launch also hands Codex).
+	half := CodexDefaultMaxBytes/2 + 1024
+	if err := os.WriteFile(filepath.Join(root, CodexBaseName), []byte(strings.Repeat("R", half)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	required := strings.Repeat("C", 20*1024)
+	required := strings.Repeat("C", half)
 	if err := os.WriteFile(CodexInstructionPath(sub), []byte(required), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +180,7 @@ func TestCodexRefusesSilentChainTruncation(t *testing.T) {
 		Config: Config{ProjectDocMaxBytes: CodexDefaultMaxBytes},
 	})
 	if !errors.Is(err, ErrContextTooLarge) {
-		t.Fatalf("parent+cwd chain exceeds 32KiB: err = %v, want ErrContextTooLarge (Codex would truncate silently)", err)
+		t.Fatalf("parent+cwd chain exceeds the cap: err = %v, want ErrContextTooLarge (Codex would truncate silently)", err)
 	}
 }
 
