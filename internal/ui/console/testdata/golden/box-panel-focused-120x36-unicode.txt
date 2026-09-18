@@ -1,4 +1,4 @@
- matev2 console   workspace acme  /Users/dev/work/acme                                Recorded snapshot  As of 14:02:11 
+ matev2 console   workspace acme  /Users/dev/work/acme                                                  live · 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE                 HARNESS    STATUS     MODE        BINDING     │ MATE  payments-api                               

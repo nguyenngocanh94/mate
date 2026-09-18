@@ -1,4 +1,4 @@
- matev2 console   workspace ws_1                                                                                              Recorded snapshot  As of 14:02:11 
+ matev2 console   workspace ws_1                                                                                                                live · 14:02:11 
  ws_1 › acme                                                                                                                                   Project · 1 crew 
 ───────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────
   MATE                                               HARNESS    STATUS     MODE        BINDING     │ CREW  crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB                      

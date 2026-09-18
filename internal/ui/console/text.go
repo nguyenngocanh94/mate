@@ -65,6 +65,16 @@ func truncateEnd(s string, w int, g glyphSet) string {
 	return cutCells(s, w-cells(g.Ellipsis)) + g.Ellipsis
 }
 
+// oneLine collapses an error's message onto a single line: a wrapped
+// filesystem error can carry an embedded newline (a multi-line os.PathError
+// chain, for instance), and the header (frame.go's "stale" wording) is one
+// line of chrome that must stay one line of chrome.
+func oneLine(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
+}
+
 // cutCells returns the longest prefix of s that fits in w display cells,
 // measured one grapheme cluster at a time. Summing per-rune widths instead
 // (as this once did) disagrees with cells' own measurement of a cluster

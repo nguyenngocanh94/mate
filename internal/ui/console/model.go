@@ -11,10 +11,14 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-// LoadFunc reads the current navigation tree. Called once at startup and
-// again on every manual refresh ('r'). There is no auto-refresh: the header
-// says "As of HH:MM:SS" instead, because a picture that redraws itself
-// invites the reader to believe it is live.
+// LoadFunc reads the current navigation tree. Called once at startup, again
+// on every manual refresh ('r'), and every treeTickInterval in the
+// background (treeTickCmd) so the crew list, statuses and Mate state do not
+// go stale between keystrokes. The header says "live · HH:MM:SS" for the
+// time of the last successful load, or "stale · HH:MM:SS · <error>" when
+// the most recent background load failed - the picture on screen is always
+// exactly what the last successful read said, never a guess at what
+// changed since.
 type LoadFunc func(context.Context) (query.Snapshot, error)
 
 // AttachCmdFunc builds the *exec.Cmd that runs `matev2 attach <target>`. The
@@ -258,6 +262,35 @@ type Model struct {
 	// the tree) from every later refresh (position is re-found by selID and
 	// then clamped - see reconcileSelection).
 	hasLoaded bool
+	// lastLoadErr is the error from the most recent load that followed the
+	// first one (background tick or 'r'), or nil once one succeeds. It is
+	// what the header's "stale" wording reads (frame.go): the tree itself
+	// is never rolled back on a failed refresh (onTreeLoaded), so without a
+	// field of its own the header would keep calling a known-bad picture
+	// "live".
+	lastLoadErr error
+	// treeGen guards the auto-refresh tick chain the way sess.gen guards the
+	// session poll chain (session_mode.go): a tick whose gen does not match
+	// this one is a leftover from a chain that is no longer the current one
+	// and is dropped rather than acted on. Bubble Tea gives tea.Tick no way
+	// to be cancelled once scheduled, so this is the only way to retire a
+	// chain.
+	treeGen int
+	// treeLoadInFlight is set the moment a tree load (tick, 'r', or the
+	// failed-phase retry) is issued and cleared when its treeLoadedMsg
+	// lands. A tick that fires while it is still true reschedules without
+	// issuing a second concurrent load.
+	treeLoadInFlight bool
+	// treeTickIntervalOverride lets tests replace the real 2s auto-refresh
+	// cadence (treeTickInterval below) so they do not have to block on it.
+	// Zero (every production Console) means the real interval.
+	treeTickIntervalOverride time.Duration
+	// treeTickStarted is set the moment the auto-refresh chain is scheduled,
+	// which happens exactly once per Console run, on the first treeLoadedMsg
+	// Update sees (Init's own comment explains why there rather than in
+	// Init itself). It exists solely to keep that one place from ever
+	// scheduling a second chain.
+	treeTickStarted bool
 
 	stack  []frame
 	focus  pane
@@ -466,10 +499,23 @@ func New(load LoadFunc, attachCmd AttachCmdFunc, action ...ActionFunc) Model {
 		sess:     sessionFlow{boxSel: -1},
 		g:        glyphsFor(os.Getenv),
 		p:        defaultPalette(),
+		// Init issues the first load immediately; this marks it in flight
+		// so a tick that fires before it resolves reschedules instead of
+		// starting a second, redundant load.
+		treeLoadInFlight: true,
 	}
 }
 
-// Init kicks off the first tree load.
+// Init kicks off the first tree load. Init returns a single Cmd rather than
+// a tea.Batch that also starts the auto-refresh tick chain: Bubble Tea's own
+// Program unpacks a tea.BatchMsg back into its Cmds via its event loop, but
+// every test in this package drives Update directly with
+// `m, _ = send(t, m, m.Init()())` - one Cmd invoked once, its one resulting
+// Msg fed straight to Update - and a BatchMsg there would need every such
+// call site taught to unpack it. The tick chain starts instead the moment
+// the first treeLoadedMsg (success or failure) comes back from this load -
+// see Update's treeLoadedMsg case and Model.treeTickStarted - which reaches
+// exactly the same place at exactly the same moment without it.
 func (m Model) Init() tea.Cmd {
 	return loadCmd(m.load)
 }
@@ -498,6 +544,33 @@ func loadCmd(load LoadFunc) tea.Cmd {
 		tree, err := load(context.Background())
 		return treeLoadedMsg{tree: tree, err: err}
 	}
+}
+
+// treeTickInterval is the auto-refresh cadence: every 2s the Console loads
+// the tree in the background, whatever frame is on screen (gallery,
+// project, or a session view - onTreeLoaded's refresh path is the same one
+// 'r' already takes, so a session view's crews table behind it is fresh by
+// the time the reader leaves). The much faster 1s session-metadata and box
+// ticks (session_mode.go) are unrelated and unchanged.
+const defaultTreeTickInterval = 2 * time.Second
+
+// treeTickInterval is defaultTreeTickInterval unless a test overrode it via
+// Model.treeTickIntervalOverride, mirroring pollInterval's own override
+// (session_mode.go) so a test can exercise the chain without a 2s sleep.
+func (m Model) treeTickInterval() time.Duration {
+	if m.treeTickIntervalOverride > 0 {
+		return m.treeTickIntervalOverride
+	}
+	return defaultTreeTickInterval
+}
+
+// treeTickMsg requests the next background tree load.
+type treeTickMsg struct{ gen int }
+
+func treeTickCmd(interval time.Duration, gen int) tea.Cmd {
+	return tea.Tick(interval, func(time.Time) tea.Msg {
+		return treeTickMsg{gen: gen}
+	})
 }
 
 // ---------- navigation ----------

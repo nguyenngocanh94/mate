@@ -88,15 +88,20 @@ func (m Model) headerLine(l frameLayout) *line {
 	case phaseFailed:
 		right.add("No snapshot loaded ", m.p.Amber)
 	default:
-		// "Recorded snapshot" is not decoration: everything below it is
-		// durable database state read at a point in time, never a live
-		// liveness check. It is the first thing dropped when the header
-		// runs out of room, and "As of" - which carries the same claim -
-		// is the last.
-		if l.Cols >= 100 {
-			right.add("Recorded snapshot  ", m.p.Dim)
+		// The tree auto-refreshes every treeTickInterval (model.go) as well
+		// as on 'r', so "live" is now an honest word for it - unlike the
+		// former "Recorded snapshot", which was never wrong but is no
+		// longer the whole truth. m.tree.AsOf is still the time of the last
+		// *successful* load (query.Snapshot.AsOf, never a UI-owned clock):
+		// on a failed background refresh the tree is not rolled back
+		// (onTreeLoaded), so this is the time the picture on screen was
+		// actually taken, live or stale.
+		if err := m.lastLoadErr; err != nil {
+			short := truncateEnd(oneLine(err.Error()), 32, m.g)
+			right.add("stale "+m.g.Dot+" "+m.tree.AsOf.Format("15:04:05")+" "+m.g.Dot+" "+short+" ", m.p.Amber)
+		} else {
+			right.add("live "+m.g.Dot+" "+m.tree.AsOf.Format("15:04:05")+" ", m.p.Fg)
 		}
-		right.add("As of "+m.tree.AsOf.Format("15:04:05")+" ", m.p.Fg)
 	}
 	return leftRight(left, right, l.Cols, m.g)
 }

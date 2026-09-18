@@ -480,7 +480,8 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	// on the next read. Waiting for the ordinary one-second metadata tick
 	// would leave the answered item under the reader's cursor long enough for
 	// them to act on it twice, so the session's own box is re-read now.
-	return m, tea.Batch(loadCmd(m.load), m.sessionBoxRefreshCmd())
+	m, load := m.startLoad()
+	return m, tea.Batch(load, m.sessionBoxRefreshCmd())
 }
 
 func (m Model) actionObjectDescription(c actionChoice) (string, string, string) {
