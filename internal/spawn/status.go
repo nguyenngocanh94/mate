@@ -74,14 +74,46 @@ func MateStatus(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	}
 	out := Status{
 		Project:     project,
-		Agent:       meta[MetaAgent],
-		Session:     meta[MetaSession],
-		Pane:        meta[MetaPane],
-		Harness:     meta[MetaHarness],
-		SessionID:   meta[MetaSessionID],
 		Resumed:     meta[MetaResumed] == "true",
 		ResumedFrom: meta[MetaResumedFrom],
 	}
+	return agentStatus(ctx, w, deps, meta, out)
+}
+
+// CrewStatus is MateStatus for one crew: `crews/<id>.meta` names an agent,
+// Herdr says whether it still has it. Task, session id and the harness
+// come from the meta; Resumed/ResumedFrom stay empty because a crew is
+// never resumed (mvp.md task 16).
+func CrewStatus(ctx context.Context, w *store.Workspace, deps Deps, project, crew string) (Status, error) {
+	if w == nil {
+		return Status{}, errUsage("spawn: a workspace is required")
+	}
+	if deps.Runtime == nil {
+		return Status{}, errUsage("spawn: a runtime adapter is required")
+	}
+	if err := store.ValidateProjectName(project); err != nil {
+		return Status{}, err
+	}
+	if err := store.ValidateCrewID(crew); err != nil {
+		return Status{}, err
+	}
+	meta, err := w.ReadCrewMeta(project, crew)
+	if err != nil {
+		return Status{}, err
+	}
+	return agentStatus(ctx, w, deps, meta, Status{Project: project})
+}
+
+// agentStatus fills out from one recorded meta and one question to Herdr.
+// The meta is never the answer on its own: an agent it names is `running`
+// only when Herdr still has it, `stale` otherwise, and no agent at all is
+// the stopped state.
+func agentStatus(ctx context.Context, w *store.Workspace, deps Deps, meta map[string]string, out Status) (Status, error) {
+	out.Agent = meta[MetaAgent]
+	out.Session = meta[MetaSession]
+	out.Pane = meta[MetaPane]
+	out.Harness = meta[MetaHarness]
+	out.SessionID = meta[MetaSessionID]
 	if out.Agent == "" {
 		out.State = StateStopped
 		out.Detail = "no agent recorded"

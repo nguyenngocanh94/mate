@@ -203,7 +203,7 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 | 06 ∥ | Template AGENTS.md của Mate bản đầu, fork từ firstmate và cắt tmux, treehouse, no-mistakes, secondmate, X mode. CLAUDE.md `@AGENTS.md`. Sinh file bằng `embed`. | Snapshot test, review tay. Đã xong 2026-09-17. |
 | 07 | `internal/spawn` start Mate: tạo `mate/`, Herdr workspace và tab, `agent start`, trust dialog, ghi `mate.meta`. | Live test: Mate Claude trả lời đúng vai. Đã xong 2026-09-17. |
 | 08 | Hook `UserPromptSubmit` và `Stop` cho Mate: ghi `sent.log`, lưu `session_id`, xoá `.auto` khi prompt không có marker. | Live test: `sent.log` có dòng user và dòng mate. Đã xong 2026-09-17. |
-| 09 | Session view stream mode nối pane Mate, phím detach, header hiện chế độ. | Live test E2E. Đã xong 2026-09-17. |
+| 09 | Session view stream mode nối pane Mate và pane crew (Enter trên hàng crew mở terminal của crew), phím detach, header hiện chế độ. | Live test E2E. Mate xong 2026-09-17; crew nối 2026-09-18 sau khi test tay phát hiện Enter trên crew rơi vào fallback `matev2 attach` không tồn tại. |
 | 10 | Mate stop và restart với `--resume session_id`. | Live test: Mate nhớ câu trước. Đã xong 2026-09-17. |
 
 ### M2. Crew và chế độ giám sát

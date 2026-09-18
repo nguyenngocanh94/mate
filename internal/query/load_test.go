@@ -178,3 +178,32 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 		t.Fatalf("projects = %+v, want the newly registered one too", snap.Projects)
 	}
 }
+
+// TestLoadGivesATornDownSilentCrewTheStoppedStatus: StopCrew leaves the
+// meta with stopped_at and no agent. A crew that never wrote a status
+// line is then stopped, not reserved - reserved is the promise of a start
+// (2026-09-18: the tree showed a discarded test crew as reserved).
+func TestLoadGivesATornDownSilentCrewTheStoppedStatus(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{
+		"task": "scout", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
+		t.Fatalf("write crew meta: %v", err)
+	}
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := snap.Projects[0].Crews[0].Status; got != CrewStopped {
+		t.Fatalf("status = %q, want %q", got, CrewStopped)
+	}
+	// One that wrote before it was stopped keeps its own last word.
+	if err := ws.AppendStatus("shop", "k9", "done: report ready"); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if snap, err = Load(context.Background(), ws); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := snap.Projects[0].Crews[0].Status; got != CrewStatus("done") {
+		t.Fatalf("status = %q, want done", got)
+	}
+}

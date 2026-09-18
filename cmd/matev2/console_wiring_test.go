@@ -283,3 +283,117 @@ func TestConsoleSessionMetadataReportsRecordedAndObservedSeparately(t *testing.T
 		t.Fatalf("runtime after stop = %+v, want absent", snap.Runtime)
 	}
 }
+
+// TestConsoleSessionStreamOpensACrewFromItsMeta is the wiring the user hit
+// on 2026-09-18: Enter on a crew row reached the fallback with "Crews
+// arrive in task 11" long after task 11 had shipped, and the fallback
+// (`matev2 attach`) does not exist, so the crew's terminal could not be
+// looked at at all. The factory must resolve a crew exactly like a Mate:
+// out of `crews/<id>.meta`, into the Herdr agent it names.
+func TestConsoleSessionStreamOpensACrewFromItsMeta(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	res := spawnFakeCrew(t, w, deps, "shop", "k3")
+	stream := runtime.NewFakeSessionStream()
+	ref := runtime.AgentSessionRef{HerdrSession: w.Session(), AgentName: res.Agent}
+	if err := stream.Seed(ref, []byte("› ")); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	factory := consoleSessionStream(w, stream)
+	target := console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k3", ProjectID: "shop"}
+
+	channel, err := factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
+	if err != nil {
+		t.Fatalf("open a running crew: %v", err)
+	}
+	if channel == nil {
+		t.Fatal("a running crew handed back no channel")
+	}
+	if len(stream.OpenCalls) != 1 || stream.OpenCalls[0] != ref {
+		t.Fatalf("opened %v, want exactly the crew's own agent %v", stream.OpenCalls, ref)
+	}
+	_ = channel.Close(context.Background())
+
+	// Torn down: the record stays, the agent and pane are gone, and the
+	// factory says stopped rather than opening a PTY against nothing.
+	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true); err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	channel, err = factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
+	if channel != nil {
+		t.Fatal("a stopped crew handed back a channel")
+	}
+	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "k3") {
+		t.Fatalf("error = %v, want the stopped state naming the crew", err)
+	}
+	if len(stream.OpenCalls) != 1 {
+		t.Fatalf("the stopped crew still reached the transport: %v", stream.OpenCalls)
+	}
+}
+
+// TestConsoleSessionMetadataFollowsACrewStatusFile: a crew's recorded
+// status is what it wrote last (mvp.md section 4), not `mate status`'s
+// vocabulary; whether Herdr still has the agent is reported separately,
+// and a torn-down crew that never wrote is `stopped`, not `reserved`.
+func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	ctx := context.Background()
+	spawnFakeCrew(t, w, deps, "shop", "k3")
+	target := console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k3", ProjectID: "shop"}
+	read := consoleSessionMetadata(w, deps)
+
+	snap, err := read(ctx, target)
+	if err != nil {
+		t.Fatalf("metadata: %v", err)
+	}
+	if snap.RecordedStatus.Value != string(query.CrewReserved) {
+		t.Fatalf("recorded before any status line = %+v, want reserved", snap.RecordedStatus)
+	}
+	if snap.Runtime.Status != query.Known {
+		t.Fatalf("runtime = %+v, want the live agent observed", snap.Runtime)
+	}
+	if snap.Transcript.Raw != "" || len(snap.Transcript.Entries) != 0 {
+		t.Fatal("the metadata reader produced transcript content; the PTY is the only source of the live frame")
+	}
+
+	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
+		t.Fatalf("AppendStatus: %v", err)
+	}
+	snap, err = read(ctx, target)
+	if err != nil {
+		t.Fatalf("metadata after a status line: %v", err)
+	}
+	if snap.RecordedStatus.Value != "needs-decision" {
+		t.Fatalf("recorded = %+v, want the crew's own last verb", snap.RecordedStatus)
+	}
+	if snap.Box.State != query.Known || len(snap.Box.Value.Inbox) != 1 {
+		t.Fatalf("box = %+v, want the question in the inbox", snap.Box)
+	}
+
+	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	snap, err = read(ctx, target)
+	if err != nil {
+		t.Fatalf("metadata after stop: %v", err)
+	}
+	if snap.RecordedStatus.Value != "needs-decision" {
+		t.Fatalf("recorded after stop = %+v, want the last verb kept (the record is the crew's, not Herdr's)", snap.RecordedStatus)
+	}
+	if snap.Runtime.Status != query.Absent {
+		t.Fatalf("runtime after stop = %+v, want absent", snap.Runtime)
+	}
+
+	// A second crew torn down before it wrote anything: stopped, never
+	// reserved, because reserved promises a start that is not coming.
+	spawnFakeCrew(t, w, deps, "shop", "k4")
+	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k4", true); err != nil {
+		t.Fatalf("StopCrew k4: %v", err)
+	}
+	snap, err = read(ctx, console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k4", ProjectID: "shop"})
+	if err != nil {
+		t.Fatalf("metadata k4: %v", err)
+	}
+	if snap.RecordedStatus.Value != string(query.CrewStopped) {
+		t.Fatalf("recorded for a silent torn-down crew = %+v, want stopped", snap.RecordedStatus)
+	}
+}

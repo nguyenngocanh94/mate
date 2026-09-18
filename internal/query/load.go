@@ -292,6 +292,11 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 	}
 
 	c.Status = crewStatus(ws, project, id, w, row)
+	if c.Status == CrewReserved && meta["agent"] == "" && meta["stopped_at"] != "" {
+		// Torn down before it ever wrote a status line. `reserved` would
+		// promise a crew that is about to start; nothing is.
+		c.Status = CrewStopped
+	}
 	return c
 }
 

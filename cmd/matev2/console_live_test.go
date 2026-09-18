@@ -295,3 +295,163 @@ func consoleBinaryPath(t *testing.T) string {
 	}
 	return bin
 }
+
+// TestLiveConsoleStreamCrew is the crew half of task 09, wired only on
+// 2026-09-18 after Enter on a crew row failed in the user's workspace: a
+// real Codex crew is spawned, the Console's own SessionStreamFactory opens
+// that crew's terminal, Codex's composer arrives through the PTY, the
+// metadata side channel reports the crew's own status verb beside Herdr's
+// observation, and detaching leaves the crew running.
+func TestLiveConsoleStreamCrew(t *testing.T) {
+	requireConsoleLive(t)
+	session, configHome := consoleLiveLab(t)
+
+	root := t.TempDir()
+	w, err := store.Init(root)
+	if err != nil {
+		t.Fatalf("store.Init: %v", err)
+	}
+	consoleUseLabSession(t, w, session)
+	if w, err = store.Open(root); err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	repo := filepath.Join(w.Root(), "shop")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initGitRepo(t, repo)
+	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+		t.Fatalf("AddProject: %v", err)
+	}
+
+	names := runtime.NewMemoryNameRegistry()
+	rt := runtime.NewHerdr(process.ExecRunner{})
+	rt.Names = names
+	rt.StartServer = func(context.Context, string) error {
+		t.Fatal("the lab session is provisioned by the runner; this test must not start a Herdr server")
+		return nil
+	}
+	deps := spawn.Deps{
+		Runtime:              rt,
+		Names:                names,
+		ConfigHome:           configHome,
+		Binary:               consoleBinaryPath(t),
+		ReadinessTimeout:     90 * time.Second,
+		StartupPromptTimeout: 60 * time.Second,
+		StartTimeout:         60 * time.Second,
+	}
+	marker := filepath.Join(configHome, "mate", "session-owners", session)
+	_ = os.Remove(marker)
+	t.Cleanup(func() { _ = os.Remove(marker) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	defer cancel()
+
+	res, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
+		Project:   "shop",
+		Crew:      "k3",
+		Harness:   harness.KindCodex,
+		BriefText: "Append working: looking to the status file, then wait for further instructions. Do not edit any file.",
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	t.Cleanup(func() {
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer stopCancel()
+		_, _ = spawn.StopCrew(stopCtx, w, deps, "shop", "k3", true)
+	})
+	t.Logf("spawned crew %s in pane %s", res.Agent, res.Pane)
+
+	// The snapshot offers the crew as a session target the same way the
+	// tree's Enter would build it.
+	snap, err := query.Load(ctx, w)
+	if err != nil {
+		t.Fatalf("query.Load: %v", err)
+	}
+	if len(snap.Projects[0].Crews) != 1 {
+		t.Fatalf("crews = %+v, want the one just spawned", snap.Projects[0].Crews)
+	}
+	crew := snap.Projects[0].Crews[0]
+	target := console.SessionTarget{
+		Kind:        console.SessionTargetCrew,
+		ID:          crew.CrewID,
+		ProjectID:   "shop",
+		HarnessKind: query.HarnessCodex,
+		AgentName:   crew.AgentName.Value,
+		Worktree:    crew.Worktree.Value.Path,
+	}
+
+	meta, err := consoleSessionMetadata(w, deps)(ctx, target)
+	if err != nil {
+		t.Fatalf("session metadata: %v", err)
+	}
+	if meta.Runtime.Status != query.Known {
+		t.Fatalf("metadata runtime = %+v, want the crew observed live", meta.Runtime)
+	}
+	t.Logf("metadata: recorded=%s runtime=%v", meta.RecordedStatus.Value, meta.Runtime.Status)
+
+	factory := consoleSessionStream(w, rt)
+	if factory == nil {
+		t.Fatal("the live adapter provides no session stream")
+	}
+	channel, err := factory(ctx, target, console.TerminalSize{Cols: 120, Rows: 36})
+	if err != nil {
+		t.Fatalf("open the crew's session stream: %v", err)
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = channel.Close(context.Background())
+		}
+	}()
+
+	// Codex's composer glyph in the raw stream is the proof the reader is
+	// inside the crew's own terminal.
+	var seen strings.Builder
+	deadline := time.Now().Add(90 * time.Second)
+	for !strings.Contains(seen.String(), "›") {
+		if time.Now().After(deadline) {
+			t.Fatalf("Codex's composer glyph never arrived in the stream; last bytes:\n%s",
+				harness.StartupScreenTail(seen.String(), 12))
+		}
+		readCtx, readCancel := context.WithTimeout(ctx, 5*time.Second)
+		data, readErr := channel.Read(readCtx)
+		readCancel()
+		seen.Write(data)
+		if readErr != nil && !os.IsTimeout(readErr) && time.Now().After(deadline) {
+			t.Fatalf("stream read: %v", readErr)
+		}
+	}
+	t.Logf("composer reached the console stream:\n%s", harness.StartupScreenTail(seen.String(), 12))
+
+	if err := channel.Close(ctx); err != nil {
+		t.Fatalf("close the session stream: %v", err)
+	}
+	closed = true
+
+	status, err := spawn.CrewStatus(ctx, w, deps, "shop", "k3")
+	if err != nil {
+		t.Fatalf("CrewStatus after detach: %v", err)
+	}
+	if status.State != spawn.StateRunning {
+		t.Fatalf("status after detach = %q, want the crew still running", status.Line())
+	}
+
+	// Torn down, the factory refuses with the stopped state and the tree
+	// shows the crew's own last word, never `reserved`.
+	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	if _, err := factory(ctx, target, console.TerminalSize{Cols: 120, Rows: 36}); err == nil ||
+		!strings.Contains(err.Error(), "stopped") {
+		t.Fatalf("factory on a stopped crew = %v, want the stopped state", err)
+	}
+	if snap, err = query.Load(ctx, w); err != nil {
+		t.Fatalf("query.Load after stop: %v", err)
+	}
+	if got := snap.Projects[0].Crews[0].Status; got == query.CrewReserved {
+		t.Fatalf("a torn-down crew is shown as %q", got)
+	}
+	t.Logf("tree after stop: %s", snap.Projects[0].Crews[0].Status)
+}

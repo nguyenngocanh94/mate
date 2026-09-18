@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -28,7 +30,7 @@ func consoleSessionStream(ws *store.Workspace, stream runtime.SessionStream) con
 		return nil
 	}
 	return func(ctx context.Context, target console.SessionTarget, size console.TerminalSize) (console.SessionChannel, error) {
-		ref, err := mateSessionRef(ws, target)
+		ref, err := sessionRef(ws, target)
 		if err != nil {
 			return nil, err
 		}
@@ -40,34 +42,47 @@ func consoleSessionStream(ws *store.Workspace, stream runtime.SessionStream) con
 	}
 }
 
-// mateSessionRef resolves the Herdr identity of a Project's Mate out of
-// `mate.meta`, which is the only record there is (internal/spawn/doc.go).
-// The meta is re-read on every open rather than captured from the
-// Console's snapshot: the snapshot can be a refresh old, and opening a PTY
-// against a pane nobody owns is exactly the failure that record is a hint
-// about, not proof of.
-func mateSessionRef(ws *store.Workspace, target console.SessionTarget) (runtime.AgentSessionRef, error) {
-	if target.Kind != console.SessionTargetMate {
-		return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
-			"the live session view is wired for a Mate; Crews arrive in mvp.md task 11")
-	}
+// sessionRef resolves the Herdr identity of the agent a target names out
+// of its `.meta` - `mate.meta` for a Mate, `crews/<id>.meta` for a crew -
+// which is the only record there is (internal/spawn/doc.go). The meta is
+// re-read on every open rather than captured from the Console's snapshot:
+// the snapshot can be a refresh old, and opening a PTY against a pane
+// nobody owns is exactly the failure that record is a hint about, not
+// proof of.
+func sessionRef(ws *store.Workspace, target console.SessionTarget) (runtime.AgentSessionRef, error) {
 	if target.ProjectID == "" {
 		return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
 			"the session target names no Project")
 	}
-	meta, err := ws.ReadMateMeta(target.ProjectID)
+	var (
+		meta    map[string]string
+		err     error
+		stopped error
+	)
+	switch target.Kind {
+	case console.SessionTargetMate:
+		meta, err = ws.ReadMateMeta(target.ProjectID)
+		stopped = errMateStopped(target.ProjectID)
+	case console.SessionTargetCrew:
+		if target.ID == "" {
+			return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
+				"the session target names no crew")
+		}
+		meta, err = ws.ReadCrewMeta(target.ProjectID, target.ID)
+		stopped = errCrewStopped(target.ProjectID, target.ID)
+	default:
+		return runtime.AgentSessionRef{}, observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("the live session view has no target of kind %q", target.Kind))
+	}
 	if err != nil {
 		return runtime.AgentSessionRef{}, err
 	}
-	if meta[spawn.MetaAgent] == "" {
-		return runtime.AgentSessionRef{}, errMateStopped(target.ProjectID)
-	}
-	if meta[spawn.MetaPane] == "" {
+	if meta[spawn.MetaAgent] == "" || meta[spawn.MetaPane] == "" {
 		// An agent with no pane is the same stopped record seen from the
-		// other side: StopMate drops both keys together, so one without the
-		// other is a half-written meta, and neither is something to open a
-		// PTY against.
-		return runtime.AgentSessionRef{}, errMateStopped(target.ProjectID)
+		// other side: StopMate and StopCrew drop both keys together, so one
+		// without the other is a half-written meta, and neither is
+		// something to open a PTY against.
+		return runtime.AgentSessionRef{}, stopped
 	}
 	session := meta[spawn.MetaSession]
 	if session == "" {
@@ -84,6 +99,14 @@ func mateSessionRef(ws *store.Workspace, target console.SessionTarget) (runtime.
 func errMateStopped(project string) error {
 	return observability.NewError(observability.CodeStateConflict,
 		fmt.Sprintf("the Mate of %s is stopped; press s to start it", project))
+}
+
+// errCrewStopped is the crew counterpart. A stopped crew is not restarted
+// from the Console - the Mate spawns a new one - so there is no key to
+// offer, only the record that remains.
+func errCrewStopped(project, crew string) error {
+	return observability.NewError(observability.CodeStateConflict,
+		fmt.Sprintf("crew %s of %s is stopped; its record stays in crews/%s", crew, project, crew))
 }
 
 // consoleSessionChannel adapts the runtime transport without exposing any
@@ -109,17 +132,33 @@ func (c consoleSessionChannel) Close(ctx context.Context) error {
 // consoleSessionMetadata is the stream's slow side channel: recorded
 // lifecycle and one runtime observation per tick. It never reads the pane's
 // contents - the PTY bytes are the sole source of the live frame - and it
-// never rewrites `mate.meta`, so a Mate that disappears from Herdr while
+// never rewrites a `.meta`, so an agent that disappears from Herdr while
 // the view is open is reported as an absent runtime, not promoted into a
 // lifecycle change (ADR 0025).
+//
+// A Mate's recorded status is what `mate status` establishes. A crew's is
+// the last verb it appended to `crews/<id>.status` (mvp.md section 4), or
+// `stopped` once its meta names no agent; whether Herdr still has the
+// agent is asked the same way for both.
 func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.SessionMetadataReader {
 	return func(ctx context.Context, target console.SessionTarget) (console.SessionSnapshot, error) {
 		snap := console.SessionSnapshot{Target: target, AsOf: time.Now().UTC()}
-		if target.Kind != console.SessionTargetMate || target.ProjectID == "" {
-			return snap, observability.NewError(observability.CodeUsage,
-				"session metadata is wired for a Mate; Crews arrive in mvp.md task 11")
+		if target.ProjectID == "" {
+			return snap, observability.NewError(observability.CodeUsage, "the session target names no Project")
 		}
-		status, err := spawn.MateStatus(ctx, ws, deps, target.ProjectID)
+		var (
+			status spawn.Status
+			err    error
+		)
+		switch target.Kind {
+		case console.SessionTargetMate:
+			status, err = spawn.MateStatus(ctx, ws, deps, target.ProjectID)
+		case console.SessionTargetCrew:
+			status, err = spawn.CrewStatus(ctx, ws, deps, target.ProjectID, target.ID)
+		default:
+			return snap, observability.NewError(observability.CodeUsage,
+				fmt.Sprintf("session metadata has no target of kind %q", target.Kind))
+		}
 		if err != nil {
 			return snap, err
 		}
@@ -130,6 +169,9 @@ func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.Sessio
 		// a message box rather than a snapshot field.
 		snap.Box = query.LoadBox(ws, target.ProjectID)
 		snap.RecordedStatus = query.KnownField(string(status.State))
+		if target.Kind == console.SessionTargetCrew {
+			snap.RecordedStatus = query.KnownField(crewRecordedStatus(ws, target.ProjectID, target.ID, status))
+		}
 		switch status.State {
 		case spawn.StateRunning:
 			snap.Runtime = console.SessionRuntime{Status: query.Known, ObservedAt: time.Now().UTC()}
@@ -140,4 +182,25 @@ func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.Sessio
 		}
 		return snap, nil
 	}
+}
+
+// crewRecordedStatus is the word the crew row shows in the tree: the verb
+// of the crew's last status line, `stopped` for a torn-down crew that
+// wrote nothing, `reserved` for one that has not written yet. The stale
+// state is Herdr's observation, not the crew's record, so it is reported
+// on Runtime and never here.
+func crewRecordedStatus(ws *store.Workspace, project, crew string, status spawn.Status) string {
+	entries, _, err := ws.ReadStatus(project, crew, 0)
+	if err == nil {
+		for i := len(entries) - 1; i >= 0; i-- {
+			if strings.TrimSpace(entries[i].Line) == "" {
+				continue
+			}
+			return string(box.ParseStatus(entries[i].Line).State)
+		}
+	}
+	if status.State == spawn.StateStopped {
+		return string(query.CrewStopped)
+	}
+	return string(query.CrewReserved)
 }

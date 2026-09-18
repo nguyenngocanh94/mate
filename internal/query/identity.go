@@ -125,6 +125,10 @@ const (
 	CrewBlocked        CrewStatus = "blocked"
 	CrewNeedsRebase    CrewStatus = "needs_rebase"
 	CrewNeedsRepair    CrewStatus = "needs_repair"
+	// CrewStopped is a crew whose meta no longer names an agent (StopCrew
+	// ran) and whose status file never got a line: torn down, not
+	// waiting. A crew that did write is shown by its own last verb.
+	CrewStopped CrewStatus = "stopped"
 )
 
 // ParseCrewStatus rejects empty and unknown values.
