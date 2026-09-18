@@ -172,7 +172,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 
 	// 6. The crew takes it as a new prompt and finishes.
 	done := waitForBoxEntry(t, ctx, w, 300*time.Second, paneTail, func(e query.BoxEntry) bool {
-		return e.Kind == query.BoxStatus && e.Verb == "done" && strings.Contains(strings.ToLower(e.Text), "chose")
+		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose")
 	})
 	t.Logf("crew finished: %s: %s", done.Verb, done.Text)
 	if lower := strings.ToLower(done.Text); !strings.Contains(lower, "a") && !strings.Contains(lower, "b") {

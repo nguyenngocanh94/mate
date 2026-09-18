@@ -182,7 +182,7 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 
 	assertSentLine(t, w, store.SourceUser, store.CrewTarget("k3"), "A")
 	done := waitForBoxEntry(t, ctx, w, 240*time.Second, paneTail, func(e query.BoxEntry) bool {
-		return e.Kind == query.BoxStatus && e.Verb == "done" && strings.Contains(strings.ToLower(e.Text), "chose a")
+		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose a")
 	})
 	t.Logf("the crew continued: %s %s", done.Verb, done.Text)
 
