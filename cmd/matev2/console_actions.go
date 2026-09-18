@@ -96,6 +96,9 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 	if res.StaleMeta {
 		line += "; the previous record was stale and has been replaced"
 	}
+	if res.UpdateDialog {
+		line += "; a Codex update prompt was skipped"
+	}
 	if res.TrustDialog {
 		line += "; a trust dialog was answered"
 	}

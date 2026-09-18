@@ -63,6 +63,9 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	if res.StaleMeta {
 		fmt.Fprintf(stderr, "note: %s recorded a Mate that Herdr no longer had; the stale record was replaced\n", res.Project)
 	}
+	if res.UpdateDialog {
+		fmt.Fprintf(stderr, "note: skipped the %s release-update prompt; it returns at the next release\n", res.Harness)
+	}
 	if res.TrustDialog {
 		fmt.Fprintf(stderr, "note: answered the %s directory-trust dialog for %s\n", res.Harness, res.MateDir)
 	}
