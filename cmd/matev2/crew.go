@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -140,18 +139,15 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 		}
 		return nil
 	}
+	// STATE is the app's word for the crew (mvp.md section 4b); NOTE is the
+	// crew's own last line. Two columns, because they answer two questions:
+	// a `wait-mate` crew with the note "could not build without a db" is not
+	// the same row as one that says "ready in branch matev2/k3".
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tHARNESS\tBRANCH\tSTATUS\tPANE")
+	fmt.Fprintln(tw, "ID\tHARNESS\tBRANCH\tSTATE\tNOTE\tPANE")
 	for _, c := range crews {
-		status := c.Status
-		if status == "" {
-			status = "-"
-		}
-		pane := c.Pane
-		if pane == "" {
-			pane = "-"
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", c.Crew, c.Harness, c.Branch, status, pane)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			c.Crew, c.Harness, c.Branch, dashIfEmpty(c.State), dashIfEmpty(c.Note), dashIfEmpty(c.Pane))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -162,10 +158,19 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
+// dashIfEmpty keeps a table cell from reading as a missing column.
+func dashIfEmpty(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
 // cmdCrewStop implements `matev2 crew stop <project> <id> [--discard]`. It
-// stops the agent, closes the tab, and then tears down the worktree and
-// branch unless they carry unlanded work and --discard was not given
-// (task 16).
+// refuses up front when the branch carries unlanded work and --discard was
+// not given, and otherwise stops the agent, closes the tab, tears down the
+// worktree and branch, and records the crew as finished or failed
+// (task 16, mvp.md section 4b).
 func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew stop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -187,16 +192,17 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 	}
 	project, crew := fs.Arg(0), fs.Arg(1)
 	res, err := spawn.StopCrew(context.Background(), w, spawn.LiveDeps(), project, crew, *discardFlag)
-	if err != nil && !errors.Is(err, spawn.ErrUnlandedWork) {
+	if err != nil {
+		// Including ErrUnlandedWork, which is now a refusal that changed
+		// nothing: there is no outcome to report, only the reason.
 		return err
 	}
 	fmt.Fprintln(stdout, crewStopReport(project, crew, res))
-	return err
+	return nil
 }
 
 // crewStopReport is the one line `matev2 crew stop` prints describing
-// exactly what happened and what was kept, whether the stop succeeded,
-// tore down cleanly, discarded unlanded work, or refused to.
+// exactly what happened, what was kept, and the state the crew ends in.
 func crewStopReport(project, crew string, res spawn.StopResult) string {
 	agent := res.Agent
 	if agent == "" {
@@ -211,17 +217,14 @@ func crewStopReport(project, crew string, res spawn.StopResult) string {
 		tab = "not confirmed closed"
 	}
 	switch res.Teardown {
-	case spawn.TeardownRefusedUnlanded:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch KEPT: branch %s is %d commit(s) ahead of default and the worktree has %d dirty file(s); rerun with --discard to remove them",
-			project, crew, agent, stopped, tab, res.Branch, res.Ahead, res.DirtyFiles)
 	case spawn.TeardownClean:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed (%s was already landed in default)",
-			project, crew, agent, stopped, tab, res.Branch)
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed (%s was already landed in default); state %s",
+			project, crew, agent, stopped, tab, res.Branch, res.State)
 	case spawn.TeardownDiscarded:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed with --discard (%d commit(s) ahead, %d dirty file(s) discarded)",
-			project, crew, agent, stopped, tab, res.Ahead, res.DirtyFiles)
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed with --discard (%d commit(s) ahead, %d dirty file(s) discarded); state %s",
+			project, crew, agent, stopped, tab, res.Ahead, res.DirtyFiles, res.State)
 	default:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch kept",
-			project, crew, agent, stopped, tab)
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch kept; state %s",
+			project, crew, agent, stopped, tab, res.State)
 	}
 }

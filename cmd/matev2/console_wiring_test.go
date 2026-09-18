@@ -331,9 +331,10 @@ func TestConsoleSessionStreamOpensACrewFromItsMeta(t *testing.T) {
 }
 
 // TestConsoleSessionMetadataFollowsACrewStatusFile: a crew's recorded
-// status is what it wrote last (mvp.md section 4), not `mate status`'s
-// vocabulary; whether Herdr still has the agent is reported separately,
-// and a torn-down crew that never wrote is `stopped`, not `reserved`.
+// status is its declared state, resolved in the order of mvp.md section 4b,
+// not `mate status`'s vocabulary; whether Herdr still has the agent is
+// reported separately, and a closed crew reads `finished` or `failed`
+// whatever it last said.
 func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	ctx := context.Background()
@@ -345,8 +346,8 @@ func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("metadata: %v", err)
 	}
-	if snap.RecordedStatus.Value != string(query.CrewReserved) {
-		t.Fatalf("recorded before any status line = %+v, want reserved", snap.RecordedStatus)
+	if snap.RecordedStatus.Value != string(query.CrewSpawned) {
+		t.Fatalf("recorded before any status line = %+v, want spawned", snap.RecordedStatus)
 	}
 	if snap.Runtime.Status != query.Known {
 		t.Fatalf("runtime = %+v, want the live agent observed", snap.Runtime)
@@ -376,15 +377,16 @@ func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("metadata after stop: %v", err)
 	}
-	if snap.RecordedStatus.Value != "needs-decision" {
-		t.Fatalf("recorded after stop = %+v, want the last verb kept (the record is the crew's, not Herdr's)", snap.RecordedStatus)
+	if snap.RecordedStatus.Value != string(query.CrewFailed) {
+		t.Fatalf("recorded after a --discard stop = %+v, want failed: the terminal state outranks the crew's last verb", snap.RecordedStatus)
 	}
 	if snap.Runtime.Status != query.Absent {
 		t.Fatalf("runtime after stop = %+v, want absent", snap.Runtime)
 	}
 
-	// A second crew torn down before it wrote anything: stopped, never
-	// reserved, because reserved promises a start that is not coming.
+	// A second crew torn down before it wrote anything: `failed`, because
+	// --discard threw the work away, and never `spawned`, which promises a
+	// start that is not coming.
 	spawnFakeCrew(t, w, deps, "shop", "k4")
 	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k4", true); err != nil {
 		t.Fatalf("StopCrew k4: %v", err)
@@ -393,7 +395,7 @@ func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("metadata k4: %v", err)
 	}
-	if snap.RecordedStatus.Value != string(query.CrewStopped) {
-		t.Fatalf("recorded for a silent torn-down crew = %+v, want stopped", snap.RecordedStatus)
+	if snap.RecordedStatus.Value != string(query.CrewFailed) {
+		t.Fatalf("recorded for a silent discarded crew = %+v, want failed", snap.RecordedStatus)
 	}
 }

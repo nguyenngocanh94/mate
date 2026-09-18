@@ -94,12 +94,14 @@ func TestLoadMergesStatusAndSentByTime(t *testing.T) {
 		t.Fatalf("ByCrew[k9] = %d, want 1", len(v.ByCrew["k9"]))
 	}
 
-	// Attention holds the needs-decision and done status lines, newest first.
-	if len(v.Attention) != 2 {
-		t.Fatalf("Attention = %d, want 2: %+v", len(v.Attention), v.Attention)
+	// Attention holds the needs-decision line and nothing else: k9's
+	// `done:` is a wait-mate report, which the STATE column carries and
+	// attention deliberately does not (mvp.md section 4b).
+	if len(v.Attention) != 1 {
+		t.Fatalf("Attention = %d, want 1: %+v", len(v.Attention), v.Attention)
 	}
-	if v.Attention[0].Crew != "k9" || v.Attention[1].Crew != "k3" {
-		t.Fatalf("Attention order = %+v, want k9 then k3 (newest first)", v.Attention)
+	if v.Attention[0].Crew != "k3" {
+		t.Fatalf("Attention = %+v, want only k3's needs-decision line", v.Attention)
 	}
 }
 
@@ -180,7 +182,10 @@ func TestLoadMergesIncidents(t *testing.T) {
 	}
 }
 
-func TestParseStatusUnknownStateAndMalformed(t *testing.T) {
+// TestParseStatusVocabulary pins mvp.md section 4b: the three verbs a crew
+// may write, the three pre-4b verbs a status file may still carry and what
+// each maps to, and the two shapes that are not a verb at all.
+func TestParseStatusVocabulary(t *testing.T) {
 	cases := []struct {
 		line      string
 		wantState box.State
@@ -188,9 +193,16 @@ func TestParseStatusUnknownStateAndMalformed(t *testing.T) {
 	}{
 		{"working: on it", box.StateWorking, "on it"},
 		{"needs-decision: pick one", box.StateNeedsDecision, "pick one"},
-		{"blocked: waiting on ci", box.StateBlocked, "waiting on ci"},
-		{"done: shipped", box.StateDone, "shipped"},
-		{"failed: tests red", box.StateFailed, "tests red"},
+		{"wait-mate: ready in branch matev2/k3", box.StateWaitMate, "ready in branch matev2/k3"},
+		// Legacy. `done:` is the old spelling of `wait-mate:`.
+		{"done: shipped", box.StateWaitMate, "shipped"},
+		// A crew that said `blocked:` could still speak, which is a
+		// needs-decision now - and its own word stays in the text so
+		// nothing it said is lost to the mapping.
+		{"blocked: waiting on ci", box.StateNeedsDecision, "blocked: waiting on ci"},
+		// Same for `failed:`: the crew handing work back is wait-mate, and
+		// whether the task failed is the Mate's call, not the crew's.
+		{"failed: tests red", box.StateWaitMate, "failed: tests red"},
 		{"pr-ready: opened #4", box.StateUnknown, "pr-ready: opened #4"},
 		{"no colon at all here", box.StateUnknown, "no colon at all here"},
 		{"", box.StateUnknown, ""},
@@ -203,14 +215,38 @@ func TestParseStatusUnknownStateAndMalformed(t *testing.T) {
 	}
 }
 
-func TestAttentionVerbSet(t *testing.T) {
-	yes := []box.State{box.StateNeedsDecision, box.StateBlocked, box.StateDone, box.StateFailed}
-	for _, s := range yes {
-		if !box.Attention(s) {
-			t.Errorf("Attention(%s) = false, want true", s)
+// TestLastVerbSkipsLinesThatCarryNoVerb: a crew that echoed something
+// malformed after reporting has not changed state, and `unknown` is not a
+// state (mvp.md section 4b).
+func TestLastVerbSkipsLinesThatCarryNoVerb(t *testing.T) {
+	cases := []struct {
+		name  string
+		lines []string
+		want  box.State
+	}{
+		{"nothing written", nil, box.StateUnknown},
+		{"only blank lines", []string{"", "   "}, box.StateUnknown},
+		{"only unrecognised lines", []string{"hello there"}, box.StateUnknown},
+		{"last verb wins", []string{"working: a", "needs-decision: b"}, box.StateNeedsDecision},
+		{"a malformed tail does not erase the last verb", []string{"working: a", "oops"}, box.StateWorking},
+		{"a legacy done tail reads as wait-mate", []string{"working: a", "done: b"}, box.StateWaitMate},
+	}
+	for _, tc := range cases {
+		if got := box.LastVerb(tc.lines); got != tc.want {
+			t.Errorf("%s: LastVerb(%q) = %q, want %q", tc.name, tc.lines, got, tc.want)
 		}
 	}
-	no := []box.State{box.StateWorking, box.StateUnknown, box.State("something-else")}
+}
+
+// TestAttentionVerbSet: among the crew's own verbs only needs-decision is
+// attention (mvp.md section 4b). wait-mate is a report the STATE column
+// already carries, and the decision of 2026-09-18 keeps it out of the
+// inbox on purpose.
+func TestAttentionVerbSet(t *testing.T) {
+	if !box.Attention(box.StateNeedsDecision) {
+		t.Errorf("Attention(%s) = false, want true", box.StateNeedsDecision)
+	}
+	no := []box.State{box.StateWorking, box.StateWaitMate, box.StateUnknown, box.State("something-else")}
 	for _, s := range no {
 		if box.Attention(s) {
 			t.Errorf("Attention(%s) = true, want false", s)

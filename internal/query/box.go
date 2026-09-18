@@ -121,17 +121,32 @@ func (v BoxView) ToResolve() int { return len(v.Inbox) }
 // every other field in this package does: an unreadable sent.log must not
 // blank the project.
 func LoadBox(ws *store.Workspace, project string) Field[BoxView] {
+	_, _, field := loadBox(ws, project)
+	return field
+}
+
+// loadBox is LoadBox plus the raw merged View behind it, for the one caller
+// that needs both: Load, which draws the box on the ProjectNode *and* reads
+// the observer's open incidents out of it to resolve each Crew's state
+// (mvp.md section 4b). Reading the project's files once for both is not an
+// optimisation, it is correctness: two reads could disagree about whether
+// an incident is open while the same snapshot draws both.
+//
+// ok is false when the read failed, in which case the View is zero and the
+// Field carries the reason.
+func loadBox(ws *store.Workspace, project string) (box.View, bool, Field[BoxView]) {
 	if ws == nil {
-		return UnknownField[BoxView]("no workspace is open")
+		return box.View{}, false, UnknownField[BoxView]("no workspace is open")
 	}
 	// No incidents are passed: the observer that produces them is mvp.md
-	// task 18. An empty slice here is the honest "nothing has detected
-	// anything", not "there is nothing wrong".
+	// task 18, and `box.Load` grows its own `incidents.log` read there. An
+	// empty set here is the honest "nothing has detected anything", not
+	// "there is nothing wrong".
 	v, err := box.Load(ws, project, nil)
 	if err != nil {
-		return UnknownField[BoxView](readFailureReason(err))
+		return box.View{}, false, UnknownField[BoxView](readFailureReason(err))
 	}
-	return KnownField(boxView(ws, project, v))
+	return v, true, KnownField(boxView(ws, project, v))
 }
 
 func boxView(ws *store.Workspace, project string, v box.View) BoxView {

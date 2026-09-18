@@ -5,7 +5,7 @@
 ▌ none assigned                                          ! no mate   │                                                  
                                                                      │ ID               none · this project has no      
   CREWS  1          TASK              STATUS           NOTE          │                  designated Mate                 
-  crew_01J9N3…Z6BR  Migrate email del…running          ? unknown     │ Agent            none · this project has no      
+  crew_01J9N3…Z6BR  Migrate email del…working          ? unknown     │ Agent            none · this project has no      
                                                                      │                  designated Mate                 
                                                                      │ Harness          none · this project has no      
                                                                      │                  designated Mate                 

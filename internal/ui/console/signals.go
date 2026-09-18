@@ -78,28 +78,31 @@ func columnHeaderSpan(text string, p palette) span {
 // statusStyle maps a recorded status word to its hue. The word is the
 // signal; this only tints it.
 //
-//	fg    - in progress or neutral: running, ready, starting
-//	dim   - not started or over without a result: reserved, stopped
-//	amber - needs attention: awaiting_review, blocked, needs_rebase,
-//	        needs_repair, a binding recorded stale
+//	fg    - in progress or neutral: working, running, ready, starting
+//	dim   - not started, or over without a result: spawned, stopped
+//	amber - somebody must act: needs-decision, wait-mate, blocked, a
+//	        binding recorded stale
 //	red   - failed, a worktree recorded missing
-//	green - succeeded
+//	green - finished
 //
-// running is deliberately plain fg, not green: it is a recorded status, not
-// proof that an agent is alive. stale and missing are here because the
-// inspector already routes CrewNode.Agent.Status and a worktree's status
-// word through this function (see seams.go); the design's token table
-// colours both, and leaving them out renders them plain fg -
+// working and running are deliberately plain fg, not green: they are
+// recorded statuses, not proof that an agent is alive. wait-mate is amber
+// even though it is not an inbox item (mvp.md section 4b): the crew has
+// handed the task back and this column is the surface that says so, which
+// is precisely why the inbox does not have to. stale and missing are here
+// because the inspector routes CrewNode.Agent.Status and a worktree's
+// status word through this function too (see seams.go); the design's token
+// table colours both, and leaving them out renders them plain fg -
 // indistinguishable from a healthy binding or worktree.
 func statusStyle(word string, p palette) lipgloss.Style {
 	switch word {
-	case "awaiting_review", "blocked", "needs_rebase", "needs_repair", "unknown", "stale":
+	case "needs-decision", "wait-mate", "blocked", "unknown", "stale":
 		return p.Amber
 	case "failed", "missing":
 		return p.Red
-	case "succeeded":
+	case "finished":
 		return p.Green
-	case "reserved", "preparing", "draft", "created", "stopped", "stopping", "cancelled":
+	case "spawned", "draft", "created", "stopped", "stopping", "cancelled":
 		return p.Dim
 	default:
 		return p.Fg

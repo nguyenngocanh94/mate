@@ -49,7 +49,7 @@ func projectDetailRows(p query.ProjectNode, completedOpen bool) []row {
 	var finished []row
 	for i, c := range p.Crews {
 		r := row{kind: rowCrew, idx: i, id: c.CrewID}
-		if c.Status.IsFinished() {
+		if c.Closed {
 			finished = append(finished, r)
 			continue
 		}

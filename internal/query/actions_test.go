@@ -13,7 +13,7 @@ func TestDeriveActionsPublishesReasonsFromRecordedState(t *testing.T) {
 		},
 		Crews: []CrewNode{
 			{CrewID: "failed", Status: CrewFailed},
-			{CrewID: "running", Status: CrewRunning, Binding: KnownField(BindingValue{Status: BindingActive})},
+			{CrewID: "running", Status: CrewWorking, Binding: KnownField(BindingValue{Status: BindingActive})},
 		},
 	}}}
 	deriveActions(&s)
@@ -36,7 +36,7 @@ func TestDeriveActionsPublishesReasonsFromRecordedState(t *testing.T) {
 func TestRepairUnknownBindingIsNeverReportedAsNoStaleBinding(t *testing.T) {
 	s := Snapshot{Projects: []ProjectNode{{
 		Crews: []CrewNode{
-			{CrewID: "crew", Status: CrewNeedsRepair, Binding: UnknownField[BindingValue]("binding lookup timed out (2s)")},
+			{CrewID: "crew", Status: CrewWorking, Binding: UnknownField[BindingValue]("binding lookup timed out (2s)")},
 		},
 	}}}
 	deriveActions(&s)

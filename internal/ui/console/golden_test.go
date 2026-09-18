@@ -360,6 +360,9 @@ func sampleTree() query.Snapshot {
 						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
 						Task:        "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
 						Status:      query.CrewFailed,
+						// `failed` is terminal, so this row lives in the
+						// Completed group (mvp.md section 4b).
+						Closed:      true,
 						HarnessKind: query.HarnessCodex,
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
@@ -389,7 +392,7 @@ func sampleTree() query.Snapshot {
 						CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
 						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
 						Task:        "Add idempotency-key index",
-						Status:      query.CrewRunning,
+						Status:      query.CrewWorking,
 						HarnessKind: query.HarnessClaude,
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",

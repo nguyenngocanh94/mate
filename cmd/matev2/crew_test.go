@@ -76,14 +76,16 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 	if err := run([]string{"crew", "list", "shop", "--workspace", w.Root()}, &out, &errw); err != nil {
 		t.Fatalf("crew list: %v", err)
 	}
-	for _, want := range []string{"k3", "codex", "matev2/k3", "done: ready in branch matev2/k3", "w1:p2"} {
+	// STATE is the app's word, NOTE the crew's own. A legacy `done:` line
+	// reads as `wait-mate` and its text lands in NOTE (mvp.md section 4b).
+	for _, want := range []string{"k3", "codex", "matev2/k3", "wait-mate", "ready in branch matev2/k3", "w1:p2"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("out = %q, want it to carry %q", out.String(), want)
 		}
 	}
 }
 
-func TestCrewListStatusColumnShowsTeardown(t *testing.T) {
+func TestCrewListStateColumnShowsTheDeclaredState(t *testing.T) {
 	root := t.TempDir()
 	w, err := store.Init(root)
 	if err != nil {
@@ -103,10 +105,11 @@ func TestCrewListStatusColumnShowsTeardown(t *testing.T) {
 		meta map[string]string
 		want string
 	}{
-		{"k1", map[string]string{"teardown": "refused_unlanded", "stopped_at": "2026-09-17T10:00:00Z"}, "stopped (unlanded)"},
-		{"k2", map[string]string{"teardown": "clean", "stopped_at": "2026-09-17T10:00:00Z"}, "torn down"},
-		{"k3", map[string]string{"teardown": "discarded", "stopped_at": "2026-09-17T10:00:00Z"}, "torn down"},
-		{"k4", map[string]string{"stopped_at": "2026-09-17T10:00:00Z"}, "stopped"},
+		{"k1", map[string]string{"state": "finished", "teardown": "clean", "stopped_at": "2026-09-17T10:00:00Z"}, "finished"},
+		{"k2", map[string]string{"state": "failed", "teardown": "discarded", "stopped_at": "2026-09-17T10:00:00Z"}, "failed"},
+		{"k3", map[string]string{"state": "failed", "failed_reason": "startup screen not recognised"}, "failed"},
+		// Pre-4b: a meta with stopped_at and no state= reads as finished.
+		{"k4", map[string]string{"teardown": "clean", "stopped_at": "2026-09-17T10:00:00Z"}, "finished"},
 	}
 	for _, tc := range cases {
 		if err := w.WriteCrewMeta("shop", tc.crew, tc.meta); err != nil {
@@ -154,28 +157,20 @@ func TestCrewStopReportLineDescribesEachOutcome(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "refused",
-			res: spawn.StopResult{
-				Agent: "crew-k3", TabClosed: true,
-				Teardown: spawn.TeardownRefusedUnlanded, Branch: "matev2/k3", Ahead: 2, DirtyFiles: 1,
-			},
-			want: []string{"KEPT", "2 commit(s) ahead", "1 dirty file(s)", "--discard"},
-		},
-		{
 			name: "clean",
 			res: spawn.StopResult{
 				Agent: "crew-k3", TabClosed: true,
-				Teardown: spawn.TeardownClean, Branch: "matev2/k3",
+				Teardown: spawn.TeardownClean, State: spawn.CrewStateFinished, Branch: "matev2/k3",
 			},
-			want: []string{"removed", "already landed"},
+			want: []string{"removed", "already landed", "state finished"},
 		},
 		{
 			name: "discarded",
 			res: spawn.StopResult{
 				Agent: "crew-k3", TabClosed: true,
-				Teardown: spawn.TeardownDiscarded, Ahead: 3, DirtyFiles: 2,
+				Teardown: spawn.TeardownDiscarded, State: spawn.CrewStateFailed, Ahead: 3, DirtyFiles: 2,
 			},
-			want: []string{"removed", "--discard", "3 commit(s)", "2 dirty file(s)"},
+			want: []string{"removed", "--discard", "3 commit(s)", "2 dirty file(s)", "state failed"},
 		},
 		{
 			name: "already gone",
@@ -212,10 +207,10 @@ func TestCrewStopRequiresProjectAndID(t *testing.T) {
 	}
 }
 
-// TestCrewListShowsOnlyOpenCrewsByDefault: a `done:` line is the crew's
-// report, not the end of its task - the Mate or the captain ends it with
-// `crew stop` (2026-09-18). So a crew that said done is still listed, a
-// stopped one is not, and the footer says how many are hidden.
+// TestCrewListShowsOnlyOpenCrewsByDefault: a `wait-mate:` line is the
+// crew's report, not the end of its task - the Mate or the captain ends it
+// with `crew stop` (2026-09-18). So a crew that reported is still listed, a
+// closed one is not, and the footer says how many are hidden.
 func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 	w, err := store.Init(t.TempDir())
 	if err != nil {
@@ -232,10 +227,10 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship it", "agent": "crew-k1", "pane": "w1:p2"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.AppendStatus("shop", "k1", "done: ready in branch matev2/k1"); err != nil {
+	if err := w.AppendStatus("shop", "k1", "wait-mate: ready in branch matev2/k1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.WriteCrewMeta("shop", "k2", map[string]string{"task": "old", "teardown": "clean", "stopped_at": "2026-09-18T10:00:00Z"}); err != nil {
+	if err := w.WriteCrewMeta("shop", "k2", map[string]string{"task": "old", "state": "finished", "teardown": "clean", "stopped_at": "2026-09-18T10:00:00Z"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -244,8 +239,8 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 		t.Fatalf("crew list: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "k1") || !strings.Contains(got, "done: ready") {
-		t.Fatalf("crew list = %q, want the done-but-open crew listed with its own line", got)
+	if !strings.Contains(got, "k1") || !strings.Contains(got, "wait-mate") || !strings.Contains(got, "ready in branch") {
+		t.Fatalf("crew list = %q, want the reported-but-open crew listed with its own note", got)
 	}
 	if strings.Contains(got, "k2") {
 		t.Fatalf("crew list = %q, want the closed crew hidden", got)

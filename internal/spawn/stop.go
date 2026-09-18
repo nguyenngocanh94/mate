@@ -44,9 +44,13 @@ type StopResult struct {
 	// worktree. Only meaningful when Unlanded is true because of the
 	// worktree.
 	DirtyFiles int
-	// Teardown is TeardownClean, TeardownDiscarded or
-	// TeardownRefusedUnlanded once StopCrew has decided.
+	// Teardown is TeardownClean or TeardownDiscarded once StopCrew has torn
+	// the crew down. It is empty on a refusal, which changes nothing.
 	Teardown string
+	// State is the terminal state written to `crews/<id>.meta`:
+	// CrewStateFinished for a clean stop, CrewStateFailed for a --discard.
+	// Empty on a refusal, for the same reason.
+	State string
 	// WorktreeRemoved and BranchRemoved report what a teardown actually did,
 	// as distinct from what it decided: a crew whose worktree or branch had
 	// already been removed by an earlier call leaves these false even on a

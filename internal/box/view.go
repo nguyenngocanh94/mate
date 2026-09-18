@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
@@ -30,10 +31,11 @@ type View struct {
 	// Attention is the subset that needs a human or Mate's eyes: a status
 	// entry whose state is Attention, or any incident. Newest first.
 	Attention []Entry
-	// Closed is the set of crews whose meta carries `stopped_at`: the Mate
-	// or the captain closed them with `matev2 crew stop`. Their lines stay
-	// in Entries as history; Inbox skips them, because nobody can answer a
-	// crew that is gone.
+	// Closed is the set of crews whose meta declares a terminal state
+	// (`state=finished|failed`, or a pre-4b `stopped_at` with no state):
+	// the Mate or the captain closed them with `matev2 crew stop`, or their
+	// spawn failed. Their lines stay in Entries as history; Inbox skips
+	// them, because nobody can answer a crew that is gone.
 	Closed map[string]bool
 	// Cursor resumes a later LoadSince from exactly where this View ended.
 	Cursor Cursor
@@ -76,7 +78,7 @@ func load(ws *store.Workspace, project string, incidents []Incident, cursor Curs
 	var entries []Entry
 
 	for _, crew := range crews {
-		if meta, err := ws.ReadCrewMeta(project, crew); err == nil && meta["stopped_at"] != "" {
+		if meta, err := ws.ReadCrewMeta(project, crew); err == nil && crewstate.Declare(crewstate.Declaration{Meta: meta}).Closed() {
 			closed[crew] = true
 		}
 		from := int64(0)

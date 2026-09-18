@@ -832,7 +832,7 @@ func (m Model) revealCompletedIfSelHidden(i int, selID string) {
 		return
 	}
 	for _, c := range p.Crews {
-		if c.CrewID == selID && c.Status.IsFinished() {
+		if c.CrewID == selID && c.Closed {
 			m.completedOpen[f.id] = true
 			return
 		}

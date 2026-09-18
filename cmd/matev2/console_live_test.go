@@ -450,7 +450,7 @@ func TestLiveConsoleStreamCrew(t *testing.T) {
 	if snap, err = query.Load(ctx, w); err != nil {
 		t.Fatalf("query.Load after stop: %v", err)
 	}
-	if got := snap.Projects[0].Crews[0].Status; got == query.CrewReserved {
+	if got := snap.Projects[0].Crews[0].Status; got == query.CrewSpawned {
 		t.Fatalf("a torn-down crew is shown as %q", got)
 	}
 	t.Logf("tree after stop: %s", snap.Projects[0].Crews[0].Status)

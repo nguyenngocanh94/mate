@@ -8,15 +8,24 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// cmdState implements `matev2 state <project> <crew>` (docs/mvp.md task 13):
-// one deterministic line about a crew, built by internal/crewstate's pure
-// decision table over what this command gathers live.
+// cmdState implements `matev2 state <project> <crew>` (docs/mvp.md task 13,
+// vocabulary of section 4b): one deterministic line about a crew, two
+// columns wide -
+//
+//	state: <the crew's declared state> · health: <what the runtime looks like>
+//
+// The state comes from the record and the health from a live look, and they
+// are kept apart on purpose: a crew is `wait-mate` because it said so, not
+// because its pane went quiet, and its pane is busy or idle whatever the
+// record says. internal/crewstate decides both from what this command
+// gathers.
 func cmdState(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("state", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -45,14 +54,31 @@ func cmdState(args []string, stdout, stderr io.Writer) error {
 
 // stateOfCrew is state's core, kept separate from flag parsing so a test can
 // drive it with a fake runtime instead of spawn.LiveDeps(). It gathers the
-// four inputs crewstate.Decide needs and hands the verdict entirely to that
-// pure function: this is the only place in the CLI allowed to guess.
+// inputs crewstate.Decide needs - the crew's meta, the observer's open
+// incidents, the last status verb, and what the pane looks like - and hands
+// the verdict entirely to that pure function: this is the only place in the
+// CLI allowed to guess.
+//
+// A crew with no record at all is an error rather than a state: `unknown`
+// is not one of the seven (mvp.md section 4b), and "there is no such crew"
+// is a different answer from any state a real crew could be in.
 func stateOfCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, project, crew string) (crewstate.Result, error) {
 	meta, err := w.ReadCrewMeta(project, crew)
 	if err != nil {
 		return crewstate.Result{}, err
 	}
-	in := crewstate.Input{Meta: meta}
+	if len(meta) == 0 {
+		return crewstate.Result{}, observability.NewError(observability.CodeNotFound,
+			fmt.Sprintf("no crew %s is recorded for project %s; %s is empty", crew, project, w.CrewMeta(project, crew)))
+	}
+	in := crewstate.Input{
+		Declaration: crewstate.Declaration{
+			Meta:         meta,
+			OpenIncident: crewHasOpenIncident(w, project, crew),
+			LastVerb:     crewstate.StatusVerb(lastCrewVerb(w, project, crew)),
+		},
+		Observation: crewstate.Observation{AgentRecorded: meta[spawn.MetaAgent] != ""},
+	}
 
 	resolved, err := resolveCrewHandle(ctx, w, deps, project, crew)
 	if err != nil {
@@ -67,7 +93,8 @@ func stateOfCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, proje
 				return crewstate.Result{}, err
 			}
 			in.AgentFound = true
-			in.Composer = cls
+			in.Composer = composerReading(cls.State)
+			in.Evidence = cls.Evidence
 		case runtime.IsAgentNotFound(err):
 			in.AgentFound = false
 		default:
@@ -75,14 +102,53 @@ func stateOfCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, proje
 		}
 	}
 
+	return crewstate.Decide(in), nil
+}
+
+// composerReading translates internal/send's composer vocabulary into
+// crewstate's. crewstate is a leaf package on purpose (it imports nothing
+// from matev2), so the translation lives at the caller, where both
+// vocabularies are already in scope.
+func composerReading(state send.ComposerState) crewstate.Composer {
+	switch state {
+	case send.StateBusy:
+		return crewstate.ComposerBusy
+	case send.StateEmpty:
+		return crewstate.ComposerEmpty
+	case send.StatePending:
+		return crewstate.ComposerPending
+	default:
+		return crewstate.ComposerUnknown
+	}
+}
+
+// crewHasOpenIncident asks the merged box view whether the observer has an
+// unresolved finding for this crew - the one thing that makes a crew
+// `blocked` (mvp.md section 4b). A box that cannot be read is reported as
+// no incident: `blocked` is a claim, and a failed read has not established
+// it.
+func crewHasOpenIncident(w *store.Workspace, project, crew string) bool {
+	view, err := box.Load(w, project, nil)
+	if err != nil {
+		return false
+	}
+	return len(box.OpenIncidents(view, crew)) > 0
+}
+
+// lastCrewVerb is the verb of the crew's last recognised status line, ""
+// when it has written none. box owns the parsing, including the pre-4b
+// verbs an older status file may still carry.
+func lastCrewVerb(w *store.Workspace, project, crew string) string {
 	entries, _, err := w.ReadStatus(project, crew, 0)
 	if err != nil {
-		return crewstate.Result{}, err
+		return ""
 	}
-	if len(entries) > 0 {
-		parsed := box.ParseStatus(entries[len(entries)-1].Line)
-		in.Status = crewstate.Status{Verb: crewstate.StatusVerb(parsed.State), Text: parsed.Text}
+	lines := make([]string, 0, len(entries))
+	for _, e := range entries {
+		lines = append(lines, e.Line)
 	}
-
-	return crewstate.Decide(in), nil
+	if verb := box.LastVerb(lines); verb != box.StateUnknown {
+		return string(verb)
+	}
+	return ""
 }

@@ -296,7 +296,7 @@ func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.Agent
 		return b.String()
 	}
 	for _, c := range crews {
-		fmt.Fprintf(&b, "\n\ncrew %s (%s, status %q)", c.Crew, c.Harness, c.Status)
+		fmt.Fprintf(&b, "\n\ncrew %s (%s, state %s, note %q)", c.Crew, c.Harness, c.State, c.Note)
 	}
 	return b.String()
 }

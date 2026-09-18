@@ -5,8 +5,8 @@
   mate-payments-api                                  claude     running    supervised  active      │                                                            
                                                                                                    │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT              
   CREWS  2          TASK                                  STATUS           NOTE          UPDATED   │ Task             Add idempotency-key index                 
-▌ crew_01J9P6…B8DT  Add idempotency-key index             running                        14:01:58  │                                                            
-  ↓ Completed (1)                                                          ! failed                │ Recorded status  running                                   
+▌ crew_01J9P6…B8DT  Add idempotency-key index             working                        14:01:58  │                                                            
+  ↓ Completed (1)                                                          ! failed                │ Recorded status  working                                   
                                                                                                    │ Harness          claude                                    
                                                                                                    │ Agent            crew-payments-api-2                       
                                                                                                    │ Binding          active                                    

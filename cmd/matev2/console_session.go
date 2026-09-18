@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
@@ -137,9 +136,9 @@ func (c consoleSessionChannel) Close(ctx context.Context) error {
 // lifecycle change (ADR 0025).
 //
 // A Mate's recorded status is what `mate status` establishes. A crew's is
-// the last verb it appended to `crews/<id>.status` (mvp.md section 4), or
-// `stopped` once its meta names no agent; whether Herdr still has the
-// agent is asked the same way for both.
+// its declared state, resolved in the order of mvp.md section 4b; whether
+// Herdr still has the agent is asked the same way for both, and is reported
+// on Runtime rather than folded into either status.
 func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.SessionMetadataReader {
 	return func(ctx context.Context, target console.SessionTarget) (console.SessionSnapshot, error) {
 		snap := console.SessionSnapshot{Target: target, AsOf: time.Now().UTC()}
@@ -170,7 +169,7 @@ func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.Sessio
 		snap.Box = query.LoadBox(ws, target.ProjectID)
 		snap.RecordedStatus = query.KnownField(string(status.State))
 		if target.Kind == console.SessionTargetCrew {
-			snap.RecordedStatus = query.KnownField(crewRecordedStatus(ws, target.ProjectID, target.ID, status))
+			snap.RecordedStatus = query.KnownField(crewRecordedStatus(ws, target.ProjectID, target.ID))
 		}
 		switch status.State {
 		case spawn.StateRunning:
@@ -184,23 +183,29 @@ func consoleSessionMetadata(ws *store.Workspace, deps spawn.Deps) console.Sessio
 	}
 }
 
-// crewRecordedStatus is the word the crew row shows in the tree: the verb
-// of the crew's last status line, `stopped` for a torn-down crew that
-// wrote nothing, `reserved` for one that has not written yet. The stale
-// state is Herdr's observation, not the crew's record, so it is reported
-// on Runtime and never here.
-func crewRecordedStatus(ws *store.Workspace, project, crew string, status spawn.Status) string {
-	entries, _, err := ws.ReadStatus(project, crew, 0)
-	if err == nil {
-		for i := len(entries) - 1; i >= 0; i-- {
-			if strings.TrimSpace(entries[i].Line) == "" {
-				continue
-			}
-			return string(box.ParseStatus(entries[i].Line).State)
+// crewRecordedStatus is the word the crew row shows in the tree: the crew's
+// declared state, resolved in the fixed order of mvp.md section 4b through
+// the same query.CrewStateOf the workspace tree uses. Herdr's own answer
+// about the agent is deliberately not an input: that is an observation, and
+// it is reported on Runtime and never here (decision 8).
+func crewRecordedStatus(ws *store.Workspace, project, crew string) string {
+	meta, err := ws.ReadCrewMeta(project, crew)
+	if err != nil {
+		meta = nil
+	}
+	openIncident := false
+	if view, err := box.Load(ws, project, nil); err == nil {
+		openIncident = len(box.OpenIncidents(view, crew)) > 0
+	}
+	verb := ""
+	if entries, _, err := ws.ReadStatus(project, crew, 0); err == nil {
+		lines := make([]string, 0, len(entries))
+		for _, e := range entries {
+			lines = append(lines, e.Line)
+		}
+		if v := box.LastVerb(lines); v != box.StateUnknown {
+			verb = string(v)
 		}
 	}
-	if status.State == spawn.StateStopped {
-		return string(query.CrewStopped)
-	}
-	return string(query.CrewReserved)
+	return string(query.CrewStateOf(meta, openIncident, verb))
 }

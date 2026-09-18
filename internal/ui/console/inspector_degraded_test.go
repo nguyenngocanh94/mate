@@ -19,14 +19,15 @@ import (
 // state - so the distinction between "recorded as gone" and "could not be
 // read" has real teeth rather than only the rendering code's say-so.
 
-// galleryRepairTree is design's "repair-120" state: a needs_repair Crew
+// galleryRepairTree is design's "repair-120" state: a Crew still recorded
+// working
 // whose worktree read succeeded and recorded the worktree removed (not a
 // failed read - Worktree.State stays Known), with the durable reason a
 // repair precheck records for why cleanup was not run automatically.
 func galleryRepairTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
 		CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-		Status:      query.CrewNeedsRepair,
+		Status:      query.CrewWorking,
 		HarnessKind: query.HarnessCodex,
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
@@ -41,7 +42,7 @@ func galleryRepairTree() query.Snapshot {
 		AgentName: query.AbsentField[string]("no runtime binding has ever been held for this attempt"),
 		Binding:   query.AbsentField[query.BindingValue]("no runtime binding is held for this attempt"),
 		LastEvent: query.KnownField(query.EventValue{
-			EventType: "crew.needs_repair", OccurredAt: time.Date(2026, 9, 10, 11, 30, 44, 0, time.UTC),
+			EventType: "crew.worktree_removed", OccurredAt: time.Date(2026, 9, 10, 11, 30, 44, 0, time.UTC),
 		}),
 		Error: query.KnownField(query.ErrorReason(
 			"worktree path missing on disk; branch mate/upgrade-database-adapter/a1 still exists. " +
@@ -56,7 +57,7 @@ func galleryRepairTree() query.Snapshot {
 func galleryAbsentTree() query.Snapshot {
 	return oneCrewTree(query.CrewNode{
 		CrewID:      "crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB",
-		Status:      query.CrewAwaitingReview,
+		Status:      query.CrewWaitMate,
 		HarnessKind: query.HarnessClaude,
 		Repo: query.KnownField(query.RepoValue{
 			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
@@ -77,12 +78,12 @@ func galleryAbsentTree() query.Snapshot {
 	})
 }
 
-// TestCrewNeedsRepairRendersRecordedWorktreeRemovalDistinctFromAFailedRead
+// TestCrewWorktreeRemovalRendersRecordedDistinctFromAFailedRead
 // is B2's first required case: a Known recorded removal must render the
 // design's user-facing word "missing", in red - no "r re-reads" hint and no
 // Unknown warning, because the read succeeded and this is what it found, not
 // a read failure.
-func TestCrewNeedsRepairRendersRecordedWorktreeRemovalDistinctFromAFailedRead(t *testing.T) {
+func TestCrewWorktreeRemovalRendersRecordedDistinctFromAFailedRead(t *testing.T) {
 	m := newFixture(t, galleryRepairTree(), 120, 36, unicodeGlyphs)
 	m = intoFirstCrew(t, m)
 	l := layout(m.w, m.h)
@@ -114,8 +115,8 @@ func TestCrewNeedsRepairRendersRecordedWorktreeRemovalDistinctFromAFailedRead(t 
 	}
 
 	recorded, ok := fields["Recorded status"]
-	if !ok || recorded != "needs_repair" {
-		t.Fatalf("Recorded status = %q, ok=%v, want needs_repair", recorded, ok)
+	if !ok || recorded != string(query.CrewWorking) {
+		t.Fatalf("Recorded status = %q, ok=%v, want %q", recorded, ok, query.CrewWorking)
 	}
 
 	reason, ok := fields["Reason"]

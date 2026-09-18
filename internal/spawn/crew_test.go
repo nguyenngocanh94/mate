@@ -144,6 +144,8 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",
 		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
+		// The crew exists and has written nothing yet (mvp.md section 4b).
+		spawn.MetaState: spawn.CrewStateSpawned,
 	}
 	for k, v := range want {
 		got, ok := meta[k]
@@ -323,9 +325,11 @@ func TestSpawnCrewRefusesABriefOutsideTheWorkspace(t *testing.T) {
 	}
 }
 
-// TestSpawnCrewCompensatesAfterTheTabExists is the saga proof: a failure once
-// the tab is live must leave no worktree, no branch, no tab and no meta - and
-// must leave the brief, which is the evidence of what was asked for.
+// TestSpawnCrewCompensatesAfterTheTabExists is the saga proof: a failure
+// once the tab is live must leave no worktree, no branch and no tab - and
+// must leave the brief, which is the evidence of what was asked for, plus a
+// meta recording `state=failed` and why (mvp.md section 4b: the directory
+// survives, so no orphan is left reading as `spawned`).
 func TestSpawnCrewCompensatesAfterTheTabExists(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
@@ -352,8 +356,21 @@ func TestSpawnCrewCompensatesAfterTheTabExists(t *testing.T) {
 	if listed := git(t, w.RepoDir("shop"), "worktree", "list"); strings.Contains(listed, "shop-k3") {
 		t.Fatalf("git still lists the crew worktree:\n%s", listed)
 	}
-	if _, statErr := os.Stat(w.CrewMeta("shop", "k3")); !os.IsNotExist(statErr) {
-		t.Fatal("a failed spawn wrote a meta")
+	meta, metaErr := w.ReadCrewMeta("shop", "k3")
+	if metaErr != nil {
+		t.Fatalf("a failed spawn must still record what happened: %v", metaErr)
+	}
+	if meta[spawn.MetaState] != spawn.CrewStateFailed {
+		t.Fatalf("meta state = %q, want %q", meta[spawn.MetaState], spawn.CrewStateFailed)
+	}
+	if !strings.Contains(meta[spawn.MetaFailedReason], "herdr refused the launch") {
+		t.Fatalf("failed_reason = %q, want the cause of the failure", meta[spawn.MetaFailedReason])
+	}
+	if meta[spawn.MetaAgent] != "" || meta[spawn.MetaPane] != "" {
+		t.Fatalf("meta = %+v, want no agent or pane: compensation removed them", meta)
+	}
+	if meta[spawn.MetaTask] != "Add a healthcheck endpoint." {
+		t.Fatalf("meta task = %q, want what the crew was asked for", meta[spawn.MetaTask])
 	}
 	// The brief stays: it is what the crew was asked to do.
 	brief, readErr := os.ReadFile(w.CrewBrief("shop", "k3"))
@@ -481,15 +498,22 @@ func TestListCrewsReportsTheRecordedCrews(t *testing.T) {
 	if got.Crew != "k3" || got.Harness != "codex" || got.Branch != "matev2/k3" || got.Pane != res.Pane {
 		t.Fatalf("row = %+v", got)
 	}
-	if got.Status != "done: ready in branch matev2/k3" {
-		t.Fatalf("status = %q, want the last line", got.Status)
+	if got.State != "wait-mate" {
+		t.Fatalf("state = %q, want wait-mate: the legacy done: verb reads as wait-mate", got.State)
+	}
+	if got.Note != "ready in branch matev2/k3" {
+		t.Fatalf("note = %q, want the last status line's text", got.Note)
+	}
+	if got.Closed {
+		t.Fatal("a crew that reported wait-mate is still open; only crew stop closes one")
 	}
 }
 
-// TestListCrewsStatusReflectsTeardownMeta is task 16's contract for the CLI
-// STATUS column: once a crew has been stopped, the column reports what the
-// meta says happened to the worktree and branch, not the status log.
-func TestListCrewsStatusReflectsTeardownMeta(t *testing.T) {
+// TestListCrewsStateReflectsTheMeta is the STATE column's contract
+// (mvp.md section 4b): before any stop it is the crew's own last verb;
+// a refused stop changes nothing at all, so it stays there; and once the
+// stop actually runs the meta's terminal state is what the column shows.
+func TestListCrewsStateReflectsTheMeta(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
@@ -513,8 +537,8 @@ func TestListCrewsStatusReflectsTeardownMeta(t *testing.T) {
 		return crews[0]
 	}
 
-	if got := row().Status; got != "done: ready in branch matev2/k3" {
-		t.Fatalf("status before any stop = %q, want the status log line", got)
+	if got := row().State; got != "wait-mate" {
+		t.Fatalf("state before any stop = %q, want the crew's own last verb", got)
 	}
 
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
@@ -531,14 +555,16 @@ func TestListCrewsStatusReflectsTeardownMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCrews: %v", err)
 	}
-	var k4Status string
+	var k4 spawn.CrewSummary
 	for _, c := range crews {
 		if c.Crew == "k4" {
-			k4Status = c.Status
+			k4 = c
 		}
 	}
-	if k4Status != "stopped (unlanded)" {
-		t.Fatalf("k4 status = %q, want %q", k4Status, "stopped (unlanded)")
+	// The refusal changed nothing, so the state is still whatever the crew
+	// itself last said - here nothing at all.
+	if k4.State != "spawned" || k4.Closed {
+		t.Fatalf("k4 after a refused stop = %+v, want state spawned and open", k4)
 	}
 
 	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k4", true); err != nil {
@@ -549,8 +575,11 @@ func TestListCrewsStatusReflectsTeardownMeta(t *testing.T) {
 		t.Fatalf("ListCrews: %v", err)
 	}
 	for _, c := range crews {
-		if c.Crew == "k4" && c.Status != "torn down" {
-			t.Fatalf("k4 status after discard = %q, want %q", c.Status, "torn down")
+		if c.Crew != "k4" {
+			continue
+		}
+		if c.State != "failed" || !c.Closed {
+			t.Fatalf("k4 after --discard = %+v, want state failed and closed: the work was thrown away", c)
 		}
 	}
 }
@@ -649,23 +678,23 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	if existsErr != nil || !exists {
 		t.Fatalf("a refused stop must keep the branch: %v, %v", exists, existsErr)
 	}
-	// The agent is stopped and the tab closed even though the teardown was
-	// refused.
-	if _, ok := rt.Tabs[res.Pane]; ok {
-		t.Fatal("a refused teardown must still close the crew's tab")
+	// The refusal happens before anything is touched (mvp.md section 4b):
+	// the agent is still alive, its tab still open, and the meta unchanged.
+	// The old shape - kill the agent, close the tab, then refuse the
+	// cleanup - left a crew that was dead but not closed, which is a third
+	// outcome nobody could name or act on.
+	if _, ok := rt.Tabs[res.Pane]; !ok {
+		t.Fatal("a refused stop must leave the crew's tab open; nothing was decided")
 	}
 	meta, err := w.ReadCrewMeta("shop", "k3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if meta[spawn.MetaTeardown] != spawn.TeardownRefusedUnlanded {
-		t.Fatalf("meta teardown = %q, want %q", meta[spawn.MetaTeardown], spawn.TeardownRefusedUnlanded)
+	if meta[spawn.MetaTeardown] != "" || meta[spawn.MetaStoppedAt] != "" || meta[spawn.MetaState] != spawn.CrewStateSpawned {
+		t.Fatalf("meta after a refused stop = %+v, want it untouched at state=spawned", meta)
 	}
-	if meta[spawn.MetaStoppedAt] == "" {
-		t.Fatal("a refused stop must still record stopped_at")
-	}
-	if meta[spawn.MetaAgent] != "" {
-		t.Fatal("a refused stop must still drop the live agent from the meta")
+	if meta[spawn.MetaAgent] != res.Agent {
+		t.Fatalf("meta agent = %q, want the still-running %q", meta[spawn.MetaAgent], res.Agent)
 	}
 
 	// A rerun with --discard finishes the job.
@@ -675,6 +704,14 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	}
 	if discarded.Teardown != spawn.TeardownDiscarded || discarded.Ahead != 1 {
 		t.Fatalf("discarded stop = %+v", discarded)
+	}
+	if discarded.State != spawn.CrewStateFailed {
+		t.Fatalf("discarded stop state = %q, want failed: the work was thrown away", discarded.State)
+	}
+	if meta, err := w.ReadCrewMeta("shop", "k3"); err != nil {
+		t.Fatal(err)
+	} else if meta[spawn.MetaState] != spawn.CrewStateFailed || meta[spawn.MetaStoppedAt] == "" {
+		t.Fatalf("meta after --discard = %+v, want state=failed and stopped_at", meta)
 	}
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatal("--discard must remove the worktree")

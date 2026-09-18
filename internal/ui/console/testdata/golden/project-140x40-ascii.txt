@@ -5,7 +5,7 @@
 > mate-payments-api              claude     running    supervised  active      |                                                            
                                                                                | ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK           
   CREWS  2          TASK                        STATUS           NOTE          | Agent            mate-payments-api                         
-  crew_01J9P6..B8DT Add idempotency-key index   running                        | Harness          claude                                    
+  crew_01J9P6..B8DT Add idempotency-key index   working                        | Harness          claude                                    
   v Completed (1)                                                ! failed      |                                                            
                                                                                | Recorded status  running                                   
                                                                                | Binding          active                                    

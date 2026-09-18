@@ -5,8 +5,8 @@
   none assigned                                          ! no mate   │                                                  
                                                                      │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
   CREWS  1          TASK              STATUS           NOTE          │ Task                                             
-▌ crew_01J9P4…A7CS                    needs_repair     ? unknown     │                                                  
-                                                                     │ Recorded status  needs_repair                    
+▌ crew_01J9P4…A7CS                    working          ? unknown     │                                                  
+                                                                     │ Recorded status  working                         
                                                                      │ Harness          codex                           
                                                                      │ Agent            none · no runtime binding has   
                                                                      │                  ever been held for this attempt 

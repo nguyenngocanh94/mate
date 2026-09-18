@@ -238,7 +238,7 @@ func manyCrewsTree(n int) query.Snapshot {
 		crews = append(crews, query.CrewNode{
 			CrewID:      fmt.Sprintf("crew_%03d", i),
 			Task:        fmt.Sprintf("task-%03d", i),
-			Status:      query.CrewRunning,
+			Status:      query.CrewWorking,
 			HarnessKind: query.HarnessClaude,
 			Error:       query.AbsentField[query.ErrorReason](notErrorState),
 			Attention:   query.AbsentField[query.Attention]("nothing about it needs attention"),

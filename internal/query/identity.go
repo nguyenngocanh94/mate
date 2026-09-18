@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 )
 
 // The lifecycle enums the read model and the Console render. They lived in
@@ -111,31 +113,40 @@ func (s MateStatus) OccupiesActiveSlot() bool {
 	}
 }
 
-// CrewStatus is the Crew attempt lifecycle. awaiting_review does not become
-// succeeded without a Mate or user accepting it.
+// CrewStatus is a Crew's displayed state: the seven-state vocabulary of
+// mvp.md section 4b, with one owner each. The values are crewstate's own,
+// spelled as constants of this type so the Console never has to import
+// crewstate and the two vocabularies cannot drift - a change to a spelling
+// in crewstate is a compile error here, not a silent rename.
+//
+// The v1 lifecycle (`reserved`, `preparing`, `running`, `awaiting_review`,
+// `succeeded`, `needs_rebase`, `needs_repair`, `stopped`) is gone: those
+// states had no owner in matev2, nothing wrote them, and a status nobody
+// sets is a status the Console can only render as a lie.
 type CrewStatus string
 
 const (
-	CrewReserved       CrewStatus = "reserved"
-	CrewPreparing      CrewStatus = "preparing"
-	CrewRunning        CrewStatus = "running"
-	CrewAwaitingReview CrewStatus = "awaiting_review"
-	CrewSucceeded      CrewStatus = "succeeded"
-	CrewFailed         CrewStatus = "failed"
-	CrewBlocked        CrewStatus = "blocked"
-	CrewNeedsRebase    CrewStatus = "needs_rebase"
-	CrewNeedsRepair    CrewStatus = "needs_repair"
-	// CrewStopped is a crew whose meta no longer names an agent (StopCrew
-	// ran) and whose status file never got a line: torn down, not
-	// waiting. A crew that did write is shown by its own last verb.
-	CrewStopped CrewStatus = "stopped"
+	// CrewSpawned: the app spawned the crew and it has written nothing yet.
+	CrewSpawned = CrewStatus(crewstate.StateSpawned)
+	// CrewWorking, CrewNeedsDecision and CrewWaitMate are the three verbs a
+	// crew writes to its own `.status`.
+	CrewWorking       = CrewStatus(crewstate.StateWorking)
+	CrewNeedsDecision = CrewStatus(crewstate.StateNeedsDecision)
+	CrewWaitMate      = CrewStatus(crewstate.StateWaitMate)
+	// CrewBlocked is the observer's: an open incident in `incidents.log`
+	// says the crew cannot report for itself any more.
+	CrewBlocked = CrewStatus(crewstate.StateBlocked)
+	// CrewFinished and CrewFailed are terminal, and only `crew stop` (or a
+	// failed spawn) writes them.
+	CrewFinished = CrewStatus(crewstate.StateFinished)
+	CrewFailed   = CrewStatus(crewstate.StateFailed)
 )
 
 // ParseCrewStatus rejects empty and unknown values.
 func ParseCrewStatus(s string) (CrewStatus, error) {
 	v := CrewStatus(strings.ToLower(strings.TrimSpace(s)))
 	switch v {
-	case CrewReserved, CrewPreparing, CrewRunning, CrewAwaitingReview, CrewSucceeded, CrewFailed, CrewBlocked, CrewNeedsRebase, CrewNeedsRepair:
+	case CrewSpawned, CrewWorking, CrewNeedsDecision, CrewWaitMate, CrewBlocked, CrewFinished, CrewFailed:
 		return v, nil
 	case "":
 		return "", fmt.Errorf("crew status: %w", ErrEmptyValue)
@@ -146,11 +157,27 @@ func ParseCrewStatus(s string) (CrewStatus, error) {
 
 func (s CrewStatus) String() string { return string(s) }
 
-// IsFinished reports whether the attempt's outcome is already recorded, so
-// the Console can drop it out of the active list into its Completed group.
-// awaiting_review is not finished: it is waiting on a person.
-func (s CrewStatus) IsFinished() bool {
-	return s == CrewSucceeded || s == CrewFailed
+// Closed reports whether the task is over: `finished` or `failed`, the two
+// states `matev2 crew stop` writes. A closed Crew leaves ProjectNode.Crews
+// and is counted in ProjectNode.ClosedCrews instead. `wait-mate` is not
+// closed - it is the crew reporting, and closing is somebody else's
+// decision (mvp.md section 4b).
+func (s CrewStatus) Closed() bool { return crewstate.State(s).Closed() }
+
+// CrewStateOf resolves one Crew's displayed state in the fixed order of
+// mvp.md section 4b, over the same pure table `matev2 state` uses. Every
+// reader of a Crew's state in this codebase goes through here or through
+// crewstate.Declare directly; there is no second ordering anywhere.
+//
+// meta is `crews/<id>.meta`, openIncident is whether box.OpenIncidents
+// returned anything for the crew, and lastVerb is the verb of its last
+// recognised `.status` line (box.LastVerb).
+func CrewStateOf(meta map[string]string, openIncident bool, lastVerb string) CrewStatus {
+	return CrewStatus(crewstate.Declare(crewstate.Declaration{
+		Meta:         meta,
+		OpenIncident: openIncident,
+		LastVerb:     crewstate.StatusVerb(lastVerb),
+	}))
 }
 
 // MergeRequestStatus is the merge request lifecycle. A successful merge
