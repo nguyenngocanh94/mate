@@ -163,7 +163,7 @@ func TestFixedColumnWidthsHoldAcrossLevels(t *testing.T) {
 
 	// items: [0] mate header, [1] mate row, [2] blank separator, [3] crews header.
 	crewHeader := proj.listLines(l.List, l.Body)[3].render(l.List)
-	requireColumnGap(t, crewHeader, "STATUS", "NOTE", 17)
+	requireColumnGap(t, crewHeader, "STATE", "NOTE", 17)
 	requireColumnGap(t, crewHeader, "NOTE", "UPDATED", 14)
 }
 

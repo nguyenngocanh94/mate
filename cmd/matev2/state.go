@@ -128,7 +128,7 @@ func composerReading(state send.ComposerState) crewstate.Composer {
 // no incident: `blocked` is a claim, and a failed read has not established
 // it.
 func crewHasOpenIncident(w *store.Workspace, project, crew string) bool {
-	view, err := box.Load(w, project, nil)
+	view, err := box.Load(w, project)
 	if err != nil {
 		return false
 	}

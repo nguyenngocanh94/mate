@@ -3,6 +3,7 @@ package console
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -33,7 +34,7 @@ const (
 	// has to be able to show a whole `mate-<project>` at 120 columns.
 	colMode    = 12
 	colBinding = 12 // the Project's Mate row: binding status
-	colStatus  = 17 // a Crew row: recorded status
+	colStatus  = 17 // a Crew row: its declared state (mvp.md section 4b)
 	colCrewID  = 18 // a Crew row: abbreviated id
 
 	// listWideMin is the list pane's own width (not the terminal's), at or
@@ -402,7 +403,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
 		l.addSpans(fitCell([]span{paneTitleSpan(fmt.Sprintf("CREWS  %d", activeCrews), focused, p)}, colCrewID)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("TASK", p)}, taskW)...)
-		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colStatus)...)
+		l.addSpans(fitCell([]span{columnHeaderSpan("STATE", p)}, colStatus)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("NOTE", p)}, colAttention)...)
 		if crewsWide {
 			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
@@ -616,13 +617,74 @@ func crewNoteItems(c query.CrewNode, p palette) [][]span {
 }
 
 // crewRowNoteSpans is the Crew row's NOTE cell: crewNoteItems' work-outcome
-// items, packed.
+// items, then the observer's health, packed.
 //
-// TODO(task 18): a runtime health warning was appended here, last in the
-// priority list so a narrow terminal drops it before it drops a work
-// outcome. mvp.md defers the health observer to task 18.
+// Health comes last in the priority list so a narrow terminal drops it
+// before it drops a work outcome: a recorded outcome is a fact about the
+// job, while health is a reading of the pane a second ago (mvp.md section
+// 4b), and the pane can be looked at directly.
 func (m Model) crewRowNoteSpans(c query.CrewNode, w int) []span {
-	return packNoteItems(crewNoteItems(c, m.p), w)
+	items := crewNoteItems(c, m.p)
+	if s := healthSpans(c.Health, m.p); len(s) > 0 {
+		items = append(items, s)
+	}
+	return packNoteItems(items, w)
+}
+
+// healthSpans renders the observer's health observation (query.CrewHealth) as
+// the short phrase the design's NOTE column has room for: "agent gone",
+// "pane busy 12s", "pane idle 4m".
+//
+// It is an observation, never a state: the Crew's STATUS column beside it is
+// what `.meta`, the incidents and the status file say, and nothing here
+// changes that. An agent Herdr no longer has is drawn red, because it is the
+// one reading a reader must act on; the rest is dim.
+//
+// Anything but Known draws nothing, which is the one place this file departs
+// from its own rule that Absent and Unknown must never render alike. They
+// genuinely are alike here: every other Field is produced by query.Load out
+// of a file, so a failure to read one is news, while health is filled in
+// after the fact by the console's wiring from internal/watch. A snapshot
+// with no health is a snapshot nobody has observed - a one-shot read, a
+// console whose observer has not polled yet, a crew Herdr could not be asked
+// about - and "nobody has looked at this crew" is not something to tell a
+// reader in the column that exists to tell them what to act on.
+func healthSpans(h query.Field[query.CrewHealth], p palette) []span {
+	if h.State != query.Known {
+		return nil
+	}
+	v := h.Value
+	if !v.AgentPresent {
+		return []span{{text: "agent gone", style: p.Red}}
+	}
+	word := "idle"
+	switch v.Composer {
+	case query.ComposerBusy:
+		word = "busy"
+	case query.ComposerUnknown:
+		// The pane was readable and showed no composer mate can name: a
+		// dialog, or a harness still drawing itself.
+		return []span{{text: "pane unreadable", style: p.Dim}}
+	}
+	return []span{{text: "pane " + word + " " + shortDuration(v.QuietFor), style: p.Dim}}
+}
+
+// shortDuration is a quiet time in the two or three cells the NOTE column can
+// spare: seconds under a minute, then minutes, then hours. It rounds down,
+// the way "how long has this been quiet" is read - a pane quiet for 119
+// seconds has been quiet for a minute, not two.
+func shortDuration(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		if d < 0 {
+			d = 0
+		}
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	default:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
 }
 
 // packNoteItems packs a priority-ordered list of note items into w cells,

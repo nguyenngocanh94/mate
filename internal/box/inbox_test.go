@@ -27,9 +27,14 @@ type step struct {
 	at     time.Time
 }
 
-func runInbox(t *testing.T, incidents []box.Incident, steps ...step) []box.Item {
+func runInbox(t *testing.T, incidents []store.IncidentEntry, steps ...step) []box.Item {
 	t.Helper()
 	w := newFixtureWorkspace(t)
+	for _, inc := range incidents {
+		if err := w.AppendIncident("shop", inc); err != nil {
+			t.Fatalf("AppendIncident: %v", err)
+		}
+	}
 	for _, s := range steps {
 		if s.crew != "" {
 			if err := w.AppendStatus("shop", s.crew, s.status); err != nil {
@@ -53,7 +58,7 @@ func runInbox(t *testing.T, incidents []box.Incident, steps ...step) []box.Item 
 		}
 		time.Sleep(15 * time.Millisecond)
 	}
-	v, err := box.Load(w, "shop", incidents)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -200,17 +205,19 @@ func TestInboxSeparatesCrews(t *testing.T) {
 }
 
 // TestInboxIncidentLeavesOnlyWhenTheObserverResolvesIt is the rule of
-// mvp.md section 4b: the observer does not write `.status`, so nothing the
-// crew says - and nothing anybody sends it - takes its incident out of the
-// inbox. Only the observer's own `resolved` line does, and box sees that as
-// Incident.Resolved.
+// mvp.md section 4b: an incident is the observer's, and only the observer's
+// own `resolved` line takes it out of the inbox. Nothing the crew says, and
+// nothing anybody sends the crew, closes it - if a status line did, the
+// crew would still read `blocked` (an open incident is what that state is)
+// while the inbox no longer listed the thing making it so.
 func TestInboxIncidentLeavesOnlyWhenTheObserverResolvesIt(t *testing.T) {
-	stale := box.Incident{
-		At: time.Now().Add(-time.Hour), Crew: "k3", Kind: box.IncidentStale, Text: "no status for 20m",
+	stale := store.IncidentEntry{
+		Time: time.Now().Add(-time.Hour), Crew: "k3", Kind: string(box.IncidentStale),
+		State: store.IncidentOpen, Text: "no status for 20m",
 	}
 
 	// The crew has spoken since, and been sent a line: neither matters.
-	open := runInbox(t, []box.Incident{stale},
+	open := runInbox(t, []store.IncidentEntry{stale},
 		step{crew: "k3", status: "working: reading the ticket"},
 		step{source: store.SourceMate, target: store.CrewTarget("k3"), text: "are you there?"},
 	)
@@ -219,10 +226,11 @@ func TestInboxIncidentLeavesOnlyWhenTheObserverResolvesIt(t *testing.T) {
 		t.Fatalf("incident text = %q, want the observer's own", open[0].Text)
 	}
 
-	// The observer wrote `resolved`: it is history now.
+	// The observer saw the crew running again and wrote `resolved`: history.
 	resolved := stale
-	resolved.Resolved = true
-	assertInbox(t, runInbox(t, []box.Incident{resolved},
+	resolved.Time = time.Now()
+	resolved.State = store.IncidentResolved
+	assertInbox(t, runInbox(t, []store.IncidentEntry{stale, resolved},
 		step{crew: "k3", status: "working: reading the ticket"},
 	))
 }
@@ -249,7 +257,7 @@ func TestInboxDoesNotShrinkTheView(t *testing.T) {
 			t.Fatalf("AppendStatus: %v", err)
 		}
 	}
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -290,7 +298,7 @@ func TestInboxDropsAClosedCrewsQuestion(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -318,7 +326,7 @@ func TestInboxKeepsAQuestionFromACrewThatOnlyReportedWaitMate(t *testing.T) {
 	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"state": "spawned"}); err != nil {
 		t.Fatal(err)
 	}
-	v, err := box.Load(w, "shop", nil)
+	v, err := box.Load(w, "shop")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

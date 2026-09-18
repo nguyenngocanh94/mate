@@ -138,11 +138,11 @@ func loadBox(ws *store.Workspace, project string) (box.View, bool, Field[BoxView
 	if ws == nil {
 		return box.View{}, false, UnknownField[BoxView]("no workspace is open")
 	}
-	// No incidents are passed: the observer that produces them is mvp.md
-	// task 18, and `box.Load` grows its own `incidents.log` read there. An
-	// empty set here is the honest "nothing has detected anything", not
-	// "there is nothing wrong".
-	v, err := box.Load(ws, project, nil)
+	// box.Load reads the observer's `incidents.log` itself (mvp.md section
+	// 4b): the file is the record, and a project whose observer has never
+	// run simply has none - which is the honest "nothing has detected
+	// anything", not "there is nothing wrong".
+	v, err := box.Load(ws, project)
 	if err != nil {
 		return box.View{}, false, UnknownField[BoxView](readFailureReason(err))
 	}

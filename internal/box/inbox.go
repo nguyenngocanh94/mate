@@ -20,7 +20,8 @@ import "time"
 //   - a status entry whose state is needs-decision - the crew asked and
 //     stopped its turn (mvp.md section 4b);
 //   - an open incident - the observer noticed something the crew itself
-//     cannot report, which is what `blocked` means. A resolved incident is
+//     cannot report, which is what `blocked` means, and has not yet
+//     written the `resolved` line that ends it. A resolved incident is
 //     history and is not in the inbox.
 //
 // # When a thing stops being in the inbox
@@ -137,8 +138,8 @@ func inboxItem(e Entry) (Item, bool) {
 	case KindIncident:
 		if e.Incident != nil && e.Incident.Resolved {
 			// The observer wrote a `resolved` line for it: the condition
-			// cleared, so it is history rather than something to act on
-			// (mvp.md section 4b).
+			// cleared, and mvp.md section 4b says that is exactly when the
+			// incident leaves the inbox.
 			return Item{}, false
 		}
 		kind, text := ParseIncidentText(e.Text)

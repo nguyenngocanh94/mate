@@ -331,7 +331,7 @@ func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 	// every crew without incidents, which is the honest degradation -
 	// `blocked` is a claim a failed read has not established.
 	view, viewOK := box.View{}, false
-	if v, err := box.Load(w, project, nil); err == nil {
+	if v, err := box.Load(w, project); err == nil {
 		view, viewOK = v, true
 	}
 	out := make([]CrewSummary, 0, len(ids))

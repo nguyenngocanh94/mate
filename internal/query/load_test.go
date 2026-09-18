@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
@@ -220,16 +220,15 @@ func TestLoadResolvesEachCrewStateInTheOrderOfSection4b(t *testing.T) {
 	}
 }
 
-// TestLoadCrewsReadsBlockedFromTheObserversOpenIncidents drives the
-// `blocked` rule through the real box.View the loader consumes, with the
-// incident entries the observer (task 18) will produce. Until that lands,
-// box.Load reads no incidents.log, so the view is built here: the rule
-// under test is the resolution, not the producer.
+// TestLoadReadsBlockedFromTheObserversOpenIncidents drives the `blocked`
+// rule end to end over real files: the observer (internal/watch) appends to
+// `incidents.log`, box.Load merges it, and Load resolves the state from
+// there. Nothing is hand-built; the rule under test is the resolution.
 //
 // k1 has an open incident and is blocked even though it last said
 // `working:`; k2's incident was resolved, so it is back to its own verb;
 // k3 has none.
-func TestLoadCrewsReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
+func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 	ws := newWorkspace(t, "shop")
 	for _, id := range []string{"k1", "k2", "k3"} {
 		if err := ws.WriteCrewMeta("shop", id, map[string]string{"state": "spawned"}); err != nil {
@@ -239,21 +238,29 @@ func TestLoadCrewsReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 			t.Fatalf("append status %s: %v", id, err)
 		}
 	}
-	view := box.View{Entries: []box.Entry{
-		{Kind: box.KindIncident, Crew: "k1", Text: "stale: no status for 20m",
-			Incident: &box.Incident{Crew: "k1", Kind: box.IncidentStale, Text: "no status for 20m"}},
-		{Kind: box.KindIncident, Crew: "k2", Text: "runtime_lost: herdr has no agent crew-k2",
-			Incident: &box.Incident{Crew: "k2", Kind: box.IncidentRuntimeLost, Text: "herdr has no agent crew-k2", Resolved: true}},
-	}}
+	for _, inc := range []store.IncidentEntry{
+		{Time: time.Now().Add(-time.Hour), Crew: "k1", Kind: "stale", State: store.IncidentOpen, Text: "no status for 20m"},
+		{Time: time.Now().Add(-time.Hour), Crew: "k2", Kind: "runtime_lost", State: store.IncidentOpen, Text: "the agent left herdr"},
+		{Time: time.Now(), Crew: "k2", Kind: "runtime_lost", State: store.IncidentResolved, Text: "the agent is back"},
+	} {
+		if err := ws.AppendIncident("shop", inc); err != nil {
+			t.Fatalf("AppendIncident: %v", err)
+		}
+	}
 
-	var w warnings
-	crews, closed := loadCrews(ws, "shop", AbsentField[[]RepoValue]("no repos"), view, true, &w)
-	if closed != 0 {
-		t.Fatalf("closed = %d, want 0: an incident never closes a crew", closed)
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := snap.Projects[0]
+	if p.ClosedCrews != 0 {
+		t.Fatalf("ClosedCrews = %d, want 0: an incident never closes a crew", p.ClosedCrews)
 	}
 	got := map[string]CrewStatus{}
-	for _, c := range crews {
+	attention := map[string]Field[Attention]{}
+	for _, c := range p.Crews {
 		got[c.CrewID] = c.Status
+		attention[c.CrewID] = c.Attention
 	}
 	want := map[string]CrewStatus{"k1": CrewBlocked, "k2": CrewWorking, "k3": CrewWorking}
 	for id, wantState := range want {
@@ -262,16 +269,11 @@ func TestLoadCrewsReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 		}
 	}
 	// And `blocked` is attention, with a sentence naming the observer.
-	for i := range crews {
-		crews[i].Attention = crewAttention(crews[i])
+	if a := attention["k1"]; a.State != Known || a.Value.Kind != AttentionBlocked {
+		t.Fatalf("k1 attention = %+v, want a Known blocked attention", a)
 	}
-	for _, c := range crews {
-		if c.CrewID != "k1" {
-			continue
-		}
-		if c.Attention.State != Known || c.Attention.Value.Kind != AttentionBlocked {
-			t.Fatalf("k1 attention = %+v, want a Known blocked attention", c.Attention)
-		}
+	if a := attention["k3"]; a.State == Known {
+		t.Fatalf("k3 attention = %+v, want none: it is simply working", a)
 	}
 }
 

@@ -193,6 +193,12 @@ func unknownMate(reason string, w *warnings, row RowRef) MateNode {
 
 const notAnErrorState = "the recorded status is not an error state"
 
+// noObserver is why a Crew row carries no health: nothing has observed it.
+// The observer lives in the console process (mvp.md section 4b), so a
+// one-shot CLI read never has one, and a console that has just opened has
+// not polled yet.
+const noObserver = "no observer has looked at this crew yet"
+
 // loadCrews lists `crews/*.meta` and reads each one, resolving the Crew's
 // state through CrewStateOf - the one ordering of mvp.md section 4b.
 //
@@ -257,6 +263,11 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		Repo:      repoFor(repos, project),
 		LastEvent: AbsentField[EventValue]("matev2 records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
+		// This package reads files; an observation comes from Herdr. A
+		// snapshot loaded without an observer running therefore carries no
+		// health, and says so - the Console's wiring fills this in from
+		// internal/watch when one is running (CrewNode.Health).
+		Health: AbsentField[CrewHealth](noObserver),
 	}
 
 	meta, err := ws.ReadCrewMeta(project, id)

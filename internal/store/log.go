@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,13 +10,14 @@ import (
 	"time"
 )
 
-// The two append-only logs. `crews/<id>.status` is what a crew writes with
+// The three append-only logs. `crews/<id>.status` is what a crew writes with
 // `echo "state: one line" >> $MATEV2_STATUS`, so its format is whatever the
 // crew echoed: one line, no escaping. `sent.log` records every line the app
 // put into a pane, so it is written only by this package and can afford a
-// fixed shape.
+// fixed shape; `incidents.log` is the observer's (docs/mvp.md section 4b) and
+// has the same property and the same fixed tab-separated shape.
 //
-// Both are appended under an exclusive flock with O_APPEND, and both are read
+// All three are appended under an exclusive flock with O_APPEND, and all are read
 // from a byte offset so a watcher can keep a cursor and see only what is new.
 // A trailing partial line - a writer caught mid-append by a reader that does
 // not hold the lock - is never returned; the cursor stops at its start and the
@@ -212,4 +214,123 @@ func readLines(path string, from int64) ([]rawLine, int64, error) {
 // oneLine flattens a value into something a line-oriented log can hold.
 func oneLine(s string) string {
 	return strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(s)
+}
+
+// The observer's incident log, docs/mvp.md section 4b: one line per
+// transition, `RFC3339 \t crew \t kind \t open|resolved \t text`. An incident
+// has no identity beyond its (crew, kind) pair and is never updated in place:
+// it is open when the last line for that pair says `open`, which is a fact
+// about the file and costs a reader no state of its own.
+
+// The two states an incident line can record.
+const (
+	IncidentOpen     = "open"
+	IncidentResolved = "resolved"
+)
+
+// incidentFields is how many tab-separated fields one incidents.log line has.
+// Tabs are stripped from every field, so a line always splits into exactly
+// that many.
+const incidentFields = 5
+
+// IncidentEntry is one line of `incidents.log`.
+type IncidentEntry struct {
+	// Offset is the byte offset of this line, for a caller keeping a
+	// cursor. It is set by the reader and ignored by the writer.
+	Offset int64
+	Time   time.Time
+	// Crew is the crew the incident is about, empty only for an incident
+	// nothing could attribute to one.
+	Crew string
+	// Kind is the trouble detected: `stale`, `runtime_lost`, and later
+	// `wedged` and `budget`.
+	Kind string
+	// State is IncidentOpen or IncidentResolved.
+	State string
+	// Text is the one-line evidence the observer decided from.
+	Text string
+}
+
+// Open reports whether this line opens an incident rather than resolving one.
+func (e IncidentEntry) Open() bool { return e.State == IncidentOpen }
+
+// AppendIncident appends one line to `incidents.log`. Time defaults to now.
+//
+// The project name and the crew id are validated before anything is written,
+// the same way AppendStatus validates them: an incident must not be able to
+// name a path outside the workspace. The state must be one of the two words
+// the contract allows, because a third would leave every reader unable to
+// answer "is this incident open".
+func (w *Workspace) AppendIncident(project string, entry IncidentEntry) error {
+	if err := ValidateProjectName(project); err != nil {
+		return err
+	}
+	if entry.Crew != "" {
+		if err := ValidateCrewID(entry.Crew); err != nil {
+			return err
+		}
+	}
+	if entry.Kind == "" {
+		return fmt.Errorf("store: an incident line needs a kind")
+	}
+	if entry.State != IncidentOpen && entry.State != IncidentResolved {
+		return fmt.Errorf("store: invalid incident state %q: want %s or %s",
+			entry.State, IncidentOpen, IncidentResolved)
+	}
+	if entry.Time.IsZero() {
+		entry.Time = time.Now()
+	}
+	line := strings.Join([]string{
+		entry.Time.Format(time.RFC3339),
+		oneLine(entry.Crew),
+		oneLine(entry.Kind),
+		entry.State,
+		oneLine(entry.Text),
+	}, sentSep)
+	return w.appendLine(w.IncidentsLog(project), line)
+}
+
+// ReadIncidents returns the incident lines of a project from a byte offset,
+// and the offset to resume from. A line that does not parse is skipped rather
+// than failing the read, for the reason ReadSent skips one: the log is
+// history, and one bad line must not hide the rest.
+func (w *Workspace) ReadIncidents(project string, from int64) ([]IncidentEntry, int64, error) {
+	if err := ValidateProjectName(project); err != nil {
+		return nil, from, err
+	}
+	lines, next, err := readLines(w.IncidentsLog(project), from)
+	if err != nil {
+		return nil, from, err
+	}
+	entries := make([]IncidentEntry, 0, len(lines))
+	for _, l := range lines {
+		entry, ok := parseIncident(l.text)
+		if !ok {
+			continue
+		}
+		entry.Offset = l.offset
+		entries = append(entries, entry)
+	}
+	return entries, next, nil
+}
+
+func parseIncident(line string) (IncidentEntry, bool) {
+	fields := strings.SplitN(line, sentSep, incidentFields)
+	if len(fields) != incidentFields {
+		return IncidentEntry{}, false
+	}
+	ts, err := time.Parse(time.RFC3339, fields[0])
+	if err != nil {
+		return IncidentEntry{}, false
+	}
+	if fields[3] != IncidentOpen && fields[3] != IncidentResolved {
+		return IncidentEntry{}, false
+	}
+	return IncidentEntry{
+		Time:  ts,
+		Crew:  fields[1],
+		Kind:  fields[2],
+		State: fields[3],
+		Text:  fields[4],
+	}, true
 }

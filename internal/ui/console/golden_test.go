@@ -356,10 +356,10 @@ func sampleTree() query.Snapshot {
 				}),
 				Crews: []query.CrewNode{
 					{
-						CrewID:      "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
-						Task:        "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
-						Status:      query.CrewFailed,
+						CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
+						RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+						Task:   "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
+						Status: query.CrewFailed,
 						// `failed` is terminal, so this row lives in the
 						// Completed group (mvp.md section 4b).
 						Closed:      true,

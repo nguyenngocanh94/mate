@@ -194,7 +194,7 @@ func crewRecordedStatus(ws *store.Workspace, project, crew string) string {
 		meta = nil
 	}
 	openIncident := false
-	if view, err := box.Load(ws, project, nil); err == nil {
+	if view, err := box.Load(ws, project); err == nil {
 		openIncident = len(box.OpenIncidents(view, crew)) > 0
 	}
 	verb := ""
