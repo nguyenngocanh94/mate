@@ -24,16 +24,19 @@ const (
 	colCrewsCount  = 7  // Workspace level: this Project's Crew count
 	colAttention   = 14
 	colUpdated     = 10
-	colHarness     = 11
-	colMateStatus  = 11 // the Project's Mate row: recorded status
+	colHarness     = 8
+	colMateStatus  = 10 // the Project's Mate row: recorded status
 	// colMode is the Project's Mate row: communication mode (mvp.md
-	// section 5). "supervised" is the longest value it ever holds. Its
-	// twelve cells came out of the three columns beside it - each of which
-	// held six or more cells of padding over its longest value - rather
-	// than out of the agent name, which is the one cell on this row that
-	// has to be able to show a whole `mate-<project>` at 120 columns.
-	colMode    = 12
-	colBinding = 12 // the Project's Mate row: binding status
+	// section 5) and, once the auto daemon has sent, the time of its last
+	// digest - "auto · sent 14:32:10", which is the longest value the cell
+	// ever holds and what its twenty-one cells are cut to. Nine of those
+	// came out of the three columns beside it, each of which still has
+	// padding over its own longest value ("claude", "stopping",
+	// "released"), and three out of the agent name, which at 120 columns
+	// still shows a whole `mate-<project>` for the project names the
+	// gallery was designed around.
+	colMode    = 21
+	colBinding = 10 // the Project's Mate row: binding status
 	colStatus  = 17 // a Crew row: its declared state (mvp.md section 4b)
 	colCrewID  = 18 // a Crew row: abbreviated id
 
@@ -373,7 +376,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		items = append(items, rowListLine(0, func(selected, focused bool) *line {
 			l := selectRow(newLine(), selected, p)
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
-			l.addSpans(mateRowSpans(proj.Mate, proj.Mode, agentW, g, p)...)
+			l.addSpans(mateRowSpans(proj.Mate, proj.Mode, proj.Daemon, agentW, g, p)...)
 			return l
 		}))
 	}
@@ -500,7 +503,7 @@ func completedGroupTitle(n int, open bool, g glyphSet) string {
 // mode is the Project's, not the Mate's: it is drawn on this row even when
 // there is no Mate yet, because the flag is a Project setting that survives
 // every start and stop, and a blank cell there would read as "no mode".
-func mateRowSpans(mate query.MateNode, mode query.Mode, agentW int, g glyphSet, p palette) []span {
+func mateRowSpans(mate query.MateNode, mode query.Mode, daemon query.AutoDaemon, agentW int, g glyphSet, p palette) []span {
 	if mate.Designated.State == query.Known && mate.Designated.Value.MateID != "" {
 		v := mate.Designated.Value
 		agent := v.MateID
@@ -510,7 +513,7 @@ func mateRowSpans(mate query.MateNode, mode query.Mode, agentW int, g glyphSet, 
 		out := titleCell(agent, agentW, p.Fg, g)
 		out = append(out, fitCell([]span{{text: string(v.HarnessKind), style: p.Fg}}, colHarness)...)
 		out = append(out, fitCell([]span{statusSpan(string(v.Status), p)}, colMateStatus)...)
-		out = append(out, fitCell(modeSpans(mode, p), colMode)...)
+		out = append(out, fitCell(modeSpans(mode, daemon, p), colMode)...)
 		out = append(out, fitCell(bindingSpans(mate.Binding, p), colBinding)...)
 		return out
 	}
@@ -522,22 +525,34 @@ func mateRowSpans(mate query.MateNode, mode query.Mode, agentW int, g glyphSet, 
 	out := fitCell(agentSpans, agentW)
 	out = append(out, fitCell(nil, colHarness)...)
 	out = append(out, fitCell(nil, colMateStatus)...)
-	out = append(out, fitCell(modeSpans(mode, p), colMode)...)
+	out = append(out, fitCell(modeSpans(mode, daemon, p), colMode)...)
 	out = append(out, fitCell(mateMissingBindingSpans(mate, p), colBinding)...)
 	return out
 }
 
-// modeSpans renders the communication mode. Auto takes the accent style
-// because it is the mode in which the Console may type into the Mate's pane
-// without the reader; supervised, the default, is plain.
-func modeSpans(mode query.Mode, p palette) []span {
+// modeSpans renders the communication mode, and in auto mode the daemon's
+// own last word. Auto takes the accent style because it is the mode in which
+// the Console may type into the Mate's pane without the reader; supervised,
+// the default, is plain.
+//
+// "auto" alone means the flag is set and this console has sent nothing yet,
+// which is the true state right after a toggle and a different sentence from
+// "auto · sent 14:32:10" - where the reader can see that lines really are
+// going into the Mate's composer, and when the last one did. The time is dim
+// beside the accented mode word, and it is drawn only once there is one: a
+// blank where a clock would be is not a time.
+func modeSpans(mode query.Mode, daemon query.AutoDaemon, p palette) []span {
 	if mode == "" {
 		return nil
 	}
-	if mode == query.ModeAuto {
-		return []span{{text: string(mode), style: p.Acc}}
+	if mode != query.ModeAuto {
+		return []span{{text: string(mode), style: p.Fg}}
 	}
-	return []span{{text: string(mode), style: p.Fg}}
+	out := []span{{text: string(mode), style: p.Acc}}
+	if daemon.Sent() && !daemon.LastSentAt.IsZero() {
+		out = append(out, span{text: " · sent " + daemon.LastSentAt.Format("15:04:05"), style: p.Dim})
+	}
+	return out
 }
 
 // mateMissingBindingSpans is the Binding cell for a Project with no

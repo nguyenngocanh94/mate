@@ -63,7 +63,12 @@ type ProjectNode struct {
 	// been started, and the daemon that acts on it (mvp.md task 19) is the
 	// Console's, not the Mate's.
 	Mode Mode
-	Mate MateNode
+	// Daemon is what the auto-mode daemon has done for this Project in this
+	// console's lifetime (mvp.md task 19). It is filled by cmd/matev2 after
+	// Load, not by Load: the daemon is a live thing in the console process,
+	// the way the observer's crew health is.
+	Daemon AutoDaemon
+	Mate   MateNode
 	// Repos are the Project's registered repos, read once per Project. A
 	// Crew's own Repo field is resolved against this list rather than
 	// through a per-row read, so a Project with many Crews still costs one

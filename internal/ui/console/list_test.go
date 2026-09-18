@@ -153,13 +153,14 @@ func TestFixedColumnWidthsHoldAcrossLevels(t *testing.T) {
 	requireColumnGap(t, wsHeader, "CREWS", "ATTENTION", 7)
 	requireColumnGap(t, wsHeader, "ATTENTION", "UPDATED", 14)
 
-	// Project level: HARNESS 11, STATUS 11, MODE 12 (its own Mate-row
-	// table), then blank, then the Crew table's STATUS 17, NOTE 14.
+	// Project level: HARNESS 8, STATUS 10, MODE 21 (its own Mate-row table -
+	// MODE is the wide one because it carries "auto · sent 14:32:10"), then
+	// blank, then the Crew table's STATUS 17, NOTE 14.
 	proj, _ := send(t, m, key("enter"))
 	header := proj.listLines(l.List, l.Body)[0].render(l.List)
-	requireColumnGap(t, header, "HARNESS", "STATUS", 11)
-	requireColumnGap(t, header, "STATUS", "MODE", 11)
-	requireColumnGap(t, header, "MODE", "BINDING", 12)
+	requireColumnGap(t, header, "HARNESS", "STATUS", 8)
+	requireColumnGap(t, header, "STATUS", "MODE", 10)
+	requireColumnGap(t, header, "MODE", "BINDING", 21)
 
 	// items: [0] mate header, [1] mate row, [2] blank separator, [3] crews header.
 	crewHeader := proj.listLines(l.List, l.Body)[3].render(l.List)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 )
@@ -73,6 +74,32 @@ func ModeFor(auto bool) Mode {
 	}
 	return ModeSupervised
 }
+
+// AutoDaemon is what the Console's auto-mode daemon (mvp.md section 5, task
+// 19) has done for one Project. It is not a Field: every value in it is an
+// in-process observation with a meaningful zero - "this console has sent
+// nothing yet" is Sends == 0, not an Unknown - and nothing on disk records
+// it, so there is no read that could fail and no reason to carry one.
+//
+// query.Load cannot fill it: the daemon lives in the console process beside
+// the observer, and cmd/matev2 merges its snapshot into the tree the same
+// way it merges the observer's health readings.
+type AutoDaemon struct {
+	// Sends is how many digests this console has delivered for the Project.
+	Sends int
+	// LastSentAt is when the last one was delivered, zero before the first.
+	LastSentAt time.Time
+	// Notice is why the daemon's last tick did not deliver, empty when it
+	// did or when it had nothing to say. One line per tick, not per item:
+	// a tick sends one digest and so has one outcome.
+	Notice string
+	// NoticeAt is when that notice was recorded.
+	NoticeAt time.Time
+}
+
+// Sent reports whether the daemon has delivered anything for the Project,
+// which is what puts its indicator in the MODE cell.
+func (d AutoDaemon) Sent() bool { return d.Sends > 0 }
 
 // MateStatus is the Mate lifecycle. Herdr's blocked/idle/done are runtime
 // observations, not Mate statuses (mvp.md §2 decision 8).

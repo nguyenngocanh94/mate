@@ -1,28 +1,28 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                                  live · 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
-  MATE              HARNESS STATUS    MODE                 BINDING   │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
-  mate-payments-api claude  running   supervised           active    │                                                  
-                                                                     │ ID               crew_01J9P6Q6W0E5V8XK2M4B8DT    
-  CREWS  2          TASK              STATE            NOTE          │ Task             Add idempotency-key index       
-▌ crew_01J9P6…B8DT  Add idempotency-k…working                        │                                                  
-  ↓ Completed (1)                                      ! failed      │ Recorded status  working                         
-                                                                     │ Harness          claude                          
-                                                                     │ Agent            crew-payments-api-2             
+  MATE              HARNESS STATUS    MODE                 BINDING   │ MATE  payments-api                               
+▌ mate-payments-api claude  running   auto · sent 14:32:10 active    │                                                  
+                                                                     │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK 
+  CREWS  2          TASK              STATE            NOTE          │ Agent            mate-payments-api               
+  crew_01J9P6…B8DT  Add idempotency-k…working                        │ Harness          claude                          
+  ↓ Completed (1)                                      ! failed      │                                                  
+                                                                     │ Recorded status  running                         
                                                                      │ Binding          active                          
                                                                      │                  recorded active; this does not  
                                                                      │                  prove the agent is alive        
-                                                                     │ Runtime          herdr · mate-acme · tab crew/   
-                                                                     │                  01J9P6Q6 · pane p-7c1e          
-                                                                     │ Bound since      13:41:05                        
+                                                                     │ Runtime          herdr · mate-acme · tab mate/   
+                                                                     │                  payments-api · pane p-3f2a      
+                                                                     │ Bound since      09:14:02                        
                                                                      │                                                  
-                                                                     │ Repo             payments-api                    
-                                                                     │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │ Branch           matev2/01J9P6Q6                 
-                                                                     │ Worktree         /Users/dev/work/acme/           
-                                                                     │                  .worktrees/                     
-                                                                     │                  payments-api-crew_01J9P6Q6W0E5V 
-                                                                     │  ↓ 10 more                                       
+                                                                     │ Last event       13:41:05  crew.started          
+                                                                     │ Reason           none · not an error state       
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
+                                                                     │                                                  
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  BOX                                                                                                       1 to resolve 
                                                                                                                         
@@ -32,5 +32,5 @@
 ▏! 14:01  k3  needs-decision                                                                    [resolve] [reply] [peek]
     migration for idempotency_keys, or key off stripe_events?                                                           
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-                                                                                                                        
- ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          
+ ! auto digest for payments-api not delivered: agent mate-payments-api is mid-turn                                      
+ ↑↓ Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

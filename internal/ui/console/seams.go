@@ -590,6 +590,14 @@ func maxInt(a, b int) int {
 // the line falls back to the standing unknown-field warning built from the
 // read layer's own Snapshot.Warnings, so an Unknown field is never silently
 // dropped just because the reader moved the selection or changed screens.
+//
+// Between the two stands the auto daemon's notice: a refusal it hit this
+// tick (mvp.md section 5, task 19). It outranks the warning line because it
+// is about something the Console is doing right now on the reader's behalf
+// and failing at, while an Unknown field is about something it could not
+// read. Both are standing lines rather than events - the daemon clears its
+// own notice on the tick that delivers - so neither needs a keystroke to go
+// away and neither survives the condition that produced it.
 func (m Model) footerMessage() footerMsg {
 	if m.msg.tone != toneNone || m.msg.text != "" {
 		return m.msg
@@ -597,7 +605,35 @@ func (m Model) footerMessage() footerMsg {
 	if m.phase != phaseReady {
 		return footerMsg{}
 	}
+	if daemon := daemonFooterMsg(m.tree.Projects); daemon.text != "" {
+		return daemon
+	}
 	return warningsFooterMsg(m.tree.Warnings)
+}
+
+// daemonFooterMsg is the auto daemon's standing refusal line, taken verbatim
+// from the notice the daemon recorded: internal/send already names which
+// composer state it observed and quotes the screen it read that from, and a
+// reader deciding whether to take the Mate's composer back needs that
+// observation rather than a reworded summary of it.
+//
+// The newest notice wins when more than one Project has one, and its Project
+// is named, because the reader is looking at one Project's rows and the line
+// may well be about another's.
+func daemonFooterMsg(projects []query.ProjectNode) footerMsg {
+	var newest query.ProjectNode
+	for _, p := range projects {
+		if p.Daemon.Notice == "" {
+			continue
+		}
+		if newest.Daemon.Notice == "" || p.Daemon.NoticeAt.After(newest.Daemon.NoticeAt) {
+			newest = p
+		}
+	}
+	if newest.Daemon.Notice == "" {
+		return footerMsg{}
+	}
+	return warnMsg(newest.Daemon.Notice)
 }
 
 // warningsFooterMsg is the standing "N field(s) unknown" line, built only
