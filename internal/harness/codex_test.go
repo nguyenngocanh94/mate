@@ -89,9 +89,15 @@ func TestCodexBindsCwdAndOverride(t *testing.T) {
 	if spec.TaskPrompt() != "FIRST-CREW-TASK" {
 		t.Fatalf("task prompt = %q", spec.TaskPrompt())
 	}
-	wantArgs := []string{"--dangerously-bypass-approvals-and-sandbox"}
+	// The launch carries the permission bypass and the documented override
+	// that suppresses codex's startup release-update prompt; nothing else,
+	// because codex discovers its instruction chain from the cwd.
+	wantArgs := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck}
 	if !slices.Equal(spec.Args(), wantArgs) {
 		t.Fatalf("codex uses cwd discovery, args = %#v", spec.Args())
+	}
+	if CodexDisableUpdateCheck != "check_for_update_on_startup=false" {
+		t.Fatalf("the update-check override must stay the documented config key, got %q", CodexDisableUpdateCheck)
 	}
 	notes := strings.Join(spec.Notes(), " ")
 	if strings.Contains(notes, "externally isolated") {
