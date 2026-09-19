@@ -218,7 +218,10 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// input, and ctrl+c - the terminal's own interrupt, not a character -
 	// still quits from inside it. (A stream-mode Ctrl+C never reaches this
 	// branch at all: the check above already routed it to the agent.)
-	if key == "ctrl+c" || (key == "q" && !m.actionInputMode &&
+	// The diff overlay is the third exception, for the same reason a pager
+	// is: it is a full-region reader, and q is how every pager closes one.
+	// Ctrl+C still quits from inside it, and the key line says so (seams.go).
+	if key == "ctrl+c" || (key == "q" && !m.actionInputMode && !m.diff.open &&
 		m.sess.phase != sessionActive && m.sess.phase != sessionOpening && m.sess.phase != sessionFallback) {
 		if key == "ctrl+c" && (m.sess.phase == sessionActive || m.sess.phase == sessionOpening || m.sess.phase == sessionFallback) {
 			// Bubble Tea stops processing after tea.Quit; reap the stream here
@@ -287,6 +290,13 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// are honoured (q and ctrl+c already ran above), so no key here can
 		// move the list behind it.
 		return m.onFailureDetailKey(key, l), nil
+	}
+	if m.diff.open {
+		// The diff overlay is modal for the same reason (diff.go): a key
+		// that moved the selection behind a full-region patch would be
+		// invisible. Here q reaches this branch and closes, because the
+		// branch above lets it through while the overlay is open.
+		return m.onDiffKey(key, l), nil
 	}
 	if m.actionBusy {
 		return m, nil
@@ -547,6 +557,7 @@ func (m Model) open(f frame) Model {
 	m.detail = false
 	m.failureDetail = false
 	m.failureTop = 0
+	m.diff = diffFlow{}
 	m.inspTop = 0
 	return m.push(f).relayout()
 }

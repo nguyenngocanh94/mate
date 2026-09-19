@@ -79,9 +79,15 @@ const (
 	// become a message the Mate answers.
 	ActionRestartMate   Action = "restart_mate"
 	ActionClearComposer Action = "clear_composer"
-	// TODO(task 21/22): v1 also had retry, discard and switch_harness.
-	// matev2 has no retry (a Crew runs once), and discard/merge belong to
-	// mvp.md's task 21 and 22.
+	// ActionDiff is a Crew row's review surface (mvp.md task 21): what
+	// `matev2 diff <project> <crew>` prints - the commits the crew's branch
+	// carries beyond the project's default branch, then the patch. It writes
+	// nothing, so it is the one action with no confirmation, and its result
+	// is a screenful rather than a line: the Console puts it in the scrolling
+	// overlay of diff.go instead of on the message line.
+	ActionDiff Action = "diff"
+	// TODO(task 22): v1 also had retry, discard and switch_harness. matev2
+	// has no retry (a Crew runs once), and merge belongs to mvp.md's task 22.
 )
 
 // ActionRequest is the identity selected from the snapshot. TargetKind is
@@ -306,6 +312,11 @@ type Model struct {
 	// expanded. failureTop is its scroll offset.
 	failureDetail bool
 	failureTop    int
+
+	// diff is the open diff overlay (diff.go, mvp.md task 21): the text one
+	// ActionDiff returned, the crew and branch it names, and where the
+	// reader has scrolled to. Its zero value is closed.
+	diff diffFlow
 
 	// pendingBoxOpen is the inbox entry whose crew the reader asked to open
 	// from inside a session view (box_keys.go). The open cannot happen on

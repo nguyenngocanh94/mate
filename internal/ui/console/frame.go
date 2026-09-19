@@ -261,6 +261,13 @@ func (m Model) pushMainRegion(s *screen, l frameLayout) {
 		pushAll(s, fitLines(m.openFailureDetail(l), l.Body))
 		return
 	}
+	// The diff overlay (diff.go, mvp.md task 21) owns the main region the
+	// same way, and for the same reason: it is modal in onKey, so nothing
+	// behind it can answer a key while it is drawn.
+	if m.diff.open {
+		pushAll(s, fitLines(m.diffLines(l.Cols, l.Body), l.Body))
+		return
+	}
 	if m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {
 		pushAll(s, fitLines(m.actionLines(l.Cols, l.Body), l.Body))
 		return

@@ -661,6 +661,18 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 	if hints, ok := m.attachKeyHints(); ok {
 		return hints
 	}
+	// The diff overlay owns the keyboard before anything else on the frame
+	// does (update.go), including the box zone, so its keys are named first.
+	// q is Close here, not Quit: the overlay is a pager, and Ctrl+C is the
+	// way out of the Console while it is open.
+	if m.diff.open {
+		return []keyHint{
+			{key: m.g.UpDown, desc: "Scroll", sacrifice: keyMovement},
+			{key: "PgUp/PgDn", desc: "Page", optional: true},
+			{key: "Esc", desc: "Close", sacrifice: keyBack},
+			{key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit},
+		}
+	}
 	if m.focus == paneBox {
 		// The box keys are bare: nothing on this frame is prefixed, here or
 		// in the session view (session_focus.go). They are also the same keys

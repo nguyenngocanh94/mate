@@ -78,9 +78,8 @@ func mateActions(m MateNode) []ActionAvailability {
 
 // crewActions publishes the per-Crew actions matev2 can offer today.
 //
-// retry, discard and merge are not here: mvp.md defers diff/merge to task
-// 21 and 22 and has no retry at all (a Crew runs once), so offering them
-// would publish a capability nothing implements.
+// retry and discard are not here: mvp.md has no retry at all (a Crew runs
+// once), so offering one would publish a capability nothing implements.
 // TODO(task 22): add merge once `matev2 merge <crew>` exists.
 func crewActions(c CrewNode) []ActionAvailability {
 	stop := c.Binding.State == Known && c.Binding.Value.Status == BindingActive
@@ -93,10 +92,23 @@ func crewActions(c CrewNode) []ActionAvailability {
 	if c.Binding.State == Unknown {
 		repairReason = "binding is unknown; refresh before repair"
 	}
-	return []ActionAvailability{
+	out := []ActionAvailability{
 		action("stop", stop, stopReason),
 		action("repair", repair, repairReason),
 	}
+	// diff (mvp.md task 21) needs only a branch to compare, and it needs it
+	// in every state: reviewing a Crew is what a reader does *before*
+	// deciding it is done, so tying the capability to a state would withhold
+	// it exactly when somebody is trying to find out where a Crew got to.
+	// An unreadable worktree row is Unknown, and Unknown is never treated as
+	// "there is no branch": the refusal says the read failed.
+	diff, diffReason := c.Worktree.IsKnown() && c.Worktree.Value.Branch != "",
+		"this Crew records no branch to compare"
+	if !c.Worktree.IsKnown() && c.Worktree.State != Absent {
+		diffReason = "the worktree record could not be read; refresh before diffing"
+	}
+	out = append(out, action("diff", diff, diffReason))
+	return out
 }
 
 // deriveActions fills capability DTOs after all dependent rows have been

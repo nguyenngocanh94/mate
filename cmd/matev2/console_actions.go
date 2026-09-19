@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/nguyenngocanh94/matev2/internal/autopilot"
+	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -67,6 +68,8 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return boxReplyAction(ctx, ws, deps, req)
 		case console.ActionPeek:
 			return boxPeekAction(ctx, ws, deps, req)
+		case console.ActionDiff:
+			return crewDiffAction(ctx, ws, req)
 		case console.ActionRestartMate:
 			return restartMateAction(ctx, ws, deps, req)
 		case console.ActionClearComposer:
@@ -76,6 +79,23 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 				fmt.Sprintf("%s is not wired in this build", req.Action))
 		}
 	}
+}
+
+// crewDiffAction is the Console's `diff` entry (mvp.md task 21). It calls
+// the same function `matev2 diff <project> <crew>` calls, so the overlay
+// and the terminal show one text and cannot drift: a reader who runs the
+// command after reading the overlay sees what they already saw.
+//
+// It takes no spawn.Deps because it asks Herdr nothing. A diff is git and
+// the workspace's own files, and a crew whose agent is gone still has a
+// branch worth reading.
+func crewDiffAction(ctx context.Context, ws *store.Workspace, req console.ActionRequest) (string, error) {
+	if req.Target == "" || req.Crew == "" {
+		return "", observability.NewError(observability.CodeUsage,
+			"diff needs both a Project and a Crew; the Console sent "+
+				fmt.Sprintf("target=%q crew=%q", req.Target, req.Crew))
+	}
+	return crewDiffText(ctx, ws, gitx.New(), req.Target, req.Crew, false)
 }
 
 // startMateAction starts the Mate of one Project. The harness is whatever

@@ -229,6 +229,36 @@ func (g Git) AheadCount(ctx context.Context, dir, branch, base string) (int, err
 	return n, nil
 }
 
+// Diff is the review diff of one crew branch: `git -C dir diff
+// <base>...<branch>`, with --stat when the caller wants the summary instead
+// of the patch.
+//
+// Three dots, not two. `base...branch` is the branch measured against the
+// merge base it actually grew from, so a default branch that moved on while
+// the crew worked does not turn every unrelated commit on it into a deletion
+// in the crew's diff. `base..branch` would print exactly that lie, and it is
+// the one a reader reviewing a crew would believe.
+//
+// It is read-only: nothing here writes an index, a ref or a file.
+func (g Git) Diff(ctx context.Context, dir, base, branch string, stat bool) (string, error) {
+	args := []string{"diff"}
+	if stat {
+		args = append(args, "--stat")
+	}
+	return g.run(ctx, dir, append(args, base+"..."+branch)...)
+}
+
+// LogOneline is `git -C dir log --oneline <base>..<branch>`: the commits the
+// branch carries that base does not, newest first, one line each.
+//
+// Two dots here where Diff uses three, and the difference is not an
+// oversight. `log base..branch` is exactly "the commits on this branch",
+// which is what a review list is; the three-dot form of log would also list
+// base's own commits since the merge base, which belong to somebody else.
+func (g Git) LogOneline(ctx context.Context, dir, base, branch string) (string, error) {
+	return g.run(ctx, dir, "log", "--oneline", base+".."+branch)
+}
+
 // IsDirty is the number of entries `git -C worktree status --porcelain`
 // lists: uncommitted changes a teardown would otherwise discard silently.
 // 0 means the worktree is clean.

@@ -59,8 +59,16 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 // pane the box belongs to - the Mate whose session is open is not
 // necessarily the row the tree's cursor is sitting on.
 func (m Model) actionChoicesForRow(selected row) []actionChoice {
-	choices := make([]actionChoice, 0, 7)
+	choices := make([]actionChoice, 0, 8)
 	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.repairChoice(selected), m.onboardChoice(selected))
+	// The Crew row's own entry (mvp.md task 21). It is appended only on a
+	// Crew row rather than listed as "unavailable · applies to a Crew"
+	// everywhere else, for the same reason the Mate's two recovery actions
+	// are appended only on a Mate row: a menu that names every action the
+	// Console has, on every row, is a menu of refusals.
+	if selected.kind == rowCrew {
+		choices = append(choices, m.diffChoice(selected))
+	}
 	// Capability is authored by the store-backed loader. The local builders above
 	// only supply row-specific wording and target identity; availability is
 	// replaced from the DTO so this surface cannot drift from other clients.
@@ -229,6 +237,44 @@ func (m Model) onboardChoice(r row) actionChoice {
 			c.req.Target = m.currentProject().ProjectID
 			c.req.TargetKind = "project-mate"
 		}
+	}
+	return c
+}
+
+// diffChoice is the Crew row's review entry (mvp.md task 21). It is offered
+// in every state a crew can be in as long as the crew records a branch:
+// reviewing is what a reader does *before* deciding a crew is done, so
+// restricting it to `wait-mate` would withhold it exactly when somebody is
+// trying to find out whether a crew has got anywhere.
+//
+// It is not dangerous and it takes no confirmation, because it writes
+// nothing: no ref, no file, no pane. A crew mid-turn is untouched by it.
+//
+// The request names the Project in Target and the Crew in Crew, the shape
+// the box's own actions use: the bridge needs both to find crews/<id>.meta,
+// and a single string would make it guess which one it had been handed.
+func (m Model) diffChoice(r row) actionChoice {
+	c := actionChoice{action: ActionDiff, desc: "unavailable · applies to a Crew"}
+	if r.kind != rowCrew || m.cur().kind != frameProject {
+		return c
+	}
+	project := m.currentProject().ProjectID
+	c.req = ActionRequest{Action: ActionDiff, Target: project, TargetKind: "crew", Crew: r.id}
+	crew, ok := m.crewByID(r.id)
+	if !ok {
+		c.desc = "unavailable · this Crew is not in the snapshot"
+		return c
+	}
+	switch {
+	case crew.Worktree.IsKnown() && crew.Worktree.Value.Branch != "":
+		c.enabled, c.desc = true, "Show "+crew.Worktree.Value.Branch+" against the default branch"
+	case crew.Worktree.IsKnown(), crew.Worktree.State == query.Absent:
+		// The read succeeded and there is no branch. That is a fact.
+		c.desc = "unavailable · this Crew records no branch to compare"
+	default:
+		// The read failed, which is a different thing and must not be
+		// reported as "there is no branch" (query.FieldState's whole point).
+		c.desc = "unavailable · the worktree record could not be read; r re-reads"
 	}
 	return c
 }
@@ -486,7 +532,15 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 	}
 }
 
+// actionObject is what the running line and the confirmation name as the
+// thing being acted on. A request that carries a Crew is about that crew
+// whatever object it routes through - the box's own actions and the Crew
+// row's diff both put the Project in Target, because that is what the
+// bridge needs to find the files - so the crew wins when there is one.
 func actionObject(c actionChoice) string {
+	if c.req.Crew != "" {
+		return c.req.Crew
+	}
 	if c.req.Target != "" {
 		return c.req.Target
 	}
@@ -500,6 +554,19 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.confirm = nil
 	m.actions = false
 	m.actionChoices = nil
+	// A diff's whole result is the overlay (diff.go): the text is a
+	// screenful, and the message line would show a truncated first line of
+	// it. A diff that *failed* still takes the message line - there is no
+	// overlay to put a refusal in, and an empty frame would read as success.
+	//
+	// The session view has no body region to draw an overlay into (view.go),
+	// so an ActionDiff that somehow arrived from there is answered the
+	// ordinary way rather than opening a surface nothing would render.
+	if msg.choice.action == ActionDiff && msg.err == nil && m.sess.phase == sessionIdle {
+		// Nothing is re-read: a diff changes no recorded state, so asking
+		// the loader again would only be a chance to drop the overlay.
+		return m.openDiff(msg.choice.req.Crew, m.diffBranch(msg.choice.req.Crew), msg.text), nil
+	}
 	var result footerMsg
 	if msg.err != nil {
 		// This path means the service was actually called. It is therefore a
