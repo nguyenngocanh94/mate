@@ -1,4 +1,4 @@
- claude-code · mate-payments-api · supervised                                                                           
+ claude-code · mate-payments-api · manual                                                                               
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
  [waiting] [all]                                      │                                                                 
  CREW › MATE                                          │                                                                 

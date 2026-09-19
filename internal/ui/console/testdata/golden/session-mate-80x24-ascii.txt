@@ -1,4 +1,4 @@
- claude-code . mate-payments-api . supervised                                   
+ claude-code . mate-payments-api . manual                                       
 --------------------------------------------------------------------------------
  CREW > MATE                                                          2 waiting 
  ! 14:01  k3  needs an answer                                                   

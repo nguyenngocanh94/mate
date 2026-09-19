@@ -69,14 +69,14 @@ func TestModeCellIndicatorFitsAtEveryBreakpoint(t *testing.T) {
 	}
 }
 
-// A supervised Project never grows the indicator, whatever the daemon's
+// A manual-mode Project never grows the indicator, whatever the daemon's
 // leftover state says: the mode word is the flag, and the flag is off.
-func TestSupervisedModeCellNeverShowsTheDaemon(t *testing.T) {
+func TestManualModeCellNeverShowsTheDaemon(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Daemon = query.AutoDaemon{Sends: 3, LastSentAt: time.Date(2026, 9, 18, 14, 32, 10, 0, time.UTC)}
 	row := mateRow(t, tree, 120, 36)
-	if !strings.Contains(row, "supervised") || strings.Contains(row, "sent 14:32") {
-		t.Fatalf("supervised mate row shows a daemon indicator:\n%s", row)
+	if !strings.Contains(row, "manual") || strings.Contains(row, "sent 14:32") {
+		t.Fatalf("manual-mode mate row shows a daemon indicator:\n%s", row)
 	}
 }
 

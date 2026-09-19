@@ -28,11 +28,11 @@ func sessionTestTarget(kind SessionTargetKind) SessionTarget {
 	switch kind {
 	case SessionTargetMate:
 		return SessionTarget{Kind: SessionTargetMate, ID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", ProjectID: "proj_1",
-			HarnessKind: query.HarnessClaude, AgentName: sessionTestMateAgent, Mode: query.ModeSupervised}
+			HarnessKind: query.HarnessClaude, AgentName: sessionTestMateAgent, Mode: query.ModeManual}
 	default:
 		return SessionTarget{Kind: SessionTargetCrew, ID: "crew_01J9P6Q6W0E5V8XK2M4B8DT", ProjectID: "proj_1",
 			HarnessKind: query.HarnessClaude, AgentName: sessionTestCrewAgent, Worktree: sessionTestCrewWorkdir,
-			Mode: query.ModeSupervised}
+			Mode: query.ModeManual}
 	}
 }
 

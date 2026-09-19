@@ -149,7 +149,7 @@ Observer sống trong tiến trình console: đóng console thì không ai canh 
 
 Cờ là file `.matev2/projects/<p>/mate/.auto`.
 
-Chế độ giám sát (mặc định):
+Chế độ `manual` (giám sát, mặc định; nhãn đổi từ `supervised` ngày 2026-09-19 vì người dùng không hiểu chữ đó):
 
 - Không dòng nào tự đi vào pane Mate.
 - Trên một mục trong inbox (quyết định 2026-09-19: box là chỗ để hành động, không phải chỗ để đọc):
@@ -157,7 +157,7 @@ Chế độ giám sát (mặc định):
   - `a`, hoặc nút `[assign]` trên hàng, gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. Chữ trên nút là `assign` vì đó là việc người dùng làm (giao đi); dòng gửi cho Mate vẫn là `resolve:`, đúng như manual của Mate.
   - `l` đổi giữa hai bộ lọc; `j`/`k` và phím mũi tên di chuyển; `o` mở Actions menu của pane đang xem; `Esc`/`Tab` rời khỏi zone. Không còn `r` (reply) và `p` (peek): muốn nói chuyện với crew thì vào thẳng pane của nó.
 - Header của rail chỉ còn hai nút lọc: `[waiting]` (inbox, mặc định) và `[all]` (toàn bộ log), nút đang bật tô accent, nút kia mờ; dòng đếm ngay dưới nói bằng chữ đang xem cái nào (`N waiting`, hay `all · N entries`), nên terminal đơn sắc vẫn đọc được. Không dùng chữ "unread": console không lưu trạng thái đã đọc, và một mục người dùng đã nhìn nhưng chưa giao vẫn đang chờ ai đó xử lý.
-- `[← project]`, `[supervised|auto]`, `[restart mate]`, `[clear composer]` rời khỏi header (quyết định 2026-09-19). `Esc` vẫn rời session (dòng hint ghi `Esc project`); mode vẫn ở ô MODE và phím `m`; restart Mate và clear composer nằm trong Actions menu của hàng Mate (`a` trong cây, `o` trong box zone), giữ nguyên bước xác nhận và request cũ.
+- `[← project]`, `[manual|auto]`, `[restart mate]`, `[clear composer]` rời khỏi header (quyết định 2026-09-19). `Esc` vẫn rời session (dòng hint ghi `Esc project`); mode vẫn ở ô MODE và phím `m`; restart Mate và clear composer nằm trong Actions menu của hàng Mate (`a` trong cây, `o` trong box zone), giữ nguyên bước xác nhận và request cũ.
 - `resolve` chỉ giao việc, không đóng câu hỏi. Mục rời inbox khi crew thật sự nhận được câu trả lời - `matev2 send` của Mate ghi `Source: mate` vào `sent.log` - hoặc khi crew tự ghi dòng status mới.
 
 Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở task 19):

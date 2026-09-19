@@ -532,7 +532,7 @@ func mateRowSpans(mate query.MateNode, mode query.Mode, daemon query.AutoDaemon,
 
 // modeSpans renders the communication mode, and in auto mode the daemon's
 // own last word. Auto takes the accent style because it is the mode in which
-// the Console may type into the Mate's pane without the reader; supervised,
+// the Console may type into the Mate's pane without the reader; manual,
 // the default, is plain.
 //
 // "auto" alone means the flag is set and this console has sent nothing yet,

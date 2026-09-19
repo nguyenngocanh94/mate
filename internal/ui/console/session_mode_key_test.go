@@ -124,7 +124,7 @@ func TestStreamModeBindsTheModeKeyToBoxFocusOnly(t *testing.T) {
 // that pane on their behalf.
 func TestTheSessionHeaderNamesTheCommunicationMode(t *testing.T) {
 	t.Parallel()
-	for _, mode := range []query.Mode{query.ModeSupervised, query.ModeAuto} {
+	for _, mode := range []query.Mode{query.ModeManual, query.ModeAuto} {
 		target := sessionTestTarget(SessionTargetMate)
 		target.Mode = mode
 		line := sessionHeaderLine(target, query.KnownField("running"), unicodeGlyphs, defaultPalette())
@@ -132,11 +132,11 @@ func TestTheSessionHeaderNamesTheCommunicationMode(t *testing.T) {
 			t.Fatalf("header %q does not name mode %q", line.render(120), mode)
 		}
 	}
-	// An unpopulated mode is omitted rather than guessed at "supervised".
+	// An unpopulated mode is omitted rather than guessed at "manual".
 	target := sessionTestTarget(SessionTargetMate)
 	target.Mode = ""
 	rendered := sessionHeaderLine(target, query.KnownField("running"), unicodeGlyphs, defaultPalette()).render(120)
-	if strings.Contains(rendered, "supervised") || strings.Contains(rendered, "auto") {
+	if strings.Contains(rendered, "manual") || strings.Contains(rendered, "auto") {
 		t.Fatalf("header %q invented a mode", rendered)
 	}
 }
@@ -149,7 +149,7 @@ func TestARefreshRepointsTheOpenSessionsModeLabel(t *testing.T) {
 	t.Parallel()
 	tree := sampleTree()
 	m := loaded(t, tree, nil)
-	m.sess.target = SessionTarget{Kind: SessionTargetMate, ProjectID: tree.Projects[0].ProjectID, Mode: query.ModeSupervised}
+	m.sess.target = SessionTarget{Kind: SessionTargetMate, ProjectID: tree.Projects[0].ProjectID, Mode: query.ModeManual}
 	m.sess.snapshot.Target = m.sess.target
 
 	flipped := sampleTree()

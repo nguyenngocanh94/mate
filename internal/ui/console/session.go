@@ -71,7 +71,7 @@ type SessionTarget struct {
 	// carried on the target so the session header can name it without this
 	// package reading state. Empty means the caller did not populate it
 	// (tests, the fake controller) and the header omits it rather than
-	// guessing "supervised".
+	// guessing "manual".
 	Mode query.Mode
 	// Worktree is the Crew's worktree path (query.CrewNode.Worktree), shown
 	// in the session header alongside the agent name - the contract's frame

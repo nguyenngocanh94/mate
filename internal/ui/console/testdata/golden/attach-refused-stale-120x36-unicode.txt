@@ -2,7 +2,7 @@
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE              HARNESS STATUS    MODE                 BINDING   │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS            
-  mate-payments-api claude  running   supervised           active    │                                                  
+  mate-payments-api claude  running   manual               active    │                                                  
                                                                      │ ID               crew_01J9P4Q5R6S7T8U9V0W1X2A7CS 
   CREWS  2          TASK              STATE            NOTE          │ Task             Fix webhook idempotency so      
   crew_01J9P6…B8DT  Add idempotency-k…working                        │                  retried Stripe deliveries do    

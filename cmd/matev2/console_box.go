@@ -128,7 +128,7 @@ func boxPeekAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, re
 	return screen, nil
 }
 
-// restartMateAction is the rail's [restart mate] label and its `R` key: stop
+// restartMateAction is the Actions menu's restart_mate entry on the Mate row: stop
 // the Mate, then start it again, through the same spawn seams the action
 // menu's own Stop and Start use. It is one action rather than two keystrokes
 // because the state it exists for - a Mate that no longer answers - is one a
@@ -159,7 +159,7 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 	return fmt.Sprintf("%s; Mate %s is running on %s in pane %s", was, res.Agent, res.Harness, res.Pane), nil
 }
 
-// clearComposerAction is [clear composer] and its `u` key: one Ctrl+U into
+// clearComposerAction is the Actions menu's clear_composer entry: one Ctrl+U into
 // the Mate's pane.
 //
 // It goes through runtime.SendKeys, not internal/send: send.Send types a

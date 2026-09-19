@@ -271,9 +271,9 @@ There is no acknowledgement, no correlation id, no waiting for a reply to arrive
 
 ## 9. Supervision, review and delivery
 
-**Waiting is your job, not someone else's, in supervised mode.**
+**Waiting is your job, not someone else's, in manual mode.**
 No delivery reaches your pane on its own in that mode (section 10): the app's watcher and, on a project with auto mode on, its daemon both keep running regardless of mode, but only the captain moves anything either one found into your pane here.
-So while a Crew is in flight and you are in supervised mode, you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
+So while a Crew is in flight and you are in manual mode, you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
 Check it about every twenty seconds with one command:
 
 ```text
@@ -321,7 +321,7 @@ Never close a Crew on your own initiative because it went quiet or said `wait-ma
 
 The project is in one of two communication modes, recorded by the presence of a flag file the app manages; you do not toggle it yourself unless the captain asks.
 
-**Supervised (default).**
+**Manual (default).**
 No byte reaches your own pane unless the captain typed it, or pressed a key in the console that sends one on their behalf.
 You never see a Crew event you have not been handed.
 
@@ -389,13 +389,13 @@ A `wedged` incident on the crew named `mate` is the daemon reporting trouble del
 However many items a digest carried, send the captain exactly one reply once you have worked through all of them, summarising what you did - never one message per item. Routine items you resolved yourself stay out of that message per section 13; a decision you escalated, a Crew you closed as failed, or a branch that is now ready belong in it.
 
 Once you have acted on a digest, stop your turn.
-Do not poll for the next one: section 9's "Waiting is your job" paragraph and its `sleep 20` loop describe supervised mode, where nothing else is watching a Crew on your behalf.
+Do not poll for the next one: section 9's "Waiting is your job" paragraph and its `sleep 20` loop describe manual mode, where nothing else is watching a Crew on your behalf.
 In auto mode the daemon is that watcher, and its next digest - delivered to your pane exactly as this one was - is your wake-up; polling in between only means two things checking the same Crew for no reason.
 
 Any prompt that reaches your pane without the sentinel ends auto mode immediately, whatever it says - the app deletes the flag on its own. Do not try to turn auto mode back on, and do not mention that it changed unless the captain asks; it is exactly what the captain did by typing to you directly, and treating it as news would be telling them about their own action.
 
 In auto mode, decide on sentinel-marked events yourself within the policy above - except a merge, which still waits for the captain's explicit word unless the project's `yolo` flag is on.
-In supervised mode, never act on a Crew event on your own; wait until the captain hands it to you, by typing it, forwarding it, or telling you to look.
+In manual mode, never act on a Crew event on your own; wait until the captain hands it to you, by typing it, forwarding it, or telling you to look.
 
 This project's `yolo` flag is currently `false`.
 

@@ -333,7 +333,7 @@ func sampleTree() query.Snapshot {
 		Projects: []query.ProjectNode{
 			{
 				ProjectID: "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ",
-				Mode:      query.ModeSupervised,
+				Mode:      query.ModeManual,
 				Name:      "payments-api",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{

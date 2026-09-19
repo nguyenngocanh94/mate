@@ -53,7 +53,7 @@ func ParseHarnessKind(s string) (HarnessKind, error) {
 
 func (k HarnessKind) String() string { return string(k) }
 
-// Mode is a Project's communication mode (mvp.md section 5). Supervised is
+// Mode is a Project's communication mode (mvp.md section 5). Manual is
 // the default and means no byte is ever sent to the Mate's pane without the
 // reader pressing a key; auto means the Console's digest daemon may. The
 // durable form of this is the presence of `mate/.auto`; this type is only
@@ -61,8 +61,8 @@ func (k HarnessKind) String() string { return string(k) }
 type Mode string
 
 const (
-	ModeSupervised Mode = "supervised"
-	ModeAuto       Mode = "auto"
+	ModeManual Mode = "manual"
+	ModeAuto   Mode = "auto"
 )
 
 func (m Mode) String() string { return string(m) }
@@ -72,7 +72,7 @@ func ModeFor(auto bool) Mode {
 	if auto {
 		return ModeAuto
 	}
-	return ModeSupervised
+	return ModeManual
 }
 
 // AutoDaemon is what the Console's auto-mode daemon (mvp.md section 5, task

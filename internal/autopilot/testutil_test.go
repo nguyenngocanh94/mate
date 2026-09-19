@@ -137,7 +137,7 @@ func (f *fixture) restart() *autopilot.Pilot {
 	return autopilot.New(ws, f.deps(nil))
 }
 
-// addProject registers a second project, supervised by default.
+// addProject registers a second project, manual by default.
 func (f *fixture) addProject(name string) {
 	f.t.Helper()
 	repo := filepath.Join(f.ws.Root(), name)

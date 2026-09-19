@@ -1,4 +1,4 @@
- claude-code · crew-payments-api-2 · .worktrees/crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 · supervised                                                                    
+ claude-code · crew-payments-api-2 · .worktrees/crew_01J9P6Q6W0E5V8XK2M4B8DT/a2 · manual                                                                        
                                                                                                                                                                 
                                                                                                                                                                 
                                                                                                                                                                 

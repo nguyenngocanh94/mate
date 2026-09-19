@@ -2,7 +2,7 @@
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE              HARNESS STATUS    MODE                 BINDING   │ COMPLETED                                        
-  mate-payments-api claude  running   supervised           active    │                                                  
+  mate-payments-api claude  running   manual               active    │                                                  
                                                                      │ Finished         1 of 2 crews                    
   CREWS  2          TASK              STATE            NOTE          │                  Finished crews stay in the      
   crew_01J9P6…B8DT  Add idempotency-k…working                        │                  snapshot. Enter shows or hides  

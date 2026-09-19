@@ -115,7 +115,7 @@ func TestRenderAgentsSection10TeachesDigestGrammar(t *testing.T) {
 	}
 
 	// After acting, the Mate stops its turn rather than polling - the
-	// opposite of section 9's supervised-mode sleep loop.
+	// opposite of section 9's manual-mode sleep loop.
 	if !strings.Contains(sec, "stop your turn") {
 		t.Error("section 10 does not tell the Mate to stop its turn after acting on a digest")
 	}

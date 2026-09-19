@@ -133,8 +133,8 @@ func TestLiveConsoleStreamMate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
-	if snap.Projects[0].Mode != query.ModeSupervised {
-		t.Fatalf("mode = %q, want supervised by default", snap.Projects[0].Mode)
+	if snap.Projects[0].Mode != query.ModeManual {
+		t.Fatalf("mode = %q, want manual by default", snap.Projects[0].Mode)
 	}
 	target := console.SessionTarget{
 		Kind:        console.SessionTargetMate,

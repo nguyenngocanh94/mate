@@ -1,4 +1,4 @@
- claude-code · mate-payments-api · supervised                                                                           
+ claude-code · mate-payments-api · manual                                                                               
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
  [waiting] [all]                                      │shop-mate $ matev2 crew list                                     
  CREW › MATE                                          │k3  needs-decision                                               

@@ -13,10 +13,10 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// Supervised mode sends nothing, ever - mvp.md section 5's first line, and
+// Manual mode sends nothing, ever - mvp.md section 5's first line, and
 // the rule the whole daemon has to be safe under. The project here has a full
 // inbox and a live Mate with an empty composer: everything except the flag.
-func TestSupervisedModeSendsNothing(t *testing.T) {
+func TestManualModeSendsNothing(t *testing.T) {
 	f := newFixture(t)
 	f.status("k3", "needs-decision: pick A or B")
 	f.incident("k9", box.IncidentStale, store.IncidentOpen, "quiet for 3m0s")
@@ -30,7 +30,7 @@ func TestSupervisedModeSendsNothing(t *testing.T) {
 		t.Fatalf("sent.log = %+v, want nothing recorded", sent)
 	}
 	if cursor := f.cursor(); len(cursor) != 0 {
-		t.Fatalf("cursor = %v, want none written in supervised mode", cursor)
+		t.Fatalf("cursor = %v, want none written in manual mode", cursor)
 	}
 }
 
@@ -366,7 +366,7 @@ func TestTheFlagDisappearingStopsTheDaemonWithinOneTick(t *testing.T) {
 		t.Fatalf("typed %#v after .auto was deleted, want nothing more", typed)
 	}
 	if got := f.daemonStatus().Notice; got != "" {
-		t.Fatalf("notice = %q, want supervised mode to clear it: nothing is pending", got)
+		t.Fatalf("notice = %q, want manual mode to clear it: nothing is pending", got)
 	}
 }
 
@@ -417,7 +417,7 @@ func TestOnlyProjectsWithTheFlagAreDigested(t *testing.T) {
 
 	line := f.requireOneDigest()
 	if strings.Contains(line, "b1") {
-		t.Fatalf("digest = %q, want nothing from the supervised project", line)
+		t.Fatalf("digest = %q, want nothing from the manual-mode project", line)
 	}
 	entries, _, err := f.ws.ReadSent("blog", 0)
 	if err != nil {

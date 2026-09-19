@@ -218,7 +218,7 @@ func (p *Pilot) Snapshot() map[string]Status {
 //
 // The error it returns is the joined per-project failures of the tick; the
 // tick itself always finishes. Nothing is ever sent for a project whose
-// `.auto` flag is absent, which is the whole of supervised mode.
+// `.auto` flag is absent, which is the whole of manual mode.
 func (p *Pilot) Tick(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -244,7 +244,7 @@ func (p *Pilot) Tick(ctx context.Context) error {
 
 func (p *Pilot) tickProject(ctx context.Context, project string) error {
 	if !p.ws.Auto(project) {
-		// Supervised. Nothing is sent, and the stopwatch is dropped: there
+		// Manual. Nothing is sent, and the stopwatch is dropped: there
 		// is no pending digest any more, so nothing is failing to arrive.
 		// The cursor stays on disk, which is what makes turning auto back on
 		// resume rather than replay.
@@ -326,7 +326,7 @@ func (p *Pilot) deliver(ctx context.Context, project, line string) (send.Report,
 
 // errAutoOff is the one "failure" that is not one: the captain took over
 // between the tick starting and the line being typed. Nothing was sent,
-// nothing is wedged, and the next tick will find the project supervised.
+// nothing is wedged, and the next tick will find the project in manual mode.
 var errAutoOff = errors.New("auto mode was turned off during the tick")
 
 // undelivered records a tick that had something to say and could not say it:

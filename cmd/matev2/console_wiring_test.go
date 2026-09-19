@@ -161,7 +161,7 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	ctx := context.Background()
 
 	if w.Auto("shop") {
-		t.Fatal("a fresh project is not supervised")
+		t.Fatal("a fresh project is not manual")
 	}
 	out, err := action(ctx, console.ActionRequest{Action: console.ActionMode, Target: "shop", TargetKind: "project"})
 	if err != nil {
@@ -181,8 +181,8 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	if w.Auto("shop") {
 		t.Fatal("the .auto flag was not removed")
 	}
-	if !strings.Contains(out, string(query.ModeSupervised)) {
-		t.Fatalf("mode outcome = %q, want the supervised label", out)
+	if !strings.Contains(out, string(query.ModeManual)) {
+		t.Fatalf("mode outcome = %q, want the manual label", out)
 	}
 
 	// And the snapshot the Console renders follows the flag.
@@ -190,8 +190,8 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
-	if snap.Projects[0].Mode != query.ModeSupervised {
-		t.Fatalf("snapshot mode = %q, want supervised", snap.Projects[0].Mode)
+	if snap.Projects[0].Mode != query.ModeManual {
+		t.Fatalf("snapshot mode = %q, want manual", snap.Projects[0].Mode)
 	}
 	if err := w.SetAuto("shop", true); err != nil {
 		t.Fatal(err)
