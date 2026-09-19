@@ -88,8 +88,25 @@ func Init(workspaceDir string) (*Workspace, error) {
 	if err := w.SaveConfig(); err != nil {
 		return nil, err
 	}
+	// The captain's rules for every Mate. Every Mate's bootstrap reads this
+	// file first (mateassets, section 3), so an init that did not create it
+	// left each Mate opening with a "no such file" error on a file its own
+	// manual names (measured 2026-09-19, task 24). Seeded once, never
+	// rewritten: it is the captain's file from here on.
+	if err := os.WriteFile(w.WorkspaceDoc(), []byte(workspaceDocSeed), 0o644); err != nil {
+		return nil, err
+	}
 	return w, nil
 }
+
+// workspaceDocSeed is the WORKSPACE.md a new workspace starts with: a place
+// for the captain's rules, empty of rules, so a Mate that reads it learns
+// only that nothing workspace-wide has been said yet.
+const workspaceDocSeed = `# Workspace rules
+
+Rules here apply to every Mate in this workspace, on top of each project's PROJECT.md.
+Nothing is written here yet.
+`
 
 // Open resolves workspaceDir, which must contain `.matev2/workspace.yaml`, and
 // loads the configuration.

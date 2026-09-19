@@ -395,6 +395,6 @@ Nợ kỹ thuật đã biết:
 
 - Digest của daemon chưa được chứng minh trong acceptance hai project (đo 2026-09-19, task 24): Mate ở chế độ tự động nhận yêu cầu của captain rồi spawn, giám sát và merge gọn trong **một lượt** khoảng 90 giây, nên không có lúc nào daemon có mục mới mà Mate đang rảnh. `sent.log` của `blog` không có dòng `digest:` nào trong cả hai lần chạy. Mục 7 bước 4 của manual đã được sửa để bảo Mate ở chế độ tự động dừng lượt sau khi spawn và để daemon đánh thức, nhưng Mate không làm theo trong cả hai lần. Bản thân daemon vẫn có live test riêng ở task 19 và 20; thứ chưa chứng minh được là Mate chịu nhường lượt cho nó sau một task do captain khởi xướng.
 
-- `store.Init` không tạo `.matev2/WORKSPACE.md`, nên mọi Mate mở đầu bootstrap bằng `cat: … No such file or directory` trên đúng file mà manual của nó bảo đọc. Vô hại nhưng thấy trong mọi pane của bản ghi task 24.
+- ~~`store.Init` không tạo `.matev2/WORKSPACE.md`, nên mọi Mate mở đầu bootstrap bằng `cat: … No such file or directory` trên đúng file mà manual của nó bảo đọc. Vô hại nhưng thấy trong mọi pane của bản ghi task 24.~~ Trả 2026-09-19: `store.Init` seed `WORKSPACE.md` một lần, không ghi đè.
 
 Sau MVP: token monitor gồm locator theo `session_id`, copy parser transcript v1, `usage.jsonl` và view, tín hiệu `budget`.

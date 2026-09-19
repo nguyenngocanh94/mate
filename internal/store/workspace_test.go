@@ -150,3 +150,30 @@ func TestStoreLayoutPathsAreInsideWorkspace(t *testing.T) {
 		}
 	}
 }
+
+// TestInitSeedsTheWorkspaceDoc: every Mate reads WORKSPACE.md at bootstrap,
+// so Init must create it; a second Init must not overwrite the captain's
+// edits.
+func TestInitSeedsTheWorkspaceDoc(t *testing.T) {
+	root := t.TempDir()
+	w, err := store.Init(root)
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	body, err := os.ReadFile(w.WorkspaceDoc())
+	if err != nil {
+		t.Fatalf("WORKSPACE.md was not created: %v", err)
+	}
+	if !strings.Contains(string(body), "Workspace rules") {
+		t.Fatalf("seed = %q, want the rules heading", body)
+	}
+	if err := os.WriteFile(w.WorkspaceDoc(), []byte("# mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Init(root); err != nil {
+		t.Fatalf("second Init: %v", err)
+	}
+	if got, _ := os.ReadFile(w.WorkspaceDoc()); string(got) != "# mine\n" {
+		t.Fatalf("second Init rewrote the captain's file: %q", got)
+	}
+}
