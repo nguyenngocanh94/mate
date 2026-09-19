@@ -613,6 +613,10 @@ func (m Model) onFailureDetailKey(key string, l frameLayout) Model {
 
 func (m Model) scrollFailureDetail(delta int, l frameLayout) Model {
 	total := len(m.openFailureDetailContent(l.Cols))
-	m.failureTop = clampTop(m.failureTop+delta, 0, total, l.Body)
+	// clampScrollTop, not clampTop: there is no selected row in a detail
+	// overlay, and clampTop's "keep the selection visible" rule with sel=0
+	// pinned the offset to the top, so this view drew "↑ N more" indicators
+	// it could never reach (fixed 2026-09-19).
+	m.failureTop = clampScrollTop(m.failureTop+delta, total, l.Body)
 	return m
 }

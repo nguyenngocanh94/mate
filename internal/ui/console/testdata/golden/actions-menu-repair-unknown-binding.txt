@@ -8,9 +8,9 @@
     resume  unavailable · applies to a stopped Mate                                                                     
     repair  unavailable · binding is unknown; refresh before repair                                                     
     onboard  unavailable · use this action at the workspace or a Project without a Mate                                 
+    diff  unavailable · the worktree record could not be read; r re-reads                                               
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
   ↑↓ Move  Enter Run  Esc Close                                                                                         
-                                                                                                                        
                                                                                                                         
                                                                                                                         
                                                                                                                         

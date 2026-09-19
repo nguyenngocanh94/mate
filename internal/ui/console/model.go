@@ -79,6 +79,13 @@ const (
 	// become a message the Mate answers.
 	ActionRestartMate   Action = "restart_mate"
 	ActionClearComposer Action = "clear_composer"
+	// ActionDiff is a Crew row's review surface (mvp.md task 21): what
+	// `matev2 diff <project> <crew>` prints - the commits the crew's branch
+	// carries beyond the project's default branch, then the patch. It writes
+	// nothing, so it is the one action with no confirmation, and its result
+	// is a screenful rather than a line: the Console puts it in the scrolling
+	// overlay of diff.go instead of on the message line.
+	ActionDiff Action = "diff"
 	// ActionMerge lands a Crew's branch in the Project's default branch and
 	// finishes the Crew (mvp.md task 22). It is offered on a Crew row only
 	// while that Crew reads `wait-mate` - the one state in which the Crew
@@ -87,6 +94,10 @@ const (
 	// a refusal worth reading. It is dangerous, so the menu's own
 	// confirmation stands in front of it, exactly as it does for
 	// ActionRestartMate.
+	//
+	// ActionDiff is its read-only counterpart and deliberately has neither
+	// restriction: a reader looks at a branch to decide whether it is worth
+	// landing, which is before, not after, the Crew says `wait-mate`.
 	ActionMerge Action = "merge"
 	// TODO: v1 also had retry, discard and switch_harness. matev2 has no
 	// retry (a Crew runs once), and no discard action: throwing work away
@@ -315,6 +326,11 @@ type Model struct {
 	// expanded. failureTop is its scroll offset.
 	failureDetail bool
 	failureTop    int
+
+	// diff is the open diff overlay (diff.go, mvp.md task 21): the text one
+	// ActionDiff returned, the crew and branch it names, and where the
+	// reader has scrolled to. Its zero value is closed.
+	diff diffFlow
 
 	// pendingBoxOpen is the inbox entry whose crew the reader asked to open
 	// from inside a session view (box_keys.go). The open cannot happen on
@@ -861,6 +877,25 @@ func clampTop(top, sel, total, h int) int {
 		top = sel - h + 1
 	}
 	return clampInt(top, 0, total-h)
+}
+
+// clampScrollTop is clampTop for a surface that has no selected row: an
+// overlay showing total lines in a window of h. It exists because passing
+// sel=0 to clampTop does not mean "there is no selection" - the rule "keep
+// the selection on screen" then drags the offset back to the top on every
+// keystroke, so such an overlay never scrolls at all.
+//
+// The bound is total-h+1, not total-h, and the extra line is windowContent's
+// (seams.go): as soon as the offset leaves the top, one row of the window
+// goes to the "↑ N more" indicator, so at total-h the last line of the
+// content is still one row below the fold. An overlay that advertises more
+// content below it and cannot reach it is worse than one that does not
+// scroll.
+func clampScrollTop(top, total, h int) int {
+	if h <= 0 || total <= h {
+		return 0
+	}
+	return clampInt(top, 0, total-h+1)
 }
 
 // window is the [start, end) row range a body of h lines shows at offset
