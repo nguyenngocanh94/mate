@@ -26,10 +26,10 @@
                                                       │                                                                 
                                                       │⏺ 1 crew question still needs an answer. Oldest first: the       
                                                       │  rebase conflict on "Upgrade database adapter".                 
-▌! 14:01  k3  needs-decision  [resolve] [reply] [peek]│                                                                 
-    migration for idempotency_keys, or key off        │✻ Waiting for the completion report from crew-payments-api-2 (esc
-    stripe_events?                                    │╭───────────────────────────────────────────────────────────────╮
- ! 14:06  k9  blocked                                 ││ >                                                             │
+                                                      │                                                                 
+                                                      │✻ Waiting for the completion report from crew-payments-api-2 (esc
+▌! 14:01  k3  needs an answer [resolve] [reply] [peek]│╭───────────────────────────────────────────────────────────────╮
+ ! 14:06  k9  needs an answer                         ││ >                                                             │
 ──────────────────────────────────────────────────────│╰───────────────────────────────────────────────────────────────╯
  reply k3 > A_                         [send] [cancel]│? for shortcuts                                ⏵⏵ accept edits on
  ! Send refused: composer holds unsubmitted text · nothing was sent                                                     

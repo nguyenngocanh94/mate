@@ -29,8 +29,8 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs-decision                                                                    [resolve] [reply] [peek]
-    migration for idempotency_keys, or key off stripe_events?                                                           
+                                                                                                                        
+▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) · snapshot re-read                        
  ↑↓ Move  a Actions  e Details  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit               

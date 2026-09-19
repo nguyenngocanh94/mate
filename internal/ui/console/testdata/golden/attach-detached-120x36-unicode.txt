@@ -29,8 +29,8 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs-decision                                                                    [resolve] [reply] [peek]
-    migration for idempotency_keys, or key off stripe_events?                                                           
+                                                                                                                        
+▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  Detached from crew-payments-api-2 · agent not stopped · re-read 14:05:12                                               
  ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

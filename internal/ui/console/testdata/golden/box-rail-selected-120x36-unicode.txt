@@ -28,9 +28,9 @@
                                                       │⏺ 1 crew question still needs an answer. Oldest first: the       
                                                       │  rebase conflict on "Upgrade database adapter".                 
                                                       │                                                                 
-▌! 14:01  k3  needs-decision  [resolve] [reply] [peek]│✻ Waiting for the completion report from crew-payments-api-2 (esc
-    migration for idempotency_keys, or key off        │╭───────────────────────────────────────────────────────────────╮
-    stripe_events?                                    ││ >                                                             │
- ! 14:06  k9  blocked                                 │╰───────────────────────────────────────────────────────────────╯
+                                                      │✻ Waiting for the completion report from crew-payments-api-2 (esc
+                                                      │╭───────────────────────────────────────────────────────────────╮
+▌! 14:01  k3  needs an answer [resolve] [reply] [peek]││ >                                                             │
+ ! 14:06  k9  needs an answer                         │╰───────────────────────────────────────────────────────────────╯
 ──────────────────────────────────────────────────────│? for shortcuts                                ⏵⏵ accept edits on
  BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal     

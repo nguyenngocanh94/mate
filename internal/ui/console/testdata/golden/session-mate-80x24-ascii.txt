@@ -1,8 +1,8 @@
  claude-code . mate-payments-api . supervised                                   
 --------------------------------------------------------------------------------
  CREW > MATE                                                       2 to resolve 
- ! 14:01  k3  needs-decision                                                    
- ! 14:06  k9  blocked                                                           
+ ! 14:01  k3  needs an answer                                                   
+ ! 14:06  k9  needs an answer                                                   
 --------------------------------------------------------------------------------
 * Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. 
   Reading its report before reviewing attempt 2.                                

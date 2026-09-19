@@ -56,21 +56,23 @@ func (b boxList) rows() []query.BoxEntry {
 	return b.field.Value.Inbox
 }
 
-// wraps reports whether the selected row shows its full text underneath.
-// Only the inbox does: its rows carry no text of their own, so the question
-// has to be somewhere, and `[all]` is a log a reader is scanning rather than
-// one question they are answering.
-func (b boxList) wraps() bool { return !b.all }
+// wraps reports whether the selected item's text is laid out under its row.
+// No surface does any more (2026-09-19): the crew's status text is its own
+// summary of a question it asked in full in its pane, and reading the
+// summary never replaced looking at the pane - so the inbox says who needs
+// what and offers the pane and the Mate, and `[all]` keeps the text on the
+// entry's own line for the reader who is scanning the log.
+func (b boxList) wraps() bool { return false }
 
 // boxEntryLine is one entry, on one line, at every surface:
 //
-//	inbox: <marker><!> HH:MM  <crew>  <verb>
+//	inbox: <marker><!> HH:MM  <crew>  <what it needs>
 //	all:   <marker><!> HH:MM  <who>  <verb>  <text>
 //
-// The inbox line carries no text because the selected item's full text is
-// wrapped on the rows underneath it (boxWrapLines): one line per item keeps
-// the whole inbox on screen, and the one item the reader is on is the one
-// whose words they need.
+// The inbox line carries no text: what a crew wrote after its verb is its
+// own summary, and the reader who wants the question opens the pane
+// ([peek], or Enter on the crew row) or hands it to the Mate ([resolve]).
+// One line per item keeps the whole inbox on screen.
 //
 // The marker is the selection signal (signals.go: a glyph, never colour
 // alone) and the "!" is the attention signal, for the same reason - a
@@ -109,10 +111,17 @@ func boxEntryLine(e query.BoxEntry, selected, hovered, focused, all bool, g glyp
 }
 
 // boxEntryText is the entry's own words, without any selection or attention
-// decoration: time, who it is about, the verb, and - in `[all]` mode only -
-// the payload.
+// decoration. In the inbox: time, the crew, and what it needs in plain
+// words (boxNeedPhrase). In `[all]` mode: time, who, the raw verb, and the
+// payload, because a log is read for its record.
 func boxEntryText(e query.BoxEntry, all bool) string {
 	parts := []string{e.At.UTC().Format("15:04"), boxEntryWho(e)}
+	if !all {
+		if need := boxNeedPhrase(e); need != "" {
+			parts = append(parts, need)
+		}
+		return strings.Join(parts, "  ")
+	}
 	if e.Verb != "" {
 		verb := e.Verb
 		if e.Kind == query.BoxIncident {
@@ -120,37 +129,40 @@ func boxEntryText(e query.BoxEntry, all bool) string {
 		}
 		parts = append(parts, verb)
 	}
-	if all && e.Text != "" {
+	if e.Text != "" {
 		parts = append(parts, sanitizeText(e.Text))
 	}
 	return strings.Join(parts, "  ")
 }
 
-// boxWrapLines is the selected inbox item's own words, wrapped into the rail
-// under its row. This is what makes the inbox readable without `p`: the
-// reader moves the cursor onto an item and the crew's question is right
-// there, in full, rather than cut at the rail's edge.
-//
-// An item with no text of its own - a status line that was only a verb -
-// gets nothing, not an empty row: a blank line under the cursor reads as a
-// rendering fault.
-func boxWrapLines(e query.BoxEntry, w int) []string {
-	text := sanitizeText(strings.TrimSpace(e.Text))
-	if text == "" {
-		return nil
+// boxNeedPhrase is the inbox's one phrase per item: what the crew needs,
+// not what it said. A `needs-decision` line is a crew waiting for an
+// answer; an incident is the observer's finding, named by its kind
+// (mvp.md section 4b). A verb the inbox does not know renders as itself
+// rather than as a blank.
+func boxNeedPhrase(e query.BoxEntry) string {
+	switch e.Kind {
+	case query.BoxIncident:
+		switch e.Verb {
+		case "stale":
+			return "stuck, quiet too long"
+		case "runtime_lost":
+			return "agent gone"
+		case "wedged":
+			return "send wedged"
+		case "budget":
+			return "out of budget"
+		default:
+			return "incident " + e.Verb
+		}
+	case query.BoxStatus:
+		switch e.Verb {
+		case "needs-decision", "blocked":
+			return "needs an answer"
+		}
 	}
-	var out []string
-	for _, chunk := range wrapAfterSlash(text, max0(w-boxWrapIndent)) {
-		out = append(out, strings.Repeat(" ", boxWrapIndent)+chunk)
-	}
-	return out
+	return e.Verb
 }
-
-// boxWrapIndent lines the wrapped text up under the entry's own words,
-// past the marker and the attention mark (boxEntryLead) plus one more cell
-// so the block reads as belonging to the row above it rather than as a
-// second entry.
-const boxWrapIndent = boxEntryLead + 1
 
 // boxEntryWho names the entry's subject: the crew for a status line or an
 // incident, and the "source->target" pair for a message, which is the same
@@ -228,11 +240,11 @@ func boxDigestLine(v query.Field[query.BoxView], g glyphSet, p palette) *line {
 
 // ---------- the body, and where each row came from ----------
 
-// boxPlanRow is one drawn row of a box body: either an entry's own line, or
-// one wrapped line of the selected item's text underneath it. Both carry the
-// entry index, so a click anywhere in an item's block - its row or its
-// question - selects that item, and neither the renderer nor the hit test
-// has to re-derive where the rows went.
+// boxPlanRow is one drawn row of a box body: an entry's own line. It
+// carries the entry index so a click on a row selects that item without
+// the hit test re-deriving where the rows went. (Until 2026-09-19 the
+// selected item's text was wrapped under it as extra rows; the inbox no
+// longer shows text, so a row is an entry and nothing else.)
 type boxPlanRow struct {
 	index int
 	wrap  string
@@ -241,15 +253,9 @@ type boxPlanRow struct {
 // boxPlan lays a box body out as rows, before any scrolling.
 func boxPlan(b boxList, sel, w int) []boxPlanRow {
 	rows := b.rows()
-	out := make([]boxPlanRow, 0, len(rows)+4)
-	for i, e := range rows {
+	out := make([]boxPlanRow, 0, len(rows))
+	for i := range rows {
 		out = append(out, boxPlanRow{index: i})
-		if i != sel || !b.wraps() {
-			continue
-		}
-		for _, text := range boxWrapLines(e, w) {
-			out = append(out, boxPlanRow{index: i, wrap: text})
-		}
 	}
 	return out
 }

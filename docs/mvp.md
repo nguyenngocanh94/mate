@@ -97,7 +97,9 @@ Không interaction row, không wait, không correlation id, không ack.
 Message box trong console là view gộp theo thời gian của `crews/*.status`, `sent.log`, và incident của observer.
 Không có file box riêng.
 
-Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần chưa được giải quyết - gọi là inbox: một status `needs-decision`/`blocked`, hoặc một incident, mà chưa có ai trả lời.
+Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần chưa được giải quyết - gọi là inbox: một status `needs-decision`, hoặc một incident, mà chưa có ai trả lời.
+Mỗi mục inbox là một dòng: giờ, crew, và nó cần gì bằng chữ thường (`needs an answer`, `stuck, quiet too long`, `agent gone`, `send wedged`), không hiện text của status (quyết định 2026-09-19: text đó là bản tóm tắt crew tự viết, đọc nó không thay được việc nhìn pane).
+Người dùng hoặc tự vào xem (`[peek]`, Enter trên hàng crew) hoặc giao cho Mate (`[resolve]`); `[all]` mới hiện verb và text đầy đủ của từng dòng.
 Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật chính xác, dựa trên thứ tự byte trong file), hoặc khi `sent.log` có một dòng gửi tới `crew:<id>` sau thời điểm của câu hỏi (luật xấp xỉ, vì status không có timestamp riêng).
 `wait-mate` không nằm trong inbox: cột STATE của bảng crew đã mang nó, và người dùng vẫn Enter vào pane crew để đối thoại tiếp bất cứ lúc nào (quyết định 2026-09-18).
 

@@ -1,6 +1,7 @@
 package console
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -248,8 +249,32 @@ func TestBoxInboxIsTheDefaultAndAllShowsTheLog(t *testing.T) {
 			t.Fatalf("inbox item %+v carries no resolve line", e)
 		}
 	}
-	if !inbox.wraps() || all.wraps() {
-		t.Fatalf("wraps() = inbox %v, all %v; only the inbox expands its selection", inbox.wraps(), all.wraps())
+	// The inbox names the need and never the text (2026-09-19: the crew's
+	// status text is its own summary of a question it asked in full in its
+	// pane, and reading the summary never replaced looking); `[all]` is
+	// the record, verb and text on the entry's own line.
+	if inbox.wraps() || all.wraps() {
+		t.Fatalf("wraps() = inbox %v, all %v; no surface lays text under a row any more", inbox.wraps(), all.wraps())
+	}
+	for _, e := range inbox.rows() {
+		line := boxEntryText(e, false)
+		if !strings.Contains(line, "needs an answer") {
+			t.Fatalf("inbox line %q does not say what the crew needs", line)
+		}
+		if e.Text != "" && strings.Contains(line, e.Text) {
+			t.Fatalf("inbox line %q carries the crew's text; the pane and [resolve] are where that goes", line)
+		}
+		if strings.Contains(line, "needs-decision") {
+			t.Fatalf("inbox line %q shows the raw verb", line)
+		}
+	}
+	for _, e := range all.rows() {
+		if e.Text == "" {
+			continue
+		}
+		if line := boxEntryText(e, true); !strings.Contains(line, e.Verb) || !strings.Contains(line, sanitizeText(e.Text)) {
+			t.Fatalf("[all] line %q lost the verb or the text of %+v", line, e)
+		}
 	}
 }
 
@@ -272,5 +297,27 @@ func TestBoxEmptyInboxSaysNothingToResolve(t *testing.T) {
 	two := boxCountLine(boxList{field: sessionTestBox()}, unicodeGlyphs, plainPalette()).render(44)
 	if !containsLine(two, "2 to resolve") {
 		t.Fatalf("header = %q, want \"2 to resolve\"", two)
+	}
+}
+
+// TestBoxNeedPhraseNamesTheNeedNotTheText pins the inbox vocabulary: one
+// plain phrase per kind, the pane for the words.
+func TestBoxNeedPhraseNamesTheNeedNotTheText(t *testing.T) {
+	cases := []struct {
+		e    query.BoxEntry
+		want string
+	}{
+		{query.BoxEntry{Kind: query.BoxStatus, Verb: "needs-decision", Text: "red or blue?"}, "needs an answer"},
+		{query.BoxEntry{Kind: query.BoxStatus, Verb: "blocked", Text: "legacy verb"}, "needs an answer"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "stale", Text: "no pane change for 4m"}, "stuck, quiet too long"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "runtime_lost"}, "agent gone"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "wedged"}, "send wedged"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "budget"}, "out of budget"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "novel"}, "incident novel"},
+	}
+	for _, tc := range cases {
+		if got := boxNeedPhrase(tc.e); got != tc.want {
+			t.Errorf("boxNeedPhrase(%s %s) = %q, want %q", tc.e.Kind, tc.e.Verb, got, tc.want)
+		}
 	}
 }

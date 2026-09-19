@@ -29,8 +29,8 @@
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs-decision                                                                    [resolve] [reply] [peek]
-    migration for idempotency_keys, or key off stripe_events?                                                           
+                                                                                                                        
+▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                         
  ↑↓ Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

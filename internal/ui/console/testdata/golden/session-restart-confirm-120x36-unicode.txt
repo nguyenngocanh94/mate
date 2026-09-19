@@ -26,11 +26,11 @@
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
- ! 14:01  k3  needs-decision  [resolve] [reply] [peek]│                                                                 
-▌! 14:06  k9  blocked         [resolve] [reply] [peek]│                                                                 
-    the staging database refuses the new migration;   │                                                                 
-    drop and recreate it, or patch the constraint in  │                                                                 
-    place?                                            │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+                                                      │                                                                 
+ ! 14:01  k3  needs an answer [resolve] [reply] [peek]│                                                                 
+▌! 14:06  k9  needs an answer [resolve] [reply] [peek]│                                                                 
 ──────────────────────────────────────────────────────│                                                                 
  restart Mate payments-api?                 [yes] [no]│                                                                 
  CONFIRM  Enter yes  Esc no                                                                                             
