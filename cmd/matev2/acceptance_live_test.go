@@ -131,7 +131,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 
 	// Everything from here is the Mate's own doing, observed from the files.
 	budget := 4 * time.Minute
-	crew := waitForCrewRecord(t, ctx, w, budget, func() string { return acceptancePanes(ctx, rt, mate, w) })
+	crew := waitForCrewRecord(t, ctx, w, "shop", budget, func() string { return acceptancePanes(ctx, rt, mate, w, "shop") })
 	t.Logf("the mate spawned crew %q", crew)
 
 	meta, err := w.ReadCrewMeta("shop", crew)
@@ -142,7 +142,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	worktree := filepath.Join(w.Root(), meta[spawn.MetaWorktree])
 	t.Logf("crew %s: branch %s, worktree %s, task %q", crew, branch, worktree, meta[spawn.MetaTask])
 
-	status := waitForCrewStatus(t, ctx, w, crew, "wait-mate:", budget, func() string { return acceptancePanes(ctx, rt, mate, w) })
+	status := waitForCrewStatus(t, ctx, w, "shop", crew, "wait-mate:", budget, func() string { return acceptancePanes(ctx, rt, mate, w, "shop") })
 	t.Logf("crew status file:\n%s", status)
 
 	// The branch must actually carry the change; a `wait-mate:` line is a claim,
@@ -163,7 +163,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	t.Logf("README.md on %s:\n%s", branch, readme)
 
 	// The Mate has to close the loop with the captain, in its own words.
-	reported := waitForMateReport(t, ctx, w, branch, budget)
+	reported := waitForMateReport(t, ctx, w, "shop", branch, budget)
 	t.Logf("mate → user: %s", reported)
 
 	sent, _, err := w.ReadSent("shop", 0)
@@ -188,11 +188,11 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 
 // waitForCrewRecord polls the project's crews directory for the first
 // `<id>.meta` the Mate's own `matev2 crew spawn` wrote.
-func waitForCrewRecord(t *testing.T, ctx context.Context, w *store.Workspace, budget time.Duration, evidence func() string) string {
+func waitForCrewRecord(t *testing.T, ctx context.Context, w *store.Workspace, project string, budget time.Duration, evidence func() string) string {
 	t.Helper()
 	deadline := time.Now().Add(budget)
 	for {
-		entries, err := os.ReadDir(w.CrewsDir("shop"))
+		entries, err := os.ReadDir(w.CrewsDir(project))
 		if err != nil && !os.IsNotExist(err) {
 			t.Fatalf("read crews dir: %v", err)
 		}
@@ -213,12 +213,12 @@ func waitForCrewRecord(t *testing.T, ctx context.Context, w *store.Workspace, bu
 }
 
 // waitForCrewStatus polls the crew's status file until it holds want.
-func waitForCrewStatus(t *testing.T, ctx context.Context, w *store.Workspace, crew, want string, budget time.Duration, evidence func() string) string {
+func waitForCrewStatus(t *testing.T, ctx context.Context, w *store.Workspace, project, crew, want string, budget time.Duration, evidence func() string) string {
 	t.Helper()
 	deadline := time.Now().Add(budget)
 	var text string
 	for {
-		entries, _, err := w.ReadStatus("shop", crew, 0)
+		entries, _, err := w.ReadStatus(project, crew, 0)
 		if err != nil {
 			t.Fatalf("ReadStatus: %v", err)
 		}
@@ -245,11 +245,11 @@ func waitForCrewStatus(t *testing.T, ctx context.Context, w *store.Workspace, cr
 // branch or says the work is ready. That entry is written by the Mate's own
 // Stop hook, so its presence proves the Mate finished a turn saying so,
 // rather than the test reading the pane and deciding for it.
-func waitForMateReport(t *testing.T, ctx context.Context, w *store.Workspace, branch string, budget time.Duration) string {
+func waitForMateReport(t *testing.T, ctx context.Context, w *store.Workspace, project, branch string, budget time.Duration) string {
 	t.Helper()
 	deadline := time.Now().Add(budget)
 	for {
-		entries, _, err := w.ReadSent("shop", 0)
+		entries, _, err := w.ReadSent(project, 0)
 		if err != nil {
 			t.Fatalf("ReadSent: %v", err)
 		}
@@ -282,7 +282,7 @@ func waitForMateReport(t *testing.T, ctx context.Context, w *store.Workspace, br
 // crew pane matev2 knows about. A failure of this test is the Mate doing
 // something the manual did not prepare it for, and the pane is where that is
 // visible.
-func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.AgentHandle, w *store.Workspace) string {
+func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.AgentHandle, w *store.Workspace, project string) string {
 	var b strings.Builder
 	b.WriteString("mate pane:\n")
 	if screen, err := rt.ReadAgent(ctx, mate, 60); err == nil {
@@ -290,7 +290,7 @@ func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.Agent
 	} else {
 		fmt.Fprintf(&b, "(not readable: %v)", err)
 	}
-	crews, err := spawn.ListCrews(w, "shop")
+	crews, err := spawn.ListCrews(w, project)
 	if err != nil {
 		fmt.Fprintf(&b, "\n(crew list failed: %v)", err)
 		return b.String()

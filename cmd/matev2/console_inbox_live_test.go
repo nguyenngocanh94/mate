@@ -132,7 +132,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 
 	// 3. The inbox, not the log: this is what the rail draws, and an item
 	// that does not reach it is one the reader can never act on.
-	ask := waitForInboxItem(t, ctx, w, 180*time.Second, paneTail)
+	ask := waitForInboxItem(t, ctx, w, "shop", 180*time.Second, paneTail)
 	t.Logf("inbox item: %s %s %s", ask.Crew, ask.Verb, ask.Text)
 	if ask.Verb != "needs-decision" {
 		t.Fatalf("inbox item = %+v, want the needs-decision question", ask)
@@ -164,19 +164,19 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 	}
 	t.Logf("resolve action: %s", resolveOut)
 	t.Logf("resolve line: %s", ask.Resolve)
-	assertSentLine(t, w, store.SourceApp, store.TargetMate, ask.Resolve)
+	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, ask.Resolve)
 
 	// 5. The Mate answers the crew itself. `matev2 send` records Source:
 	// mate because the Mate's pane carries MATEV2_AGENT_ROLE=mate
 	// (internal/spawn/start.go), so this line is proof the Mate - not the
 	// test, not the console - decided and replied.
-	mate := waitForSent(t, ctx, w, 300*time.Second, func(e store.SentEntry) bool {
+	mate := waitForSent(t, ctx, w, "shop", 300*time.Second, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate && e.Target == store.CrewTarget("k3")
 	})
 	t.Logf("mate -> crew:k3 %q", mate.Text)
 
 	// 6. The crew takes it as a new prompt and finishes.
-	done := waitForBoxEntry(t, ctx, w, 300*time.Second, paneTail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 300*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose")
 	})
 	t.Logf("crew finished: %s: %s", done.Verb, done.Text)
@@ -218,13 +218,13 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 // waitForInboxItem polls query.LoadBox until the inbox holds exactly one
 // item, and fails with the crew's screen so a timeout says what the agent was
 // actually doing rather than only that nothing arrived.
-func waitForInboxItem(t *testing.T, ctx context.Context, w *store.Workspace, within time.Duration,
+func waitForInboxItem(t *testing.T, ctx context.Context, w *store.Workspace, project string, within time.Duration,
 	tail func() string) query.BoxEntry {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	var last string
 	for time.Now().Before(deadline) {
-		box := query.LoadBox(w, "shop")
+		box := query.LoadBox(w, project)
 		switch {
 		case !box.IsKnown():
 			last = "box unreadable: " + box.Reason

@@ -38,7 +38,11 @@ const (
 // structurally cannot start, stop, type into or prompt anything.
 type Runtime interface {
 	InspectAgent(ctx context.Context, handle runtime.AgentHandle) (runtime.ObservedAgent, error)
-	ReadAgent(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
+	// ReadAgentStyled, not ReadAgent: the health column reports the
+	// composer state, and telling a harness's own faint suggestion from a
+	// person's unsubmitted line needs the attributes
+	// (internal/send/classify.go's faintPlaceholder).
+	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
 }
 
 var _ Runtime = runtime.Adapter(nil)
@@ -335,7 +339,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		return err
 	}
 
-	screen, err := w.deps.Runtime.ReadAgent(ctx, handle, send.DefaultLines)
+	screen, err := w.deps.Runtime.ReadAgentStyled(ctx, handle, send.DefaultLines)
 	if err != nil {
 		// The agent is there and the pane is not readable: an unread screen
 		// is not a quiet one, so the round ends without a verdict.

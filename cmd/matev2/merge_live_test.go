@@ -105,10 +105,10 @@ func crewPaneTail(ctx context.Context, rt *runtime.Herdr, session, configHome, a
 // whole claim of task 22: the crew's commit is on the project's default
 // branch, the crew records `finished`, its branch and worktree are gone, and
 // the console's own snapshot no longer lists it.
-func assertMergedAndFinished(t *testing.T, w *store.Workspace, branch, worktree string) {
+func assertMergedAndFinished(t *testing.T, w *store.Workspace, project, crew, branch, worktree string) {
 	t.Helper()
 	ctx := context.Background()
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir(project)
 	readme, err := os.ReadFile(filepath.Join(repo, "README.md"))
 	if err != nil {
 		t.Fatalf("README.md in the primary checkout: %v", err)
@@ -123,12 +123,12 @@ func assertMergedAndFinished(t *testing.T, w *store.Workspace, branch, worktree 
 		t.Fatalf("the primary repo is on %q after the merge, want main", head)
 	}
 
-	meta, err := w.ReadCrewMeta("shop", "k3")
+	meta, err := w.ReadCrewMeta(project, crew)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if meta[spawn.MetaState] != spawn.CrewStateFinished {
-		t.Fatalf("crew k3 meta state = %q, want finished", meta[spawn.MetaState])
+		t.Fatalf("crew %s meta state = %q, want finished", crew, meta[spawn.MetaState])
 	}
 	if worktree != "" {
 		if _, err := os.Stat(worktree); !os.IsNotExist(err) {
@@ -146,16 +146,16 @@ func assertMergedAndFinished(t *testing.T, w *store.Workspace, branch, worktree 
 		t.Fatalf("query.Load: %v", err)
 	}
 	for _, p := range snap.Projects {
-		if p.ProjectID != "shop" {
+		if p.ProjectID != project {
 			continue
 		}
 		for _, c := range p.Crews {
-			if c.CrewID == "k3" {
-				t.Fatalf("crew k3 is still a console row after the merge: %+v", c)
+			if c.CrewID == crew {
+				t.Fatalf("crew %s is still a console row after the merge: %+v", crew, c)
 			}
 		}
 		if p.ClosedCrews != 1 {
-			t.Fatalf("project shop counts %d closed crew(s), want 1", p.ClosedCrews)
+			t.Fatalf("project %s counts %d closed crew(s), want 1", project, p.ClosedCrews)
 		}
 	}
 }
@@ -195,7 +195,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 	}
 	tail := crewPaneTail(ctx, rt, session, configHome, crewRes.Agent, "k3")
 
-	done := waitForBoxEntry(t, ctx, w, 5*time.Minute, tail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 5*time.Minute, tail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate"
 	})
 	t.Logf("crew handed back: %s: %s", done.Verb, done.Text)
@@ -233,7 +233,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 		}
 	}
 
-	assertMergedAndFinished(t, w, crewRes.Branch, crewRes.Worktree)
+	assertMergedAndFinished(t, w, "shop", "k3", crewRes.Branch, crewRes.Worktree)
 }
 
 // TestLiveMateMergesUnderYolo is the Mate's half: on a project with `yolo`
@@ -293,7 +293,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	}
 	tail := crewPaneTail(ctx, rt, session, configHome, crewRes.Agent, "k3")
 
-	done := waitForBoxEntry(t, ctx, w, 4*time.Minute, tail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 4*time.Minute, tail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate"
 	})
 	t.Logf("crew handed back: %s: %s", done.Verb, done.Text)
@@ -303,7 +303,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 		Runtime: deps.Runtime,
 		Handle:  consoleMateHandle(w, deps),
 	})
-	digest := tickUntilDigest(t, ctx, pilot, w, 2*time.Minute)
+	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 2*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 wait-mate") {
 		t.Fatalf("digest = %q, want the crew's wait-mate item", digest)
@@ -323,9 +323,9 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 		}
 		return screen
 	}
-	waitForCrewState(t, ctx, w, "k3", spawn.CrewStateFinished, 5*time.Minute, mateTail)
+	waitForCrewState(t, ctx, w, "shop", "k3", spawn.CrewStateFinished, 5*time.Minute, mateTail)
 
-	assertMergedAndFinished(t, w, crewRes.Branch, crewRes.Worktree)
+	assertMergedAndFinished(t, w, "shop", "k3", crewRes.Branch, crewRes.Worktree)
 
 	// The trace: the Mate's own pane shows the command it ran and the one
 	// line it printed. `matev2 merge` writes nothing to sent.log - sent.log
@@ -343,13 +343,13 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 }
 
 // waitForCrewState polls `crews/<id>.meta` until the crew records want.
-func waitForCrewState(t *testing.T, ctx context.Context, w *store.Workspace, crew, want string,
+func waitForCrewState(t *testing.T, ctx context.Context, w *store.Workspace, project, crew, want string,
 	within time.Duration, tail func() string) {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	last := ""
 	for time.Now().Before(deadline) {
-		meta, err := w.ReadCrewMeta("shop", crew)
+		meta, err := w.ReadCrewMeta(project, crew)
 		if err != nil {
 			t.Fatalf("ReadCrewMeta: %v", err)
 		}

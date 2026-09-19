@@ -46,8 +46,12 @@ type Fake struct {
 	Now             time.Time
 	Calls           []string
 	ReadOutputs     map[string]string
-	ReadCalls       []string
-	StartArgv       [][]string
+	// StyledOutputs are the screens ReadAgentStyled returns, for the tests
+	// that need SGR attributes. An agent with no entry here falls back to
+	// its plain ReadOutputs screen.
+	StyledOutputs map[string]string
+	ReadCalls     []string
+	StartArgv     [][]string
 	// PromptGate, if set, is called after PromptAgent is recorded and with
 	// the Fake lock released, so a test can interleave another command with
 	// an in-flight delivery (claim committed, outcome not yet recorded).
@@ -443,6 +447,34 @@ func (f *Fake) ReadAgent(_ context.Context, handle AgentHandle, lines int) (stri
 		return "", NewHerdrError(HerdrAgentNotFound, "agent target not found")
 	}
 	return f.ReadOutputs[key], nil
+}
+
+// ReadAgentStyled implements Adapter. The fake's scripted screens are plain
+// text, which is a screen with no attributes set rather than a screen whose
+// attributes were thrown away, so the styled read returns the same bytes
+// unless a test scripted a styled screen of its own with SetStyledOutput.
+func (f *Fake) ReadAgentStyled(ctx context.Context, handle AgentHandle, lines int) (string, error) {
+	f.mu.Lock()
+	styled, ok := f.StyledOutputs[handle.Session.Name+"/"+handle.Name]
+	f.mu.Unlock()
+	if ok {
+		if _, err := f.ReadAgent(ctx, handle, lines); err != nil {
+			return "", err
+		}
+		return styled, nil
+	}
+	return f.ReadAgent(ctx, handle, lines)
+}
+
+// SetStyledOutput scripts what ReadAgentStyled returns for one agent, for a
+// test that needs the SGR attributes the composer classifier reads.
+func (f *Fake) SetStyledOutput(handle AgentHandle, screen string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.StyledOutputs == nil {
+		f.StyledOutputs = map[string]string{}
+	}
+	f.StyledOutputs[handle.Session.Name+"/"+handle.Name] = screen
 }
 
 // startupReadyScreen is the smallest snapshot harness.ClassifyStartupScreen

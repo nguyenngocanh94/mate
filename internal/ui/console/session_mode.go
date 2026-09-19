@@ -623,6 +623,21 @@ func (m Model) endSession() (Model, tea.Cmd) {
 	}
 }
 
+// StreamSize is the PTY geometry stream mode opens an agent's terminal at
+// inside a console of w by h columns and rows, with the splitter at its
+// breakpoint default and no banner over the pane.
+//
+// It exists because a Mate's pane is not the console's own size and never
+// was: the rail and its divider come off the width, so a 120x36 console
+// gives a Mate 65 columns, and 65 is where Claude draws a composer rule
+// exactly as wide as the pane. A live proof that opens a stream at the
+// console's own numbers is measuring a pane no reader ever has
+// (docs/mvp.md task 24), so the proofs ask this function instead of
+// spelling the arithmetic out a second time.
+func StreamSize(kind SessionTargetKind, w, h int) TerminalSize {
+	return streamTerminalSize(kind, w, h, 0, 0)
+}
+
 func streamTerminalSize(kind SessionTargetKind, w, h, reservedLines, railWidth int) TerminalSize {
 	cols := w
 	if kind == SessionTargetMate {

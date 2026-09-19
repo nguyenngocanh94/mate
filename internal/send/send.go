@@ -74,6 +74,12 @@ var (
 // structurally cannot start, stop, attach or prompt anything.
 type Runtime interface {
 	ReadAgent(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
+	// ReadAgentStyled is the same snapshot with SGR attributes intact. The
+	// composer classifier needs them: a harness's own faint suggestion and
+	// a person's unsubmitted line are the same characters (classify.go's
+	// faintPlaceholder), and typing over the second is the mistake this
+	// package exists to prevent.
+	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
 	SendText(ctx context.Context, handle runtime.AgentHandle, text string) error
 	SendKeys(ctx context.Context, handle runtime.AgentHandle, keys []string) error
 	WaitAgent(ctx context.Context, handle runtime.AgentHandle, until runtime.WaitCondition) (runtime.ObservedAgent, error)
@@ -203,7 +209,8 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	}
 	report.Text = payload
 
-	screen, err := deps.Runtime.ReadAgent(ctx, target, opts.Lines)
+	// The styled read, not the plain one: see the Runtime interface above.
+	screen, err := deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
 	if err != nil {
 		return report, err
 	}
@@ -228,7 +235,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	case StateUnknown:
 		return report, sendError(observability.CodeStateConflict, ErrComposerUnknown,
 			fmt.Sprintf("agent %s is showing a screen mate cannot name; nothing was typed", target.Name),
-			map[string]any{"screen_tail": ScreenTail(screen, tailLines)})
+			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 
 	if err := deps.Runtime.SendText(ctx, target, payload); err != nil {
@@ -254,7 +261,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		if err := sleep(ctx, deps, opts.RetrySleep); err != nil {
 			return report, err
 		}
-		screen, err = deps.Runtime.ReadAgent(ctx, target, opts.Lines)
+		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
 		if err != nil {
 			return report, err
 		}
@@ -276,7 +283,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if after.State == StatePending {
 		return report, sendError(observability.CodeStateConflict, ErrEnterSwallowed,
 			fmt.Sprintf("typed into %s but %d enter(s) did not submit it; the line is still in the composer (%q)", target.Name, report.Presses, after.Pending),
-			map[string]any{"pending": after.Pending, "screen_tail": ScreenTail(screen, tailLines)})
+			map[string]any{"pending": after.Pending, "screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 
 	if opts.WaitForWorking {

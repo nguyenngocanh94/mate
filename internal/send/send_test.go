@@ -34,6 +34,12 @@ type scripted struct {
 	lines   []int
 }
 
+func (s *scripted) ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error) {
+	// The scripted screens carry no attributes, which is what a screen with
+	// nothing drawn faint looks like; send.Send reads this one.
+	return s.ReadAgent(ctx, handle, lines)
+}
+
 func (s *scripted) ReadAgent(_ context.Context, _ runtime.AgentHandle, lines int) (string, error) {
 	s.lines = append(s.lines, lines)
 	if s.reads >= len(s.screens) {
