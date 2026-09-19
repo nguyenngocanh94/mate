@@ -71,6 +71,8 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return restartMateAction(ctx, ws, deps, req)
 		case console.ActionClearComposer:
 			return clearComposerAction(ctx, ws, deps, req)
+		case console.ActionMerge:
+			return mergeCrewAction(ctx, ws, deps, req)
 		default:
 			return "", observability.NewError(observability.CodeUsage,
 				fmt.Sprintf("%s is not wired in this build", req.Action))
@@ -104,6 +106,28 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 		line += "; a trust dialog was answered"
 	}
 	return line, nil
+}
+
+// mergeCrewAction is the Console's `merge` entry on a `wait-mate` Crew row
+// (mvp.md task 22). The caller is CallerUser and is passed as a literal,
+// never read from the environment: the console is the captain's own
+// program, and a console that inherited MATEV2_CALLER=mate - which it does
+// whenever the captain opens it from inside a Mate's pane - would otherwise
+// refuse the captain's own keystroke because the project's yolo is off.
+//
+// The line it returns is the command's own one line, so the console and
+// `matev2 merge` report the same event in the same words, and a refusal is
+// propagated verbatim for the reason every other branch here does.
+func mergeCrewAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" || req.Crew == "" {
+		return "", observability.NewError(observability.CodeUsage,
+			"merge needs both a Project and one of its Crews; the request named "+req.Target+"/"+req.Crew)
+	}
+	res, err := spawn.MergeCrew(ctx, ws, deps, req.Target, req.Crew, spawn.CallerUser)
+	if err != nil {
+		return "", err
+	}
+	return res.Line(), nil
 }
 
 // toggleModeAction flips `mate/.auto` (mvp.md section 5). The flag is the

@@ -789,6 +789,11 @@ func crewPaneEnv(plan crewPlan, session runtime.SessionHandle, statusPath string
 		{Key: config.EnvCrewID, Value: plan.crew},
 		{Key: config.EnvRuntimeSessionID, Value: session.Name},
 		{Key: config.EnvStatusFile, Value: statusPath},
+		// Who is typing, for the commands that answer differently to the
+		// three of them (docs/mvp.md task 22): a crew may never merge its
+		// own branch, and the refusal has to name the crew rather than
+		// guess from an absent variable.
+		{Key: config.EnvCaller, Value: CallerCrew},
 	}
 }
 

@@ -244,6 +244,54 @@ func (g Git) IsDirty(ctx context.Context, worktree string) (int, error) {
 	return len(strings.Split(trimmed, "\n")), nil
 }
 
+// CurrentBranch is `git -C dir rev-parse --abbrev-ref HEAD`: the name of the
+// branch dir has checked out, or the literal "HEAD" when the checkout is
+// detached. The merge of docs/mvp.md task 22 asks it of the primary
+// repository before touching anything, because `git merge --ff-only`
+// advances whatever HEAD happens to be and a caller that did not look would
+// move the wrong branch.
+func (g Git) CurrentBranch(ctx context.Context, dir string) (string, error) {
+	out, err := g.run(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// DetachedHead is what CurrentBranch reports for a detached checkout: git
+// prints the word HEAD rather than a branch name.
+const DetachedHead = "HEAD"
+
+// MergeFFOnly is `git -C repo merge --ff-only <branch>` in the primary
+// repository: the crew's branch is landed by moving the checked-out branch
+// forward onto it, and nothing else. No commit is created, so a branch that
+// is not a descendant of the checked-out one is refused by git itself rather
+// than turned into a merge commit nobody asked for.
+//
+// It re-reads HEAD first and refuses a detached checkout, and refuses a
+// repository that already has `branch` checked out - merging a branch into
+// itself is a no-op git reports as success, which would let a caller print
+// "merged" for a fast-forward that never happened. That the checked-out
+// branch is the *project's* default branch is the caller's fact, not git's:
+// spawn.MergeCrew establishes it with CurrentBranch and refuses by name, so
+// the reason a merge did not happen is reported in the project's words.
+func (g Git) MergeFFOnly(ctx context.Context, repo, branch string) error {
+	head, err := g.CurrentBranch(ctx, repo)
+	if err != nil {
+		return err
+	}
+	if head == DetachedHead {
+		return observability.NewError(observability.CodeStateConflict,
+			fmt.Sprintf("%s has a detached HEAD; check out a branch before merging %s", repo, branch))
+	}
+	if head == branch {
+		return observability.NewError(observability.CodeStateConflict,
+			fmt.Sprintf("%s already has %s checked out; a branch cannot be fast-forwarded into itself", repo, branch))
+	}
+	_, err = g.run(ctx, repo, "merge", "--ff-only", branch)
+	return err
+}
+
 // SamePath reports whether a and b name the same location, resolving
 // symlinks when both sides exist. macOS /tmp is /private/tmp and git reports
 // the resolved path, so the tangle guard cannot compare strings.
