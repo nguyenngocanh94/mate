@@ -865,6 +865,25 @@ func clampTop(top, sel, total, h int) int {
 	return clampInt(top, 0, total-h)
 }
 
+// clampScrollTop is clampTop for a surface that has no selected row: an
+// overlay showing total lines in a window of h. It exists because passing
+// sel=0 to clampTop does not mean "there is no selection" - the rule "keep
+// the selection on screen" then drags the offset back to the top on every
+// keystroke, so such an overlay never scrolls at all.
+//
+// The bound is total-h+1, not total-h, and the extra line is windowContent's
+// (seams.go): as soon as the offset leaves the top, one row of the window
+// goes to the "↑ N more" indicator, so at total-h the last line of the
+// content is still one row below the fold. An overlay that advertises more
+// content below it and cannot reach it is worse than one that does not
+// scroll.
+func clampScrollTop(top, total, h int) int {
+	if h <= 0 || total <= h {
+		return 0
+	}
+	return clampInt(top, 0, total-h+1)
+}
+
 // window is the [start, end) row range a body of h lines shows at offset
 // top. h <= 0 (no size message yet) shows everything: the caller's screen
 // enforces the real line budget, and hiding the whole list would be worse

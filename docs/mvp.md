@@ -249,6 +249,12 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   Cùng lần đo: dòng `digest: 1 item(s) — k3 needs-decision: "pick A or B" — status files under /private/tmp/…/crews; act per AGENTS.md section 10` (có `—`, `·`, dấu nháy kép và một đường dẫn tuyệt đối dài) tới `UserPromptSubmit` của Claude nguyên vẹn, nên hook ghi `Source: app` và không xoá `.auto`.
   Bằng chứng dùng được là `sent.log` có **hai** bản cùng một dòng - một do daemon ghi sau khi composer sạch, một do hook ghi khi model đọc được - còn một bản chỉ chứng minh chữ tới pane.
   Ngay sau đó một dòng người dùng gõ không có marker xoá `.auto` trong vòng poll đầu tiên, và vòng tick kế tiếp không gửi gì dù đã có câu hỏi mới chờ sẵn.
+- Overlay cuộn trong console không được dùng `clampTop`.
+  `clampTop` có việc là giữ *hàng đang chọn* trong khung, nên gọi nó với `sel=0` trên một mặt không có hàng nào được chọn sẽ kéo offset về đầu sau mỗi phím.
+  Màn hình chi tiết lỗi (`e`, `session_failure.go`) vì thế vẽ chỉ báo "↓ N more" từ task 05 mà chưa bao giờ cuộn được; phát hiện và sửa 2026-09-19 khi overlay diff của task 21 cần đúng cơ chế đó.
+  Cận trên đúng là `total-h+1`, không phải `total-h`: `windowContent` mất một dòng cho chỉ báo "↑ N more" ngay khi offset rời khỏi đầu, nên ở `total-h` dòng cuối cùng vẫn nằm dưới mép.
+  Bài học chung: một khung nói là còn nội dung bên dưới mà không tới được còn tệ hơn một khung không cuộn.
+
 - Mục 9 ("Waiting is your job") và mục 10 của manual Mate mâu thuẫn nhau về việc có nên tự poll `state` sau một digest hay không, sót lại từ trước khi observer và daemon (task 18, 19) tồn tại: mục 9 vẫn viết "Nothing wakes you on its own today" như thể chưa ai canh crew.
   Sửa ở task 20: mục 9 chỉ còn nói tới chế độ giám sát (`sleep 20` là vòng của chế độ đó), mục 10 nói rõ Mate dừng turn ngay sau khi hành động trên một digest - daemon là bên canh giữ tiếp theo, không phải Mate tự poll.
   Đo 2026-09-18, `TestLiveAutoPolicyMateAnswersADigest`: một crew Codex hỏi `needs-decision: choose colour red or blue for the button`, digest tới Mate Claude, Mate đọc `.status` thật (không đoán từ đoạn cắt ≤120 rune trên dòng digest) rồi trả lời crew bằng đúng một `matev2 send` (`"Use blue for the button."`), crew ghi `wait-mate: chose blue`, và Mate không tự `crew stop` - `crews/k3.meta` vẫn `state=spawned` sau khi Mate trả lời, đúng luật mục 4b rằng đóng crew là lời của người dùng.

@@ -204,7 +204,10 @@ func diffPage(l frameLayout) int {
 }
 
 func (m Model) scrollDiff(delta int, l frameLayout) Model {
-	m.diff.top = clampDiffTop(m.diff.top+delta, len(m.diffBodyLines(l.Cols)), diffBodyHeight(l))
+	// clampScrollTop, not clampTop (model.go): a patch has no selected row,
+	// and clampTop's "keep the selection on screen" rule would drag the
+	// offset back to the top on every keystroke.
+	m.diff.top = clampScrollTop(m.diff.top+delta, len(m.diffBodyLines(l.Cols)), diffBodyHeight(l))
 	return m
 }
 
@@ -225,15 +228,4 @@ func RenderDiffOverlay(text, crew, branch string, w, h int) []string {
 		out = append(out, l.render(w))
 	}
 	return out
-}
-
-// clampDiffTop confines the offset to a real window. It is not clampTop
-// (model.go): that one keeps a *selected row* on screen, and there is no
-// selection in a patch - dragging the offset back to the selection would
-// mean the overlay never scrolled at all.
-func clampDiffTop(top, total, h int) int {
-	if h <= 0 || total <= h {
-		return 0
-	}
-	return clampInt(top, 0, total-h)
 }
