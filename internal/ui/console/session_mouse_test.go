@@ -2,6 +2,7 @@ package console
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -67,17 +68,22 @@ func TestClickInTheTerminalZoneFocusesItAndForwardsToThePTY(t *testing.T) {
 	}
 }
 
-// TestClickOnARailEntryFocusesTheBoxAndSelectsThatEntry.
-func TestClickOnARailEntryFocusesTheBoxAndSelectsThatEntry(t *testing.T) {
+// TestClickOnARailEntrySelectsItWithoutReachingThePTY. The entry it clicks
+// is the Mate's own `wedged` incident, the one row that names the view
+// already on screen: it selects and opens nothing, so what this measures is
+// the press itself rather than the open (which is
+// TestClickOnARailEntryOpensThatCrewsSession's job).
+func TestClickOnARailEntrySelectsItWithoutReachingThePTY(t *testing.T) {
 	m, channel := mouseBoxFixture(t)
+	m.sess.snapshot.Box = boxMateWedged()
 	row := railRowOf(t, m, 0)
 
 	m, cmd := send(t, m, press(2, row))
 	if cmd != nil {
 		t.Fatalf("a click on a rail entry produced a Cmd: %T", cmd())
 	}
-	if m.sess.zone != zoneBox {
-		t.Fatalf("zone after a click on the rail = %v, want the box", m.sess.zone)
+	if m.sess.zone != zoneTerminal {
+		t.Fatalf("zone after clicking the Mate's own row = %v, want the terminal it opened", m.sess.zone)
 	}
 	if got := m.sessionRailState().sel; got != 0 {
 		t.Fatalf("selection after the click = %d, want the entry that was clicked (0)", got)
@@ -87,25 +93,29 @@ func TestClickOnARailEntryFocusesTheBoxAndSelectsThatEntry(t *testing.T) {
 	}
 }
 
-// TestDoubleClickOnARailEntryOpensPeek: the second press on the same entry
-// is the gesture, and it runs the same action `p` does.
-func TestDoubleClickOnARailEntryOpensPeek(t *testing.T) {
-	m, _ := mouseBoxFixture(t)
-	action := &recordingAction{out: "pane text"}
-	m.action = action.run
-	row := railRowOf(t, m, 0) // the k3 needs-decision item, which names a crew
+// TestClickOnARailEntryOpensThatCrewsSession is the 2026-09-19 gesture: one
+// press on the row body, anywhere but the button, and the reader is looking
+// at that crew's own pane. The Mate's stream is closed first - two PTY
+// streams are never open at once - so the crew's own open begins from the
+// close, not from the click.
+func TestClickOnARailEntryOpensThatCrewsSession(t *testing.T) {
+	m, channel := mouseBoxFixture(t)
+	m.sess.snapshot.Box = boxAsking(fixtureCrewID)
+	row := railRowOf(t, m, 0)
 
-	m, _ = send(t, m, press(2, row))
 	m, cmd := send(t, m, press(2, row))
 	if cmd == nil {
-		t.Fatal("a double click on a rail entry ran nothing; want the peek action")
+		t.Fatal("a click on a rail row opened nothing")
+	}
+	if m.sess.phase != sessionClosing {
+		t.Fatalf("phase after the click = %v, want the Mate's stream closing first", m.sess.phase)
 	}
 	m, _ = send(t, m, cmd())
-	if !m.peek.open || m.peek.crew != "k3" {
-		t.Fatalf("peek = %+v, want it open on k3", m.peek)
+	if !channel.isClosed() {
+		t.Fatal("the Mate's channel is still open after its session was left")
 	}
-	if len(action.reqs) != 1 || action.reqs[0].Action != ActionPeek {
-		t.Fatalf("action requests = %+v, want one peek", action.reqs)
+	if m.sess.target.Kind != SessionTargetCrew || m.sess.target.ID != fixtureCrewID {
+		t.Fatalf("session target after the click = %+v, want crew %s", m.sess.target, fixtureCrewID)
 	}
 }
 
@@ -214,197 +224,192 @@ func TestSplitterDragIsClampedToTheRailBounds(t *testing.T) {
 	}
 }
 
-// TestEachHeaderLabelRunsItsOwnAction hit-tests every clickable label on the
-// rail header at the coordinates the renderer drew it at. A label that is
-// drawn but not clickable is decoration, and a label whose hit box has
-// drifted off its text runs the wrong thing.
-func TestEachHeaderLabelRunsItsOwnAction(t *testing.T) {
+// TestTheHeaderCarriesTheTwoFiltersAndNothingElse is the 2026-09-19 header:
+// the box is a filter and a list of rows, so the only things above the rows
+// are the two filters. A label that came back - the view, the mode, a
+// recovery action - would be something to read before the first row again.
+func TestTheHeaderCarriesTheTwoFiltersAndNothingElse(t *testing.T) {
+	specs := sessionHeaderLabels()
+	if len(specs) != 2 {
+		t.Fatalf("header labels = %+v, want exactly the two filters", specs)
+	}
+	if specs[0].id != labelWaiting || specs[0].text != "[waiting]" {
+		t.Fatalf("first label = %+v, want [waiting]", specs[0])
+	}
+	if specs[1].id != labelAll || specs[1].text != "[all]" {
+		t.Fatalf("second label = %+v, want [all]", specs[1])
+	}
+	// The header is one line at every rail width the splitter allows, which
+	// is the other half of the complaint it answers.
+	for w := railMinWidth; w <= railMaxWidth; w++ {
+		if rows := packLabels(specs, w); len(rows) != 1 {
+			t.Fatalf("the header wraps onto %d lines at %d cells", len(rows), w)
+		}
+	}
+}
+
+// TestTheFilterLabelsSelectTheirOwnList hit-tests both filters at the
+// coordinates the renderer drew them at, and pins that each one names the
+// list it wants rather than toggling: two presses on [all] leave [all] on.
+func TestTheFilterLabelsSelectTheirOwnList(t *testing.T) {
 	for _, tc := range []struct {
-		id     labelID
-		assert func(t *testing.T, m Model, cmd tea.Cmd, action *recordingAction)
-	}{
-		{labelProject, func(t *testing.T, m Model, _ tea.Cmd, _ *recordingAction) {
-			if m.sess.phase == sessionActive {
-				t.Fatal("[← project] did not leave the session view")
-			}
-		}},
-		{labelMode, func(t *testing.T, m Model, cmd tea.Cmd, action *recordingAction) {
-			if cmd == nil {
-				t.Fatal("[supervised] ran nothing")
-			}
-			send(t, m, cmd())
-			if len(action.reqs) != 1 || action.reqs[0].Action != ActionMode {
-				t.Fatalf("requests = %+v, want one mode flip", action.reqs)
-			}
-		}},
-		{labelRestart, func(t *testing.T, m Model, cmd tea.Cmd, action *recordingAction) {
-			if cmd != nil {
-				t.Fatalf("[restart mate] ran %T before the confirmation was answered", cmd())
-			}
-			if !m.boxConfirm {
-				t.Fatal("[restart mate] did not open its confirmation")
-			}
-			if len(action.reqs) != 0 {
-				t.Fatalf("[restart mate] reached ActionFunc before confirmation: %+v", action.reqs)
-			}
-		}},
-		{labelClear, func(t *testing.T, m Model, cmd tea.Cmd, action *recordingAction) {
-			if cmd == nil {
-				t.Fatal("[clear composer] ran nothing")
-			}
-			send(t, m, cmd())
-			if len(action.reqs) != 1 || action.reqs[0].Action != ActionClearComposer {
-				t.Fatalf("requests = %+v, want one clear_composer", action.reqs)
-			}
-		}},
-	} {
+		id      labelID
+		wantAll bool
+	}{{labelAll, true}, {labelWaiting, false}} {
 		t.Run(labelName(tc.id), func(t *testing.T) {
 			m, _ := mouseBoxFixture(t)
-			action := &recordingAction{out: "done"}
-			m.action = action.run
 			at, ok := labelPlacement(m.sessionGeom(), tc.id)
 			if !ok {
 				t.Fatalf("%s is not drawn on the header", labelName(tc.id))
 			}
-			after, cmd := send(t, m, press(at.x, at.y))
-			tc.assert(t, after, cmd, action)
-		})
-	}
-}
-
-// TestTheConfirmationButtonsAnswerTheRestartPrompt: [yes] runs it, [no]
-// leaves the Mate alone.
-func TestTheConfirmationButtonsAnswerTheRestartPrompt(t *testing.T) {
-	for _, tc := range []struct {
-		id   labelID
-		runs bool
-	}{{labelYes, true}, {labelNo, false}} {
-		t.Run(labelName(tc.id), func(t *testing.T) {
-			m, _ := mouseBoxFixture(t)
-			action := &recordingAction{out: "restarted"}
-			m.action = action.run
-			m = m.beginRestartMate(m.sess.target.ProjectID)
-			at, ok := labelPlacement(m.sessionGeom(), tc.id)
-			if !ok {
-				t.Fatalf("%s is not drawn on the confirmation line", labelName(tc.id))
-			}
 			m, cmd := send(t, m, press(at.x, at.y))
-			if m.boxConfirm {
-				t.Fatal("answering the confirmation left it open")
+			if cmd != nil {
+				t.Fatalf("a filter ran %T; it only changes what the rail shows", cmd())
 			}
-			if tc.runs != (cmd != nil) {
-				t.Fatalf("%s produced a command: %v, want %v", labelName(tc.id), cmd != nil, tc.runs)
+			if m.boxAll != tc.wantAll {
+				t.Fatalf("[all] = %v after pressing %s, want %v", m.boxAll, labelName(tc.id), tc.wantAll)
 			}
-			if !tc.runs {
-				return
-			}
-			m, _ = send(t, m, cmd())
-			if len(action.reqs) != 1 || action.reqs[0].Action != ActionRestartMate {
-				t.Fatalf("requests = %+v, want one restart", action.reqs)
+			m, _ = send(t, m, press(at.x, at.y))
+			if m.boxAll != tc.wantAll {
+				t.Fatalf("a second press on %s flipped the filter to %v", labelName(tc.id), m.boxAll)
 			}
 		})
 	}
 }
 
-// TestTheReplyInputButtonsSendAndCancel.
-func TestTheReplyInputButtonsSendAndCancel(t *testing.T) {
-	for _, tc := range []struct {
-		id    labelID
-		sends bool
-	}{{labelSend, true}, {labelCancel, false}} {
-		t.Run(labelName(tc.id), func(t *testing.T) {
-			m, _ := mouseBoxFixture(t)
-			action := &recordingAction{out: "replied"}
-			m.action = action.run
-			m.sess.zone = zoneBox
-			m, _ = send(t, m, key("r"))
-			m, _ = send(t, m, key("A"))
-			if !m.boxReply {
-				t.Fatal("setup: the reply input is not open")
-			}
-			at, ok := labelPlacement(m.sessionGeom(), tc.id)
-			if !ok {
-				t.Fatalf("%s is not drawn on the reply line", labelName(tc.id))
-			}
-			m, cmd := send(t, m, press(at.x, at.y))
-			if m.boxReply {
-				t.Fatalf("%s left the reply input open", labelName(tc.id))
-			}
-			if tc.sends != (cmd != nil) {
-				t.Fatalf("%s produced a command: %v, want %v", labelName(tc.id), cmd != nil, tc.sends)
-			}
-			if !tc.sends {
-				return
-			}
-			m, _ = send(t, m, cmd())
-			if len(action.reqs) != 1 || action.reqs[0].Action != ActionReply || action.reqs[0].Input != "A" {
-				t.Fatalf("requests = %+v, want one reply carrying \"A\"", action.reqs)
-			}
-		})
+// TestTheBoxZoneOpensTheActionsMenu: `o` is where the Mate's restart and
+// clear-composer went when they left the header, and the menu it opens is
+// the Mate's own - not whatever row the tree's cursor is sitting on.
+func TestTheBoxZoneOpensTheActionsMenu(t *testing.T) {
+	m, channel := mouseBoxFixture(t)
+	action := &recordingAction{out: "done"}
+	m.action = action.run
+	m.sess.zone = zoneBox
+
+	m, cmd := send(t, m, key("o"))
+	if cmd != nil {
+		t.Fatalf("o ran %T; it only opens the menu", cmd())
+	}
+	if !m.actions {
+		t.Fatal("o under box focus did not open the Actions menu")
+	}
+	if len(channel.writtenBytes()) != 0 {
+		t.Fatalf("o under box focus reached the PTY: %q", channel.writtenBytes())
+	}
+	frame := renderFrame(t, m)
+	for _, want := range []string{"ACTIONS", string(ActionRestartMate), string(ActionClearComposer)} {
+		if !containsLine(frame, want) {
+			t.Fatalf("the menu does not offer %q:\n%s", want, frame)
+		}
+	}
+
+	// The restart is dangerous, so the menu's own confirmation stands in
+	// front of it, and nothing reaches ActionFunc until it is answered.
+	m = selectMenuAction(t, m, ActionRestartMate)
+	m, cmd = send(t, m, key("enter"))
+	if cmd != nil || m.confirm == nil {
+		t.Fatalf("restart ran without its confirmation (cmd=%v confirm=%v)", cmd != nil, m.confirm != nil)
+	}
+	if len(action.reqs) != 0 {
+		t.Fatalf("restart reached ActionFunc before the confirmation: %+v", action.reqs)
+	}
+	m, cmd = send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("the answered confirmation ran nothing")
+	}
+	m, _ = send(t, m, cmd())
+	if len(action.reqs) != 1 || action.reqs[0].Action != ActionRestartMate {
+		t.Fatalf("requests = %+v, want one restart", action.reqs)
+	}
+	if m.sess.phase != sessionActive {
+		t.Fatalf("the menu left the session view (phase %v); only Esc does", m.sess.phase)
 	}
 }
 
-// TestEachActionStripButtonRunsItsOwnAction hit-tests the three inline
-// buttons on a hovered attention entry.
-func TestEachActionStripButtonRunsItsOwnAction(t *testing.T) {
-	for _, tc := range []struct {
-		id   labelID
-		want Action
-	}{{labelResolve, ActionResolve}, {labelPeek, ActionPeek}} {
-		t.Run(labelName(tc.id), func(t *testing.T) {
-			m, _ := mouseBoxFixture(t)
-			action := &recordingAction{out: "done"}
-			m.action = action.run
-			const attention = 0 // the needs-decision item, first in the inbox
-			m.sess.zone, m.sess.boxSel = zoneBox, attention
-			row := railRowOf(t, m, attention)
-
-			// The motion that puts the pointer on the entry is what makes its
-			// strip appear, exactly as it does for a reader.
-			m, _ = send(t, m, tea.MouseMsg{X: 2, Y: row, Action: tea.MouseActionMotion})
-			if m.boxHover != attention {
-				t.Fatalf("hover = %d, want the entry under the pointer (%d)", m.boxHover, attention)
-			}
-			inbox, _ := m.sessionBoxList()
-			strip, ok := sessionEntryStrip(inbox, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
-			if !ok {
-				t.Fatal("the hovered attention entry drew no action strip")
-			}
-			at, found := placementOf(strip, tc.id)
-			if !found {
-				t.Fatalf("%s is not in the strip", labelName(tc.id))
-			}
-			m, cmd := send(t, m, press(at.x, at.y))
-			if cmd == nil {
-				t.Fatalf("%s ran nothing", labelName(tc.id))
-			}
-			m, _ = send(t, m, cmd())
-			if len(action.reqs) != 1 || action.reqs[0].Action != tc.want {
-				t.Fatalf("requests = %+v, want one %s", action.reqs, tc.want)
-			}
-		})
-	}
-}
-
-// TestTheReplyStripButtonOpensTheInput is the third button, which opens a
-// field rather than running an action.
-func TestTheReplyStripButtonOpensTheInput(t *testing.T) {
+// TestTheBoxZoneActionsMenuClearsTheComposerWithoutAConfirmation: the other
+// entry writes one Ctrl+U into a composer and asks nothing first, exactly as
+// the `u` key it replaces did.
+func TestTheBoxZoneActionsMenuClearsTheComposerWithoutAConfirmation(t *testing.T) {
 	m, _ := mouseBoxFixture(t)
-	const attention = 0
-	m.sess.zone, m.sess.boxSel, m.boxHover = zoneBox, attention, attention
+	action := &recordingAction{out: "cleared"}
+	m.action = action.run
+	m.sess.zone = zoneBox
+
+	m, _ = send(t, m, key("o"))
+	m = selectMenuAction(t, m, ActionClearComposer)
+	m, cmd := send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("clear_composer ran nothing")
+	}
+	if m.confirm != nil {
+		t.Fatal("clear_composer asked for a confirmation; it changes nothing that cannot be retyped")
+	}
+	m, _ = send(t, m, cmd())
+	if len(action.reqs) != 1 || action.reqs[0].Action != ActionClearComposer {
+		t.Fatalf("requests = %+v, want one clear_composer", action.reqs)
+	}
+}
+
+// selectMenuAction moves the menu cursor onto one action by name, the way a
+// reader would with j.
+func selectMenuAction(t *testing.T, m Model, want Action) Model {
+	t.Helper()
+	for i, c := range m.actionChoices {
+		if c.action == want {
+			m.actionIndex = i
+			return m
+		}
+	}
+	t.Fatalf("the menu does not offer %s: %+v", want, m.actionChoices)
+	return m
+}
+
+// TestTheAssignButtonHandsTheEntryToTheMate hit-tests the row's one inline
+// button at the coordinates the renderer drew it at, and proves the press
+// assigns rather than opening the crew's pane the rest of the row opens.
+func TestTheAssignButtonHandsTheEntryToTheMate(t *testing.T) {
+	m, channel := mouseBoxFixture(t)
+	action := &recordingAction{out: "done"}
+	m.action = action.run
+	const attention = 0 // the needs-decision item, first in the inbox
+	m.sess.zone, m.sess.boxSel = zoneBox, attention
 	row := railRowOf(t, m, attention)
+
+	// The motion that puts the pointer on the entry is what makes its strip
+	// appear, exactly as it does for a reader.
+	m, _ = send(t, m, tea.MouseMsg{X: 2, Y: row, Action: tea.MouseActionMotion})
+	if m.boxHover != attention {
+		t.Fatalf("hover = %d, want the entry under the pointer (%d)", m.boxHover, attention)
+	}
 	inbox, _ := m.sessionBoxList()
 	strip, ok := sessionEntryStrip(inbox, attention, attention, attention, 0, row, m.sessionGeom().railW, m.g)
 	if !ok {
-		t.Fatal("the selected attention entry drew no action strip")
+		t.Fatal("the hovered attention entry drew no action strip")
 	}
-	at, found := placementOf(strip, labelReply)
+	at, found := placementOf(strip, labelAssign)
 	if !found {
-		t.Fatal("[reply] is not in the strip")
+		t.Fatal("[assign] is not in the strip")
 	}
-	m, _ = send(t, m, press(at.x, at.y))
-	if !m.boxReply || m.boxReplyCrew != "k3" {
-		t.Fatalf("[reply] did not open the input for k3: reply=%v crew=%q", m.boxReply, m.boxReplyCrew)
+	m, cmd := send(t, m, press(at.x, at.y))
+	if cmd == nil {
+		t.Fatal("[assign] ran nothing")
+	}
+	m, _ = send(t, m, cmd())
+	if len(action.reqs) != 1 || action.reqs[0].Action != ActionResolve {
+		t.Fatalf("requests = %+v, want one resolve", action.reqs)
+	}
+	if channel.isClosed() || m.sess.phase != sessionActive {
+		t.Fatalf("[assign] left the Mate's session (phase %v, closed %v); only the row body opens a crew",
+			m.sess.phase, channel.isClosed())
+	}
+}
+
+// TestTheStripIsTheOnlyButtonOnTheRow: one button, so a reader never has to
+// aim at the right word out of three (2026-09-19).
+func TestTheStripIsTheOnlyButtonOnTheRow(t *testing.T) {
+	buttons := boxStripButtons(unicodeGlyphs)
+	if len(buttons) != 1 || buttons[0].id != labelAssign || buttons[0].text != "[assign]" {
+		t.Fatalf("strip buttons = %+v, want exactly [assign]", buttons)
 	}
 }
 
@@ -464,9 +469,16 @@ func TestBareMotionOverThePaneIsNeverForwarded(t *testing.T) {
 
 // TestClickOnTheProjectFrameBoxPanelFocusesAndSelectsIt: the project frame's
 // panel answers the mouse the same way the rail does (mvp.md task 15), so a
-// reader does not learn one set of gestures per surface.
+// reader does not learn one set of gestures per surface. The click both
+// selects the row and opens the crew it names, which is one gesture with one
+// outcome - the panel's own proof that the two surfaces agree.
 func TestClickOnTheProjectFrameBoxPanelFocusesAndSelectsIt(t *testing.T) {
-	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
+	tree := sampleTree()
+	tree.Projects[0].Box = boxAsking(fixtureCrewID)
+	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
+	m = m.WithSession(func(context.Context, SessionTarget) (SessionSnapshot, error) {
+		return SessionSnapshot{}, nil
+	}, nil, nil)
 	m, _ = send(t, m, key("enter")) // into the project frame
 	top, h, ok := m.boxPanelBodyRegion()
 	if !ok {
@@ -489,15 +501,15 @@ func TestClickOnTheProjectFrameBoxPanelFocusesAndSelectsIt(t *testing.T) {
 		t.Fatal("setup: the panel draws no entries at all")
 	}
 
-	m, cmd := send(t, m, press(4, top+row))
-	if cmd != nil {
-		t.Fatalf("a click on the panel produced a Cmd: %T", cmd())
-	}
+	m, _ = send(t, m, press(4, top+row))
 	if m.focus != paneBox {
 		t.Fatalf("focus after the click = %v, want paneBox", m.focus)
 	}
 	if got := m.projectBoxSelection(); got != want {
 		t.Fatalf("selection after the click = %d, want the clicked entry %d", got, want)
+	}
+	if m.sess.target.Kind != SessionTargetCrew || m.sess.target.ID != fixtureCrewID {
+		t.Fatalf("session target after the click = %+v, want crew %s", m.sess.target, fixtureCrewID)
 	}
 }
 
@@ -532,30 +544,12 @@ func placementOf(labels []placedLabel, id labelID) (placedLabel, bool) {
 
 func labelName(id labelID) string {
 	switch id {
-	case labelProject:
-		return "project"
-	case labelMode:
-		return "mode"
-	case labelRestart:
-		return "restart"
-	case labelClear:
-		return "clear"
 	case labelAll:
 		return "all"
-	case labelResolve:
-		return "resolve"
-	case labelReply:
-		return "reply"
-	case labelPeek:
-		return "peek"
-	case labelSend:
-		return "send"
-	case labelCancel:
-		return "cancel"
-	case labelYes:
-		return "yes"
-	case labelNo:
-		return "no"
+	case labelAssign:
+		return "assign"
+	case labelWaiting:
+		return "waiting"
 	default:
 		return "none"
 	}

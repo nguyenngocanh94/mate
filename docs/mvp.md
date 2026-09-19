@@ -99,7 +99,7 @@ Không có file box riêng.
 
 Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần chưa được giải quyết - gọi là inbox: một status `needs-decision`, hoặc một incident, mà chưa có ai trả lời.
 Mỗi mục inbox là một dòng: giờ, crew, và nó cần gì bằng chữ thường (`needs an answer`, `stuck, quiet too long`, `agent gone`, `send wedged`), không hiện text của status (quyết định 2026-09-19: text đó là bản tóm tắt crew tự viết, đọc nó không thay được việc nhìn pane).
-Người dùng hoặc tự vào xem (`[peek]`, Enter trên hàng crew) hoặc giao cho Mate (`[resolve]`); `[all]` mới hiện verb và text đầy đủ của từng dòng.
+Người dùng hoặc tự vào xem (Enter, hoặc click vào hàng: mở luôn pane của crew đó) hoặc giao cho Mate (`[assign]`); `[all]` mới hiện verb và text đầy đủ của từng dòng.
 Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật chính xác, dựa trên thứ tự byte trong file), hoặc khi `sent.log` có một dòng gửi tới `crew:<id>` sau thời điểm của câu hỏi (luật xấp xỉ, vì status không có timestamp riêng).
 `wait-mate` không nằm trong inbox: cột STATE của bảng crew đã mang nó, và người dùng vẫn Enter vào pane crew để đối thoại tiếp bất cứ lúc nào (quyết định 2026-09-18).
 
@@ -108,7 +108,7 @@ Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật
 Task kết thúc khi `matev2 crew stop` chạy: scout đóng khi người dùng nhận report và hài lòng (chủ động bảo Mate đóng), ship đóng khi branch đã merge (người dùng merge, sau này `matev2 merge`).
 Crew đã đóng (`state=finished|failed` trong meta) biến khỏi cây console, khỏi inbox và khỏi `crew list` mặc định (`--all` để xem); `crews/<id>/` giữ nguyên.
 Cây console vì thế chỉ hiện việc đang chạy, kể cả crew đã nói `wait-mate` mà chưa ai đóng.
-Phím `a` dưới focus box bật `[all]`, hiện lại toàn bộ log để debug; mặc định tắt và không lưu lại.
+Phím `l` dưới focus box bật `[all]`, hiện lại toàn bộ log để debug; mặc định tắt và không lưu lại.
 
 Gửi vào pane Mate là trường hợp đặc biệt vì người dùng cùng sở hữu composer.
 Chỉ gửi khi người dùng bấm (chế độ giám sát) hoặc khi chế độ tự động đang bật.
@@ -152,7 +152,12 @@ Cờ là file `.matev2/projects/<p>/mate/.auto`.
 Chế độ giám sát (mặc định):
 
 - Không dòng nào tự đi vào pane Mate.
-- Trên một mục trong inbox: Enter (`[resolve]`) gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. `r` trả lời crew trực tiếp qua `matev2 send`; `p` peek pane crew.
+- Trên một mục trong inbox (quyết định 2026-09-19: box là chỗ để hành động, không phải chỗ để đọc):
+  - Enter, hoặc một click vào thân hàng, mở pane của chính crew mà mục đó nêu tên - đúng như Enter trên hàng crew trong cây; mục có crew là `mate` (incident `wedged` của daemon) mở pane Mate. Trong session view thì stream đang mở được đóng trước, rồi mới mở stream của crew, không bao giờ có hai PTY cùng lúc.
+  - `a`, hoặc nút `[assign]` trên hàng, gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. Chữ trên nút là `assign` vì đó là việc người dùng làm (giao đi); dòng gửi cho Mate vẫn là `resolve:`, đúng như manual của Mate.
+  - `l` đổi giữa hai bộ lọc; `j`/`k` và phím mũi tên di chuyển; `o` mở Actions menu của pane đang xem; `Esc`/`Tab` rời khỏi zone. Không còn `r` (reply) và `p` (peek): muốn nói chuyện với crew thì vào thẳng pane của nó.
+- Header của rail chỉ còn hai nút lọc: `[waiting]` (inbox, mặc định) và `[all]` (toàn bộ log), nút đang bật tô accent, nút kia mờ; dòng đếm ngay dưới nói bằng chữ đang xem cái nào (`N waiting`, hay `all · N entries`), nên terminal đơn sắc vẫn đọc được. Không dùng chữ "unread": console không lưu trạng thái đã đọc, và một mục người dùng đã nhìn nhưng chưa giao vẫn đang chờ ai đó xử lý.
+- `[← project]`, `[supervised|auto]`, `[restart mate]`, `[clear composer]` rời khỏi header (quyết định 2026-09-19). `Esc` vẫn rời session (dòng hint ghi `Esc project`); mode vẫn ở ô MODE và phím `m`; restart Mate và clear composer nằm trong Actions menu của hàng Mate (`a` trong cây, `o` trong box zone), giữ nguyên bước xác nhận và request cũ.
 - `resolve` chỉ giao việc, không đóng câu hỏi. Mục rời inbox khi crew thật sự nhận được câu trả lời - `matev2 send` của Mate ghi `Source: mate` vào `sent.log` - hoặc khi crew tự ghi dòng status mới.
 
 Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở task 19):

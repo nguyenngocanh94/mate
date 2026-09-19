@@ -24,13 +24,13 @@
                                                                      │                                                  
                                                                      │                                                  
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                       1 to resolve 
+ BOX                                                                                                          1 waiting 
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
+▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                         
  ↑↓ Move  a Actions  m Mode  Enter Show completed  Esc Back  Tab Inspector/Box  r Refresh  q Quit                       

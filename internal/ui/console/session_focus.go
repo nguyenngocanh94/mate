@@ -85,18 +85,12 @@ type labelID int
 
 const (
 	labelNone labelID = iota
-	labelProject
-	labelMode
+	// The rail header's two filters. They name what the box is showing,
+	// and they are the only labels on it (2026-09-19).
+	labelWaiting
 	labelAll
-	labelRestart
-	labelClear
-	labelResolve
-	labelReply
-	labelPeek
-	labelSend
-	labelCancel
-	labelYes
-	labelNo
+	// labelAssign is the inbox row's own button.
+	labelAssign
 )
 
 // labelSpec is a label's identity and the exact text drawn for it. The two
@@ -116,32 +110,24 @@ func (l placedLabel) hit(x, y int) bool {
 	return y == l.y && x >= l.x && x < l.x+cells(l.text)
 }
 
-// sessionHeaderLabels are the rail header's five affordances. They are
-// labels rather than key hints because every one of them is a recovery from
-// a state the reader is already unhappy in - the wrong view, the wrong
-// mode, the wrong list, a wedged Mate, a composer full of junk - and a
-// recovery that needs a remembered keystroke is one a reader will not find.
+// sessionHeaderLabels are the rail header's two filters, and nothing else
+// (2026-09-19). The box is a place to act on what is waiting; a header that
+// also carried the view, the mode and two recovery actions was five
+// affordances deep before the reader reached a single row, and it wrapped
+// onto a second line at every rail width. Leaving the view is Esc (named on
+// the hint line), the mode lives on the project's own MODE cell and `m`
+// key, and restarting the Mate or clearing its composer are entries in the
+// Actions menu, which the box zone opens with `o`.
 //
-// The `[all]` label names the state it is in rather than the one it offers,
-// the way `[supervised]`/`[auto]` does: "[all on]" is the only way a reader
-// looking at a rail full of `working` lines can tell that they turned the
-// debugging view on rather than that the inbox filter broke. The words
-// carry it, not the colour, so a monochrome terminal says the same thing.
-func sessionHeaderLabels(mode query.Mode, all bool, g glyphSet) []labelSpec {
-	modeText := string(mode)
-	if modeText == "" {
-		modeText = "mode"
-	}
-	allText := "[all]"
-	if all {
-		allText = "[all on]"
-	}
+// The word is "waiting", not "unread": the Console keeps no read state, and
+// an item the reader has looked at but not assigned still needs somebody to
+// act on it. Which filter is on is carried by the count line under these -
+// "N waiting" or "all · N entries" (box.go's boxCountLine) - and not by the
+// accent alone, so a monochrome terminal says the same thing.
+func sessionHeaderLabels() []labelSpec {
 	return []labelSpec{
-		{labelProject, "[" + g.Back + " project]"},
-		{labelMode, "[" + modeText + "]"},
-		{labelAll, allText},
-		{labelRestart, "[restart mate]"},
-		{labelClear, "[clear composer]"},
+		{labelWaiting, "[waiting]"},
+		{labelAll, "[all]"},
 	}
 }
 
@@ -172,14 +158,13 @@ func packLabels(specs []labelSpec, w int) [][]placedLabel {
 // ---------- the inline action strip ----------
 
 // boxStripButtons is the trailing action strip an attention entry grows
-// when it is selected or hovered: the three things a reader does with a
-// crew that is waiting on them, as buttons rather than as remembered keys.
+// when it is selected or hovered. There is one button, and it is the one
+// thing an inbox row does that is not "go and look": hand the item to the
+// Mate (2026-09-19). Everything else a reader wants with a waiting crew is
+// in that crew's own pane, and the rest of the row opens it - so the strip
+// never competes with the row it sits on.
 func boxStripButtons(g glyphSet) []labelSpec {
-	return []labelSpec{
-		{labelResolve, "[resolve]"},
-		{labelReply, "[reply]"},
-		{labelPeek, "[peek]"},
-	}
+	return []labelSpec{{labelAssign, "[assign]"}}
 }
 
 // boxStripWidth is how many cells the strip occupies, including the single
@@ -314,7 +299,7 @@ func sessionGeometry(snapshot SessionSnapshot, rail boxRail, stream bool, w, h i
 		geo.railW, geo.splitX = railW, railW
 		geo.paneX, geo.paneW = railW+1, w-railW-1
 		geo.bodyH = max0(rest)
-		labelRows := packLabels(sessionHeaderLabels(snapshot.Target.Mode, rail.all, g), railW)
+		labelRows := packLabels(sessionHeaderLabels(), railW)
 		for y, row := range labelRows {
 			for _, l := range row {
 				if l.x+cells(l.text) > railW {
@@ -326,15 +311,8 @@ func sessionGeometry(snapshot SessionSnapshot, rail boxRail, stream bool, w, h i
 		}
 		geo.railHdrH = len(labelRows) + 3 // title, counts, rule
 		geo.railFootH = 1                 // the rule above the footer
-		if rail.confirm {
-			geo.railFootH++
-		}
-		if rail.reply {
-			geo.railFootH++
-		}
 		geo.railBodyTop = geo.bodyTop + geo.railHdrH
 		geo.railBodyH = max0(geo.bodyH - geo.railHdrH - geo.railFootH)
-		geo.labels = append(geo.labels, sessionFooterLabels(geo, rail)...)
 	case snapshot.Target.Kind == SessionTargetMate:
 		digest := sessionDigestHeight(boxList{field: snapshot.Box, all: rail.all})
 		geo.digestTop, geo.digestH = geo.bodyTop, digest
@@ -352,56 +330,10 @@ func sessionGeometry(snapshot SessionSnapshot, rail boxRail, stream bool, w, h i
 	return geo
 }
 
-// sessionFooterLabels are the rail footer's buttons: the reply input's
-// [send]/[cancel] and the restart confirmation's [yes]/[no]. They sit on
-// the same line as the field or the question they answer, right-aligned,
-// so a reader's eye does not have to leave the thing they are deciding.
-func sessionFooterLabels(geo sessionGeom, rail boxRail) []placedLabel {
-	row := geo.bodyTop + geo.bodyH - 1
-	var specs []labelSpec
-	switch {
-	case rail.reply:
-		specs = []labelSpec{{labelSend, "[send]"}, {labelCancel, "[cancel]"}}
-	case rail.confirm:
-		specs = []labelSpec{{labelYes, "[yes]"}, {labelNo, "[no]"}}
-	default:
-		return nil
-	}
-	return rightAlignLabels(specs, 0, row, geo.railW)
-}
-
-// rightAlignLabels places labels against the right edge of a w-cell line
-// starting at x0, one space between them and one before the edge.
-func rightAlignLabels(specs []labelSpec, x0, y, w int) []placedLabel {
-	total := 1
-	for i, s := range specs {
-		if i > 0 {
-			total++
-		}
-		total += cells(s.text)
-	}
-	at := x0 + w - total + 1
-	if at < x0 {
-		return nil
-	}
-	out := make([]placedLabel, 0, len(specs))
-	for i, s := range specs {
-		if i > 0 {
-			at++
-		}
-		out = append(out, placedLabel{labelSpec: s, x: at, y: y})
-		at += cells(s.text)
-	}
-	return out
-}
-
 // sessionEntryAt maps a body row of a box pane back to the entry drawn on
 // it. It mirrors boxBodyLines' own windowing - the same plan, the same
 // scroll offset, the same top padding - rather than storing what was drawn,
 // so a click resolves against the frame the reader is actually looking at.
-// A click on one of the wrapped question lines under the selected item
-// resolves to that item, because the block is one thing on screen and a
-// reader who clicks the words they are reading means the row they belong to.
 func sessionEntryAt(b boxList, sel, h, row, w int) (int, bool) {
 	if h <= 0 || row < 0 || row >= h || !b.known() || len(b.rows()) == 0 {
 		return 0, false
@@ -421,7 +353,8 @@ func sessionEntryAt(b boxList, sel, h, row, w int) (int, bool) {
 
 // sessionEntryStrip is the action strip of the entry at one index, when
 // that entry has one: only an attention entry that is selected or hovered
-// grows buttons, which is the same condition boxEntryLine draws them under.
+// grows its button, which is the same condition boxEntryLine draws it
+// under.
 func sessionEntryStrip(b boxList, sel, hover, index, x0, row, w int, g glyphSet) ([]placedLabel, bool) {
 	e, ok := boxSelectedEntry(b, index)
 	if !ok || !boxEntryHasStrip(e, index == sel, index == hover) {
@@ -431,7 +364,7 @@ func sessionEntryStrip(b boxList, sel, hover, index, x0, row, w int, g glyphSet)
 }
 
 // boxEntryHasStrip is the one predicate the renderer and the hit test share
-// for "does this entry show its buttons": an entry that needs a decision,
+// for "does this entry show its button": an entry that needs a decision,
 // is blocked, finished or failed, or is an incident - which is exactly what
 // internal/query already decided when it set Attention - and only while the
 // reader's cursor or pointer is on it.

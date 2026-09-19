@@ -14,13 +14,14 @@ func (m Model) View() string {
 		if m.w <= 0 || m.h <= 0 {
 			return ""
 		}
-		if m.peek.open {
-			// The peek overlay is modal (box_keys.go's onPeekKey), so it takes
-			// the whole frame rather than a pane of it: it is a crew's screen,
-			// and cropping someone else's terminal into a 36-column rail would
-			// misalign every line the harness drew.
+		if m.actions || m.confirm != nil {
+			// The Actions menu the box zone opened (`o`, box_keys.go) is
+			// modal, so it takes the whole frame rather than a pane of it:
+			// the session view is not built from frame.go's chrome and has
+			// no body region to draw an overlay into, and a menu cropped
+			// into a 36-column rail would cut every description it carries.
 			s := newScreen(m.w, m.h)
-			pushAll(s, m.peekLines(m.w, m.h))
+			pushAll(s, fitLines(m.actionLines(m.w, m.h), m.h))
 			return s.String()
 		}
 		if m.sess.terminal != nil {

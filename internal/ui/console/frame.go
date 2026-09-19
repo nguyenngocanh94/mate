@@ -229,13 +229,6 @@ func (m Model) pushBody(s *screen, l frameLayout) {
 	if l.Body <= 0 {
 		return
 	}
-	// The peek overlay ('p', box_keys.go) owns the whole region: it is a
-	// crew's own terminal screen, and cropping it into a pane would misalign
-	// every line the harness drew.
-	if m.peek.open {
-		pushAll(s, fitLines(m.peekLines(l.Cols, l.Body), l.Body))
-		return
-	}
 	// The box panel is the project frame's third region (mvp.md task 15): it
 	// sits below the list/inspector split rather than beside it, so attention
 	// is visible without entering the session view. It is subtracted from the

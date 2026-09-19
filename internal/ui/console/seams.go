@@ -661,31 +661,16 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 	if hints, ok := m.attachKeyHints(); ok {
 		return hints
 	}
-	// The peek overlay and the box's reply input each own the keyboard
-	// outright while open (box_keys.go), so the line names only their own
-	// keys - and, for the reply input, not q, which is a character there.
-	if m.peek.open {
-		return []keyHint{
-			{key: m.g.UpDown, desc: "Scroll", sacrifice: keyMovement},
-			{key: "Esc", desc: "Close peek", sacrifice: keyBack},
-			{key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit},
-		}
-	}
-	if m.boxReply {
-		return []keyHint{
-			{key: "Enter", desc: "Send reply to " + m.boxReplyCrew, sacrifice: keyAction},
-			{key: "Esc", desc: "Cancel", sacrifice: keyBack},
-			{key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit},
-		}
-	}
 	if m.focus == paneBox {
 		// The box keys are bare: nothing on this frame is prefixed, here or
-		// in the session view (session_focus.go).
+		// in the session view (session_focus.go). They are also the same keys
+		// the rail offers, in the same words, because they are the same box.
 		return []keyHint{
 			{key: m.g.UpDown, desc: "Move", sacrifice: keyMovement},
-			{key: "Enter", desc: "Send to Mate", sacrifice: keyAction},
-			{key: "r", desc: "Reply", sacrifice: keyAction},
-			{key: "p", desc: "Peek", sacrifice: keyAction},
+			{key: "Enter", desc: "Open crew", sacrifice: keyAction},
+			{key: "a", desc: "Assign", sacrifice: keyAction},
+			{key: "l", desc: "All", optional: true},
+			{key: "o", desc: "Actions", optional: true},
 			{key: "F2", desc: "List", optional: true},
 			{key: "Esc", desc: "List", sacrifice: keyBack},
 			{key: "q", desc: "Quit", sacrifice: keyQuit},

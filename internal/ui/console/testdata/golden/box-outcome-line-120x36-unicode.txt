@@ -1,10 +1,10 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [supervised] [all] [restart mate]        │                                                                 
- [clear composer]                                     │                                                                 
+ [waiting] [all]                                      │                                                                 
  CREW › MATE                                          │                                                                 
- 2 to resolve                                         │                                                                 
+ 2 waiting                                            │                                                                 
 ──────────────────────────────────────────────────────│                                                                 
+                                                      │                                                                 
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
@@ -28,9 +28,9 @@
                                                       │  rebase conflict on "Upgrade database adapter".                 
                                                       │                                                                 
                                                       │✻ Waiting for the completion report from crew-payments-api-2 (esc
-▌! 14:01  k3  needs an answer [resolve] [reply] [peek]│╭───────────────────────────────────────────────────────────────╮
- ! 14:06  k9  needs an answer                         ││ >                                                             │
-──────────────────────────────────────────────────────│╰───────────────────────────────────────────────────────────────╯
- reply k3 > A_                         [send] [cancel]│? for shortcuts                                ⏵⏵ accept edits on
- ! Send refused: composer holds unsubmitted text · nothing was sent                                                     
- REPLY  Enter send  Esc cancel                                                                                          
+                                                      │╭───────────────────────────────────────────────────────────────╮
+▌! 14:01  k3  needs an answer                 [assign]││ >                                                             │
+ ! 14:06  k9  needs an answer                         │╰───────────────────────────────────────────────────────────────╯
+──────────────────────────────────────────────────────│? for shortcuts                                ⏵⏵ accept edits on
+ ! Assign refused: composer holds unsubmitted text · nothing was sent                                                   
+ BOX  ↑↓ move  Enter open crew  a assign  l all  m mode  o actions  Esc project  F2 terminal                            

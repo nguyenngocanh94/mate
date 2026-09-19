@@ -1,11 +1,11 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [supervised] [all] [restart mate]        │                                                                 
- [clear composer]                                     │                                                                 
+ [waiting] [all]                                      │                                                                 
  CREW › MATE                                          │                                                                 
- nothing to resolve                                   │                                                                 
+ nothing waiting                                      │                                                                 
 ──────────────────────────────────────────────────────│                                                                 
- nothing to resolve                                   │                                                                 
+ nothing waiting                                      │                                                                 
+                                                      │                                                                 
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
@@ -33,4 +33,4 @@
                                                       ││ >                                                             │
                                                       │╰───────────────────────────────────────────────────────────────╯
 ──────────────────────────────────────────────────────│? for shortcuts                                ⏵⏵ accept edits on
- BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal     
+ BOX  ↑↓ move  Enter open crew  a assign  l all  m mode  o actions  Esc project  F2 terminal                            

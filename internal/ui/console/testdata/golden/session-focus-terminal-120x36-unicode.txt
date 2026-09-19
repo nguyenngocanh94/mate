@@ -1,9 +1,8 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [supervised] [all] [restart mate]        │shop-mate $ matev2 crew list                                     
- [clear composer]                                     │k3  needs-decision                                               
- CREW › MATE                                          │shop-mate $                                                      
- 2 to resolve                                         │                                                                 
+ [waiting] [all]                                      │shop-mate $ matev2 crew list                                     
+ CREW › MATE                                          │k3  needs-decision                                               
+ 2 waiting                                            │shop-mate $                                                      
 ──────────────────────────────────────────────────────│                                                                 
                                                       │                                                                 
                                                       │                                                                 
@@ -30,7 +29,8 @@
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
+                                                      │                                                                 
  ! 14:01  k3  needs an answer                         │                                                                 
-▏! 14:06  k9  needs an answer [resolve] [reply] [peek]│                                                                 
+▏! 14:06  k9  needs an answer                 [assign]│                                                                 
 ──────────────────────────────────────────────────────│                                                                 
  TERMINAL  every key goes to the agent  ·  F2 box                                                                       

@@ -23,12 +23,12 @@ import (
 //
 // This file owns every way the box is drawn - the Mate session view's left
 // rail, the narrow digest that replaces it, the project frame's own panel
-// and its one-line digest, and the peek overlay - so the four surfaces
-// cannot disagree about what an entry looks like or which one is selected.
+// and its one-line digest - so the surfaces cannot disagree about what an
+// entry looks like or which one is selected.
 //
 // Nothing here decides what an entry *means*. The verb, whether the entry
 // needs attention, whether it is still unresolved and the exact line
-// [resolve] would send are all fields on the DTO, authored in internal/query
+// [assign] would send are all fields on the DTO, authored in internal/query
 // next to the merge that produced them (query/box.go). A renderer that
 // re-derived them would be a second copy of the vocabulary, free to drift
 // from box.Inbox.
@@ -60,8 +60,9 @@ func (b boxList) rows() []query.BoxEntry {
 // No surface does any more (2026-09-19): the crew's status text is its own
 // summary of a question it asked in full in its pane, and reading the
 // summary never replaced looking at the pane - so the inbox says who needs
-// what and offers the pane and the Mate, and `[all]` keeps the text on the
-// entry's own line for the reader who is scanning the log.
+// what, the row opens that crew's pane, `[assign]` hands it to the Mate,
+// and `[all]` keeps the text on the entry's own line for the reader who is
+// scanning the log.
 func (b boxList) wraps() bool { return false }
 
 // boxEntryLine is one entry, on one line, at every surface:
@@ -70,18 +71,18 @@ func (b boxList) wraps() bool { return false }
 //	all:   <marker><!> HH:MM  <who>  <verb>  <text>
 //
 // The inbox line carries no text: what a crew wrote after its verb is its
-// own summary, and the reader who wants the question opens the pane
-// ([peek], or Enter on the crew row) or hands it to the Mate ([resolve]).
-// One line per item keeps the whole inbox on screen.
+// own summary, and the reader who wants the question opens that crew's own
+// pane - Enter, or a click anywhere on the row - or hands the item to the
+// Mate ([assign]). One line per item keeps the whole inbox on screen.
 //
 // The marker is the selection signal (signals.go: a glyph, never colour
 // alone) and the "!" is the attention signal, for the same reason - a
 // golden fixture is rendered with plainPalette, so a state carried only by
 // amber would be invisible to a reader with a monochrome terminal.
-// An attention entry grows a trailing action strip - "[resolve] [reply]
-// [peek]" - while it is selected or while the pointer is over it, so the
-// three things a reader does with a waiting crew are on screen as buttons
-// rather than as keys they have to remember (session_focus.go).
+// An attention entry grows a trailing action strip - "[assign]" - while it
+// is selected or while the pointer is over it, so the one thing a reader
+// does with a waiting crew other than go and look at it is on screen as a
+// button rather than as a key they have to remember (session_focus.go).
 func boxEntryLine(e query.BoxEntry, selected, hovered, focused, all bool, g glyphSet, p palette, w int) *line {
 	l := selectRow(newLine(), selected, p)
 	l.addSpan(markerSpan(selected, focused, g, p))
@@ -209,9 +210,9 @@ func boxCountLine(b boxList, g glyphSet, p palette) *line {
 			add(fmt.Sprintf(" %s %s", g.Dot, plural(len(b.field.Value.Entries), "entry", "entries")), p.Dim)
 	}
 	if n := b.field.Value.ToResolve(); n > 0 {
-		return l.add(fmt.Sprintf(" %d to resolve", n), p.Amber)
+		return l.add(fmt.Sprintf(" %d waiting", n), p.Amber)
 	}
-	return l.add(" nothing to resolve", p.Dim)
+	return l.add(" nothing waiting", p.Dim)
 }
 
 // boxDigestLine is the whole box in one line. It is what a frame too short
@@ -225,9 +226,9 @@ func boxDigestLine(v query.Field[query.BoxView], g glyphSet, p palette) *line {
 		return l
 	}
 	if n := v.Value.ToResolve(); n > 0 {
-		l.add(fmt.Sprintf("%d to resolve", n), p.Amber)
+		l.add(fmt.Sprintf("%d waiting", n), p.Amber)
 	} else {
-		l.add("nothing to resolve", p.Dim)
+		l.add("nothing waiting", p.Dim)
 	}
 	l.add(fmt.Sprintf(" %s %s %s %s",
 		g.Dot, plural(len(v.Value.Entries), "entry", "entries"),
@@ -302,13 +303,13 @@ func boxBodyLines(b boxList, sel, hover int, focused bool, g glyphSet, p palette
 }
 
 // boxEmptyText is the placeholder a box with no rows shows. The inbox's is
-// the quiet one the reader asked for: "nothing to resolve" is a state, not a
+// the quiet one the reader asked for: "nothing waiting" is a state, not a
 // fault, and it must not look like a failed read.
 func boxEmptyText(all bool) string {
 	if all {
 		return "no crew has written a status line yet"
 	}
-	return "nothing to resolve"
+	return "nothing waiting"
 }
 
 // boxPlanTop resolves the scroll offset for a body of h rows: keep the
@@ -379,14 +380,14 @@ const (
 // says there is one, and listLayout subtracts exactly what this says it
 // takes, so the rows the selection is clamped against and the rows the list
 // is actually given can never disagree. Every screen that owns the whole
-// body - a modal, Detail, the loading and error screens, the peek and
-// failure overlays - gets no region at all, because the list is not drawn
-// under any of them either.
+// body - a modal, Detail, the loading and error screens, the failure
+// overlay - gets no region at all, because the list is not drawn under any
+// of them either.
 func (m Model) boxRegion(l frameLayout) (height int, panel bool) {
 	switch {
 	case m.cur().kind != frameProject, l.TooSmall, l.Body <= 0:
 		return 0, false
-	case m.phase != phaseReady, m.detail, m.peek.open, m.failureDetail:
+	case m.phase != phaseReady, m.detail, m.failureDetail:
 		return 0, false
 	case m.actions, m.actionInputMode, m.harnessPick, m.confirm != nil:
 		return 0, false

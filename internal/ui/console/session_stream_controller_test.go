@@ -69,6 +69,15 @@ func (c *controllerTestChannel) resizedTo() []TerminalSize {
 	return append([]TerminalSize(nil), c.resizes...)
 }
 
+// isClosed reports whether Close has run, under the channel's own lock:
+// the close can come from the controller's goroutine, so a test that read
+// the field directly would race it.
+func (c *controllerTestChannel) isClosed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
 func (c *controllerTestChannel) Close(context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

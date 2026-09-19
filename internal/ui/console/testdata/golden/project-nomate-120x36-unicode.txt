@@ -24,8 +24,8 @@
                                                                      │                                                  
                                                                      │                                                  
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                 nothing to resolve 
- nothing to resolve                                                                                                     
+ BOX                                                                                                    nothing waiting 
+ nothing waiting                                                                                                        
                                                                                                                         
                                                                                                                         
                                                                                                                         

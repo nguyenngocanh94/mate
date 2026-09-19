@@ -271,3 +271,60 @@ func TestActionFailureIsNotReportedAsRefusal(t *testing.T) {
 		t.Fatalf("action failure = %+v, want attempted failure distinct from refusal", m.msg)
 	}
 }
+
+// TestTheMateRowMenuCarriesTheRecoveryActions: restarting a Mate and
+// clearing its composer left the session rail's header on 2026-09-19 and
+// live here now, on the row they act on. The menu is where a reader looks
+// for something they do not do every day, and the restart keeps the
+// confirmation every dangerous action on this frame gets.
+func TestTheMateRowMenuCarriesTheRecoveryActions(t *testing.T) {
+	var got []ActionRequest
+	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
+	m.action = func(_ context.Context, req ActionRequest) (string, error) {
+		got = append(got, req)
+		return "restarted", nil
+	}
+	m, _ = send(t, m, key("enter")) // into the project frame; the Mate row is first
+	if r, ok := m.selectedRow(); !ok || r.kind != rowMate {
+		t.Fatalf("setup: selected row = %+v, want the Mate row", r)
+	}
+	m, _ = send(t, m, key("a"))
+	view := renderFrame(t, m)
+	for _, want := range []string{string(ActionRestartMate), string(ActionClearComposer)} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("the Mate row's menu does not offer %q:\n%s", want, view)
+		}
+	}
+
+	m = selectMenuAction(t, m, ActionRestartMate)
+	m, cmd := send(t, m, key("enter"))
+	if cmd != nil || m.confirm == nil {
+		t.Fatalf("restart ran without its confirmation (cmd=%v confirm=%v)", cmd != nil, m.confirm != nil)
+	}
+	m, cmd = send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("the answered confirmation ran nothing")
+	}
+	m, _ = send(t, m, cmd())
+	if len(got) != 1 || got[0].Action != ActionRestartMate || got[0].Target != m.currentProject().ProjectID {
+		t.Fatalf("requests = %+v, want one restart of the open project", got)
+	}
+}
+
+// TestACrewRowMenuHasNoMateRecoveryActions: the two entries are the Mate's,
+// and a menu that offered them on a crew would be offering to restart
+// something the row does not name.
+func TestACrewRowMenuHasNoMateRecoveryActions(t *testing.T) {
+	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
+	m, _ = send(t, m, key("enter"))
+	m, _ = send(t, m, key("down")) // onto the first crew row
+	r, ok := m.selectedRow()
+	if !ok || r.kind != rowCrew {
+		t.Fatalf("setup: selected row = %+v, want a crew row", r)
+	}
+	for _, c := range m.actionChoicesForRow(r) {
+		if c.action == ActionRestartMate || c.action == ActionClearComposer {
+			t.Fatalf("a crew row's menu offers %s", c.action)
+		}
+	}
+}

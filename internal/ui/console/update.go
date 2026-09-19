@@ -55,13 +55,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionStreamResizedMsg:
 		return m.onSessionStreamResized(msg), nil
 	case sessionStreamClosedMsg:
-		return m.onSessionStreamClosed(msg), nil
+		// The close is also where a box row's "open that crew" lands: the
+		// stream the reader was looking at has to be gone before another one
+		// is opened, or two PTYs are live at once (box_keys.go).
+		return m.onSessionStreamClosed(msg)
 	case sessionTickMsg:
 		return m.onSessionTick(msg)
 	case sessionPromptSentMsg:
 		return m.onSessionPromptSent(msg), nil
 	case sessionCloseSentMsg:
-		return m, nil
+		// Snapshot mode's own close, and the other half of the pending open.
+		return m.startPendingBoxOpen()
 	case tea.KeyMsg:
 		return m.onKey(msg)
 	case tea.MouseMsg:
@@ -129,8 +133,7 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 // snapshot that just landed. The session view keeps its own target while it
 // is open - session mode never touches the navigation stack - so without
 // this the header would keep naming the mode the target carried at entry,
-// which is exactly the value the `m` key and the [supervised]/[auto] label
-// just changed.
+// which is exactly the value the `m` key just changed.
 func (m Model) refreshSessionMode() Model {
 	if m.sess.target.ProjectID == "" {
 		return m
@@ -185,17 +188,6 @@ func (m Model) applyActionAfterRead() Model {
 
 func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	// The peek overlay ('p', box_keys.go) is modal at every phase: it is
-	// somebody else's terminal screen on the frame, and a key that moved a
-	// selection behind it would be invisible. Ctrl+C is the one exception,
-	// and it closes the overlay and then takes whatever path it already
-	// takes here - in stream mode, to the agent; otherwise, to quit.
-	if m.peek.open {
-		if key != "ctrl+c" {
-			return m.onPeekKey(key), nil
-		}
-		m.peek = peekFlow{}
-	}
 	// Stream mode with the terminal zone focused owns the whole keyboard:
 	// Esc and Ctrl+C are forwarded to the agent's PTY instead of leaving
 	// session mode or quitting the Console (session-view-contract.md, "Esc
@@ -209,7 +201,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// through to the branch below. It is the one way out that does not
 	// depend on remembering which zone has focus.
 	if m.sess.phase == sessionActive && m.sess.stream != nil &&
-		!(key == "ctrl+c" && m.sess.zone == zoneBox && !m.boxReply && !m.boxConfirm) {
+		!(key == "ctrl+c" && m.sess.zone == zoneBox && !m.actions && m.confirm == nil) {
 		return m.onSessionStreamKey(msg)
 	}
 	// q always quits, at every size and in every phase, and never stops an
@@ -320,46 +312,19 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	// The Actions menu and its confirmation are modal, and they are checked
+	// before the box panel: the box zone opens the menu itself (`o`), and a
+	// j or an Enter with the menu open belongs to the menu, not to the rows
+	// behind it.
+	if m.actions || m.confirm != nil {
+		return m.onActionOverlayKey(key)
+	}
 	if m.focus == paneBox {
 		// The box panel owns the keyboard while focus is on it (box_keys.go):
-		// Enter, r and p act on the selected entry instead of on the list
-		// row, and Esc, Tab or F2 hands focus back.
+		// Enter, a, l and o act on the box instead of on the list row, and
+		// Esc, Tab or F2 hands focus back.
 		model, cmd := m.onProjectBoxKey(msg)
 		return model, cmd
-	}
-	if m.confirm != nil {
-		switch key {
-		case "esc", "backspace":
-			m.confirm = nil
-			m.actions = true
-			return m, nil
-		case "enter":
-			choice := m.confirm.choice
-			m.confirm = nil
-			return m.runAction(choice)
-		default:
-			return m, nil
-		}
-	}
-	if m.actions {
-		switch key {
-		case "esc", "backspace":
-			return m.closeActions(), nil
-		case "up", "k":
-			if m.actionIndex > 0 {
-				m.actionIndex--
-			}
-			return m, nil
-		case "down", "j":
-			if m.actionIndex+1 < len(m.actionChoices) {
-				m.actionIndex++
-			}
-			return m, nil
-		case "enter":
-			return m.handleActionEnter()
-		default:
-			return m, nil
-		}
 	}
 	switch m.phase {
 	case phaseLoading:

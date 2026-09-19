@@ -31,16 +31,22 @@ import (
 //
 //  1. a real Claude Mate and a real Codex crew with a needs-decision brief
 //  2. the Console is opened and navigated to the Mate's session view
-//  3. a click on the rail entry, a click on its [reply] button, "A", Enter -
-//     and the crew continues to `wait-mate: chose A`, which it can only do if the
-//     reply reached its pane
-//  4. a click in the terminal zone, then "say PONG" and Enter typed bare -
+//  3. a click on each of the rail header's two filters - and the count line
+//     under them changes from "N waiting" to the whole log and back
+//  4. a click on the body of the rail entry - and the frame that comes back
+//     is the crew's own session view, named after the crew's agent, which it
+//     can only be if the Mate's stream was closed and the crew's opened
+//  5. a click in the terminal zone, then "say PONG" and Enter typed bare -
 //     and sent.log records a Mate turn, which it can only do if those
 //     keystrokes reached the Mate's own composer through the PTY
+//  6. a click on the row's [assign] button - and sent.log records the
+//     `resolve:` line against the Mate's pane, which it can only do if the
+//     button reached the same ActionFunc TestLiveConsoleInboxResolve drives
 //
-// Step 3 and step 4 together are the claim: the same bare keys go to two
-// different places depending only on which zone was clicked last, and the
-// hint line on the captured frames says which.
+// Steps 4, 5 and 6 together are the claim of the 2026-09-19 box: one press
+// on a row goes to that crew's pane, one press on its one button goes to
+// the Mate, and the same bare keys afterwards go to whichever zone was
+// clicked last - with the hint line on the captured frames saying which.
 func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	requireConsoleLive(t)
 	session, configHome := consoleLiveLab(t)
@@ -145,53 +151,78 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	assertFrameSays(t, terminalFrame, "TERMINAL", "every key goes to the agent", "F2")
 
 	// The inbox item is the row carrying the action strip. It is matched on
-	// the strip rather than on the verb because the strip is what the click
-	// below is aimed at, and a row without one has no buttons to hit.
-	entryRow, ok := frameRowOf(terminalFrame, "[reply]")
+	// the strip rather than on the verb because the strip is what one of the
+	// clicks below is aimed at, and a row without one has no button to hit.
+	entryRow, ok := frameRowOf(terminalFrame, "[assign]")
 	if !ok {
 		t.Fatalf("no entry with an action strip in the console frame:\n%s", terminalFrame)
 	}
 	if line := strings.Split(terminalFrame, "\n")[entryRow]; !strings.Contains(line, "k3") {
 		t.Fatalf("the strip row %q does not name the crew:\n%s", line, terminalFrame)
 	}
+	t.Logf("the inbox row says: %s", strings.Split(terminalFrame, "\n")[entryRow])
 
-	// 3. Click the entry, click its [reply] button, answer, Enter. The entry
-	// has to be selected before [reply] is on screen at all, which is exactly
-	// the sequence a reader performs.
-	selectEntry := fmt.Sprintf(`1200:@move:3,%d;300:@click:3,%d`, entryRow, entryRow)
-	selectedFrame := runPtysmoke(t, smoke, binary, root, enterSession+";"+selectEntry, 3*time.Second)
-	t.Logf("frame 2 - box focus, entry selected:\n%s", selectedFrame)
-	assertFrameSays(t, selectedFrame, "BOX", "[resolve] [reply] [peek]", "F2 terminal")
-	// The selected item expands: its whole question is wrapped on the rows
-	// under it, which is what makes the inbox readable without a peek.
-	if !strings.Contains(selectedFrame, ask.Text) {
-		t.Fatalf("the selected item does not show its question %q:\n%s", ask.Text, selectedFrame)
-	}
-	if row, ok := frameRowOf(selectedFrame, "[reply]"); !ok || row != entryRow {
-		t.Fatalf("the action strip moved from row %d to %d between frames:\n%s", entryRow, row, selectedFrame)
-	}
-
-	replyCol, ok := frameColOf(selectedFrame, entryRow, "[reply]")
+	// 3. The header's two filters, which are the only labels on it. Each one
+	// names the list it wants, and the count line under them says which is
+	// on in words rather than by colour alone.
+	allRow, ok := frameRowOf(terminalFrame, "[all]")
 	if !ok {
-		t.Fatalf("no [reply] button on row %d:\n%s", entryRow, selectedFrame)
+		t.Fatalf("no filter row in the console frame:\n%s", terminalFrame)
 	}
-	replyScript := fmt.Sprintf(`%s;%s;800:@click:%d,%d;800:A;600:\r`,
-		enterSession, selectEntry, replyCol, entryRow)
-	replyFrame := runPtysmoke(t, smoke, binary, root, replyScript, 5*time.Second)
-	t.Logf("frame 3 - after the [reply] button, the answer and Enter:\n%s", replyFrame)
+	allCol, ok := frameColOf(terminalFrame, allRow, "[all]")
+	if !ok {
+		t.Fatalf("no [all] filter on row %d:\n%s", allRow, terminalFrame)
+	}
+	waitingCol, ok := frameColOf(terminalFrame, allRow, "[waiting]")
+	if !ok {
+		t.Fatalf("no [waiting] filter on row %d:\n%s", allRow, terminalFrame)
+	}
+	allFrame := runPtysmoke(t, smoke, binary, root,
+		fmt.Sprintf(`%s;1200:@click:%d,%d`, enterSession, allCol, allRow), 4*time.Second)
+	t.Logf("frame 2 - after [all]:\n%s", allFrame)
+	// The count line is the colour-free half of the signal: in `[all]` it
+	// names the log's own size instead of what is waiting.
+	if !strings.Contains(allFrame, "all ") || strings.Contains(allFrame, "1 waiting") {
+		t.Fatalf("[all] did not swap the count line for the log's own:\n%s", allFrame)
+	}
+	backFrame := runPtysmoke(t, smoke, binary, root,
+		fmt.Sprintf(`%s;1200:@click:%d,%d;600:@click:%d,%d`,
+			enterSession, allCol, allRow, waitingCol, allRow), 4*time.Second)
+	t.Logf("frame 3 - after [all] then [waiting]:\n%s", backFrame)
+	if !strings.Contains(backFrame, "1 waiting") {
+		t.Fatalf("[waiting] did not bring the inbox back:\n%s", backFrame)
+	}
 
-	assertSentLine(t, w, store.SourceUser, store.CrewTarget("k3"), "A")
-	done := waitForBoxEntry(t, ctx, w, 240*time.Second, paneTail, func(e query.BoxEntry) bool {
-		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose a")
-	})
-	t.Logf("the crew continued: %s %s", done.Verb, done.Text)
+	// 4. One press on the row body - not on the button - and the frame that
+	// comes back is the crew's own pane. The Mate's stream has to be closed
+	// before the crew's is opened, so the settle here covers both.
+	openScript := fmt.Sprintf(`%s;1500:@click:3,%d`, enterSession, entryRow)
+	crewFrame := runPtysmoke(t, smoke, binary, root, openScript, 10*time.Second)
+	t.Logf("frame 4 - after one press on the row body:\n%s", crewFrame)
+	// A Crew frame has no rail at any width (session_render.go), so its hint
+	// line offers the console rather than the box - and the header names the
+	// crew's own agent, which no Mate frame ever does.
+	assertFrameSays(t, crewFrame, crewRes.Agent, "TERMINAL", "F2 console")
+	// And the rail itself is gone: [waiting] is drawn by the Mate's rail
+	// header and by nothing else, so its absence is the proof that this is a
+	// different frame rather than the same one with new words on it.
+	if strings.Contains(crewFrame, "[waiting]") {
+		t.Fatalf("the frame is still the Mate's rail after the row was clicked:\n%s", crewFrame)
+	}
 
-	// 4. The other zone. A click in the terminal, then bare keys - the same
+	// 5. The other zone. A click in the terminal, then bare keys - the same
 	// keys that a moment ago were the box's - and the Mate answers.
+	//
+	// It comes before the [assign] click on purpose: a Claude Code that has
+	// not had a turn yet is still drawing its startup screen, and
+	// internal/send refuses to type into a composer it cannot name (that
+	// refusal is real, and the outcome line reports it). One exchange puts
+	// the Mate on an ordinary conversation screen, which is the state a
+	// reader assigning an item is actually in.
 	before := len(sentEntries(t, w))
 	paneScript := fmt.Sprintf(`%s;1200:@click:90,20;800:say PONG;600:\r`, enterSession)
 	paneFrame := runPtysmoke(t, smoke, binary, root, paneScript, 8*time.Second)
-	t.Logf("frame 4 - terminal focus, after typing into the Mate:\n%s", paneFrame)
+	t.Logf("frame 5 - terminal focus, after typing into the Mate:\n%s", paneFrame)
 	assertFrameSays(t, paneFrame, "TERMINAL")
 
 	user := waitForSent(t, ctx, w, 120*time.Second, func(e store.SentEntry) bool {
@@ -206,6 +237,29 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	if after := len(sentEntries(t, w)); after <= before {
 		t.Fatalf("sent.log did not grow: %d entries before, %d after", before, after)
 	}
+
+	// 6. The one button. Its coordinates are read off a frame captured in
+	// the same state the click will find, so they are the Console's own
+	// rather than an arithmetic guess.
+	assignFrame := runPtysmoke(t, smoke, binary, root, enterSession, 6*time.Second)
+	assignRow, ok := frameRowOf(assignFrame, "[assign]")
+	if !ok {
+		t.Fatalf("no [assign] button in the console frame:\n%s", assignFrame)
+	}
+	assignCol, ok := frameColOf(assignFrame, assignRow, "[assign]")
+	if !ok {
+		t.Fatalf("no [assign] button on row %d:\n%s", assignRow, assignFrame)
+	}
+	assignScript := fmt.Sprintf(`%s;1500:@move:%d,%d;500:@click:%d,%d`,
+		enterSession, assignCol, assignRow, assignCol, assignRow)
+	assignedFrame := runPtysmoke(t, smoke, binary, root, assignScript, 10*time.Second)
+	t.Logf("frame 6 - after the [assign] button:\n%s", assignedFrame)
+
+	// The claim is the same one TestLiveConsoleInboxResolve makes of the
+	// action itself: the `resolve:` line reached the Mate's pane, recorded
+	// from the app against sent.log.
+	assertSentLine(t, w, store.SourceApp, store.TargetMate, ask.Resolve)
+	t.Logf("assigned: %s", ask.Resolve)
 
 	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
 		t.Fatalf("StopCrew: %v", err)

@@ -24,13 +24,13 @@
                                                                      │                                                  
                                                                      │                                                  
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                       1 to resolve 
+ BOX                                                                                                          1 waiting 
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
+▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ! Action refused: a Project is created at the workspace level; Esc goes back there · nothing started                   
  ↑↓ Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          
