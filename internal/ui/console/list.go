@@ -672,16 +672,20 @@ func healthSpans(h query.Field[query.CrewHealth], p palette) []span {
 	if !v.AgentPresent {
 		return []span{{text: "agent gone", style: p.Red}}
 	}
-	word := "idle"
 	switch v.Composer {
 	case query.ComposerBusy:
-		word = "busy"
+		// A working harness redraws its spinner every poll, so its quiet
+		// time is always zero; what the reader wants is how long it has
+		// been at it.
+		return []span{{text: "pane busy " + shortDuration(v.ComposerFor), style: p.Dim}}
 	case query.ComposerUnknown:
 		// The pane was readable and showed no composer mate can name: a
-		// dialog, or a harness still drawing itself.
-		return []span{{text: "pane unreadable", style: p.Dim}}
+		// dialog, a transcript viewer, or a harness still drawing itself.
+		// Kept within the NOTE column's 14 cells: a longer item is dropped
+		// whole by packNoteItems and the cell reads as "nothing to say".
+		return []span{{text: "pane unclear", style: p.Dim}}
 	}
-	return []span{{text: "pane " + word + " " + shortDuration(v.QuietFor), style: p.Dim}}
+	return []span{{text: "pane idle " + shortDuration(v.QuietFor), style: p.Dim}}
 }
 
 // shortDuration is a quiet time in the two or three cells the NOTE column can

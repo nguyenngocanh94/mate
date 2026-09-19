@@ -96,6 +96,18 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	// else (mvp.md section 4b).
 	view, viewOK, boxField := loadBox(ws, ref.Name)
 	p.Box = boxField
+	if viewOK {
+		var mateLines []box.Entry
+		for _, e := range view.Entries {
+			// The Mate's own activity is every line typed into its pane
+			// (target `mate`, by the captain or the app) and every line it
+			// sent to a crew.
+			if e.Kind == box.KindMessage && (e.Crew == "" || e.Source == box.SourceMate) {
+				mateLines = append(mateLines, e)
+			}
+		}
+		p.Mate.LastEvent = lastActivity(mateLines, "nothing has been typed into the Mate's pane yet")
+	}
 	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, view, viewOK, w)
 	for i := range p.Crews {
 		p.Crews[i].Attention = crewAttention(p.Crews[i])
@@ -269,6 +281,9 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		// internal/watch when one is running (CrewNode.Health).
 		Health: AbsentField[CrewHealth](noObserver),
 	}
+	if viewOK {
+		c.LastEvent = lastActivity(view.ByCrew[id], "no status line or message for this crew yet")
+	}
 
 	meta, err := ws.ReadCrewMeta(project, id)
 	if err != nil {
@@ -362,4 +377,22 @@ func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {
 	default:
 		return UnknownField[RepoValue](repos.Reason)
 	}
+}
+
+// lastActivity is the UPDATED column's value: the time of the newest box
+// entry among the given ones - a status line (its file's mtime), a message
+// in sent.log, or an incident - with the entry's kind as the event type.
+// No entries is a legitimate Absent with the caller's reason, never a
+// zero time rendered as midnight.
+func lastActivity(entries []box.Entry, whyAbsent string) Field[EventValue] {
+	if len(entries) == 0 {
+		return AbsentField[EventValue](whyAbsent)
+	}
+	last := entries[0]
+	for _, e := range entries[1:] {
+		if !e.At.Before(last.At) {
+			last = e
+		}
+	}
+	return KnownField(EventValue{EventType: string(last.Kind), OccurredAt: last.At})
 }

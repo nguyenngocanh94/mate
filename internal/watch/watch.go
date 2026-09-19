@@ -153,6 +153,12 @@ type observation struct {
 	// set on the first observation too: the observer counts quiet from when
 	// it started looking, never from a past it did not see.
 	changedAt time.Time
+	// composer is the last composer classification, and composerSince
+	// when it last changed. A busy pane redraws its spinner every poll, so
+	// its quiet clock is always near zero; "busy for how long" is this
+	// clock instead.
+	composer      send.ComposerState
+	composerSince time.Time
 }
 
 // New builds an observer over a workspace. It does not poll until Start or
@@ -346,6 +352,10 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	if class, err := send.ClassifyComposer(kind, screen); err == nil {
 		composer = class.State
 	}
+	if obs.composerSince.IsZero() || composer != obs.composer {
+		obs.composer = composer
+		obs.composerSince = now
+	}
 	quiet := now.Sub(obs.changedAt)
 
 	switch {
@@ -370,6 +380,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		AgentPresent: true,
 		Composer:     composer,
 		QuietFor:     quiet,
+		ComposerFor:  now.Sub(obs.composerSince),
 		ObservedAt:   now,
 	}
 	return nil

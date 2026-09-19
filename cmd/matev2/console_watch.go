@@ -81,6 +81,7 @@ func crewHealth(h watch.Health) query.CrewHealth {
 		AgentPresent: h.AgentPresent,
 		Composer:     composerDTO(h.Composer),
 		QuietFor:     h.QuietFor,
+		ComposerFor:  h.ComposerFor,
 		ObservedAt:   h.ObservedAt,
 	}
 }

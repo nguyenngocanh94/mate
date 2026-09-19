@@ -350,3 +350,38 @@ func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 		t.Fatalf("closed = %d, want 1", p.ClosedCrews)
 	}
 }
+
+// TestLoadFillsUpdatedFromTheBox: the UPDATED column is the newest box
+// entry for the row - a crew's last status line or message, the Mate's
+// last typed or sent line - and Absent with a reason when there is none
+// (2026-09-19: the column was blank for every row).
+func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship", "agent": "crew-k1", "pane": "w1:p2", "state": "spawned"}); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := snap.Projects[0].Crews[0].LastEvent; got.State != Absent {
+		t.Fatalf("a silent crew's last event = %+v, want Absent", got)
+	}
+	if err := ws.AppendStatus("shop", "k1", "working: reading the brief"); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 9, 19, 3, 30, 0, 0, time.UTC)
+	if err := ws.AppendSent("shop", store.SentEntry{Time: at, Source: "user", Target: "mate", Text: "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if snap, err = Load(context.Background(), ws); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := snap.Projects[0]
+	if got := p.Crews[0].LastEvent; got.State != Known || got.Value.EventType != "status" || got.Value.OccurredAt.IsZero() {
+		t.Fatalf("crew last event = %+v, want the status line's time", got)
+	}
+	if got := p.Mate.LastEvent; got.State != Known || !got.Value.OccurredAt.Equal(at) {
+		t.Fatalf("mate last event = %+v, want the line typed at %s", got, at)
+	}
+}

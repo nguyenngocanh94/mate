@@ -29,6 +29,12 @@ type Health struct {
 	// crew: a console that has just opened knows nothing about the hour
 	// before it started, and says so by counting from zero.
 	QuietFor time.Duration
+	// ComposerFor is how long the composer has read the same state. For a
+	// Busy pane this is the number that means anything - a spinner changes
+	// the screen every poll, so QuietFor is always near zero while the
+	// crew is genuinely working - and the console shows it as "busy for".
+	// Counted from the first poll that saw this crew, like QuietFor.
+	ComposerFor time.Duration
 	// ObservedAt is when this observation was made.
 	ObservedAt time.Time
 }

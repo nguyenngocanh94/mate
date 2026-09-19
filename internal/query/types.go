@@ -191,6 +191,10 @@ type CrewHealth struct {
 	// QuietFor is how long the pane's contents and the Crew's status file
 	// have both been unchanged, as of ObservedAt.
 	QuietFor time.Duration
+	// ComposerFor is how long the composer has read its current state; the
+	// duration the NOTE column shows for a busy pane, since a working
+	// harness redraws its spinner and is never quiet.
+	ComposerFor time.Duration
 	// ObservedAt is when the observation was made. It is not the snapshot's
 	// AsOf: the observer polls on its own interval, so this can be older.
 	ObservedAt time.Time

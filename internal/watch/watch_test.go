@@ -525,3 +525,34 @@ func TestWatchRuntimeIsNarrow(t *testing.T) {
 		}
 	}
 }
+
+// TestPollCountsHowLongTheComposerHasBeenBusy: a working harness redraws
+// its spinner every poll, so QuietFor resets each round and read "busy 0s"
+// in the console (2026-09-19). ComposerFor counts from the poll the
+// composer last changed state, and resets when it changes back.
+func TestPollCountsHowLongTheComposerHasBeenBusy(t *testing.T) {
+	f := newFixture(t)
+	f.poll()
+	f.setScreen(codexBusyScreen)
+	f.clock.advance(5 * time.Second)
+	f.poll()
+	f.setScreen("• Working (7s • esc to interrupt)\n› Ask Codex to do anything\n\n  model · cwd\n")
+	f.clock.advance(5 * time.Second)
+	f.poll()
+	h, ok := f.health("k3")
+	if !ok || h.Composer != send.StateBusy {
+		t.Fatalf("health = %+v (%v), want a busy composer", h, ok)
+	}
+	if h.QuietFor != 0 {
+		t.Fatalf("QuietFor = %s, want 0: the spinner changed the pane", h.QuietFor)
+	}
+	if h.ComposerFor != 5*time.Second {
+		t.Fatalf("ComposerFor = %s, want 5s (busy since the second poll)", h.ComposerFor)
+	}
+	f.setScreen(codexIdleScreen)
+	f.clock.advance(5 * time.Second)
+	f.poll()
+	if h, _ := f.health("k3"); h.Composer != send.StateEmpty || h.ComposerFor != 0 {
+		t.Fatalf("after going idle: %+v, want an empty composer with ComposerFor reset", h)
+	}
+}

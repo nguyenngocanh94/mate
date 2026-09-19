@@ -78,10 +78,14 @@ func TestCrewRowNoteSpansDrawsTheObserversHealth(t *testing.T) {
 		health query.CrewHealth
 		want   string
 	}{
-		{"busy", query.CrewHealth{AgentPresent: true, Composer: query.ComposerBusy, QuietFor: 12 * time.Second}, "pane busy 12s"},
+		// A busy pane redraws its spinner every poll, so its quiet time is
+		// always near zero; the NOTE shows how long it has been busy.
+		{"busy", query.CrewHealth{AgentPresent: true, Composer: query.ComposerBusy, QuietFor: 0, ComposerFor: 12 * time.Second}, "pane busy 12s"},
 		{"idle", query.CrewHealth{AgentPresent: true, Composer: query.ComposerEmpty, QuietFor: 4 * time.Minute}, "pane idle 4m"},
 		{"pending is idle too", query.CrewHealth{AgentPresent: true, Composer: query.ComposerPending, QuietFor: 90 * time.Second}, "pane idle 1m"},
-		{"unreadable pane", query.CrewHealth{AgentPresent: true, Composer: query.ComposerUnknown}, "pane unreadable"},
+		// 12 cells: the NOTE column is 14 and packNoteItems drops a longer
+		// item whole, which is how this read as a blank cell (2026-09-19).
+		{"unclear pane", query.CrewHealth{AgentPresent: true, Composer: query.ComposerUnknown}, "pane unclear"},
 		{"agent gone", query.CrewHealth{Composer: query.ComposerUnknown, QuietFor: time.Hour}, "agent gone"},
 	}
 	for _, tc := range cases {
