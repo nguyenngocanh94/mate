@@ -249,6 +249,13 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   Cùng lần đo: dòng `digest: 1 item(s) — k3 needs-decision: "pick A or B" — status files under /private/tmp/…/crews; act per AGENTS.md section 10` (có `—`, `·`, dấu nháy kép và một đường dẫn tuyệt đối dài) tới `UserPromptSubmit` của Claude nguyên vẹn, nên hook ghi `Source: app` và không xoá `.auto`.
   Bằng chứng dùng được là `sent.log` có **hai** bản cùng một dòng - một do daemon ghi sau khi composer sạch, một do hook ghi khi model đọc được - còn một bản chỉ chứng minh chữ tới pane.
   Ngay sau đó một dòng người dùng gõ không có marker xoá `.auto` trong vòng poll đầu tiên, và vòng tick kế tiếp không gửi gì dù đã có câu hỏi mới chờ sẵn.
+- `matev2 diff` đo branch của crew bằng ba chấm (`git diff <default>...<branch>`), không phải hai.
+  Hai chấm so branch với đầu hiện tại của default, nên mọi commit default nhận được trong lúc crew làm việc hiện ra trong diff của crew thành dòng bị xoá - đúng lời nói dối mà người review sẽ tin.
+  Bản danh sách commit thì ngược lại: `git log --oneline <default>..<branch>` hai chấm mới đúng nghĩa "những commit của riêng branch này".
+  `TestDiffIgnoresCommitsTheBaseGainedAfterTheBranchStarted` dựng đúng cảnh đó trên repo thật, nên đổi số chấm là hỏng test chứ không phải hỏng một bản diff không ai đọc lại.
+- Đo 2026-09-19 (task 21, `TestLiveConsoleDiffShowsACrewBranch`, codex-cli 0.154.0, Herdr 0.8.2): một crew Codex nhận brief "thêm một dòng vào README.md, commit đúng một lần, rồi ghi `wait-mate`" đi trọn vòng trong 56 giây, và `ActionDiff` qua ActionFunc của console trả về 176 byte gồm dòng commit `0d2d20d note the review in README` và patch của `README.md`.
+  Diff chạy trong worktree của crew khi worktree còn, nhưng branch mới là thứ mang công việc: crew đã `crew stop` không còn worktree vẫn diff được từ repo chính, vì worktree liên kết không có kho object riêng.
+  Worktree bẩn báo ở một dòng dẫn đầu chứ không phải dòng cuối: patch chỉ là phần đã commit, nên người đọc không được báo sẽ tưởng đó là toàn bộ việc crew đã làm.
 - Overlay cuộn trong console không được dùng `clampTop`.
   `clampTop` có việc là giữ *hàng đang chọn* trong khung, nên gọi nó với `sel=0` trên một mặt không có hàng nào được chọn sẽ kéo offset về đầu sau mỗi phím.
   Màn hình chi tiết lỗi (`e`, `session_failure.go`) vì thế vẽ chỉ báo "↓ N more" từ task 05 mà chưa bao giờ cuộn được; phát hiện và sửa 2026-09-19 khi overlay diff của task 21 cần đúng cơ chế đó.
