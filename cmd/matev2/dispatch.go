@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|--version> ...")
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|merge|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -58,6 +58,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdPeek(args[1:], stdout, stderr)
 	case "state":
 		return cmdState(args[1:], stdout, stderr)
+	case "merge":
+		return cmdMerge(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {
@@ -76,7 +78,7 @@ func isDir(path string) bool {
 // cmdProject dispatches `matev2 project <add|list|remove>`.
 func cmdProject(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: matev2 project <add|list|remove> ...")
+		return newUsageError("usage: matev2 project <add|list|remove|yolo> ...")
 	}
 	switch args[0] {
 	case "add":
@@ -85,6 +87,8 @@ func cmdProject(args []string, stdout, stderr io.Writer) error {
 		return cmdProjectList(args[1:], stdout, stderr)
 	case "remove":
 		return cmdProjectRemove(args[1:], stdout, stderr)
+	case "yolo":
+		return cmdProjectYolo(args[1:], stdout, stderr)
 	default:
 		return newUsageErrorf("unknown project subcommand %q", args[0])
 	}

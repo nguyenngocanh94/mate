@@ -1,0 +1,52 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+
+	"github.com/nguyenngocanh94/matev2/internal/spawn"
+)
+
+// cmdMerge implements `matev2 merge <project> <crew>`: docs/mvp.md task 22.
+//
+// It carries no `--force`, no `--no-ff` and no `--discard`. Every way a
+// merge can go wrong is a refusal that changes nothing and says what to do
+// instead, and a flag that turned any of them off would be a flag for
+// landing work nobody reviewed.
+//
+// Who is asking is read from the pane environment rather than from a flag:
+// spawn injects MATEV2_CALLER=mate into a Mate's pane and
+// MATEV2_CALLER=crew into a Crew's, so a Mate cannot claim to be the
+// captain by passing a different word on the command line.
+func cmdMerge(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("merge", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: matev2 merge <project> <crew> [--workspace <dir>]")
+	}
+	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return &usageError{err}
+	}
+	if fs.NArg() != 2 {
+		fs.Usage()
+		return newUsageError("matev2 merge: want exactly 2 arguments: <project> <crew>")
+	}
+	w, err := resolveWorkspace(*workspaceFlag)
+	if err != nil {
+		return err
+	}
+	project, crew := fs.Arg(0), fs.Arg(1)
+	res, err := spawn.MergeCrew(context.Background(), w, spawn.LiveDeps(), project, crew, spawn.CallerFromEnv())
+	if err != nil {
+		// Including the one failure that is not a refusal: a teardown that
+		// failed after the fast-forward landed. MergeCrew's error already
+		// says the merge is done and the crew is not closed, which is the
+		// whole of what the caller needs, so nothing is added here.
+		return err
+	}
+	fmt.Fprintln(stdout, res.Line())
+	return nil
+}

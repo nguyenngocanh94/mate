@@ -477,6 +477,12 @@ func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.Sess
 		{Key: config.EnvAgentID, Value: AgentNamePrefix + "-" + project},
 		{Key: config.EnvAgentRole, Value: string(harness.RoleMate)},
 		{Key: config.EnvRuntimeSessionID, Value: session.Name},
+		// MATEV2_CALLER is how `matev2 merge` knows a Mate typed it and
+		// applies the project's `yolo` rule (docs/mvp.md M4 decisions). It
+		// goes on the workspace create, not on the Mate's tab create,
+		// because the Mate's tab is the workspace's renamed root pane and
+		// Herdr can only apply `--env` when a pane is made.
+		{Key: config.EnvCaller, Value: CallerMate},
 	}
 	return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
 }
