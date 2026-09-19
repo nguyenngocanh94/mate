@@ -1,8 +1,6 @@
 package console
 
 import (
-	"time"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -23,23 +21,21 @@ import (
 //     reporting is on for the whole Console run, so bare motion arrives
 //     constantly; forwarding it would be a PTY write per pointer cell for
 //     no interaction anybody asked for. It is used for one thing only:
-//     which rail row the pointer is over, so that row can show its buttons.
+//     which rail row the pointer is over, so that row can show its button.
+//
+// One press is the whole vocabulary of a box row (2026-09-19): on
+// `[assign]` it hands the item to the Mate, anywhere else on the row it
+// opens that crew's own pane. There is no double click left in the
+// Console - a gesture that means something different from two single ones
+// is one a reader has to be told about.
 
 // onSessionMouse is every mouse event while the session view is open.
 func (m Model) onSessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	ev := tea.MouseEvent(msg)
-	if m.peek.open {
-		// The overlay is somebody else's screen taking the whole frame; the
-		// wheel scrolls it and nothing else responds, which is exactly what
-		// its keyboard does (onPeekKey).
-		switch ev.Button {
-		case tea.MouseButtonWheelUp:
-			if m.peek.top > 0 {
-				m.peek.top--
-			}
-		case tea.MouseButtonWheelDown:
-			m.peek.top++
-		}
+	if m.actions || m.confirm != nil {
+		// The Actions menu takes the whole frame in the session view the way
+		// it takes the whole body on the project frame (view.go); nothing
+		// behind it answers the pointer.
 		return m, nil
 	}
 	geo := m.sessionGeom()
@@ -78,35 +74,20 @@ func (m Model) sessionGeom() sessionGeom {
 // onSessionLabel runs one clickable label. Each one is the mouse's way to
 // the same thing a key already does, never a second implementation of it.
 func (m Model) onSessionLabel(id labelID) (tea.Model, tea.Cmd) {
-	project := m.sess.target.ProjectID
 	switch id {
-	case labelProject:
-		return m.endSession()
-	case labelMode:
-		return m.beginModeToggle(project)
 	case labelAll:
-		return m.toggleBoxAll(), nil
-	case labelRestart:
-		return m.beginRestartMate(project), nil
-	case labelClear:
-		return m.beginClearComposer(project)
-	case labelSend:
-		return m.submitBoxReply()
-	case labelCancel:
-		return m.cancelBoxReply(), nil
-	case labelYes:
-		return m.resolveBoxConfirm(true)
-	case labelNo:
-		return m.resolveBoxConfirm(false)
+		return m.setBoxAll(true), nil
+	case labelWaiting:
+		return m.setBoxAll(false), nil
 	}
 	return m, nil
 }
 
 // onSessionRailMouse is the rail and the narrow frame's digest: wheel
-// scrolls the selection, motion tracks which entry would show its buttons,
-// a press focuses the box and selects the entry under the pointer, a press
-// on one of that entry's buttons runs it, and a second press on the same
-// entry opens the peek overlay.
+// scrolls the selection, motion tracks which entry would show its button, a
+// press on `[assign]` hands that entry to the Mate, and a press anywhere
+// else on a row focuses the box, selects that entry and opens the pane of
+// the crew it names.
 func (m Model) onSessionRailMouse(ev tea.MouseEvent, geo sessionGeom) (tea.Model, tea.Cmd) {
 	b, has := m.sessionBoxList()
 	sel := m.sessionRailState().sel
@@ -142,12 +123,8 @@ func (m Model) onSessionRailMouse(ev tea.MouseEvent, geo sessionGeom) (tea.Model
 			}
 		}
 	}
-	double := m.isDoubleClick(clickSurfaceRail, index)
 	m.sess.boxSel, m.boxMsg = index, footerMsg{}
-	if double {
-		return m.beginBoxPeek(m.sess.target.ProjectID, b, index)
-	}
-	return m, nil
+	return m.openBoxEntryFromSession(b, index)
 }
 
 // onSessionPaneMouse focuses the terminal and hands the event to the PTY in
@@ -209,26 +186,12 @@ func (m Model) scrollBoxSelection(b boxList, has bool, sel, delta int) Model {
 	return m
 }
 
-// runBoxEntryAction is one action strip button.
+// runBoxEntryAction is the entry's one strip button.
 func (m Model) runBoxEntryAction(id labelID, project string, b boxList, index int) (tea.Model, tea.Cmd) {
-	switch id {
-	case labelResolve:
-		return m.beginBoxResolve(project, b, index)
-	case labelReply:
-		return m.beginBoxReply(project, b, index), nil
-	case labelPeek:
-		return m.beginBoxPeek(project, b, index)
+	if id == labelAssign {
+		return m.beginBoxAssign(project, b, index)
 	}
 	return m, nil
-}
-
-// isDoubleClick reports whether this press is the second of a pair on the
-// same thing, and records it either way.
-func (m *Model) isDoubleClick(surface, index int) bool {
-	prev := m.lastClick
-	m.lastClick = clickMemo{surface: surface, index: index, at: time.Now()}
-	return prev.surface == surface && prev.index == index &&
-		!prev.at.IsZero() && time.Since(prev.at) < doubleClickWindow
 }
 
 // ---------- the project frame ----------
@@ -239,18 +202,7 @@ func (m *Model) isDoubleClick(surface, index int) bool {
 // through with the arrow keys.
 func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	ev := tea.MouseEvent(msg)
-	if m.peek.open {
-		switch ev.Button {
-		case tea.MouseButtonWheelUp:
-			if m.peek.top > 0 {
-				m.peek.top--
-			}
-		case tea.MouseButtonWheelDown:
-			m.peek.top++
-		}
-		return m, nil
-	}
-	if m.boxReply || m.boxConfirm || m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {
+	if m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {
 		return m, nil
 	}
 	top, h, ok := m.boxPanelBodyRegion()
@@ -297,12 +249,12 @@ func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	double := m.isDoubleClick(clickSurfacePanel, index)
 	m.boxSel, m.msg, m.boxMsg = index, footerMsg{}, footerMsg{}
-	if double {
-		return m.beginBoxPeek(m.currentProject().ProjectID, b, index)
+	e, has := boxSelectedEntry(b, index)
+	if !has {
+		return m, nil
 	}
-	return m, nil
+	return m.openBoxCrew(e)
 }
 
 // boxPanelBodyRegion is the frame rows the project frame's box panel draws

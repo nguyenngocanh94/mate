@@ -24,13 +24,13 @@
                                                                      │                  payments-api-crew_01J9P6Q6W0E5V 
                                                                      │  ↓ 10 more                                       
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                       1 to resolve 
+ BOX                                                                                                          1 waiting 
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
+▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ! Attach failed: the runtime is not reachable (runtime_unavailable, exit 20) · snapshot re-read                        
  ↑↓ Move  a Actions  e Details  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit               

@@ -45,27 +45,33 @@ const (
 	// ActionOnboard adds a Project to the workspace, or creates and starts
 	// a Project's Mate.
 	ActionOnboard Action = "onboard"
-	// The three message-box actions (mvp.md task 15, section 5). Each acts
-	// on a box entry rather than on a snapshot row, which is why
-	// ActionRequest carries a Crew of its own: the entry names a crew, and
-	// the Project frame's selected row usually does not.
+	// The message-box actions (mvp.md task 15, section 5). They act on a box
+	// entry rather than on a snapshot row, which is why ActionRequest
+	// carries a Crew of its own: the entry names a crew, and the Project
+	// frame's selected row usually does not.
 	//
 	// ActionResolve hands one inbox item to the Mate as a `resolve:` line,
 	// typed into its composer behind the from-app sentinel: the crew's
 	// question, the status file to read, and the `matev2 send` that answers
-	// the crew. ActionReply types one line into the crew's own composer.
-	// ActionPeek reads the crew's pane and returns it as text for the
-	// overlay - the only one of the three that writes nothing.
+	// the crew. It is the console's `[assign]` button and `a` key - the word
+	// on the button is the reader's ("give this away"), the word on the wire
+	// is the Mate's manual's, and they are deliberately not the same.
+	//
+	// ActionReply and ActionPeek are the CLI's, not the console's: no
+	// console surface issues either one since 2026-09-19 - a reader who
+	// wants to talk to a crew or read its screen opens that crew's pane,
+	// which is what a box row now does. They stay in the enum because
+	// cmd/matev2 implements them and an ActionFunc is free to be asked.
 	ActionResolve Action = "resolve"
 	ActionReply   Action = "reply"
 	ActionPeek    Action = "peek"
 	// The two recovery actions. They exist because a Mate is a live
 	// interactive agent sharing its composer with the reader: a key
 	// sequence that went astray can leave junk half-typed in it, and an
-	// agent can wedge outright. Both are offered as clickable labels on the
-	// rail header as well as keys, because a reader reaching for them is
-	// already in a state where remembering a keystroke is the last thing
-	// they want to do.
+	// agent can wedge outright. Both are entries in the Mate row's Actions
+	// menu (actions.go), which the box zone opens with `o`: they are rare,
+	// and a menu is where a reader looks for something they do not do every
+	// day.
 	//
 	// ActionRestartMate stops the Mate and starts it again through the same
 	// seams the action menu uses. ActionClearComposer presses Ctrl+U in the
@@ -161,29 +167,6 @@ const (
 	// the list as soon as it is not, the same rule paneInspector follows
 	// when the inspector column disappears.
 	paneBox
-)
-
-// clickMemo is the previous mouse press: what it landed on and when. A
-// second press on the same thing inside doubleClickWindow is a double
-// click, which is the only gesture in this Console that means something
-// different from two single ones.
-type clickMemo struct {
-	surface int
-	index   int
-	at      time.Time
-}
-
-// doubleClickWindow is how close together two presses have to be. 400ms is
-// the middle of the range desktop toolkits use; a terminal cannot ask the
-// system for the reader's own setting.
-const doubleClickWindow = 400 * time.Millisecond
-
-// The surfaces a click can be remembered on, so a press on the rail and a
-// press on the project panel are never mistaken for one double click.
-const (
-	clickSurfaceNone int = iota
-	clickSurfaceRail
-	clickSurfacePanel
 )
 
 // footerTone selects the message line's word-and-colour pairing. The tone
@@ -324,11 +307,13 @@ type Model struct {
 	failureDetail bool
 	failureTop    int
 
-	// peek is the box's `p` overlay (box_keys.go). It lives on the Model
-	// rather than in sessionFlow because both the session view and the
-	// project frame's box panel open it, and leaving session mode must not
-	// silently drop a pane the reader is still reading.
-	peek peekFlow
+	// pendingBoxOpen is the inbox entry whose crew the reader asked to open
+	// from inside a session view (box_keys.go). The open cannot happen on
+	// the keystroke: the session already on screen owns a PTY stream, and
+	// two of those must never be open at once, so the entry waits here until
+	// that stream reports itself closed (update.go). Its zero value - an
+	// entry naming no crew - means nothing is pending.
+	pendingBoxOpen query.BoxEntry
 	// boxSel is the project frame's own box-panel selection, the panel's
 	// counterpart to sessionFlow.boxSel; -1 follows the newest entry.
 	boxSel int
@@ -338,11 +323,6 @@ type Model struct {
 	// show what somebody still has to decide on, and a filter a reader has to
 	// re-apply on every start is a filter that is not the default.
 	boxAll bool
-	// The one-line reply input ('r'). It lives on the Model rather than in
-	// sessionFlow because both box surfaces open it, and because it is a
-	// Console-drawn field with a visible caret: while it is open every
-	// keystroke belongs to it, including in stream mode, where every other
-	// unprefixed key goes to the agent's PTY.
 	// boxMsg is the outcome of the last box action, kept apart from msg
 	// because the session frame gives it a row of its own: folding it into
 	// msg would let any unrelated Console message (a stream fallback notice,
@@ -363,22 +343,13 @@ type Model struct {
 	// pointer happens to be, the way a real drag behaves once it has been
 	// grabbed.
 	draggingSplit bool
-	// The one-line recovery confirmation (box_keys.go). Restarting a Mate
-	// stops a live agent, so it is never one keystroke away.
-	boxConfirm       bool
-	boxConfirmText   string
-	boxConfirmChoice actionChoice
-	// lastClick is what a double click is measured against: the entry and
-	// the moment of the previous press, since a tea.MouseMsg carries no
-	// timestamp of its own.
-	lastClick       clickMemo
-	boxReply        bool
-	boxReplyCrew    string
-	boxReplyProject string
-	boxReplyText    string
 
-	actions         bool
-	actionChoices   []actionChoice
+	actions       bool
+	actionChoices []actionChoice
+	// actionRow is the row actionChoices were built for. It is kept because
+	// the menu can be opened for a row the list's cursor is not on (the box
+	// zone's `o`, box_keys.go), and the overlay's title names it.
+	actionRow       row
 	actionIndex     int
 	confirm         *actionConfirmation
 	actionInput     string

@@ -1,10 +1,10 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [supervised] [all on] [restart mate]     │                                                                 
- [clear composer]                                     │                                                                 
+ [waiting] [all]                                      │                                                                 
  CREW › MATE                                          │                                                                 
  all · 5 entries                                      │                                                                 
 ──────────────────────────────────────────────────────│                                                                 
+                                                      │                                                                 
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 
@@ -31,6 +31,6 @@
    13:52  user->mate  spawn a crew for the webhook fix│✻ Waiting for the completion report from crew-payments-api-2 (esc
  ! 14:01  k3  needs-decision  migration for idempoten…│╭───────────────────────────────────────────────────────────────╮
  ! 14:06  k9  blocked  the staging database refuses t…││ >                                                             │
-▌! 14:09  k2  done  PR ready… [resolve] [reply] [peek]│╰───────────────────────────────────────────────────────────────╯
+▌! 14:09  k2  done  PR ready for review       [assign]│╰───────────────────────────────────────────────────────────────╯
 ──────────────────────────────────────────────────────│? for shortcuts                                ⏵⏵ accept edits on
- BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal     
+ BOX  ↑↓ move  Enter open crew  a assign  l all  m mode  o actions  Esc project  F2 terminal                            

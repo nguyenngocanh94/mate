@@ -261,41 +261,21 @@ func TestBackgroundTickPreservesFocusedZone(t *testing.T) {
 	}
 }
 
-// TestBackgroundTickPreservesOpenReplyInputAndItsTypedText: an open box
-// reply composer, with text already typed into it, must survive a
-// background reload untouched - the reader is mid-sentence, and a refresh
-// that cleared it would lose real, unsent input.
-func TestBackgroundTickPreservesOpenReplyInputAndItsTypedText(t *testing.T) {
+// TestBackgroundTickPreservesTheBoxSelection: the panel's cursor is where
+// the reader has put it, and a background reload must not move it - the
+// next key they press acts on the row they were looking at.
+func TestBackgroundTickPreservesTheBoxSelection(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
 	m, tick := tickFixture(t, spy, 120, 36)
-	m.boxReply = true
-	m.boxReplyCrew = "k3"
-	m.boxReplyProject = tree.Projects[0].ProjectID
-	m.boxReplyText = "not yet, still checking the migration"
+	m, _ = send(t, m, key("enter")) // into the project frame
+	m.focus, m.boxSel, m.boxAll = paneBox, 0, true
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
-	if !m.boxReply || m.boxReplyCrew != "k3" || m.boxReplyProject != tree.Projects[0].ProjectID ||
-		m.boxReplyText != "not yet, still checking the migration" {
-		t.Fatalf("reply input after a background tick = open=%v crew=%q project=%q text=%q, want it unchanged",
-			m.boxReply, m.boxReplyCrew, m.boxReplyProject, m.boxReplyText)
-	}
-}
-
-// TestBackgroundTickPreservesOpenPeekOverlay: the peek overlay is modal
-// (update.go's onKey); a background tick must not close it or change what
-// it is showing.
-func TestBackgroundTickPreservesOpenPeekOverlay(t *testing.T) {
-	tree := sampleTree()
-	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
-	m.peek = peekFlow{open: true, crew: "k3", text: "reading the ticket\nstill going", top: 1}
-
-	m, _ = driveOneTick(t, m, tick, tree)
-
-	if m.peek != (peekFlow{open: true, crew: "k3", text: "reading the ticket\nstill going", top: 1}) {
-		t.Fatalf("peek overlay after a background tick = %+v, want it unchanged", m.peek)
+	if m.focus != paneBox || m.boxSel != 0 || !m.boxAll {
+		t.Fatalf("box state after a background tick = focus %v sel %d all %v, want it unchanged",
+			m.focus, m.boxSel, m.boxAll)
 	}
 }
 

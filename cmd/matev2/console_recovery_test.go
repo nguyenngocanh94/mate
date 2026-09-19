@@ -9,8 +9,8 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
 
-// The two recovery actions the session rail offers as `R` / [restart mate]
-// and `u` / [clear composer] (internal/ui/console/box_keys.go), over the
+// The two recovery actions the Mate row's Actions menu offers as
+// restart_mate and clear_composer (internal/ui/console/actions.go), over the
 // fake Herdr adapter. They exist because a Mate shares its composer with the
 // reader: a stray key sequence leaves junk in it, and an agent can stop
 // answering altogether. What is under test is the bridge - which spawn seams

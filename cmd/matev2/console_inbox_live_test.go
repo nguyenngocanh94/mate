@@ -27,9 +27,10 @@ import (
 //  1. a real Claude Mate and a real Codex crew
 //  2. the crew writes `needs-decision: pick A or B` and stops its turn
 //  3. the box's Inbox - the rows the rail actually draws - holds exactly that
-//     one item, and the crew's question is legible in the rendered rail
+//     one item, and the rendered rail says so: the crew, what it needs, and
+//     the header's own count
 //  4. the resolve action hands the Mate the `resolve:` line through the same
-//     ActionFunc the `[resolve]` button uses
+//     ActionFunc the `[assign]` button uses
 //  5. the Mate answers the crew with `matev2 send`, which records
 //     `Source: mate` because spawn puts MATEV2_AGENT_ROLE=mate in its pane
 //  6. the crew takes that as a new prompt and reaches `wait-mate: chose <A|B>`
@@ -137,20 +138,24 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 		t.Fatalf("inbox item = %+v, want the needs-decision question", ask)
 	}
 
-	// And the question is legible in the rail a reader would be looking at,
-	// wrapped under the selected row. Asserting on the DTO instead would
-	// pass while the rail showed the row cut at "need…".
+	// And the row is legible in the rail a reader would be looking at: the
+	// crew and what it needs, in the words the inbox uses (2026-09-19 - the
+	// crew's own text is not on the row any more; the row opens its pane).
+	// Asserting on the DTO instead would pass while the rail showed a row
+	// cut at "need…".
 	rail := console.RenderInboxRail(query.LoadBox(w, "shop"), -1, 54, 12)
 	t.Logf("rail:\n%s", strings.Join(rail, "\n"))
-	joined := strings.Join(rail, " ")
-	if !strings.Contains(joined, "1 to resolve") {
-		t.Fatalf("the rail header does not say \"1 to resolve\":\n%s", strings.Join(rail, "\n"))
+	joined := strings.Join(strings.Fields(strings.Join(rail, " ")), " ")
+	if !strings.Contains(joined, "1 waiting") {
+		t.Fatalf("the rail header does not say \"1 waiting\":\n%s", strings.Join(rail, "\n"))
 	}
-	if !railShowsQuestion(rail, ask.Text) {
-		t.Fatalf("the rail does not show the crew's question %q:\n%s", ask.Text, strings.Join(rail, "\n"))
+	for _, want := range []string{ask.Crew, "needs an answer"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("the rail row does not say %q:\n%s", want, strings.Join(rail, "\n"))
+		}
 	}
 
-	// 4. `[resolve]`: the line into the Mate's composer, through ActionFunc.
+	// 4. `[assign]`: the line into the Mate's composer, through ActionFunc.
 	resolveOut, err := action(ctx, console.ActionRequest{
 		Action: console.ActionResolve, Target: "shop", TargetKind: "project",
 		Crew: ask.Crew, Input: ask.Resolve})
@@ -195,7 +200,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 	}
 	empty := console.RenderInboxRail(box, -1, 54, 6)
 	t.Logf("rail after the answer:\n%s", strings.Join(empty, "\n"))
-	if !strings.Contains(strings.Join(empty, " "), "nothing to resolve") {
+	if !strings.Contains(strings.Join(empty, " "), "nothing waiting") {
 		t.Fatalf("the emptied rail does not say so:\n%s", strings.Join(empty, "\n"))
 	}
 
@@ -240,13 +245,4 @@ func waitForInboxItem(t *testing.T, ctx context.Context, w *store.Workspace, wit
 	}
 	t.Fatalf("no single inbox item within %s; %s\npane:\n%s", within, last, tail())
 	return query.BoxEntry{}
-}
-
-// railShowsQuestion reports whether the rail's wrapped lines carry the
-// question, allowing for the wrap: the words are checked against the rail as
-// one run of whitespace-collapsed text, because where the renderer broke the
-// line is not the thing under test.
-func railShowsQuestion(rail []string, question string) bool {
-	flat := strings.Join(strings.Fields(strings.Join(rail, " ")), " ")
-	return strings.Contains(flat, strings.Join(strings.Fields(question), " "))
 }

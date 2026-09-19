@@ -93,9 +93,9 @@ func TestNarrowMateDigestHeightIsReservedBeforeSizingThePTY(t *testing.T) {
 				t.Fatalf("entries=%d: CROP - %d of %d buffer rows drawn, frame starts at ROW%02d\n%s",
 					entries, count, bufRows, first, view)
 			}
-			want := "nothing to resolve"
+			want := "nothing waiting"
 			if entries > 0 {
-				want = fmt.Sprintf("%d to resolve", entries)
+				want = fmt.Sprintf("%d waiting", entries)
 			}
 			if !containsLine(view, want) {
 				t.Errorf("the digest does not report %q:\n%s", want, view)

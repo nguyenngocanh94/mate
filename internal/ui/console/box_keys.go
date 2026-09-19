@@ -1,24 +1,29 @@
 package console
 
 import (
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
 
-// The four box keys (mvp.md section 5, task 15) and the peek overlay.
+// The box keys (mvp.md section 5, task 15).
 //
-//	Enter  resolve: hand the selected item to the Mate - one verified line
+//	Enter  open the pane of the crew the selected item names. The box is a
+//	       place to act, not to read (2026-09-19): an inbox row says who
+//	       needs what, and the thing a reader does about it is go and look
+//	       at that crew's own screen. An entry whose crew is `mate` - the
+//	       daemon's `wedged` incident - opens the Mate's own view.
+//	a      assign: hand the selected item to the Mate - one verified line
 //	       into its composer, naming the crew's question, the status file to
 //	       read and the `matev2 send` that answers the crew.
-//	r      reply to the crew directly, through the same send path
-//	       `matev2 send` uses, recorded in sent.log with Source: user.
-//	p      peek: the crew's own pane, 40 lines, in a scrollable overlay.
-//	a      toggle `[all]`: the whole merged log instead of the inbox. It is
-//	       a debugging view, off every time the Console starts - what the
-//	       rail is for is the things somebody still has to decide on.
+//	l      swap the two filters the header names: `[waiting]`, which is the
+//	       inbox, and `[all]`, the whole merged log. `[all]` is a debugging
+//	       view, off every time the Console starts - what the rail is for is
+//	       the things somebody still has to act on.
+//	o      the Actions menu for the pane this box belongs to: the Mate's
+//	       restart and clear-composer live there rather than on the header
+//	       (2026-09-19), with the menu's own confirmation in front of the
+//	       one that stops a live agent.
 //	j/k    move the selection.
 //
 // They are bare everywhere, and they are live exactly while the box has
@@ -29,15 +34,13 @@ import (
 // sessionHintLine and keyHints name only the focused surface's keys, so a
 // reader is never told about a key that would land in the harness instead.
 //
-// The two recovery actions (`R` restart, `u` clear composer) live here too:
-// they are box-focus keys and rail-header labels for the same reason the
-// three above are, and they go through the same ActionFunc seam.
-//
-// None of them acts on anything itself: each builds an actionChoice and
+// No action here acts on anything itself: each builds an actionChoice and
 // goes through runAction, so the whole existing machinery - the busy flag,
 // the cancellable context, the one outcome line, the re-read afterwards -
 // applies unchanged, and this package still reaches state only through
-// ActionFunc.
+// ActionFunc. Enter is the one key that runs no action at all: opening a
+// crew's pane is navigation, and it takes the same path Enter on that
+// crew's tree row takes (update.go's onEnter).
 
 // boxOutcomeLine draws the last box action's result inside the rail, which
 // is where a session frame has to put it: unlike the project frame, the
@@ -85,73 +88,25 @@ func (m Model) sessionRailState() boxRail {
 		hover = m.boxHover
 	}
 	return boxRail{
-		all:         m.boxAll,
-		sel:         sel,
-		hover:       hover,
-		zone:        m.sess.zone,
-		railW:       m.railWidth,
-		mode:        m.sess.target.Mode,
-		outcome:     m.boxMsg,
-		reply:       m.boxReply,
-		replyCrew:   m.boxReplyCrew,
-		replyText:   m.boxReplyText,
-		confirm:     m.boxConfirm,
-		confirmText: m.boxConfirmText,
+		all:     m.boxAll,
+		sel:     sel,
+		hover:   hover,
+		zone:    m.sess.zone,
+		railW:   m.railWidth,
+		outcome: m.boxMsg,
 	}
 }
 
 // ---------- the recovery actions ----------
-
-// beginRestartMate is `R`, and the rail header's [restart mate] label. It
-// never runs on the keystroke itself: a restart stops a live agent, and an
-// agent stopped by accident takes minutes to bring back. The confirmation
-// is one rail line with its own [yes]/[no] buttons rather than the project
-// frame's modal overlay, because the session view has no overlay and a
-// modal drawn over a live PTY would hide the thing being restarted.
-func (m Model) beginRestartMate(project string) Model {
-	if project == "" || m.actionBusy {
-		return m
-	}
-	m.boxConfirm, m.boxConfirmText = true, "restart Mate "+project+"?"
-	m.boxConfirmChoice = restartMateChoice(project)
-	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
-	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
-	return m
-}
-
-// beginClearComposer is `u`, and the [clear composer] label: one Ctrl+U
-// into the Mate's pane. It asks for no confirmation because it sends
-// nothing and types nothing - it only removes what a stray key sequence
-// left half-typed in the composer, which is the state it exists for.
-func (m Model) beginClearComposer(project string) (Model, tea.Cmd) {
-	if project == "" || m.actionBusy {
-		return m, nil
-	}
-	return m.runAction(clearComposerChoice(project))
-}
-
-// onBoxConfirmKey is the confirmation line's keyboard: Enter runs it, Esc
-// and anything else that is not a decision leaves the Mate alone.
-func (m Model) onBoxConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter", "y":
-		return m.resolveBoxConfirm(true)
-	case "esc", "n":
-		return m.resolveBoxConfirm(false)
-	}
-	return m, nil
-}
-
-// resolveBoxConfirm is the confirmation's one exit, for Enter/Esc and for
-// the [yes]/[no] buttons alike.
-func (m Model) resolveBoxConfirm(yes bool) (Model, tea.Cmd) {
-	choice := m.boxConfirmChoice
-	m.boxConfirm, m.boxConfirmText, m.boxConfirmChoice = false, "", actionChoice{}
-	if !yes {
-		return m, nil
-	}
-	return m.runAction(choice)
-}
+//
+// Restarting a Mate and clearing its composer are entries in the Actions
+// menu of the Mate row (actions.go), which the box zone opens with `o`.
+// They were rail-header labels until 2026-09-19; a header of five
+// affordances was five things to read before the first row, and both of
+// these are rare enough that a menu is where a reader goes looking for
+// them. The restart keeps its confirmation - it stops a live agent - and it
+// is now the menu's own, which is the same confirmation every dangerous
+// action on the frame already gets.
 
 func restartMateChoice(project string) actionChoice {
 	return actionChoice{
@@ -177,12 +132,11 @@ func clearComposerChoice(project string) actionChoice {
 // return says whether the key was consumed; false means the caller's own
 // handling (the composer, or the PTY) still applies.
 func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	if m.boxReply {
-		model, cmd := m.onBoxReplyKey(msg)
-		return model, cmd, true
-	}
-	if msg.String() == "a" {
+	switch msg.String() {
+	case "l":
 		return m.toggleBoxAll(), nil, true
+	case "o":
+		return m.beginBoxActions(), nil, true
 	}
 	b, ok := m.sessionBoxList()
 	if !ok {
@@ -200,128 +154,101 @@ func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		m.boxMsg = footerMsg{}
 		return m, nil, true
 	case "enter":
-		model, cmd := m.beginBoxResolve(m.sess.target.ProjectID, b, rail.sel)
+		model, cmd := m.openBoxEntryFromSession(b, rail.sel)
 		return model, cmd, true
-	case "r":
-		return m.beginBoxReply(m.sess.target.ProjectID, b, rail.sel), nil, true
-	case "p":
-		model, cmd := m.beginBoxPeek(m.sess.target.ProjectID, b, rail.sel)
+	case "a":
+		model, cmd := m.beginBoxAssign(m.sess.target.ProjectID, b, rail.sel)
 		return model, cmd, true
 	}
 	return m, nil, false
 }
 
-// toggleBoxAll flips the `[all]` view, from the `a` key and from the header
-// label alike. It is Console state for the run and is never persisted: a
+// toggleBoxAll flips between the header's two filters, from the `l` key;
+// setBoxAll is the same move from a click on one of the labels, which names
+// the filter it wants rather than asking for the other one.
+//
+// The filter is Console state for the run and is never persisted: a
 // debugging view that survived a restart would quietly become the default
 // again. The selection resets to "follow the newest" because the two lists
 // have different lengths, and an index carried across them names a row the
 // reader was not looking at.
-func (m Model) toggleBoxAll() Model {
-	m.boxAll = !m.boxAll
+func (m Model) toggleBoxAll() Model { return m.setBoxAll(!m.boxAll) }
+
+func (m Model) setBoxAll(all bool) Model {
+	m.boxAll = all
 	m.sess.boxSel, m.boxSel = -1, -1
 	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	return m
 }
 
-// onBoxReplyKey is the one-line reply input. It is the same shape as the
-// new-project name input (actions.go's onActionInputKey): Enter submits,
-// Esc cancels, backspace deletes one grapheme cluster, and printable runes
-// accumulate. A reply is one line by protocol (mvp.md section 4), so there
-// is nothing here that could produce a second one.
-func (m Model) onBoxReplyKey(msg tea.KeyMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		return m.cancelBoxReply(), nil
-	case "backspace":
-		m.boxReplyText = trimLastCluster(m.boxReplyText)
-		return m, nil
-	case "enter":
-		return m.submitBoxReply()
+// beginBoxActions is `o`: the Actions menu of the pane this box belongs to.
+// It is built from the session's own target, or from the project frame's
+// Mate, rather than from whichever row the tree's cursor happens to be on -
+// the reader is looking at a box, and the row under the list's cursor
+// behind it is not what they mean.
+func (m Model) beginBoxActions() Model {
+	if m.actionBusy {
+		return m
 	}
-	if len(msg.Runes) > 0 && len([]rune(m.boxReplyText)) < 500 {
-		m.boxReplyText += string(msg.Runes)
+	r, ok := m.boxActionsRow()
+	if !ok {
+		return m
 	}
-	return m, nil
-}
-
-// submitBoxReply and cancelBoxReply are what Enter and Esc do, and what the
-// input line's own [send] and [cancel] buttons do. One implementation, so a
-// click and a keystroke cannot end up meaning different things.
-func (m Model) submitBoxReply() (Model, tea.Cmd) {
-	crew, project, text := m.boxReplyCrew, m.boxReplyProject, strings.TrimSpace(m.boxReplyText)
-	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
-	if text == "" {
-		m.boxMsg = errMsg("Reply refused: a reply is one non-empty line " + m.g.Dot + " nothing was sent")
-		return m, nil
-	}
-	return m.runAction(boxReplyChoice(project, crew, text))
-}
-
-func (m Model) cancelBoxReply() Model {
-	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
+	m.actions, m.confirm, m.actionInputMode, m.harnessPick = true, nil, false, false
+	m.actionChoices = m.actionChoicesForRow(r)
+	m.actionRow = r
+	m.actionIndex = 0
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	return m
 }
 
-// beginBoxResolve is Enter: hand the selected item to the Mate and ask it to
-// answer the crew. A message entry holds no question - the Mate either sent
-// it or was sent it - and the refusal says so rather than silently doing
-// nothing, which is indistinguishable from a lost keystroke. Only `[all]`
-// can put such a row under the cursor; every row of the inbox is resolvable.
-func (m Model) beginBoxResolve(project string, b boxList, sel int) (Model, tea.Cmd) {
+// boxActionsRow is the row `o` acts on: the crew or Mate whose session is
+// open, and the project's Mate on the project frame, where the box panel
+// sits under the Mate's own project.
+func (m Model) boxActionsRow() (row, bool) {
+	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
+		switch m.sess.target.Kind {
+		case SessionTargetCrew:
+			return row{kind: rowCrew, id: m.sess.target.ID}, true
+		case SessionTargetMate:
+			return row{kind: rowMate, id: mateRowID(m.currentProject().Mate)}, true
+		}
+		return row{}, false
+	}
+	if m.cur().kind != frameProject {
+		return row{}, false
+	}
+	return row{kind: rowMate, id: mateRowID(m.currentProject().Mate)}, true
+}
+
+// beginBoxAssign is `a`, and the row's own `[assign]` button: hand the
+// selected item to the Mate and ask it to answer the crew. It sends the
+// entry's own `resolve:` line - the word the Mate's manual uses - while the
+// button a reader presses says what the press does to them: give this away.
+// A message entry holds no question - the Mate either sent it or was sent
+// it - and the refusal says so rather than silently doing nothing, which is
+// indistinguishable from a lost keystroke. Only `[all]` can put such a row
+// under the cursor; every row of the inbox is assignable.
+func (m Model) beginBoxAssign(project string, b boxList, sel int) (Model, tea.Cmd) {
 	e, ok := boxSelectedEntry(b, sel)
 	if !ok {
 		return m, nil
 	}
 	if !e.Resolvable() {
-		m.boxMsg = errMsg("Resolve refused: a " + string(e.Kind) + " entry holds no question; only a crew status or an incident does " +
+		m.boxMsg = errMsg("Assign refused: a " + string(e.Kind) + " entry holds no question; only a crew status or an incident does " +
 			m.g.Dot + " nothing was sent")
 		return m, nil
 	}
 	if m.actionBusy {
 		return m, nil
 	}
-	return m.runAction(boxResolveChoice(project, e))
+	return m.runAction(boxAssignChoice(project, e))
 }
 
-// beginBoxReply is `r`: open the one-line input. It refuses on an entry
-// with no crew (a message to the Mate's own pane) rather than opening an
-// input with nowhere to send.
-func (m Model) beginBoxReply(project string, b boxList, sel int) Model {
-	e, ok := boxSelectedEntry(b, sel)
-	if !ok {
-		return m
-	}
-	if e.Crew == "" {
-		m.boxMsg = errMsg("Reply refused: this entry names no crew " + m.g.Dot + " nothing was sent")
-		return m
-	}
-	m.boxReply, m.boxReplyCrew, m.boxReplyProject, m.boxReplyText = true, e.Crew, project, ""
-	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
-	return m
-}
-
-// beginBoxPeek is `p`: read the crew's own pane into the overlay.
-func (m Model) beginBoxPeek(project string, b boxList, sel int) (Model, tea.Cmd) {
-	e, ok := boxSelectedEntry(b, sel)
-	if !ok {
-		return m, nil
-	}
-	if e.Crew == "" {
-		m.boxMsg = errMsg("Peek refused: this entry names no crew " + m.g.Dot + " nothing was read")
-		return m, nil
-	}
-	if m.actionBusy {
-		return m, nil
-	}
-	return m.runAction(boxPeekChoice(project, e.Crew))
-}
-
-// The three choices. They are built here rather than in actionChoicesForSelected
-// because none of them acts on the *selected row* of a frame: they act on a
+// boxAssignChoice is built here rather than in actionChoicesForRow
+// because it does not act on the *selected row* of a frame: it acts on a
 // box entry, which is a different selection entirely.
-
-func boxResolveChoice(project string, e query.BoxEntry) actionChoice {
+func boxAssignChoice(project string, e query.BoxEntry) actionChoice {
 	return actionChoice{
 		action: ActionResolve, enabled: true,
 		desc: "Ask the Mate to resolve " + e.Crew + "'s " + e.Verb,
@@ -332,100 +259,125 @@ func boxResolveChoice(project string, e query.BoxEntry) actionChoice {
 	}
 }
 
-func boxReplyChoice(project, crew, text string) actionChoice {
-	return actionChoice{
-		action: ActionReply, enabled: true,
-		desc: "Reply to crew " + crew,
-		req: ActionRequest{
-			Action: ActionReply, Target: project, TargetKind: "project",
-			Crew: crew, Input: text,
-		},
+// ---------- Enter and a click: open the crew's own pane ----------
+
+// boxEntryCrewRow is the tree row an inbox entry names: the crew that wrote
+// the status line or that the observer opened an incident about, and the
+// Mate for the daemon's own `wedged` incident, whose crew field is the
+// literal "mate" (internal/autopilot/doc.go). ok is false when the entry
+// names no crew at all - a message to the Mate's own pane, reachable only
+// through `[all]` - or when the crew it names is no longer in the snapshot,
+// which is what a crew closed since the last read looks like.
+func (m Model) boxEntryCrewRow(e query.BoxEntry) (row, string, bool) {
+	crew := e.Crew
+	if crew == "" {
+		return row{}, "", false
 	}
+	if crew == "mate" {
+		return row{kind: rowMate, id: mateRowID(m.currentProject().Mate)}, crew, true
+	}
+	if _, ok := m.crewByID(crew); !ok {
+		return row{}, crew, false
+	}
+	return row{kind: rowCrew, id: crew}, crew, true
 }
 
-func boxPeekChoice(project, crew string) actionChoice {
-	return actionChoice{
-		action: ActionPeek, enabled: true,
-		desc: "Read crew " + crew + "'s pane",
-		req: ActionRequest{
-			Action: ActionPeek, Target: project, TargetKind: "project", Crew: crew,
-		},
+// openBoxCrew is what Enter and a click on a row body both end in: the same
+// thing Enter on that crew's tree row does (update.go's onEnter) - clear the
+// open-failure chain, take the embedded session view when it is available,
+// and otherwise hand over to `matev2 attach` with its own refusal wording.
+// One implementation, so the box cannot open a pane the tree would refuse.
+func (m Model) openBoxCrew(e query.BoxEntry) (Model, tea.Cmd) {
+	r, crew, ok := m.boxEntryCrewRow(e)
+	if !ok {
+		m.msg = errMsg(boxOpenRefusal(crew, m.g))
+		m.boxMsg = m.msg
+		return m, nil
 	}
+	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
+	m = m.clearOpenFailures()
+	if target, ok := m.sessionAvailableFor(r); ok {
+		return m.beginSession(r, target)
+	}
+	return m.beginAttach(r)
 }
 
-// ---------- the peek overlay ----------
-
-// peekFlow is `p`'s result: the crew's own pane, as it was read, kept on
-// screen until Esc. It is never merged into the box or the transcript - it
-// is a live screen scrape, and mvp.md decision 8 keeps screen scraping out
-// of anything that looks like recorded state.
-type peekFlow struct {
-	open bool
-	crew string
-	text string
-	top  int
+// boxOpenRefusal is the one line an entry with nowhere to go leaves behind.
+func boxOpenRefusal(crew string, g glyphSet) string {
+	if crew == "" {
+		return "Open refused: this entry names no crew " + g.Dot + " nothing was opened"
+	}
+	return "Open refused: crew " + crew + " is not in this snapshot; it was closed " +
+		g.Dot + " nothing was opened"
 }
 
-// peekLines renders the overlay over a whole region: a title, a rule, and
-// the pane's own lines, scrolled. Nothing is wrapped - a terminal scrape is
-// already laid out in columns, and re-wrapping it would misalign whatever
-// the harness drew.
-func (m Model) peekLines(w, h int) []*line {
-	out := []*line{
-		leftRight(
-			newLine().pad(1).add("PEEK  ", m.p.Bold).add("crew "+m.peek.crew, m.p.Fg),
-			newLine().add("live pane read, not recorded state ", m.p.Dim),
-			w, m.g,
-		),
-		newLine().add(strings.Repeat(m.g.HRule, max0(w)), m.p.Faint),
+// openBoxEntryFromSession is Enter (and a click) on a rail row while a
+// session view is already open. Two PTY streams must never be open at once,
+// so this never opens the crew's session directly: it ends the current one
+// and leaves a pending open on the Model, which is started from where the
+// close completes (update.go's sessionStreamClosedMsg/sessionCloseSentMsg
+// cases). An entry naming the target already on screen opens nothing at
+// all - it moves focus to the terminal, which is the pane the reader was
+// asking to look at.
+func (m Model) openBoxEntryFromSession(b boxList, sel int) (Model, tea.Cmd) {
+	e, ok := boxSelectedEntry(b, sel)
+	if !ok {
+		return m, nil
 	}
-	body := max0(h - len(out) - 2)
-	raw := strings.Split(m.peek.text, "\n")
-	if strings.TrimSpace(m.peek.text) == "" {
-		raw = []string{"the pane returned nothing"}
+	if _, crew, ok := m.boxEntryCrewRow(e); !ok {
+		m.boxMsg = errMsg(boxOpenRefusal(crew, m.g))
+		return m, nil
 	}
-	start, end := window(len(raw), clampInt(m.peek.top, 0, max0(len(raw)-body)), body)
-	for i := start; i < end; i++ {
-		out = append(out, newLine().add(" "+sanitizeText(raw[i]), m.p.Fg))
+	if m.sessionTargetIsCrew(e.Crew) {
+		m.sess.zone = zoneTerminal
+		m.boxHover = -1
+		m.boxMsg = footerMsg{}
+		return m, nil
 	}
-	for len(out) < h-2 {
-		out = append(out, newLine())
+	model, cmd := m.endSession()
+	model.pendingBoxOpen = e
+	if cmd == nil {
+		// Nothing to wait for: snapshot mode with no closer wired has no
+		// stream to close, so the open happens on this keystroke.
+		return model.startPendingBoxOpen()
 	}
-	out = append(out,
-		newLine().add(strings.Repeat(m.g.HRule, max0(w)), m.p.Faint),
-		newLine().add(" "+m.g.UpDown, m.p.Fg).add(" Scroll", m.p.Dim).
-			add("  Esc", m.p.Fg).add(" Close", m.p.Dim).
-			add("  "+m.g.Dot+" ", m.p.Faint).
-			add(plural(len(raw), "line", "lines"), m.p.Dim),
-	)
-	return fitLines(out, h)
+	return model, cmd
 }
 
-// onPeekKey is the overlay's own keyboard. It is modal: only scroll and
-// close respond, so no key can move a selection behind it.
-func (m Model) onPeekKey(key string) Model {
-	switch key {
-	case "esc", "q", "p":
-		m.peek = peekFlow{}
-	case "j", "down":
-		m.peek.top++
-	case "k", "up":
-		if m.peek.top > 0 {
-			m.peek.top--
-		}
+// sessionTargetIsCrew reports whether the open session view is already
+// showing the pane this entry names.
+func (m Model) sessionTargetIsCrew(crew string) bool {
+	switch m.sess.target.Kind {
+	case SessionTargetMate:
+		return crew == "mate"
+	case SessionTargetCrew:
+		return crew == m.sess.target.ID
 	}
-	return m
+	return false
+}
+
+// startPendingBoxOpen opens the crew a row asked for once the session that
+// was on screen has actually closed. A refusal lands on the project frame -
+// which is where the closed session left the reader - with the refusal on
+// its message line, rather than on nothing at all.
+func (m Model) startPendingBoxOpen() (Model, tea.Cmd) {
+	e, pending := m.pendingBoxOpen, m.pendingBoxOpen.Crew != ""
+	m.pendingBoxOpen = query.BoxEntry{}
+	if !pending {
+		return m, nil
+	}
+	return m.openBoxCrew(e)
 }
 
 // ---------- the project frame's box panel ----------
 //
 // The panel exists so attention is visible without entering the session
-// view, which is the whole point of showing it here. Its keys are the same
-// three, bare - the Console owns the keyboard on this frame - but they are
-// live only while Tab has moved focus onto the panel: Enter already opens
-// the Agent View on this frame and `r` already refreshes, and rebinding
-// either of them under the list would be exactly the trap the `n` key's own
-// note (seams.go's actionHints) refuses to lay.
+// view, which is the whole point of showing it here. Its keys are the rail's
+// own, bare - the Console owns the keyboard on this frame - but they are
+// live only while Tab has moved focus onto the panel: `a` already opens the
+// action menu under the list and `r` already refreshes, and rebinding either
+// of them under the list would be exactly the trap the `n` key's own note
+// (seams.go's actionHints) refuses to lay.
 
 // projectBoxList is the box of the project frame the reader is on: the same
 // inbox the rail draws, through the same boxList, so the panel and the rail
@@ -458,9 +410,6 @@ func (m Model) projectBoxSelection() int {
 
 // onProjectBoxKey is the panel's keyboard, live only while focus is on it.
 func (m Model) onProjectBoxKey(msg tea.KeyMsg) (Model, tea.Cmd) {
-	if m.boxReply {
-		return m.onBoxReplyKey(msg)
-	}
 	project := m.currentProject().ProjectID
 	b, ok := m.projectBox()
 	sel := m.projectBoxSelection()
@@ -469,8 +418,10 @@ func (m Model) onProjectBoxKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.focus = paneList
 		m.msg = footerMsg{}
 		return m, nil
-	case "a":
+	case "l":
 		return m.toggleBoxAll(), nil
+	case "o":
+		return m.beginBoxActions(), nil
 	}
 	if !ok {
 		return m, nil
@@ -484,11 +435,13 @@ func (m Model) onProjectBoxKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.boxSel = clampInt(sel-1, 0, n-1)
 		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	case "enter":
-		return m.beginBoxResolve(project, b, sel)
-	case "r":
-		return m.beginBoxReply(project, b, sel), nil
-	case "p":
-		return m.beginBoxPeek(project, b, sel)
+		e, has := boxSelectedEntry(b, sel)
+		if !has {
+			return m, nil
+		}
+		return m.openBoxCrew(e)
+	case "a":
+		return m.beginBoxAssign(project, b, sel)
 	}
 	return m, nil
 }

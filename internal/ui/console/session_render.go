@@ -228,14 +228,14 @@ func sessionSplitRule(w, rw int, g glyphSet, p palette, boxFocused bool) *line {
 // (140, 100 - layout.go's inspectorWide/Narrow switch).
 //
 // The widths (58, 54) are sized for what the rail has to carry on one line:
-// an inbox row's own words - "HH:MM  k3  needs-decision", 25 cells - the
-// three-cell lead, and the action strip that row grows under the cursor
-// ([resolve] [reply] [peek], boxStripWidth). 53 is the sum; the defaults sit
-// just above it. The earlier 50/44 were sized for the old "[→ mate]" strip
-// and cut "needs-decision" to "need…" the moment the reader selected the
-// row - which is the one word they were reading it for. A reader who wants
-// the balance elsewhere drags the splitter (session_focus.go): these are
-// defaults, not limits.
+// an inbox row's own words - "HH:MM  k3  stuck, quiet too long", 30 cells -
+// the three-cell lead, and the action strip that row grows under the cursor
+// ([assign], boxStripWidth). The defaults sit well above the sum, which is
+// what keeps the need phrase whole while the button is on screen: the
+// earlier 50/44 cut "needs-decision" to "need…" the moment the reader
+// selected the row - the one word they were reading it for. A reader who
+// wants the balance elsewhere drags the splitter (session_focus.go): these
+// are defaults, not limits.
 func sessionRailWidth(kind SessionTargetKind, cols int) int {
 	if kind != SessionTargetMate {
 		return 0
@@ -280,13 +280,6 @@ type boxRail struct {
 	// railW is the width the reader has dragged the splitter to, 0 for the
 	// breakpoint default. It persists for the Console's run.
 	railW int
-	// mode is the project's communication mode, which the header's
-	// clickable [supervised]/[auto] label both names and flips.
-	mode query.Mode
-	// confirm is the one-line confirmation the recovery actions ask for,
-	// and confirmText is the question.
-	confirm     bool
-	confirmText string
 	// outcome is the one line the last box action left behind: the Model's
 	// own footer message. The session frame is not built from frame.go's
 	// six-line chrome and so has no message line of its own, so
@@ -294,24 +287,19 @@ type boxRail struct {
 	// full width, because a refused send quotes the screen it was refused
 	// from and the rail's 36 columns would cut that mid-sentence.
 	outcome footerMsg
-	// reply is true while the one-line reply input is open, replyCrew names
-	// the crew it will go to, and replyText is what has been typed.
-	reply     bool
-	replyCrew string
-	replyText string
 }
 
 // sessionRailLines returns exactly geo.bodyH *line values for the rail
-// pane: the clickable label header, the box body, and a footer that carries
-// the reply input or the recovery confirmation when one is open. It draws
-// no key hints of its own - the frame's single bottom hint line names the
-// focused zone's keys and nothing else, so a reader is never shown two key
-// lines and left to work out which one is live.
+// pane: the two filter labels, the breadcrumb, the count line, and the box
+// body under them. It draws no key hints of its own - the frame's single
+// bottom hint line names the focused zone's keys and nothing else, so a
+// reader is never shown two key lines and left to work out which one is
+// live.
 func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeom, g glyphSet, p palette) []*line {
 	w := geo.railW
 	b := boxList{field: v, all: rail.all}
 	header := make([]*line, 0, geo.railHdrH)
-	for _, row := range packLabels(sessionHeaderLabels(rail.mode, rail.all, g), w) {
+	for _, row := range packLabels(sessionHeaderLabels(), w) {
 		l := newLine()
 		at := 0
 		for _, lab := range row {
@@ -325,12 +313,6 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeo
 	header = append(header, title, boxCountLine(b, g, p), sessionFullRule(w, g, p))
 
 	footer := []*line{sessionFullRule(w, g, p)}
-	if rail.confirm {
-		footer = append(footer, boxConfirmLine(rail, g, p, w))
-	}
-	if rail.reply {
-		footer = append(footer, boxReplyInputLine(rail, g, p, w))
-	}
 
 	hover := -1
 	if rail.zone == zoneBox {
@@ -340,64 +322,23 @@ func sessionRailLines(v query.Field[query.BoxView], rail boxRail, geo sessionGeo
 	return fitLines(append(append(header, body...), footer...), geo.bodyH)
 }
 
-// labelStyle tints one header label. The mode label is the only one that
-// reports state rather than offering an action, so it carries the accent
-// while auto mode is on - the one setting that lets the Console type into
-// the Mate's composer without a keystroke.
+// labelStyle tints one header label: the filter the box is showing carries
+// the accent, the other is dim. The colour is the quick signal, not the only
+// one - the count line under them says which list is on in words.
 func labelStyle(id labelID, rail boxRail, p palette) lipgloss.Style {
-	if id == labelMode && rail.mode == query.ModeAuto {
-		return p.Amber
-	}
-	if id == labelAll && rail.all {
-		return p.Amber
+	switch id {
+	case labelAll:
+		if rail.all {
+			return p.Acc
+		}
+		return p.Dim
+	case labelWaiting:
+		if !rail.all {
+			return p.Acc
+		}
+		return p.Dim
 	}
 	return p.Fg
-}
-
-// boxReplyInputLine is the rail's one-line input (the `r` key). It reuses
-// the Console's existing input shape - a label, the typed text, and a "_"
-// caret - rather than inventing a second one: onboardInputLines draws the
-// new-project name the same way, and two input affordances that look
-// different would read as two different kinds of field. Its two buttons sit
-// on the same line, right-aligned, at the coordinates sessionFooterLabels
-// hands the mouse.
-func boxReplyInputLine(rail boxRail, g glyphSet, p palette, w int) *line {
-	return labelledInputLine(" reply "+rail.replyCrew+" > ", rail.replyText+"_",
-		[]labelSpec{{labelSend, "[send]"}, {labelCancel, "[cancel]"}}, g, p, w)
-}
-
-// boxConfirmLine is the one-line prompt the recovery actions ask for. A
-// restart stops a live agent, so it is never one keystroke away; the
-// question and its two buttons take one rail row and nothing else moves.
-func boxConfirmLine(rail boxRail, g glyphSet, p palette, w int) *line {
-	return labelledInputLine(" "+rail.confirmText+" ", "",
-		[]labelSpec{{labelYes, "[yes]"}, {labelNo, "[no]"}}, g, p, w)
-}
-
-// labelledInputLine draws a dim label, foreground text, and buttons pinned
-// to the right edge, cutting the text rather than the buttons: the buttons
-// are the only way a mouse-driven reader can answer, so they are the part
-// that must survive a narrow rail.
-func labelledInputLine(label, text string, specs []labelSpec, g glyphSet, p palette, w int) *line {
-	buttons := 0
-	for i, s := range specs {
-		if i > 0 {
-			buttons++
-		}
-		buttons += cells(s.text)
-	}
-	avail := max0(w - buttons - 1)
-	lab := cutCells(label, avail)
-	body := cutCells(text, max0(avail-cells(lab)))
-	l := newLine().add(lab, p.Dim).add(body, p.Fg)
-	l.add(strings.Repeat(" ", max0(avail-cells(lab)-cells(body))+1), p.Dim)
-	for i, s := range specs {
-		if i > 0 {
-			l.add(" ", p.Dim)
-		}
-		l.add(s.text, p.Acc)
-	}
-	return l.cut(w, g)
 }
 
 // sessionHintLine is the frame's one key line: the keys of the zone that
@@ -408,24 +349,14 @@ func labelledInputLine(label, text string, specs []labelSpec, g glyphSet, p pale
 func sessionHintLine(rail boxRail, geo sessionGeom, g glyphSet, p palette, w int) *line {
 	l := newLine()
 	switch {
-	case rail.reply:
-		return l.add(" REPLY  ", p.Bold).
-			add("Enter", p.Fg).add(" send", p.Dim).
-			add("  Esc", p.Fg).add(" cancel", p.Dim).cut(w, g)
-	case rail.confirm:
-		return l.add(" CONFIRM  ", p.Bold).
-			add("Enter", p.Fg).add(" yes", p.Dim).
-			add("  Esc", p.Fg).add(" no", p.Dim).cut(w, g)
 	case rail.zone == zoneBox:
 		l.add(" BOX  ", p.Bold).
 			add(g.UpDown, p.Fg).add(" move", p.Dim).
-			add("  Enter", p.Fg).add(" resolve", p.Dim).
-			add("  r", p.Fg).add(" reply", p.Dim).
-			add("  p", p.Fg).add(" peek", p.Dim).
-			add("  a", p.Fg).add(" all", p.Dim).
+			add("  Enter", p.Fg).add(" open crew", p.Dim).
+			add("  a", p.Fg).add(" assign", p.Dim).
+			add("  l", p.Fg).add(" all", p.Dim).
 			add("  m", p.Fg).add(" mode", p.Dim).
-			add("  R", p.Fg).add(" restart", p.Dim).
-			add("  u", p.Fg).add(" clear composer", p.Dim).
+			add("  o", p.Fg).add(" actions", p.Dim).
 			add("  Esc", p.Fg).add(" project", p.Dim).
 			add("  F2", p.Fg).add(" terminal", p.Dim)
 		return l.cut(w, g)

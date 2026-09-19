@@ -50,7 +50,16 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 		}
 		return choices
 	}
-	choices := make([]actionChoice, 0, 5)
+	return m.actionChoicesForRow(selected)
+}
+
+// actionChoicesForRow is the menu one row offers. It is its own function
+// because two surfaces ask for it: the list's `a`, which means the row
+// under the cursor, and the box zone's `o` (box_keys.go), which means the
+// pane the box belongs to - the Mate whose session is open is not
+// necessarily the row the tree's cursor is sitting on.
+func (m Model) actionChoicesForRow(selected row) []actionChoice {
+	choices := make([]actionChoice, 0, 7)
 	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.repairChoice(selected), m.onboardChoice(selected))
 	// Capability is authored by the store-backed loader. The local builders above
 	// only supply row-specific wording and target identity; availability is
@@ -61,6 +70,17 @@ func (m Model) actionChoicesForSelected() []actionChoice {
 			if !available {
 				choices[i].desc = "unavailable · " + reason
 			}
+		}
+	}
+	// The Mate's two recovery actions. They are here rather than on the rail
+	// header (2026-09-19, session_focus.go): both are rare, both are about a
+	// Mate that is already misbehaving, and a menu is where a reader goes
+	// looking for something they do not do every day. The restart carries
+	// `dangerous`, so the menu's own confirmation stands in front of the one
+	// that stops a live agent.
+	if selected.kind == rowMate {
+		if project := m.currentProject().ProjectID; project != "" {
+			choices = append(choices, restartMateChoice(project), clearComposerChoice(project))
 		}
 	}
 	return choices
@@ -262,6 +282,7 @@ func (m Model) beginActions() Model {
 	m.actionInputMode = false
 	m.actionInput = ""
 	m.actionChoices = m.actionChoicesForSelected()
+	m.actionRow, _ = m.selectedRow()
 	m.actionIndex = 0
 	m.msg = footerMsg{}
 	return m
@@ -355,6 +376,44 @@ func (m Model) handleActionEnter() (Model, tea.Cmd) {
 	return m.runAction(choice)
 }
 
+// onActionOverlayKey is the menu's and the confirmation's own keyboard. It
+// is one implementation because two surfaces route to it: onKey, on the
+// project frame, and the session view's box zone (session_mode.go), where
+// the overlay is drawn over the whole frame (view.go) and nothing behind it
+// may answer a key.
+func (m Model) onActionOverlayKey(key string) (Model, tea.Cmd) {
+	if m.confirm != nil {
+		switch key {
+		case "esc", "backspace":
+			m.confirm = nil
+			m.actions = true
+			return m, nil
+		case "enter":
+			choice := m.confirm.choice
+			m.confirm = nil
+			return m.runAction(choice)
+		}
+		return m, nil
+	}
+	switch key {
+	case "esc", "backspace":
+		return m.closeActions(), nil
+	case "up", "k":
+		if m.actionIndex > 0 {
+			m.actionIndex--
+		}
+		return m, nil
+	case "down", "j":
+		if m.actionIndex+1 < len(m.actionChoices) {
+			m.actionIndex++
+		}
+		return m, nil
+	case "enter":
+		return m.handleActionEnter()
+	}
+	return m, nil
+}
+
 func (m Model) onActionInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "backspace":
@@ -441,15 +500,6 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.confirm = nil
 	m.actions = false
 	m.actionChoices = nil
-	// Peek writes nothing, so it neither re-reads the snapshot nor reports
-	// through the outcome line: its whole result is the crew's screen, and
-	// that goes in the overlay (box_keys.go). A failed peek does take the
-	// ordinary failure path below - there is no screen to show then.
-	if msg.choice.action == ActionPeek && msg.err == nil {
-		m.peek = peekFlow{open: true, crew: msg.choice.req.Crew, text: msg.text}
-		m.msg, m.boxMsg = footerMsg{}, footerMsg{}
-		return m, nil
-	}
 	var result footerMsg
 	if msg.err != nil {
 		// This path means the service was actually called. It is therefore a
@@ -465,18 +515,19 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	if boxAction(msg.choice.action) {
 		// The box actions get their own wording. "Action forward failed" is
 		// the shape of a menu entry's report, and these are not menu entries:
-		// the reader pressed Enter on a line in the rail, and what they need
+		// the reader pressed a key on a line in the rail, and what they need
 		// back is whether that line reached the Mate and why not.
 		result = boxOutcome(msg, m.g)
 		m.boxMsg = result
 	}
 	m.actionAfterRead = &result
 	m.msg = result
-	// A box action changes exactly what the box shows: a resolve or a reply
-	// records a line to the crew, and rule 2 of the inbox then drops the item
-	// on the next read. Waiting for the ordinary one-second metadata tick
-	// would leave the answered item under the reader's cursor long enough for
-	// them to act on it twice, so the session's own box is re-read now.
+	// A box action changes exactly what the box shows: an assign records a
+	// line to the Mate, and the Mate's own answer then drops the item by
+	// rule 2 of the inbox on a later read. Waiting for the ordinary
+	// one-second metadata tick would leave the answered item under the
+	// reader's cursor long enough for them to act on it twice, so the
+	// session's own box is re-read now.
 	m, load := m.startLoad()
 	return m, tea.Batch(load, m.sessionBoxRefreshCmd())
 }
@@ -513,8 +564,12 @@ func (m Model) actionLines(w, h int) []*line {
 		return m.harnessPickerLines(w, h)
 	}
 	out := []*line{newLine().pad(2).add("ACTIONS", m.p.Bold)}
-	if r, ok := m.selectedRow(); ok {
-		out[0].add("  "+r.id, m.p.Dim)
+	// The row the choices were built for, which is not always the row under
+	// the list's cursor: the box zone's `o` builds the menu for the pane it
+	// belongs to (box_keys.go), and a title naming a different row would be
+	// naming something none of the entries act on.
+	if m.actionRow.id != "" {
+		out[0].add("  "+m.actionRow.id, m.p.Dim)
 	}
 	out = append(out, newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint))
 	for i, c := range m.actionChoices {
@@ -830,11 +885,14 @@ func (m Model) recordedHarness() query.HarnessKind {
 	return mate.Designated.Value.HarnessKind
 }
 
-// boxAction reports whether an action came from the message box rather than
-// the action menu.
+// boxAction reports whether an action's outcome belongs on the rail's own
+// line as well as the frame's: the assign a box row issues, and the two
+// recovery actions, whose whole subject is the Mate the rail sits beside.
+// They are answered in their own words (boxOutcome) rather than in the
+// menu's, because what the reader needs back is whether the line reached a
+// composer, not that "an action completed".
 func boxAction(a Action) bool {
-	return a == ActionResolve || a == ActionReply || a == ActionPeek ||
-		a == ActionRestartMate || a == ActionClearComposer
+	return a == ActionResolve || a == ActionRestartMate || a == ActionClearComposer
 }
 
 // boxOutcome is the one line a box action leaves on the outcome line. A
@@ -844,8 +902,11 @@ func boxAction(a Action) bool {
 // screen it read that from, and rewording it here would drop exactly the
 // detail that tells a reader whether to retry or to go look at the pane.
 func boxOutcome(msg actionDoneMsg, g glyphSet) footerMsg {
+	// ActionResolve is "Assign" here: the wire word stays `resolve` for the
+	// Mate's manual, and the word a reader is answered in is the one on the
+	// button they pressed.
 	verb := map[Action]string{
-		ActionResolve: "Resolve", ActionReply: "Reply", ActionPeek: "Peek",
+		ActionResolve:     "Assign",
 		ActionRestartMate: "Restart", ActionClearComposer: "Clear",
 	}[msg.choice.action]
 	if msg.err != nil {

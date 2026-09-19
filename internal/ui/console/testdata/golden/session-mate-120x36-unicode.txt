@@ -1,10 +1,10 @@
  claude-code · mate-payments-api · supervised                                                                           
 ──────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────
- [← project] [mode] [all] [restart mate]              │                                                                 
- [clear composer]                                     │                                                                 
+ [waiting] [all]                                      │                                                                 
  CREW › MATE                                          │                                                                 
- 2 to resolve                                         │                                                                 
+ 2 waiting                                            │                                                                 
 ──────────────────────────────────────────────────────│                                                                 
+                                                      │                                                                 
                                                       │                                                                 
                                                       │                                                                 
                                                       │                                                                 

@@ -24,13 +24,13 @@
                                                                      │                  (2s) · r re-reads               
                                                                      │  ↓ 10 more                                       
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                       1 to resolve 
+ BOX                                                                                                          1 waiting 
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
+▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ? 1 field unknown: worktree of crew 01J9P6Q6 (lookup timed out (2s))                                                   
  ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

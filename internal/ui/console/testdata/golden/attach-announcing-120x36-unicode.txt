@@ -24,13 +24,13 @@
                                                                      │                  payments-api-crew_01J9P6Q6W0E5V 
                                                                      │  ↓ 10 more                                       
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- BOX                                                                                                       1 to resolve 
+ BOX                                                                                                          1 waiting 
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
                                                                                                                         
-▏! 14:01  k3  needs an answer                                                                   [resolve] [reply] [peek]
+▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  Attaching to crew-payments-api-2 via matev2 attach · detach: Ctrl+b then q                                             
  Ctrl+b q Detach; does not stop the agent                                                                               

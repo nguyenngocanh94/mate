@@ -1,8 +1,8 @@
  claude-code · mate-payments-api · auto                                                                                                                         
 ────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────
- [← project] [auto] [all] [restart mate] [clear composer]               │                                                                                       
+ [waiting] [all]                                                        │                                                                                       
  CREW › MATE                                                            │                                                                                       
- 2 to resolve                                                           │                                                                                       
+ 2 waiting                                                              │                                                                                       
 ────────────────────────────────────────────────────────────────────────│                                                                                       
                                                                         │                                                                                       
                                                                         │                                                                                       
@@ -42,7 +42,7 @@
                                                                         │                                                                                       
                                                                         │                                                                                       
                                                                         │                                                                                       
- ! 14:01  k3  needs an answer                   [resolve] [reply] [peek]│                                                                                       
-▌! 14:06  k9  needs an answer                   [resolve] [reply] [peek]│                                                                                       
+ ! 14:01  k3  needs an answer                                   [assign]│                                                                                       
+▌! 14:06  k9  needs an answer                                   [assign]│                                                                                       
 ────────────────────────────────────────────────────────────────────────│                                                                                       
- BOX  ↑↓ move  Enter resolve  r reply  p peek  a all  m mode  R restart  u clear composer  Esc project  F2 terminal                                             
+ BOX  ↑↓ move  Enter open crew  a assign  l all  m mode  o actions  Esc project  F2 terminal                                                                    

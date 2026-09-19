@@ -545,15 +545,24 @@ func (m Model) onSessionStreamResized(msg sessionStreamResizedMsg) Model {
 	return m
 }
 
-func (m Model) onSessionStreamClosed(msg sessionStreamClosedMsg) Model {
+// onSessionStreamClosed retires the stream the reader has left. It is also
+// where a box row's "open that crew" is finally started (box_keys.go's
+// openBoxEntryFromSession): the pending entry waits until the PTY it was
+// asked from reports itself closed, so the Console never holds two streams
+// at once. A close that does not belong to the session on screen drops the
+// pending open rather than acting on it late - the reader has moved on, and
+// opening a pane for a row they left behind would be a frame they did not
+// ask for.
+func (m Model) onSessionStreamClosed(msg sessionStreamClosedMsg) (Model, tea.Cmd) {
 	if msg.gen != m.sess.gen || m.sess.phase != sessionClosing {
-		return m
+		m.pendingBoxOpen = query.BoxEntry{}
+		return m, nil
 	}
 	if msg.err != nil {
 		m.msg = errMsg("Session close failed: " + sessionErrorReason(msg.err))
 	}
 	m.sess = sessionFlow{boxSel: -1, gen: msg.gen}
-	return m
+	return m.startPendingBoxOpen()
 }
 
 // onSessionTick starts the next poll read, unless session mode has moved on
@@ -587,11 +596,10 @@ func (m Model) onSessionPromptSent(msg sessionPromptSentMsg) Model {
 	return m
 }
 
-// endSession leaves session mode: Esc from the box zone, or the rail's
-// [← project] label (session_focus.go). It restores
-// the navigation stack and the prior selection - untouched throughout
-// session mode, since session mode never mutates them - and does not stop
-// the agent. SessionClose is given a Cmd to run on rather than invoked
+// endSession leaves session mode: Esc, from either zone (session_focus.go).
+// It restores the navigation stack and the prior selection - untouched
+// throughout session mode, since session mode never mutates them - and does
+// not stop the agent. SessionClose is given a Cmd to run on rather than invoked
 // directly so leaving session mode is not a blocking call.
 func (m Model) endSession() (Model, tea.Cmd) {
 	target := m.sess.target
@@ -721,15 +729,11 @@ func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // keys. The third return says whether the key was consumed; false hands it
 // on to the mode's own terminal (the PTY, or the snapshot composer).
 func (m Model) onSessionZoneKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	// The reply input and the recovery confirmation are Console-drawn
-	// fields with a visible caret or a visible question: while one is open
-	// every keystroke was aimed at it, not at the harness.
-	if m.boxReply {
-		model, cmd := m.onBoxReplyKey(msg)
-		return model, cmd, true
-	}
-	if m.boxConfirm {
-		model, cmd := m.onBoxConfirmKey(msg)
+	// The Actions menu and its confirmation are Console-drawn and take the
+	// whole frame: while one is open every keystroke was aimed at it, not at
+	// the harness.
+	if m.confirm != nil || m.actions {
+		model, cmd := m.onActionOverlayKey(msg.String())
 		return model, cmd, true
 	}
 	if msg.Type == tea.KeyF2 {
@@ -746,11 +750,6 @@ func (m Model) onSessionZoneKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		return model, cmd, true
 	case "m":
 		model, cmd := m.beginModeToggle(m.sess.target.ProjectID)
-		return model, cmd, true
-	case "R":
-		return m.beginRestartMate(m.sess.target.ProjectID), nil, true
-	case "u":
-		model, cmd := m.beginClearComposer(m.sess.target.ProjectID)
 		return model, cmd, true
 	}
 	if model, cmd, handled := m.onSessionBoxKey(msg); handled {
@@ -812,13 +811,13 @@ func sessionErrorReason(err error) string {
 	return err.Error()
 }
 
-// clearBoxInteraction drops every half-finished box interaction: the reply
-// input, the recovery confirmation, the hover and the drag. Leaving the
-// session view has to leave them behind - a confirmation still armed when
-// the reader comes back would answer a question they have forgotten asking.
+// clearBoxInteraction drops every half-finished box interaction: the
+// Actions menu the box zone opened, its confirmation, the hover and the
+// drag. Leaving the session view has to leave them behind - a confirmation
+// still armed when the reader comes back would answer a question they have
+// forgotten asking.
 func (m Model) clearBoxInteraction() Model {
-	m.boxReply, m.boxReplyText, m.boxReplyCrew, m.boxReplyProject = false, "", "", ""
-	m.boxConfirm, m.boxConfirmText, m.boxConfirmChoice = false, "", actionChoice{}
-	m.boxHover, m.draggingSplit, m.lastClick = -1, false, clickMemo{}
+	m.actions, m.confirm, m.actionChoices, m.actionIndex = false, nil, nil, 0
+	m.boxHover, m.draggingSplit = -1, false
 	return m
 }
