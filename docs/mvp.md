@@ -332,15 +332,24 @@ assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 
 ### M4. Review và merge
 
+Quyết định trước khi làm (2026-09-19):
+
+- Merge là hành động kết thúc một ship, nên `matev2 merge` thành công thì tự chạy `crew stop` và ghi `state=finished`. Đây là chỗ duy nhất trạng thái cuối được đặt mà không phải gõ `crew stop` trực tiếp, nhưng vẫn là quyết định của người dùng, hoặc của Mate khi project bật `yolo`.
+- `needs-rebase` không phải trạng thái crew. Nó là kết quả của lệnh merge: branch không fast-forward được vào default branch thì lệnh từ chối, in nguyên nhân, không đổi gì. Mate gửi crew một dòng bảo rebase, crew về `working`.
+- Ai gọi merge: người dùng từ CLI hoặc từ console (Actions trên hàng crew đang `wait-mate`), hoặc Mate qua `matev2 merge` khi `yolo` bật. Khi `yolo` tắt, một lời gọi có `MATEV2_CALLER=mate` (spawn đặt biến này trong pane Mate) bị từ chối với thông điệp rõ. `yolo` là `project.yaml`, có sẵn `project add --yolo`; thêm `matev2 project yolo <name> on|off`.
+- `backlog.md` là trí nhớ Mate tự ghi, app không ghi vào đó. Task 23 thu hẹp thành `matev2 backlog <project>`: in một bảng chỉ đọc từ `.meta` và status (crew mở, trạng thái, task, branch, tuổi), Mate đọc để đối chiếu khi bootstrap.
+
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 21 | `matev2 diff <crew>` và view trong console. | Xem diff crew đã `wait-mate:`. |
-| 22 | `matev2 merge <crew>` chỉ fast-forward, từ chối caller agent khi không `yolo`, báo `needs_rebase`. | Test repo tạm, live một crew. |
-| 23 | `backlog.md` đồng bộ từ `.meta`, `matev2 backlog`. | Restart Mate thì backlog đúng. |
-| 24 | Acceptance end-to-end trên hai project, ghi evidence. | Một task đi hết vòng trên cả hai chế độ. |
+| 21 ∥ | `matev2 diff <project> <crew>`: `git diff <default>...<branch>` và `git log --oneline <default>..<branch>` của worktree crew, chỉ đọc, in ra stdout; `--stat` cho bản tóm tắt. Console: Actions trên hàng crew có `diff`, mở overlay cuộn được trong project frame với cùng nội dung; Enter/Esc đóng. | Unit trên repo tạm (branch trước, sau, không commit, worktree bẩn cũng hiện). Live: crew đã `wait-mate` xem được diff từ console. |
+| 22 ∥ | `matev2 merge <project> <crew>`: chỉ `git merge --ff-only` vào default branch trong repo chính, từ chối khi worktree crew bẩn, khi branch không ancestor-clean (`needs-rebase`), khi caller là Mate mà `yolo` tắt; thành công thì `crew stop` → `finished` và in một dòng kết quả. `matev2 project yolo <name> on\|off`. Console: Actions trên hàng crew `wait-mate` có `merge` với bước xác nhận. Manual Mate mục 9 "Delivery": lệnh merge đã có; khi `yolo` tắt báo captain, khi bật thì merge rồi báo. | Unit trên repo tạm cho từng nhánh từ chối. Live: một crew Codex thật đi từ brief tới `finished` qua merge từ console; và một lần Mate `yolo` tự merge. |
+| 23 | `matev2 backlog <project>`: bảng chỉ đọc từ `.meta` và status; manual mục 3 dùng nó thay `crew list` khi bootstrap. App không ghi `backlog.md`. | Unit với fixture; restart Mate thì bảng khớp cây console. |
+| 24 | Acceptance end-to-end trên hai project: mỗi project một task ship và một task scout, chế độ manual cho project thứ nhất, auto cho project thứ hai, đi tới `finished` qua merge; ghi `docs/evidence/m4-acceptance-<ngày>.md`. Trả nợ: composer classifier nhận màn hình chào của Claude Code ở kích thước pane console để `[assign]` chạy được trên Mate mới khởi động. | Evidence đầy đủ, `make check` xanh, không sửa tay giữa chừng. |
 
 Nợ kỹ thuật đã biết:
 
 - ~~`harness.Claude.BuildLaunchSpec` bắt buộc có `ContextPath`, nên `spawn` truyền chính `mate/AGENTS.md` qua `--append-system-prompt-file` trong khi `CLAUDE.md` cũng đã nạp nó từ cwd. Manual vào context hai lần.~~ Trả xong ở task 17: `AgentSpec.ManualInCwd` cho phép `ContextPath` rỗng, launch spec dùng `DeliveryCwdManual` và không truyền cờ context nào; `spawn` bật cờ đó cho Mate Claude. Với Codex thì không có nợ: Codex không tự nạp `CLAUDE.md` từ cwd, cơ chế nạp duy nhất của nó chính là file ở cwd, và nó ưu tiên `AGENTS.override.md` hơn `AGENTS.md`, nên manual vào context đúng một lần. `spawn` vẫn ghi `AGENTS.override.md` cho Mate Codex: đó là tên file Codex đọc, và giữ nguyên quy tắc "override che AGENTS.md tracked" mà crew worktree bắt buộc phải có.
+
+- `internal/send` chưa nhận màn hình chào của Claude Code ở kích thước pane mà console stream resize tới: `[assign]` trên Mate chưa có turn nào bị từ chối `agent is showing a screen mate cannot name` (đo 2026-09-19). Trả ở task 24.
 
 Sau MVP: token monitor gồm locator theo `session_id`, copy parser transcript v1, `usage.jsonl` và view, tín hiệu `budget`.
