@@ -51,8 +51,13 @@ index 1c0f3ad..8b2e5c1 100644
 +	if err := h.charge(ctx, ev); err != nil {
  		return err
  	}
- 	return nil
+ 	return h.receipt(ctx, ev)
 `
+
+// diffTailLine is the last line of sampleDiffText, and it appears nowhere
+// else in it: an assertion that the tail is reachable has to fail when the
+// window stops one line short, which a line the patch repeats would not.
+const diffTailLine = "return h.receipt(ctx, ev)"
 
 // sampleCrewBranch is the branch sampleTree's running Crew records; the
 // overlay's title has to name it.
@@ -202,14 +207,22 @@ func TestDiffOverlayScrollsAndCloses(t *testing.T) {
 		t.Fatalf("PgUp did not page back: top=%d, was %d", m.diff.top, paged)
 	}
 
-	// The tail is reachable and the offset never runs past it.
+	// The tail is reachable and the offset never runs past it. This is the
+	// assertion that catches an off-by-one in the clamp: windowContent
+	// spends a row on its "↑ N more" indicator as soon as the offset leaves
+	// the top, so a bound of total-h leaves the last line below the fold.
 	m = base
 	for i := 0; i < 200; i++ {
 		m, _ = send(t, m, key("down"))
 	}
 	frame := renderFrame(t, m)
-	if !strings.Contains(frame, "return nil") {
+	if !strings.Contains(frame, diffTailLine) {
 		t.Fatalf("the last line of the patch is not reachable by scrolling:\n%s", frame)
+	}
+	top := m.diff.top
+	m, _ = send(t, m, key("down"))
+	if m.diff.top != top {
+		t.Fatalf("the offset ran past the end of the patch: %d -> %d", top, m.diff.top)
 	}
 
 	for _, closeKey := range []string{"esc", "enter", "q"} {

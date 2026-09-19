@@ -86,8 +86,22 @@ const (
 	// is a screenful rather than a line: the Console puts it in the scrolling
 	// overlay of diff.go instead of on the message line.
 	ActionDiff Action = "diff"
-	// TODO(task 22): v1 also had retry, discard and switch_harness. matev2
-	// has no retry (a Crew runs once), and merge belongs to mvp.md's task 22.
+	// ActionMerge lands a Crew's branch in the Project's default branch and
+	// finishes the Crew (mvp.md task 22). It is offered on a Crew row only
+	// while that Crew reads `wait-mate` - the one state in which the Crew
+	// has said it is done and handed back - and it is absent, not disabled,
+	// anywhere else: a menu entry that could never apply to this row is not
+	// a refusal worth reading. It is dangerous, so the menu's own
+	// confirmation stands in front of it, exactly as it does for
+	// ActionRestartMate.
+	//
+	// ActionDiff is its read-only counterpart and deliberately has neither
+	// restriction: a reader looks at a branch to decide whether it is worth
+	// landing, which is before, not after, the Crew says `wait-mate`.
+	ActionMerge Action = "merge"
+	// TODO: v1 also had retry, discard and switch_harness. matev2 has no
+	// retry (a Crew runs once), and no discard action: throwing work away
+	// is `matev2 crew stop --discard`, on the captain's explicit word.
 )
 
 // ActionRequest is the identity selected from the snapshot. TargetKind is

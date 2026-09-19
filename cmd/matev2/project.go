@@ -168,6 +168,69 @@ func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
+// cmdProjectYolo implements `matev2 project yolo <name> on|off`: the one
+// switch that decides whether a Mate may run `matev2 merge` itself, or has
+// to report the branch and wait for the captain (docs/mvp.md M4 decisions).
+//
+// It is its own subcommand rather than a flag on some edit command because
+// it is the whole of what a reader wants to change, and because the answer
+// they need back is not "saved" but when the Mate will believe it: the
+// manual is rendered from `project.yaml` at every `mate start`, so a Mate
+// that is already running is quoting the old value until it is restarted.
+func cmdProjectYolo(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("project yolo", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: matev2 project yolo <name> on|off [--workspace <dir>]")
+	}
+	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return &usageError{err}
+	}
+	if fs.NArg() != 2 {
+		fs.Usage()
+		return newUsageError("matev2 project yolo: want exactly 2 arguments: <name> on|off")
+	}
+	name := fs.Arg(0)
+	var on bool
+	switch fs.Arg(1) {
+	case "on":
+		on = true
+	case "off":
+		on = false
+	default:
+		fs.Usage()
+		return newUsageErrorf("matev2 project yolo: want on or off, got %q", fs.Arg(1))
+	}
+
+	w, err := resolveWorkspace(*workspaceFlag)
+	if err != nil {
+		return err
+	}
+	if _, ok := w.Project(name); !ok {
+		return fmt.Errorf("%w: %s", store.ErrNoProject, name)
+	}
+	cfg, err := w.LoadProject(name)
+	if err != nil {
+		return err
+	}
+	was := cfg.Yolo
+	cfg.Yolo = on
+	if err := w.SaveProject(name, cfg); err != nil {
+		return fmt.Errorf("project yolo %s: %w", name, err)
+	}
+	if was == on {
+		fmt.Fprintf(stdout, "%s: yolo is already %t; nothing changed\n", name, on)
+		return nil
+	}
+	if on {
+		fmt.Fprintf(stdout, "%s: yolo is on; the Mate may run `matev2 merge %s <crew>` itself. A running Mate still reads the old value in its manual until its next restart.\n", name, name)
+		return nil
+	}
+	fmt.Fprintf(stdout, "%s: yolo is off; the Mate reports the branch and the captain merges. A running Mate still reads the old value in its manual until its next restart.\n", name)
+	return nil
+}
+
 // projectRow is one row of `matev2 project list`, in both the table and the
 // --json output.
 type projectRow struct {

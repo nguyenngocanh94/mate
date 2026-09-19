@@ -22,7 +22,15 @@ const (
 	// Crew pane at tab create, because the brief tells the Crew to echo into
 	// it by name and a pane without it would make every status append write
 	// to a file called the empty string.
-	EnvStatusFile      = "MATEV2_STATUS"
+	EnvStatusFile = "MATEV2_STATUS"
+	// EnvCaller says who is at the keyboard of the pane a `matev2` command
+	// was typed in: `mate` in a Mate's pane, `crew` in a Crew's pane, and
+	// absent everywhere else, which is the captain's own shell (docs/mvp.md
+	// M4 decisions: "một lời gọi có MATEV2_CALLER=mate ... bị từ chối").
+	// It is injected at pane create beside the identity keys, for the same
+	// reason MATEV2_STATUS is: a command can only know which of the three
+	// ran it from the environment its pane was given.
+	EnvCaller          = "MATEV2_CALLER"
 	EnvClaudeConfigDir = "CLAUDE_CONFIG_DIR"
 	EnvCodexHome       = "CODEX_HOME"
 )
@@ -56,6 +64,7 @@ func IdentityEnvKeys() []string {
 		EnvCrewID,
 		EnvRuntimeSessionID,
 		EnvStatusFile,
+		EnvCaller,
 	}
 }
 

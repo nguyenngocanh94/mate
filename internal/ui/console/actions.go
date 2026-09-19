@@ -21,7 +21,12 @@ type actionChoice struct {
 	desc      string
 	enabled   bool
 	dangerous bool
-	req       ActionRequest
+	// confirmPrompt replaces the confirmation overlay's generic "CONFIRM
+	// <action>?" headline for the actions whose question is worth asking in
+	// full. `merge` is one: "CONFIRM merge?" does not say which branch moves
+	// where, and that is the whole of what the reader is agreeing to.
+	confirmPrompt string
+	req           ActionRequest
 }
 
 type actionConfirmation struct {
@@ -91,7 +96,53 @@ func (m Model) actionChoicesForRow(selected row) []actionChoice {
 			choices = append(choices, restartMateChoice(project), clearComposerChoice(project))
 		}
 	}
+	if c, ok := m.mergeChoice(selected); ok {
+		choices = append(choices, c)
+	}
 	return choices
+}
+
+// mergeChoice is the `merge` entry of a Crew row's menu (mvp.md task 22).
+// The second return is whether the entry exists at all: unlike every other
+// action here, merge is absent rather than disabled on a row it does not
+// apply to, because "merge" on a Crew that has not handed back is not a
+// refusal a reader needs explained - it is an action that does not belong
+// to that row yet. A Crew announces it has handed back by appending
+// `wait-mate`, and that is exactly the state the entry appears in.
+//
+// The branch and the default branch are read from the snapshot the row was
+// drawn from, so the confirmation names the same two branches the command
+// will move; a Crew whose worktree or repo field could not be read still
+// gets the entry, worded generically, because the command re-reads both
+// facts itself and refuses on its own if they disagree.
+func (m Model) mergeChoice(r row) (actionChoice, bool) {
+	if r.kind != rowCrew {
+		return actionChoice{}, false
+	}
+	crew, ok := m.crewByID(r.id)
+	if !ok || crew.Status != query.CrewWaitMate {
+		return actionChoice{}, false
+	}
+	project := m.currentProject().ProjectID
+	if project == "" {
+		return actionChoice{}, false
+	}
+	branch := "this crew's branch"
+	if crew.Worktree.IsKnown() && crew.Worktree.Value.Branch != "" {
+		branch = crew.Worktree.Value.Branch
+	}
+	into := "the default branch"
+	if crew.Repo.IsKnown() && crew.Repo.Value.DefaultBranch != "" {
+		into = crew.Repo.Value.DefaultBranch
+	}
+	return actionChoice{
+		action: ActionMerge, enabled: true, dangerous: true,
+		desc:          "Merge " + branch + " into " + into + " and finish this crew",
+		confirmPrompt: fmt.Sprintf("Merge %s into %s and finish crew %s?", branch, into, crew.CrewID),
+		req: ActionRequest{
+			Action: ActionMerge, Target: project, TargetKind: "crew", Crew: crew.CrewID,
+		},
+	}, true
 }
 
 // actionCapability finds the store-backed loader's capability for one
@@ -613,6 +664,10 @@ func (m Model) actionObjectDescription(c actionChoice) (string, string, string) 
 	case ActionRepair:
 		scope = "The recorded binding/worktree metadata only; no live agent is assumed."
 		effect = "A stale binding may be cleared. Unknown state is never treated as proof of safe cleanup."
+	case ActionMerge:
+		object = c.req.Target + "/" + c.req.Crew
+		scope = "The Project's default branch in the primary repo, and this Crew's branch, worktree and pane."
+		effect = "A fast-forward only; anything else refuses and changes nothing. If it lands, the Crew is finished and its branch and worktree are removed."
 	}
 	return object, scope, effect
 }
@@ -682,8 +737,12 @@ func (m Model) confirmField(label, value string, style lipgloss.Style, w int) []
 
 func (m Model) confirmationLines(w, h int, choice actionChoice) []*line {
 	object, scope, effect := m.actionObjectDescription(choice)
+	headline := "CONFIRM " + string(choice.action) + "?"
+	if choice.confirmPrompt != "" {
+		headline = choice.confirmPrompt
+	}
 	out := []*line{
-		newLine().pad(2).add("CONFIRM "+string(choice.action)+"?", m.p.Bold),
+		newLine().pad(2).add(headline, m.p.Bold),
 		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
 	}
 	out = append(out, m.confirmField("Object", object, m.p.Fg, w)...)
