@@ -208,6 +208,52 @@ func TestTheFailureDetailCarriesWhatTheOneLineCannot(t *testing.T) {
 	}
 }
 
+// TestTheFailureDetailScrollsToWhatItSaysIsBelow is the regression for the
+// defect found on 2026-09-19: the overlay drew windowContent's "↓ N more"
+// indicator and then refused to move, because scrollFailureDetail passed
+// sel=0 to clampTop and clampTop's job is to keep a *selected row* on
+// screen - so every keystroke dragged the offset straight back to the top.
+// A view that advertises more content below it and cannot reach it is worse
+// than one that does not scroll at all.
+func TestTheFailureDetailScrollsToWhatItSaysIsBelow(t *testing.T) {
+	f := classified(t, stepAttach, exitErr(t, observability.ExitRuntimeUnavailable))
+	m := failureModel(t, f, f, f, f, f, f)
+	m, _ = send(t, m, key("e"))
+
+	l := m.listLayout()
+	total := len(m.openFailureDetailContent(l.Cols))
+	if total <= l.Body {
+		t.Fatalf("the fixture fits in %d lines (%d of content); it cannot prove scrolling", l.Body, total)
+	}
+	if !strings.Contains(renderFrame(t, m), "more") {
+		t.Fatal("the overlay does not claim there is more below; the fixture is wrong")
+	}
+
+	m, _ = send(t, m, key("down"))
+	if m.failureTop != 1 {
+		t.Fatalf("down did not scroll the failure detail: failureTop=%d", m.failureTop)
+	}
+	m, _ = send(t, m, key("pgdn"))
+	if m.failureTop <= 1 {
+		t.Fatalf("PgDn did not page the failure detail: failureTop=%d", m.failureTop)
+	}
+	// The last line of the content is reachable, and the offset stops there.
+	for i := 0; i < total+5; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	bottom := total - l.Body + 1
+	if m.failureTop != bottom {
+		t.Fatalf("failureTop = %d at the bottom, want %d (%d lines in %d)", m.failureTop, bottom, total, l.Body)
+	}
+	if !strings.Contains(renderFrame(t, m), "Esc closes this view") {
+		t.Fatalf("the last line of the detail is not reachable by scrolling:\n%s", renderFrame(t, m))
+	}
+	m, _ = send(t, m, key("up"))
+	if m.failureTop != bottom-1 {
+		t.Fatalf("up did not scroll back: failureTop=%d", m.failureTop)
+	}
+}
+
 // threeStepFailureModel drives the real wiring - session_mode.go's fallbacks
 // and attach.go's return path - through all three failure shapes: the live
 // stream dies with a coded runtime error, the snapshot view it falls back to

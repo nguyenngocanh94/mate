@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|merge|backlog|--version> ...")
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|diff|merge|backlog|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -58,6 +58,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdPeek(args[1:], stdout, stderr)
 	case "state":
 		return cmdState(args[1:], stdout, stderr)
+	case "diff":
+		return cmdDiff(args[1:], stdout, stderr)
 	case "merge":
 		return cmdMerge(args[1:], stdout, stderr)
 	case "backlog":

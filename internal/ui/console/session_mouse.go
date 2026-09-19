@@ -202,6 +202,18 @@ func (m Model) runBoxEntryAction(id labelID, project string, b boxList, index in
 // through with the arrow keys.
 func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	ev := tea.MouseEvent(msg)
+	// The diff overlay takes the wheel over the whole frame while it is
+	// open (diff.go): it is a full-region reader, and a wheel that scrolled
+	// the box panel underneath it would move something nobody can see.
+	if m.diff.open {
+		switch ev.Button {
+		case tea.MouseButtonWheelUp:
+			return m.scrollDiff(-1, layout(m.w, m.h)), nil
+		case tea.MouseButtonWheelDown:
+			return m.scrollDiff(1, layout(m.w, m.h)), nil
+		}
+		return m, nil
+	}
 	if m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {
 		return m, nil
 	}
