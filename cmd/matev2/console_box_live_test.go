@@ -135,7 +135,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	// on the box rather than on the raw file is the point: what the reader
 	// sees is query.BoxView, and an entry that does not reach it is not in
 	// the rail whatever the file says.
-	ask := waitForBoxEntry(t, ctx, w, 180*time.Second, paneTail, func(e query.BoxEntry) bool {
+	ask := waitForBoxEntry(t, ctx, w, "shop", 180*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "needs-decision"
 	})
 	t.Logf("box shows: %s %s %s (attention=%v, resolve=%q)", e2s(ask), ask.Verb, ask.Text, ask.Attention, ask.Resolve)
@@ -166,12 +166,12 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 	t.Logf("reply action: %s", replyOut)
-	assertSentLine(t, w, store.SourceUser, store.CrewTarget("k3"), "A")
+	assertSentLine(t, w, "shop", store.SourceUser, store.CrewTarget("k3"), "A")
 
 	// 5. The crew continues. This is the whole of mvp.md section 4's answer
 	// protocol: no interaction row, no correlation id - to the crew the
 	// reply was simply a new prompt.
-	done := waitForBoxEntry(t, ctx, w, 240*time.Second, paneTail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 240*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose a")
 	})
 	t.Logf("crew continued: %s %s", done.Verb, done.Text)
@@ -184,13 +184,13 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 		t.Fatalf("resolve action: %v", err)
 	}
 	t.Logf("resolve action: %s", resolveOut)
-	assertSentLine(t, w, store.SourceApp, store.TargetMate, done.Resolve)
+	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, done.Resolve)
 
 	// 7. The Mate answers. Its Stop hook (mvp.md task 08) appends a mate
 	// line to sent.log at the end of the turn, and the turn only started
 	// because the signal reached the composer - so this is the end-to-end
 	// proof that the app's line became a Mate turn.
-	mate := waitForSent(t, ctx, w, 240*time.Second, func(e store.SentEntry) bool {
+	mate := waitForSent(t, ctx, w, "shop", 240*time.Second, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate
 	})
 	t.Logf("the Mate replied after the signal: %s", mate.Text)
@@ -220,13 +220,13 @@ func e2s(e query.BoxEntry) string { return e.At.UTC().Format("15:04:05") + " " +
 // waitForBoxEntry polls query.LoadBox - the Console's own read - until an
 // entry matches, and fails with the crew's screen so a timeout says what the
 // agent was actually doing rather than only that nothing arrived.
-func waitForBoxEntry(t *testing.T, ctx context.Context, w *store.Workspace, within time.Duration,
+func waitForBoxEntry(t *testing.T, ctx context.Context, w *store.Workspace, project string, within time.Duration,
 	tail func() string, match func(query.BoxEntry) bool) query.BoxEntry {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	var last string
 	for time.Now().Before(deadline) {
-		box := query.LoadBox(w, "shop")
+		box := query.LoadBox(w, project)
 		if box.IsKnown() {
 			var lines []string
 			for _, e := range box.Value.Entries {
@@ -250,13 +250,13 @@ func waitForBoxEntry(t *testing.T, ctx context.Context, w *store.Workspace, with
 }
 
 // waitForSent polls sent.log for a matching line.
-func waitForSent(t *testing.T, ctx context.Context, w *store.Workspace, within time.Duration,
+func waitForSent(t *testing.T, ctx context.Context, w *store.Workspace, project string, within time.Duration,
 	match func(store.SentEntry) bool) store.SentEntry {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	var last []store.SentEntry
 	for time.Now().Before(deadline) {
-		entries, _, err := w.ReadSent("shop", 0)
+		entries, _, err := w.ReadSent(project, 0)
 		if err != nil {
 			t.Fatalf("ReadSent: %v", err)
 		}
@@ -276,9 +276,9 @@ func waitForSent(t *testing.T, ctx context.Context, w *store.Workspace, within t
 	return store.SentEntry{}
 }
 
-func assertSentLine(t *testing.T, w *store.Workspace, source, target, text string) {
+func assertSentLine(t *testing.T, w *store.Workspace, project, source, target, text string) {
 	t.Helper()
-	entries, _, err := w.ReadSent("shop", 0)
+	entries, _, err := w.ReadSent(project, 0)
 	if err != nil {
 		t.Fatalf("ReadSent: %v", err)
 	}

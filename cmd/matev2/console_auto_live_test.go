@@ -131,7 +131,7 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 		}
 		return harness.StartupScreenTail(screen, 20)
 	}
-	ask := waitForInboxItem(t, ctx, w, 180*time.Second, paneTail)
+	ask := waitForInboxItem(t, ctx, w, "shop", 180*time.Second, paneTail)
 	t.Logf("inbox item: %s %s %s", ask.Crew, ask.Verb, ask.Text)
 
 	// 3. One tick of the daemon, wired exactly as cmdConsole wires it.
@@ -139,7 +139,7 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 		Runtime: deps.Runtime,
 		Handle:  consoleMateHandle(w, deps),
 	})
-	digest := tickUntilDigest(t, ctx, pilot, w, 3*time.Minute)
+	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 3*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 needs-decision") {
 		t.Fatalf("digest = %q, want the crew's question", digest)
@@ -154,8 +154,8 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 	// 4. The Mate's own hook recorded it as an app line. Two copies of the
 	//    same text: the daemon's, written when the composer cleared, and the
 	//    hook's, written when Claude read the prompt.
-	waitForSentCount(t, ctx, w, 180*time.Second, digest, 2, paneTail)
-	for _, e := range sentEntries(t, w) {
+	waitForSentCount(t, ctx, w, "shop", 180*time.Second, digest, 2, paneTail)
+	for _, e := range sentEntries(t, w, "shop") {
 		if e.Text == digest && e.Source != store.SourceApp {
 			t.Fatalf("the digest was recorded as %q, want %q: the marker did not survive to the hook",
 				e.Source, store.SourceApp)
@@ -177,15 +177,15 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 	// 6. The Mate's hook deleted `.auto`, and the daemon stops within one
 	//    tick - with a brand new question waiting, so a cached flag would be
 	//    caught here.
-	waitForAutoOff(t, ctx, w, 180*time.Second)
+	waitForAutoOff(t, ctx, w, "shop", 180*time.Second)
 	if err := w.AppendStatus("shop", "k3", "needs-decision: and what about C"); err != nil {
 		t.Fatalf("AppendStatus: %v", err)
 	}
-	before := len(sentEntries(t, w))
+	before := len(sentEntries(t, w, "shop"))
 	if err := pilot.Tick(ctx); err != nil {
 		t.Fatalf("Tick after auto off: %v", err)
 	}
-	after := sentEntries(t, w)
+	after := sentEntries(t, w, "shop")
 	for _, e := range after[before:] {
 		if e.Source == store.SourceApp && e.Target == store.TargetMate {
 			t.Fatalf("the daemon sent %q after .auto was deleted", e.Text)
@@ -210,19 +210,19 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 // (mvp.md section 5), and this loop is how a real console's ninety-second
 // window behaves compressed.
 func tickUntilDigest(t *testing.T, ctx context.Context, pilot *autopilot.Pilot,
-	w *store.Workspace, within time.Duration) string {
+	w *store.Workspace, project string, within time.Duration) string {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	for time.Now().Before(deadline) {
 		if err := pilot.Tick(ctx); err != nil {
 			t.Fatalf("Tick: %v", err)
 		}
-		for _, e := range sentEntries(t, w) {
+		for _, e := range sentEntries(t, w, project) {
 			if e.Source == store.SourceApp && e.Target == store.TargetMate && strings.HasPrefix(e.Text, "digest: ") {
 				return e.Text
 			}
 		}
-		if notice := pilot.Snapshot()["shop"].Notice; notice != "" {
+		if notice := pilot.Snapshot()[project].Notice; notice != "" {
 			t.Logf("tick refused: %s", notice)
 		}
 		select {
@@ -236,14 +236,14 @@ func tickUntilDigest(t *testing.T, ctx context.Context, pilot *autopilot.Pilot,
 }
 
 // waitForSentCount waits for `sent.log` to hold n copies of one line.
-func waitForSentCount(t *testing.T, ctx context.Context, w *store.Workspace, within time.Duration,
+func waitForSentCount(t *testing.T, ctx context.Context, w *store.Workspace, project string, within time.Duration,
 	text string, n int, tail func() string) {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	got := 0
 	for time.Now().Before(deadline) {
 		got = 0
-		for _, e := range sentEntries(t, w) {
+		for _, e := range sentEntries(t, w, project) {
 			if e.Text == text {
 				got++
 			}
@@ -253,20 +253,20 @@ func waitForSentCount(t *testing.T, ctx context.Context, w *store.Workspace, wit
 		}
 		select {
 		case <-ctx.Done():
-			t.Fatalf("context ended waiting for %d copies of the digest; have %d\npane:\n%s", n, got, tail())
+			t.Fatalf("context ended waiting for %d copies of %q; have %d\npane:\n%s", n, text, got, tail())
 		case <-time.After(3 * time.Second):
 		}
 	}
-	t.Fatalf("sent.log holds %d copies of the digest within %s, want %d: the Mate never read it as an app line",
-		got, within, n)
+	t.Fatalf("sent.log holds %d copies of %q within %s, want %d: the Mate never read it as an app line",
+		got, text, within, n)
 }
 
 // waitForAutoOff waits for the Mate's own hook to delete `mate/.auto`.
-func waitForAutoOff(t *testing.T, ctx context.Context, w *store.Workspace, within time.Duration) {
+func waitForAutoOff(t *testing.T, ctx context.Context, w *store.Workspace, project string, within time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(within)
 	for time.Now().Before(deadline) {
-		if !w.Auto("shop") {
+		if !w.Auto(project) {
 			t.Log(".auto is gone: the Mate's UserPromptSubmit hook saw an unmarked prompt")
 			return
 		}

@@ -3,6 +3,7 @@ package send_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
@@ -12,10 +13,19 @@ import (
 // capture loads one committed live capture. Every screen under
 // testdata/screens is the verbatim stdout of `herdr agent read --source
 // recent-unwrapped --lines 40 --format text` taken on 2026-09-17 against
-// Claude Code 2.1.274 and codex-cli 0.154.0.
+// Claude Code 2.1.274 and codex-cli 0.154.0, except the three
+// `claude_startup_splash*` captures, taken on 2026-09-19 against Claude Code
+// 2.1.278 through the Console's own session stream (docs/mvp.md task 24).
 func capture(t *testing.T, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "screens", name+".txt"))
+	return captureFile(t, name+".txt")
+}
+
+// captureFile loads a capture by its own file name, for the `.ansi` screens
+// that carry the harness's styling.
+func captureFile(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "screens", name))
 	if err != nil {
 		t.Fatalf("read capture %s: %v", name, err)
 	}
@@ -70,6 +80,42 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			screen:   "claude_trust_dialog",
 			want:     send.StateUnknown,
 			evidence: "harness directory-trust dialog",
+		},
+		{
+			// docs/mvp.md task 24. A Mate that has not had a turn yet is
+			// still showing Claude's welcome box, and the Console's stream
+			// sizes its PTY to 65 columns (120 less the rail and its
+			// divider, streamTerminalSize). At that width Claude's composer
+			// rule is exactly as wide as the pane, so `--source
+			// recent-unwrapped` joins the rule, the composer and the
+			// closing rule into one line - and the composer under the
+			// splash is an empty composer all the same.
+			name:     "claude startup splash at the console's own pane width",
+			kind:     harness.KindClaude,
+			screen:   "claude_startup_splash",
+			want:     send.StateEmpty,
+			evidence: "❯",
+		},
+		{
+			// The same screen with the reader's own half-typed line in it:
+			// the joined rules must not turn somebody's text into an empty
+			// composer that mate would type over.
+			name:     "claude startup splash holding a half typed line",
+			kind:     harness.KindClaude,
+			screen:   "claude_startup_splash_pending",
+			want:     send.StatePending,
+			pending:  "half typed",
+			evidence: "❯ half typed",
+		},
+		{
+			// The same cold Mate at 80x24, where the rules happened to
+			// survive on their own lines: the splash's banner is still
+			// joined, and the verdict must be the same one.
+			name:     "claude startup splash at 80x24",
+			kind:     harness.KindClaude,
+			screen:   "claude_startup_splash_80x24",
+			want:     send.StateEmpty,
+			evidence: "❯",
 		},
 		{
 			name:     "codex empty composer shows its placeholder",
@@ -141,6 +187,83 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 	}
 }
 
+// TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer is the second
+// debt docs/mvp.md task 24 pays, and the one the acceptance run found.
+//
+// The capture is `herdr agent read --format ansi` of a real Claude Code
+// 2.1.278 Mate taken 2026-09-19, moments after it finished a turn that
+// asked the captain which of two checkout pages a button should link to.
+// Claude Code offered an answer inside the composer, drawn faint:
+//
+//	❯ \x1b[0m\x1b[2mUse checkout-express.html\x1b[0m
+//
+// The plain rendering of that same screen is indistinguishable from a
+// half-typed human line, so `send.Send` refused to type over it and Ctrl+U
+// could not clear it - there was nothing there to clear. Two live runs of
+// the two-project acceptance deadlocked on exactly this.
+func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
+	styled := captureFile(t, "claude_ghost_suggestion.ansi")
+
+	got, err := send.ClassifyComposer(harness.KindClaude, styled)
+	if err != nil {
+		t.Fatalf("ClassifyComposer: %v", err)
+	}
+	if got.State != send.StateEmpty {
+		t.Fatalf("state = %q, want empty (evidence %q, pending %q)", got.State, got.Evidence, got.Pending)
+	}
+	if got.Pending != "" {
+		t.Fatalf("pending = %q; a suggestion is nobody's unsubmitted text", got.Pending)
+	}
+	if !strings.Contains(got.Evidence, "faint") {
+		t.Fatalf("evidence = %q, want it to say the composer text was faint", got.Evidence)
+	}
+
+	// The same screen without its attributes is the read that could not
+	// tell the difference, and it must still classify the conservative way:
+	// unrecognised styling means the text might be a person's.
+	plain := send.StripSGR(styled)
+	if strings.Contains(plain, "\x1b") {
+		t.Fatalf("StripSGR left escape bytes in the screen:\n%q", plain)
+	}
+	blind, err := send.ClassifyComposer(harness.KindClaude, plain)
+	if err != nil {
+		t.Fatalf("ClassifyComposer on the plain screen: %v", err)
+	}
+	if blind.State != send.StatePending || blind.Pending != "Use checkout-express.html" {
+		t.Fatalf("the plain screen classifies %q/%q; without the attributes mate must assume the text is somebody's",
+			blind.State, blind.Pending)
+	}
+}
+
+// TestClassifyComposerKeepsTypedTextThatIsNotFaint is the other half of the
+// same rule, and the one that matters: a line drawn in ordinary intensity is
+// somebody's, whatever else is faint on the screen.
+func TestClassifyComposerKeepsTypedTextThatIsNotFaint(t *testing.T) {
+	rule := "──────────────────────────────"
+	// A screen whose status footer is faint - as Claude's really is - and
+	// whose composer holds plain white text.
+	screen := rule + "\r\n❯ \x1b[0m\x1b[38;2;255;255;255mhalf typed\x1b[0m\r\n" + rule +
+		"\r\n  \x1b[0m\x1b[2mFable 5.1 · high | tok 0 in / 0 out\x1b[0m\r\n"
+	got, err := send.ClassifyComposer(harness.KindClaude, screen)
+	if err != nil {
+		t.Fatalf("ClassifyComposer: %v", err)
+	}
+	if got.State != send.StatePending || got.Pending != "half typed" {
+		t.Fatalf("state = %q, pending = %q, want pending/half typed", got.State, got.Pending)
+	}
+
+	// And a composer holding both: one faint rune is not enough to make the
+	// whole line the harness's.
+	mixed := rule + "\r\n❯ \x1b[2mUse \x1b[22mthe classic page\x1b[0m\r\n" + rule + "\r\n"
+	got, err = send.ClassifyComposer(harness.KindClaude, mixed)
+	if err != nil {
+		t.Fatalf("ClassifyComposer: %v", err)
+	}
+	if got.State != send.StatePending {
+		t.Fatalf("state = %q, want pending: only a wholly faint line is a suggestion", got.State)
+	}
+}
+
 // TestClassifyComposerRefusesAnUnmeasuredHarness pins the fail-closed edge:
 // a kind with no measured profile is an error, not a hopeful verdict.
 func TestClassifyComposerRefusesAnUnmeasuredHarness(t *testing.T) {
@@ -192,6 +315,39 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 			kind:   harness.KindClaude,
 			screen: "· a point, and then some more…\n" + rule + "\n❯ \n" + rule + "\n",
 			want:   send.StateEmpty,
+		},
+		{
+			// The shape the unwrapped read hands back at the Console's own
+			// pane width: one line carrying both rules and the composer.
+			name:   "claude composer whose rules were joined onto its own line",
+			kind:   harness.KindClaude,
+			screen: "  " + rule + "❯   " + rule + "\n  status line\n",
+			want:   send.StateEmpty,
+		},
+		{
+			name:   "claude joined rules around a composer holding text",
+			kind:   harness.KindClaude,
+			screen: "  " + rule + "❯ half typed  " + rule + "\n  status line\n",
+			want:   send.StatePending,
+		},
+		{
+			// A rule is structure, not content: a short run of the same
+			// rune inside a sentence must not split a line and manufacture
+			// a composer out of an echoed prompt.
+			name:   "a short run of the rule rune is not a rule",
+			kind:   harness.KindClaude,
+			screen: "a ───── b ❯ an earlier prompt ───── c\nmore output\n",
+			want:   send.StateUnknown,
+		},
+		{
+			// The highlighted option of a dialog carries the composer's own
+			// glyph, and a dialog drawn under a rule must still not be read
+			// as a composer: the option below it is what a composer never
+			// has.
+			name:   "a dialog option under a rule is not a composer",
+			kind:   harness.KindClaude,
+			screen: rule + "\n❯ No, exit\n  Yes, I trust this folder\n" + rule + "\n",
+			want:   send.StateUnknown,
 		},
 		{
 			name:   "an interrupt hint far above the tail does not make a pane busy",

@@ -515,7 +515,7 @@ func waitRound(t *testing.T, s *stepSleeper) {
 // it describes.
 func TestWatchRuntimeIsNarrow(t *testing.T) {
 	rt := reflect.TypeOf((*watch.Runtime)(nil)).Elem()
-	want := map[string]bool{"InspectAgent": true, "ReadAgent": true}
+	want := map[string]bool{"InspectAgent": true, "ReadAgentStyled": true}
 	if rt.NumMethod() != len(want) {
 		t.Fatalf("watch.Runtime has %d methods, want %d", rt.NumMethod(), len(want))
 	}

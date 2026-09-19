@@ -132,7 +132,7 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 		}
 		return harness.StartupScreenTail(screen, 20)
 	}
-	ask := waitForBoxEntry(t, ctx, w, 180*time.Second, paneTail, func(e query.BoxEntry) bool {
+	ask := waitForBoxEntry(t, ctx, w, "shop", 180*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "needs-decision"
 	})
 	t.Logf("box shows %s %s (attention=%v)", ask.Verb, ask.Text, ask.Attention)
@@ -219,22 +219,22 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	// refusal is real, and the outcome line reports it). One exchange puts
 	// the Mate on an ordinary conversation screen, which is the state a
 	// reader assigning an item is actually in.
-	before := len(sentEntries(t, w))
+	before := len(sentEntries(t, w, "shop"))
 	paneScript := fmt.Sprintf(`%s;1200:@click:90,20;800:say PONG;600:\r`, enterSession)
 	paneFrame := runPtysmoke(t, smoke, binary, root, paneScript, 8*time.Second)
 	t.Logf("frame 5 - terminal focus, after typing into the Mate:\n%s", paneFrame)
 	assertFrameSays(t, paneFrame, "TERMINAL")
 
-	user := waitForSent(t, ctx, w, 120*time.Second, func(e store.SentEntry) bool {
+	user := waitForSent(t, ctx, w, "shop", 120*time.Second, func(e store.SentEntry) bool {
 		return e.Source == store.SourceUser && e.Target == store.TargetMate &&
 			strings.Contains(e.Text, "PONG")
 	})
 	t.Logf("the Mate received the typed line: %q", user.Text)
-	mate := waitForSent(t, ctx, w, 240*time.Second, func(e store.SentEntry) bool {
+	mate := waitForSent(t, ctx, w, "shop", 240*time.Second, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate
 	})
 	t.Logf("the Mate answered: %s", mate.Text)
-	if after := len(sentEntries(t, w)); after <= before {
+	if after := len(sentEntries(t, w, "shop")); after <= before {
 		t.Fatalf("sent.log did not grow: %d entries before, %d after", before, after)
 	}
 
@@ -258,7 +258,7 @@ func TestLiveConsoleMouseDrivesTheBox(t *testing.T) {
 	// The claim is the same one TestLiveConsoleInboxResolve makes of the
 	// action itself: the `resolve:` line reached the Mate's pane, recorded
 	// from the app against sent.log.
-	assertSentLine(t, w, store.SourceApp, store.TargetMate, ask.Resolve)
+	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, ask.Resolve)
 	t.Logf("assigned: %s", ask.Resolve)
 
 	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
@@ -332,9 +332,9 @@ func assertFrameSays(t *testing.T, frame string, wants ...string) {
 	}
 }
 
-func sentEntries(t *testing.T, w *store.Workspace) []store.SentEntry {
+func sentEntries(t *testing.T, w *store.Workspace, project string) []store.SentEntry {
 	t.Helper()
-	entries, _, err := w.ReadSent("shop", 0)
+	entries, _, err := w.ReadSent(project, 0)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("ReadSent: %v", err)
 	}

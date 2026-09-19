@@ -1132,9 +1132,24 @@ func (h *Herdr) ReadAgent(ctx context.Context, handle AgentHandle, lines int) (s
 	if lines <= 0 {
 		return "", observability.NewError(observability.CodeUsage, "agent read lines must be positive")
 	}
+	return h.readAgent(ctx, handle, lines, "text")
+}
+
+// ReadAgentStyled implements Adapter as the same read in `--format ansi`.
+func (h *Herdr) ReadAgentStyled(ctx context.Context, handle AgentHandle, lines int) (string, error) {
+	if strings.TrimSpace(handle.Session.Name) == "" || strings.TrimSpace(handle.Name) == "" {
+		return "", observability.NewError(observability.CodeUsage, "agent read requires a named session and agent")
+	}
+	if lines <= 0 {
+		return "", observability.NewError(observability.CodeUsage, "agent read lines must be positive")
+	}
+	return h.readAgent(ctx, handle, lines, "ansi")
+}
+
+func (h *Herdr) readAgent(ctx context.Context, handle AgentHandle, lines int, format string) (string, error) {
 	res, err := h.run(ctx, handle.Session.Name, []string{
 		"agent", "read", handle.Name, "--source", "recent-unwrapped",
-		"--lines", fmt.Sprintf("%d", lines), "--format", "text",
+		"--lines", fmt.Sprintf("%d", lines), "--format", format,
 	})
 	if err != nil {
 		return "", err

@@ -130,7 +130,7 @@ func TestLiveAutoPolicyMateAnswersADigest(t *testing.T) {
 		}
 		return harness.StartupScreenTail(screen, 20)
 	}
-	ask := waitForInboxItem(t, ctx, w, 120*time.Second, paneTail)
+	ask := waitForInboxItem(t, ctx, w, "shop", 120*time.Second, paneTail)
 	t.Logf("inbox item: %s %s %s", ask.Crew, ask.Verb, ask.Text)
 	if ask.Verb != "needs-decision" {
 		t.Fatalf("inbox item = %+v, want the needs-decision question", ask)
@@ -142,7 +142,7 @@ func TestLiveAutoPolicyMateAnswersADigest(t *testing.T) {
 		Runtime: deps.Runtime,
 		Handle:  consoleMateHandle(w, deps),
 	})
-	digest := tickUntilDigest(t, ctx, pilot, w, 2*time.Minute)
+	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 2*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 needs-decision") {
 		t.Fatalf("digest = %q, want the crew's question", digest)
@@ -155,13 +155,13 @@ func TestLiveAutoPolicyMateAnswersADigest(t *testing.T) {
 	// the test, not the console. Source: mate is written because the
 	// Mate's own pane carries MATEV2_AGENT_ROLE=mate (internal/spawn), so
 	// only `matev2 send` run from inside that pane produces it.
-	mate := waitForSent(t, ctx, w, 180*time.Second, func(e store.SentEntry) bool {
+	mate := waitForSent(t, ctx, w, "shop", 180*time.Second, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate && e.Target == store.CrewTarget("k3")
 	})
 	t.Logf("mate -> crew:k3 %q", mate.Text)
 
 	// 5. The crew takes it as a new prompt and hands back.
-	done := waitForBoxEntry(t, ctx, w, 180*time.Second, paneTail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 180*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate" && strings.Contains(strings.ToLower(e.Text), "chose")
 	})
 	t.Logf("crew finished: %s: %s", done.Verb, done.Text)

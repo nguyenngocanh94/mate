@@ -128,7 +128,7 @@ func TestLiveConsoleDiffShowsACrewBranch(t *testing.T) {
 	// 3. The crew's own word that it is done. It is the signal a reader
 	// would act on before opening the diff, so the test waits on it rather
 	// than polling git behind the crew's back.
-	done := waitForBoxEntry(t, ctx, w, 420*time.Second, paneTail, func(e query.BoxEntry) bool {
+	done := waitForBoxEntry(t, ctx, w, "shop", 420*time.Second, paneTail, func(e query.BoxEntry) bool {
 		return e.Kind == query.BoxStatus && e.Verb == "wait-mate"
 	})
 	t.Logf("crew reported: %s: %s", done.Verb, done.Text)
