@@ -1,0 +1,43 @@
+10:43:30 the Mate takes the office
+10:43:38 the Mate thinks it over
+10:43:43 the Mate is alone in its office again
+10:43:50 the captain calls the Mate
+10:43:51 the Mate thinks it over
+10:44:09 buybtn arrives at the office
+10:44:11 buybtn sits down at its desk
+10:44:12 the Mate is alone in its office again
+10:44:21 the Mate thinks it over
+10:44:21 the Mate is alone in its office again
+10:44:27 the Mate thinks it over
+10:44:33 buybtn walks to the CEO's office with a question
+10:44:33 buybtn waits at the CEO's door
+10:44:40 matev2 walks the captain's note into the Mate's office
+10:44:54 the Mate reads buybtn's note
+10:44:54 the Mate thinks it over
+10:44:54 the Mate is alone in its office again
+10:44:59 the Mate thinks it over
+10:44:59 the Mate is alone in its office again
+10:45:05 buybtn falls asleep (stale)
+10:45:10 the Mate thinks it over
+10:45:13 the Mate is alone in its office again
+10:45:20 buybtn wakes up, back waiting at the CEO's door
+10:45:23 the Mate thinks it over
+10:45:23 the Mate is alone in its office again
+10:45:30 matev2 walks a digest into the Mate's office
+10:45:45 the Mate reads buybtn's note
+10:45:45 the Mate thinks it over
+10:45:47 the Mate is alone in its office again
+10:45:57 the Mate thinks it over
+10:46:00 the Mate answers buybtn
+10:46:00 the Mate is alone in its office again
+10:46:00 buybtn goes back to its desk
+10:46:10 the Mate thinks it over
+10:46:24 buybtn walks to the CEO's office with the finished work
+10:46:24 buybtn waits for the Mate to review the work
+10:46:30 buybtn cannot be reached (runtime_lost)
+10:46:30 the Mate is alone in its office again
+10:46:35 buybtn is back in touch, waiting for the Mate to review the work
+10:46:50 buybtn leaves, merged
+10:46:50 buybtn is out of the building
+now      the Mate is alone in its office (since 10:46:30)
+now      buybtn is gone (since 10:46:50)

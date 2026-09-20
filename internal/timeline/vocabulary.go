@@ -1,5 +1,7 @@
 package timeline
 
+import "sort"
+
 // The event vocabulary of docs/mvp.md M5, plus the two kinds that section
 // does not name and task 25 requires. Every kind's payload is written out in
 // docs/timeline.md with an example.
@@ -35,6 +37,23 @@ const (
 	// (actor, reason), not a log line nobody reads.
 	KindIngestUnresolved = "ingest.unresolved"
 )
+
+// Kinds is every event kind this package can write, sorted. The scene
+// projection has a rule for each of them, and TestSceneKnowsEveryKindTheTimelineWrites
+// compares the two lists: a kind added here without a rule there would make
+// an actor's scene stop at the moment the new fact first happened.
+func Kinds() []string {
+	out := []string{
+		KindAssignClicked, KindContextCompac, KindCrewFailed, KindCrewFinished,
+		KindCrewSpawned, KindDigestSent, KindGitCommitted, KindHealthChanged,
+		KindIncidentOpen, KindIncidentResol, KindIngestUnresolved, KindMateStarted,
+		KindMateStopped, KindMergeDone, KindMessageSent, KindModeChanged,
+		KindQuestionAnsw, KindQuestionAsked, KindReviewStarted, KindStatusAppend,
+		KindToolCalled, KindToolFinished, KindTurnEnded, KindTurnStarted,
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Actor kinds, matching `actor.kind`.
 const (
