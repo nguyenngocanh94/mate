@@ -74,6 +74,12 @@ type agentInfo struct {
 	TerminalID    string
 	WorkspaceID   string
 	Cwd           string
+	// SessionRef is the harness's own session identity as Herdr reports it
+	// (agent_session.value). Measured 2026-09-20 on Herdr 0.8.2: it is the
+	// rollout session uuid for a Codex agent and absent for a Claude one, so
+	// a caller reads an empty value as "the runtime did not say" and never
+	// as "this agent has no session".
+	SessionRef string
 }
 
 type sessionInfo struct {
@@ -244,10 +250,25 @@ type agentJSON struct {
 	TerminalID    string `json:"terminal_id"`
 	WorkspaceID   string `json:"workspace_id"`
 	Cwd           string `json:"cwd"`
+	// AgentSession is the harness session Herdr tracks for this agent. Its
+	// value is the transcript identity the timeline's locator needs, and
+	// kind/source say what sort of identity it is ("id", "herdr:codex").
+	// A Claude agent carries no agent_session at all.
+	AgentSession *struct {
+		Agent  string `json:"agent"`
+		Kind   string `json:"kind"`
+		Source string `json:"source"`
+		Value  string `json:"value"`
+	} `json:"agent_session"`
 }
 
 func (a agentJSON) info() agentInfo {
+	sessionRef := ""
+	if a.AgentSession != nil {
+		sessionRef = a.AgentSession.Value
+	}
 	return agentInfo{
+		SessionRef:    sessionRef,
 		Name:          a.Name,
 		Kind:          a.Kind,
 		Status:        parseAgentStatus(a.Status),

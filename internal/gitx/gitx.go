@@ -259,6 +259,19 @@ func (g Git) LogOneline(ctx context.Context, dir, base, branch string) (string, 
 	return g.run(ctx, dir, "log", "--oneline", base+".."+branch)
 }
 
+// Log is `git -C dir log <revisions> <options...>`, read-only, for a caller
+// that needs more of a commit than a review list carries: the timeline wants
+// each commit's own time and the files it touched, and a `--oneline` summary
+// has neither.
+//
+// The revision range is passed first and the options after it, because git
+// accepts them in either order and putting the range first makes the call
+// site read as the question it is asking.
+func (g Git) Log(ctx context.Context, dir, revisions string, options ...string) (string, error) {
+	args := append([]string{"log", revisions}, options...)
+	return g.run(ctx, dir, args...)
+}
+
 // IsDirty is the number of entries `git -C worktree status --porcelain`
 // lists: uncommitted changes a teardown would otherwise discard silently.
 // 0 means the worktree is clean.

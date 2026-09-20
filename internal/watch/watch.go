@@ -69,6 +69,18 @@ type Sleeper interface {
 	Sleep(ctx context.Context, d time.Duration) error
 }
 
+// Ingest is the derived timeline's writer (internal/timeline.Ingester). The
+// observer calls it at the end of every poll, because the observer is the
+// process that already holds the workspace and is already awake every five
+// seconds - and because M5 makes it the single writer of the database.
+//
+// It is an interface rather than the concrete type so this package keeps
+// importing nothing that can start an agent, and so a Watcher with no
+// timeline (every test that predates M5) still runs.
+type Ingest interface {
+	Ingest(ctx context.Context) error
+}
+
 // Deps are the observer's collaborators. Runtime and Handle are required;
 // everything else has a default.
 type Deps struct {
@@ -76,6 +88,10 @@ type Deps struct {
 	Handle  HandleFunc
 	Clock   Clock
 	Sleeper Sleeper
+	// Timeline records what the files say into `.matev2/matev2.db`. Nil
+	// means no timeline is kept, which is a workspace opened by a build that
+	// has none and not an error.
+	Timeline Ingest
 	// PollInterval is the pause between rounds; zero means
 	// DefaultPollInterval.
 	PollInterval time.Duration
@@ -254,6 +270,17 @@ func (w *Watcher) Poll(ctx context.Context) error {
 		}
 	}
 	w.commit(results, seen, listed)
+	// The timeline is recorded last, after the health snapshot has been
+	// swapped in: the ingest reads this round's readings (Watcher.Readings),
+	// and any incident this round opened is already in `incidents.log`. A
+	// failed ingest joins the round's other errors and never stops the
+	// observing - the database is derived, and a round that could not write
+	// it still watched the crews.
+	if w.deps.Timeline != nil {
+		if err := w.deps.Timeline.Ingest(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("watch: record the timeline: %w", err))
+		}
+	}
 	return errors.Join(errs...)
 }
 

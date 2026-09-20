@@ -334,7 +334,14 @@ type AgentHandle struct {
 
 // ObservedAgent is a runtime fact, not a domain state transition.
 type ObservedAgent struct {
-	Handle        AgentHandle
+	Handle AgentHandle
+	// SessionRef is the harness session Herdr records for this agent
+	// (agent_session.value): the rollout session uuid for Codex, empty for
+	// Claude and for any agent Herdr has no session for. It is a runtime
+	// fact like the rest of this struct - the timeline's transcript locator
+	// asks for it - and an empty value means "Herdr did not say", never "no
+	// session exists".
+	SessionRef    string
 	Status        AgentStatus
 	LaunchPending bool
 	Interactive   bool
