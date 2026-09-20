@@ -48,9 +48,16 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	// open, and only then: it lives in this process, so quitting the console
 	// means nobody is watching the crews and no new incident is opened. What
 	// it already wrote stays in `incidents.log`.
-	watcher, err := consoleWatcher(dir, deps)
+	//
+	// It is also the single writer of `.matev2/matev2.db` (mvp.md M5): the
+	// timeline is recorded at the end of each of its polls, and the database
+	// handle's advisory lock is released when the console quits.
+	watcher, timelineDB, err := consoleWatcherWithTimeline(dir, deps)
 	if err != nil {
 		return err
+	}
+	if timelineDB != nil {
+		defer timelineDB.Close()
 	}
 	watcher.Start(ctx)
 	defer watcher.Stop()

@@ -1596,6 +1596,7 @@ func (h *Herdr) observed(handle AgentHandle, info agentInfo) ObservedAgent {
 	}
 	return ObservedAgent{
 		Handle:        out,
+		SessionRef:    info.SessionRef,
 		Status:        info.Status,
 		LaunchPending: info.LaunchPending,
 		ObservedAt:    h.now(),
