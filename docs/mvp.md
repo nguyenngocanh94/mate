@@ -24,7 +24,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
 3. Runtime terminal là Herdr 0.8.2. Mapping: một Herdr session cho workspace, một Herdr workspace cho project, một tab cho Mate và một tab cho mỗi Crew.
 4. Giao tiếp học triệt để từ firstmate (`/Volumes/Work/Workspace/firstmate`), xem mục 4.
 5. Hai chế độ giao tiếp: giám sát (mặc định) và tự động, xem mục 5.
-6. Persistence là file phẳng trong `.matev2/`. Không SQLite. Chỉ console sửa state; Crew chỉ append vào `.status`.
+6. Persistence cho giao tiếp và trạng thái là file phẳng trong `.matev2/`, không SQLite. Chỉ console sửa state; Crew chỉ append vào `.status`. Từ M5 có thêm `.matev2/matev2.db` (SQLite thuần Go) nhưng chỉ là kho dẫn xuất cho timeline, xây lại được từ file và transcript bằng `matev2 reindex`; mất DB không mất việc.
 7. Console TUI copy từ `internal/ui/console` của v1, giữ stream mode nhúng pane Mate.
 8. Trạng thái agent của Herdr (`idle/blocked/done`) là screen scraping, chỉ dùng làm tín hiệu phụ, không bao giờ dùng để kết luận task xong.
 9. Token monitor làm sau MVP, nhưng `.meta` ghi `transcript=` và `session_id=` từ ngày đầu.
@@ -125,7 +125,7 @@ Chốt 2026-09-18 sau khi test tay M2. Bảy trạng thái, ba người đặt, 
 | `working` | Crew | `crews/<id>.status` | Đang làm; dòng mô tả pha. |
 | `needs-decision` | Crew | `.status` | Crew hỏi và dừng turn; cần Mate hoặc người dùng trả lời. Vào inbox. |
 | `wait-mate` | Crew | `.status` | Crew đã làm hết phần mình (xong, hoặc không xong được và nói vì sao) và giao lại cho Mate. Không vào inbox. |
-| `blocked` | Observer | `incidents.log`, không đụng `.status` | Crew không tự nói được nữa: pane treo, agent biến mất khỏi Herdr, kẹt dialog, hết token. Vào inbox. Gỡ khi observer thấy crew chạy lại. |
+| `blocked` | Observer | `incidents.log`, không đụng `.status` | Crew không tự nói được nữa: pane treo, agent biến mất khỏi Herdr, kẹt dialog. Chỉ `stale` và `runtime_lost` tạo ra nó; `budget` (M5) chỉ vào inbox, không đổi trạng thái (quyết định 2026-09-20). Vào inbox. Gỡ khi observer thấy crew chạy lại. |
 | `finished` | Mate hoặc người dùng, qua `crew stop` | `.meta` `state=finished` | Trạng thái cuối. Scout: người dùng nhận report và bảo đóng. Ship: branch đã merge. |
 | `failed` | Mate hoặc người dùng, qua `crew stop --discard`; app, khi spawn thất bại | `.meta` `state=failed` | Trạng thái cuối. Việc bị bỏ, hoặc crew chưa bao giờ lên. |
 
@@ -397,4 +397,55 @@ Nợ kỹ thuật đã biết:
 
 - ~~`store.Init` không tạo `.matev2/WORKSPACE.md`, nên mọi Mate mở đầu bootstrap bằng `cat: … No such file or directory` trên đúng file mà manual của nó bảo đọc. Vô hại nhưng thấy trong mọi pane của bản ghi task 24.~~ Trả 2026-09-19: `store.Init` seed `WORKSPACE.md` một lần, không ghi đè.
 
-Sau MVP: token monitor gồm locator theo `session_id`, copy parser transcript v1, `usage.jsonl` và view, tín hiệu `budget`.
+### M5. Timeline: dữ liệu đủ sâu để kể lại mọi thứ
+
+Mục tiêu (chốt 2026-09-20): một người chưa từng thấy matev2 vẽ được cảnh "Mate là CEO ngồi trong phòng, crew là nhân viên, crew hỏi thì cầm giấy chạy vào phòng CEO đứng đợi" chỉ từ dữ liệu, không cần hỏi thêm.
+Token là một thuộc tính của dữ liệu đó, không phải mục tiêu riêng.
+Skin (dashboard web, cảnh văn phòng, swimlane) là phụ và làm sau; M5 chỉ chứng minh dữ liệu.
+
+Ba câu hỏi dữ liệu phải trả lời được:
+
+1. Ai đang làm gì, ngay lúc này, và vì sao: chuỗi nhân quả `crew hỏi → digest/assign → Mate đọc → Mate trả lời → crew làm tiếp` nối được bằng `cause_event_id`, không suy theo thời gian gần nhau. Trong một turn thấy được tool nào, file nào, lệnh gì, kết quả, thời lượng; khoảng bận không có tool call ghi là `thinking`, không có hố đen.
+2. Chuyển cảnh nào hợp lệ: máy trạng thái cảnh tường minh, mỗi cạnh ghi event kích hoạt. Crew: `arriving → at_desk_working → walking_to_ceo(question) → waiting_at_ceo → at_desk_working → walking_to_ceo(handback) → waiting_review → leaving(merged|closed)`, cộng `blocked`, `asleep`, `gone`. Mate: `idle → reading(crew) → deciding → answering(crew) → reviewing(crew) → merging → idle`, cộng `on_phone(user)`, `receiving_digest`.
+3. Đo được bao nhiêu: token bốn loại và model theo turn, cộng dồn theo task và theo Mate, context size sau mỗi turn, sự kiện nén context, thời lượng turn, thời gian chờ ở cửa CEO, số lần hỏi lại trên một task, chi phí khi có `pricing`.
+
+Nguồn: transcript (Claude theo message, Codex rollout cộng dồn; parser v1 trong `internal/harness`), `.status`, `sent.log`, `incidents.log`, `.meta`, git của worktree. Locator: Mate Claude có `transcript=` từ hook Stop; Codex lấy rollout id từ `agent_session.value` của Herdr, dự phòng `AdoptCodexRollout` theo cwd và giờ launch. Observer trong console là writer duy nhất; CLI và dashboard chỉ đọc.
+
+Schema (`internal/db`, SQLite qua `modernc.org/sqlite`, WAL, một file `.matev2/matev2.db` cho cả workspace, cột `project` ở mọi bảng cần):
+
+```sql
+actor(id PK, project, kind /*mate|crew|user|app|observer*/, name, harness, first_seen, last_seen, gone_at)
+session(id PK, actor_id FK, harness_session_id, transcript_path, started_at, ended_at, resumed_from_session_id)
+task(crew_actor_id PK FK, project, text, brief_path, branch, worktree, spawned_at, closed_at,
+     close_state, close_cause_event_id, merged_event_id, question_count, handback_count)
+event(id PK AUTOINCREMENT, project, at, actor_id FK, kind, subject_actor_id NULL, turn_id NULL,
+      task_actor_id NULL, cause_event_id NULL, payload JSON, ref_path, ref_offset)
+  INDEX (project, at), (actor_id, at), (kind, at), (cause_event_id), (task_actor_id, at)
+turn(id PK, actor_id FK, session_id FK, ordinal, started_at, ended_at, trigger_event_id, outcome,
+     model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, thinking_tokens,
+     context_tokens_after, tool_count, ref_path, ref_offset)
+action(id PK, turn_id FK, event_id FK, at, tool, target, summary, duration_ms, ok)  INDEX (target), (turn_id)
+message(event_id PK FK, from_actor_id, to_actor_id, channel /*pane|status|digest|assign|hook*/, text, marked)
+question(id PK, asked_event_id FK, crew_actor_id FK, text, answered_event_id NULL, answered_by_actor_id NULL, waited_ms NULL)
+incident(id PK, actor_id FK, kind, opened_event_id FK, resolved_event_id NULL)
+usage_sample(id PK, session_id FK, at, cumulative, input, cache_read, cache_write, output, thinking, ref_path, ref_offset)
+transition(id PK, actor_id FK, from_state, to_state, at, event_id FK, target_actor_id NULL, detail)  INDEX (actor_id, at)
+pricing(model PK, input_per_m, cache_read_per_m, cache_write_per_m, output_per_m, effective_from)
+cursor(source_path PK, byte_offset, updated_at)
+schema_version(version, applied_at)
+```
+
+View: `v_now` (mỗi actor một dòng: trạng thái cảnh, từ bao giờ, nhắm ai, token hôm nay), `v_task_ledger` (token, chi phí, số turn, số câu hỏi, tổng chờ, spawn→merge), `v_story` (event kèm tên actor, subject, kind của cause).
+
+`event.kind`: `mate.started/stopped`, `crew.spawned/finished/failed`, `mode.changed`, `turn.started/ended`, `tool.called/finished`, `git.committed`, `status.appended`, `message.sent`, `question.asked/answered`, `digest.sent`, `assign.clicked`, `incident.opened/resolved`, `review.started`, `merge.done`, `context.compacted`, `health.changed` (chỉ khi composer đổi trạng thái).
+Payload JSON của từng kind, máy trạng thái cảnh và ví dụ được ghi ở `docs/timeline.md`, có version.
+
+Lựa chọn có chủ ý: `transition` là lịch sử để replay và đo thời gian chờ; `usage_sample` giữ mẫu thô vì Codex chỉ có cộng dồn; mọi event có `ref_path/ref_offset` để truy ngược về byte nguồn; dashboard live chỉ cần `event.id > ?` mỗi giây.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 25 | `internal/db`: mở/migrate `matev2.db`, schema trên, `matev2 reindex <workspace>` dựng lại toàn bộ từ file và transcript (xoá và xây lại trong transaction). `internal/timeline` ingest: locator transcript cho Mate Claude và crew Codex, đọc từ `cursor`, parser v1, sinh `event`/`turn`/`action`/`message`/`usage_sample`/`question`/`incident`/`task`, nối `cause_event_id` theo luật ghi trong `docs/timeline.md`. Observer gọi ingest mỗi vòng poll. `matev2 events <project> [--follow] [--since]` in JSON lines từ `v_story`, `--narrate` in thành lời kể một dòng một event. | Unit: reindex hai lần cùng kết quả; fixture transcript Claude 2.1.278 và Codex 0.154 ra đúng turn/token/action; câu hỏi nối đúng câu trả lời. Live: chạy acceptance hai project rồi đối chiếu mọi tool call trong transcript và mọi dòng status đều thành event, không cửa sổ 10 giây nào agent bận mà timeline không giải thích. |
+| 26 | Projection cảnh: `internal/timeline/scene` với máy trạng thái ở trên, ghi `transition`, view `v_now`; `matev2 events --scene` in snapshot cảnh rồi transition. Bài kiểm tra độ sâu: từ fixture timeline của acceptance, mọi chuyển cảnh trong máy trạng thái đều có event kích hoạt và không event nào rơi vào trạng thái không xác định; `--narrate` đọc trôi như một câu chuyện (golden). | Unit trên fixture; golden narrate; live trên acceptance hai project. |
+| 27 | Kinh tế: `pricing.yaml` mẫu ở workspace nạp vào `pricing`, `v_task_ledger`, `context_tokens_after` và `context.compacted` cho Claude và Codex, `matev2 usage <project> [crew]` in ledger, cột TOKENS trên cây console (từ DB, chỉ đọc), `tokens:` trong health của `matev2 state`. Incident `budget` khi `project.yaml` có `budget` và task vượt; theo quyết định 2026-09-20 `budget` không làm crew `blocked`, chỉ vào inbox với chữ `over budget` (sửa mục 4b). | Unit; live: tổng của một crew Codex thật bằng `total_token_usage` cuối trong rollout, và một crew Claude bằng tổng usage theo message. |
+
+Sau M5: skin dashboard web (`matev2 dashboard`, SSE từ `event.id`, thư mục `.matev2/dashboard/` cho skin riêng), replay theo tốc độ, cảnh văn phòng làm skin tham chiếu.
