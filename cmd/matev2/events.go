@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/timeline"
 	"github.com/nguyenngocanh94/matev2/internal/timeline/scene"
@@ -271,7 +272,14 @@ func cmdReindex(args []string, stdout, stderr io.Writer) error {
 	defer handle.Close()
 
 	ctx := context.Background()
-	if err := timeline.New(w, handle, timeline.Deps{}).Reindex(ctx); err != nil {
+	// Ask Herdr for each live crew's session ref the way the console does:
+	// a Codex crew spawned before its rollout could be adopted by cwd and
+	// launch time is otherwise "rollout_not_adopted" forever, even while
+	// its agent is still listed (measured 2026-09-20 on a real workspace).
+	// A Herdr that is not running just leaves the fallback in charge.
+	if err := timeline.New(w, handle, timeline.Deps{
+		SessionRef: consoleSessionRef(w, spawn.LiveDeps()),
+	}).Reindex(ctx); err != nil {
 		return err
 	}
 	return reportReindex(ctx, w, handle, stdout)
