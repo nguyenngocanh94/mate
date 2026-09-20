@@ -1,6 +1,6 @@
 # Timeline
 
-Schema version: **1**.
+Schema version: **2**.
 
 This is the contract of `.matev2/matev2.db` and of `internal/timeline`.
 The database is derived: every row here is read out of `crews/<id>.status`, `sent.log`, `incidents.log`, the `.meta` files, the harness transcripts or git, and `matev2 reindex <workspace>` rebuilds all of it from those sources.
@@ -334,3 +334,53 @@ A session long enough for that to hurt is the place to measure again.
 
 `matev2 reindex` empties the derived tables and refills them in one transaction, so a rebuild that fails halfway leaves the timeline it started with.
 An ordinary poll commits one transaction per project instead, for the opposite reason: a project whose `.meta` is half-written must not hold back the rest of the workspace.
+
+## 9. Economics (schema v2, task 27)
+
+### `pricing.yaml`
+
+`store.Init` seeds `.matev2/pricing.yaml` once, at `PricingModel` rows for every model id matev2 has actually seen in a transcript, every price at 0 and a comment that the captain owns the numbers.
+`timeline.Ingester.ingestPricing` loads the file and upserts it into the `pricing` table on every pass, before any project's own pass, because `v_task_ledger` and `v_now` read `pricing` by model on every query and pricing has no project of its own to be ordered by.
+A missing or empty file is not an error - every model stays unpriced, which the views already render as a `NULL` cost rather than a free one - and `matev2 reindex` clears `pricing` along with everything else it rebuilds, so a model the captain removed from the file does not linger as a stale row.
+
+A price of exactly 0 across all four columns does not count as priced: `v_task_ledger.cost` and `matev2 usage`'s cost columns only join a `pricing` row into the sum when at least one of `input_per_m`, `cache_read_per_m`, `cache_write_per_m`, `output_per_m` is greater than zero.
+Without that guard the seeded placeholder rows would make every crew's cost `$0.00` from the moment `store.Init` runs, which is the exact falsehood "cost is NULL until priced" exists to prevent.
+
+### `context_window` and `context_pct`
+
+`pricing.context_window` is a technical fact, not a price, so the seed fills in a real value for each seeded model rather than leaving it at 0.
+`v_task_ledger.context_pct` and `v_now.context_pct` are both `100.0 * <the actor's most recent turn's context_tokens_after> / <that turn's model's context_window>`, `NULL` when the model has no known window.
+`v_now`'s scene columns (`state`, `since`, `target_actor_id`, `detail`) are unchanged from schema v1 and read by task 26's projection; `context_pct` is added at the end of the column list so nothing that reads those columns by name has to change.
+
+### Codex's `input_tokens` is cache-inclusive; Claude's is not
+
+Measured 2026-09-20 on a real rollout (`TestLiveUsageMatchesTheHarness`): the last `token_count` record is `{"input_tokens":232424,"cached_input_tokens":209152,"cache_write_input_tokens":0,"output_tokens":1544,"reasoning_output_tokens":351,"total_tokens":233968}`, and `232424 + 1544 = 233968` exactly - Codex's own `input_tokens` already counts every cached token, and `total_tokens` is simply input plus output. `cached_input_tokens` is a descriptive subset, not an addend.
+
+Claude's turn is the opposite: section 4's `turn.started` example (`input_tokens: 32, cache_read_tokens: 57690, cache_write_tokens: 739`) sums to exactly `context_tokens_after: 58461` - all four buckets are disjoint, and none is a subset of another.
+
+Before this was noticed, `codexTurns` stored Codex's raw `input_tokens` delta as `turn.input_tokens` unchanged, so every sum across the four buckets (`v_task_ledger`'s token columns and cost, `v_now.tokens_today`, the budget check, `matev2 usage`) double-counted the cached portion of a Codex crew's usage, and would have double-billed it too for a captain who priced both `input_per_m` and `cache_read_per_m`.
+The fix is in `codexTurns` itself: it subtracts the cache-read delta from the input delta before either is stored, so `turn.input_tokens` means "billed at the input rate, not a cache rate" for both harnesses, and every view built on top of `turn` sums correctly without asking which harness a turn came from.
+`context_tokens_after` is untouched by this - it is derived straight from the raw `last_token_usage` block, not from the corrected `turn.input_tokens`.
+
+### `matev2 usage`
+
+`matev2 usage <project>` prints `v_task_ledger` as a table, the Mate's own row first (computed the same way but read straight off `turn` rather than `task`, since a Mate's turns belong to the project and not to any one task), then one row per task, oldest spawn first, then a totals footer.
+`matev2 usage <project> <crew>` instead prints that crew's own `turn` rows, one per model call, in the shape `matev2 events --narrate` calls "ends a turn".
+Every number is humanised (`query.HumanizeTokens`, `query.HumanizeCost`: `96.3k`, `$0.12`), and a `NULL` cost or context percentage prints as `?`, never as `0` or `0%` - the same rule the console's TOKENS column and `matev2 state`'s `tokens:`/`ctx:` suffix follow, all three built on the same two functions so a number reads the same everywhere it appears.
+
+### The console's TOKENS column and `matev2 state`
+
+`query.CrewNode.Tokens` and `query.MateNode.Tokens` are `Field[TokenValue]`, filled the same way `Health` is: `query.Load` reads only `.matev2/`'s files and leaves them `Absent`, and the Console's wiring (`cmd/matev2/console_watch.go`'s `withTokens`, beside `withCrewHealth`) opens `.matev2/matev2.db` read-only afterwards and fills them from `v_task_ledger` and `v_now`.
+`internal/ui/console/list.go` draws a TOKENS column on the Mate row and every Crew row, at the same width breakpoint `colUpdated` already uses (`wideList`), so a narrow pane drops it before it drops anything a reader is more likely to need.
+`matev2 state <project> <crew>` appends ` · tokens: 96k` and, once the crew's last turn has a priced context window, ` · ctx: 62%` after `crewstate.Result.Line()` - built in `cmd/matev2/state.go`, not in `internal/crewstate`, because that package is a deliberate leaf that imports nothing else in this module.
+
+### Budget (`project.yaml`'s `budget:` block)
+
+`store.BudgetConfig` is optional and per-dimension optional: `crew_tokens`, `crew_usd` (checked per crew) and `project_usd` (checked against every crew of the project summed, filed under the crew name `mate` since no one crew is at fault).
+`internal/timeline.Ingester.CheckBudgets` runs at the end of every observer poll, after that poll's `Ingest` has written the turns a crossing would be based on, and is wired in as `watch.Deps.Budget` - a seam, the same shape as `Ingest`, so `internal/watch` still imports nothing that can read `pricing.yaml` or open the database itself.
+It opens a `budget` incident (`box.IncidentBudget`) on a crossing crew exactly once: a crew already carrying an open one is left alone even if it has since spent more, because the incident is a fact about spend that already happened, not a condition that clears - it is never resolved.
+The incident's text is `"<humanised total> tokens of <humanised limit> tokens"` or `"<humanised cost> of <humanised limit>"`, which a digest's fourth item shape reads verbatim as `<crew> over budget: <text>`.
+
+Per the 2026-09-20 decision (mvp.md section 4b), a `budget` incident is deliberately excluded from what makes a crew `blocked`: `box.BlockingIncidents` narrows `box.OpenIncidents` to `stale` and `runtime_lost` only, and every caller that used to feed `OpenIncidents` into `crewstate.Declaration.OpenIncident` (`query.CrewStateOf`, `spawn.crew_stop`'s open-crew resolution, the Console's session metadata, `matev2 state`) now goes through `BlockingIncidents` instead.
+`box.OpenIncidents` itself is unchanged and still puts a `budget` incident in the inbox, where the phrase table (`internal/ui/console/box.go`'s `boxNeedPhrase`) reads it as `over budget`.
+`internal/autopilot.Gather` gives a `budget` incident its own `ItemBudget` kind rather than `ItemBlocked`, so the digest vocabulary itself cannot claim a budget crossing changed the crew's state; `Line`'s fourth item shape is `<crew> over budget: <total> of <limit>`, spelled once in `internal/autopilot/digest.go`'s `itemText` and in the Mate manual's section 10.

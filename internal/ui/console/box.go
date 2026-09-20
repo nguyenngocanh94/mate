@@ -152,7 +152,7 @@ func boxNeedPhrase(e query.BoxEntry) string {
 		case "wedged":
 			return "send wedged"
 		case "budget":
-			return "out of budget"
+			return "over budget"
 		default:
 			return "incident " + e.Verb
 		}

@@ -74,9 +74,17 @@ func TestHookTextsMatchHook(t *testing.T) {
 // model calls; its last `total_token_usage` is the session total, and a turn
 // table built from the per-call deltas has to add back up to it.
 const (
-	codexTurns       = 11
-	codexToolCalls   = 9
-	codexTotalInput  = 232424
+	codexTurns     = 11
+	codexToolCalls = 9
+	// codexTotalInput is fresh input only - the rollout's raw cumulative
+	// input_tokens (232424) net of cached_input_tokens (209152), because
+	// task 27's ingest stores turn.input_tokens net of cache so it means
+	// the same thing for both harnesses (internal/timeline/transcript.go's
+	// codexTurns doc comment): Codex's own input_tokens is cache-inclusive,
+	// so summing it again with cache_read_tokens would double the cached
+	// portion. 232424 + 1544 (output) = 233968 = the rollout's own
+	// total_tokens field, which is the identity this fix exists to satisfy.
+	codexTotalInput  = 232424 - 209152
 	codexTotalCached = 209152
 	codexTotalWrite  = 0
 	codexTotalOutput = 1544
@@ -126,6 +134,15 @@ func turnTotals(t *testing.T, f *fixture, actorID string) totals {
 // and the deltas they carry have to add back up to the session total the
 // rollout itself reports. Anything else means the cumulative counter was
 // added twice or a group was missed.
+//
+// codexTotalInput is net of the cache-read total, not the rollout's raw
+// input_tokens: task 27's ingest stores it that way so summing all four
+// buckets means the same thing for both harnesses (see codexTurns's doc
+// comment). codexTotalInput + codexTotalCached recovers the raw cumulative
+// input_tokens (23272 + 209152 = 232424), and that raw number plus
+// codexTotalOutput (232424 + 1544 = 233968) is exactly the rollout's own
+// last `total_token_usage.total_tokens` - the identity
+// TestLiveUsageMatchesTheHarness checks live against a real rollout.
 func TestCodexRolloutBecomesTurnsWhoseTokensAddUpToTheRolloutsOwnTotal(t *testing.T) {
 	f := newFixture(t)
 	f.ingest(t)
@@ -538,8 +555,14 @@ func TestTaskLedgerCountsTheTaskAndLeavesCostNullUntilThereIsAPrice(t *testing.T
 		t.Fatalf("the ledger priced a task with no row in `pricing`: %v", cost.Float64)
 	}
 
+	// INSERT OR REPLACE, not a plain INSERT: task 27's ingest already seeded
+	// a placeholder row for every model `.matev2/pricing.yaml` names at
+	// init, priced at 0 (which is why the assertion above still saw a NULL
+	// cost - a price of 0 does not count as priced). This overwrites that
+	// placeholder with a real price, which is what a captain editing the
+	// file and matev2 reloading it would produce.
 	if _, err := f.db.SQL().Exec(
-		`INSERT INTO pricing(model, input_per_m, cache_read_per_m, cache_write_per_m, output_per_m)
+		`INSERT OR REPLACE INTO pricing(model, input_per_m, cache_read_per_m, cache_write_per_m, output_per_m)
 		 VALUES (?, 1000000, 0, 0, 0)`, model); err != nil {
 		t.Fatalf("seed pricing: %v", err)
 	}
@@ -549,6 +572,101 @@ func TestTaskLedgerCountsTheTaskAndLeavesCostNullUntilThereIsAPrice(t *testing.T
 	if !cost.Valid || int64(cost.Float64) != codexTotalInput {
 		t.Fatalf("with a price of one unit per input token the cost is %v, want %d", cost, codexTotalInput)
 	}
+}
+
+// task 27: `.matev2/pricing.yaml` loads into the `pricing` table, and a
+// second edit-then-ingest cycle updates the same row rather than adding a
+// second one - the upsert docs/timeline.md's Economics section promises.
+func TestIngestPricingLoadsAndUpdatesFromPricingYAML(t *testing.T) {
+	f := newFixture(t)
+
+	if err := f.ws.SavePricing(store.PricingConfig{Models: []store.PricingModel{
+		{Model: "a-test-model", InputPerM: 3, OutputPerM: 15, ContextWindow: 1000},
+	}}); err != nil {
+		t.Fatalf("SavePricing: %v", err)
+	}
+	f.ingest(t)
+
+	var input, output float64
+	var window int64
+	if err := f.db.SQL().QueryRow(
+		`SELECT input_per_m, output_per_m, context_window FROM pricing WHERE model = ?`,
+		"a-test-model").Scan(&input, &output, &window); err != nil {
+		t.Fatalf("read pricing: %v", err)
+	}
+	if input != 3 || output != 15 || window != 1000 {
+		t.Fatalf("pricing row = (%v, %v, %v), want (3, 15, 1000)", input, output, window)
+	}
+
+	// The captain edits the file; the next ingest must update the row it
+	// already wrote, not add a second one.
+	if err := f.ws.SavePricing(store.PricingConfig{Models: []store.PricingModel{
+		{Model: "a-test-model", InputPerM: 6, OutputPerM: 30, ContextWindow: 2000},
+	}}); err != nil {
+		t.Fatalf("SavePricing (update): %v", err)
+	}
+	f.ingest(t)
+
+	if n := f.count(t, `SELECT COUNT(*) FROM pricing WHERE model = ?`, "a-test-model"); n != 1 {
+		t.Fatalf("%d row(s) for a-test-model after a second ingest, want exactly 1 (upsert, not insert)", n)
+	}
+	if err := f.db.SQL().QueryRow(
+		`SELECT input_per_m, output_per_m, context_window FROM pricing WHERE model = ?`,
+		"a-test-model").Scan(&input, &output, &window); err != nil {
+		t.Fatalf("read pricing after update: %v", err)
+	}
+	if input != 6 || output != 30 || window != 2000 {
+		t.Fatalf("pricing row after update = (%v, %v, %v), want (6, 30, 2000)", input, output, window)
+	}
+}
+
+// A workspace with no pricing.yaml at all - store.Init not run, or the file
+// removed by hand - is not an ingest error: every model is simply unpriced.
+func TestIngestPricingToleratesNoFileAtAll(t *testing.T) {
+	f := newFixture(t)
+	if err := os.Remove(f.ws.PricingFile()); err != nil {
+		t.Fatalf("remove pricing.yaml: %v", err)
+	}
+	f.ingest(t)
+	if n := f.count(t, `SELECT COUNT(*) FROM pricing`); n != 0 {
+		t.Fatalf("%d pricing row(s) with no pricing.yaml, want 0", n)
+	}
+}
+
+// v_task_ledger's context_pct and v_now's context_pct both read the seeded
+// pricing.yaml's context_window (store.Init seeds gpt-5.6-terra at 400000,
+// matching the fixture's codex model) even though that model's price is
+// still the placeholder 0 - context size is a technical fact, not something
+// priced, so it is usable before the captain has entered a single price.
+func TestContextPctUsesTheSeededContextWindowBeforeAnyPriceIsSet(t *testing.T) {
+	f := newFixture(t)
+	f.ingest(t)
+
+	want := 100.0 * float64(codexLastContext) / 400000.0
+
+	var ledgerPct sql.NullFloat64
+	if err := f.db.SQL().QueryRow(`SELECT context_pct FROM v_task_ledger`).Scan(&ledgerPct); err != nil {
+		t.Fatalf("read v_task_ledger.context_pct: %v", err)
+	}
+	if !ledgerPct.Valid || diff(ledgerPct.Float64, want) > 0.01 {
+		t.Fatalf("v_task_ledger.context_pct = %v, want ~%.4f", ledgerPct, want)
+	}
+
+	var nowPct sql.NullFloat64
+	if err := f.db.SQL().QueryRow(`SELECT context_pct FROM v_now WHERE actor_id = ?`, f.crewActor()).
+		Scan(&nowPct); err != nil {
+		t.Fatalf("read v_now.context_pct: %v", err)
+	}
+	if !nowPct.Valid || diff(nowPct.Float64, want) > 0.01 {
+		t.Fatalf("v_now.context_pct = %v, want ~%.4f", nowPct, want)
+	}
+}
+
+func diff(a, b float64) float64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
 
 // A transcript the locator cannot find is an event, not silence: every turn,

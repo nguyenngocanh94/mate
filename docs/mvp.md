@@ -173,13 +173,16 @@ Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở tas
   ⟦matev2⟧ digest: <k> item(s) — <mục> · <mục> · … — status files under <đường dẫn tuyệt đối tới crews/>; act per AGENTS.md section 10
   ```
 
-  Mỗi `<mục>` là một trong ba dạng, và chỉ ba dạng đó:
+  Mỗi `<mục>` là một trong bốn dạng, và chỉ bốn dạng đó:
 
   ```text
   <crew> needs-decision: "<text crew viết, ≤ 120 rune, gộp khoảng trắng, " đổi thành '>"
   <crew> blocked: <incident kind>, quiet for <thời gian>
   <crew> wait-mate: "<text crew viết, cùng luật cắt>"
+  <crew> over budget: <total> of <limit>
   ```
+
+  Dạng thứ tư (task 27) là một incident `budget`: nó không bao giờ là `blocked` (quyết định 2026-09-20, mục 4b) vì vượt ngân sách là một sự thật về chi tiêu, không phải crew ngừng nói được.
 
   `<k>` luôn là số mục thật. Dòng chỉ trải tối đa 5 mục rồi ghi `· +<n> more`, vì một composer nhận dòng quá dài sẽ wrap và chính `send.Send` không đọc lại được.
   `quiet for` đo từ dòng `open` của incident, tức là cận dưới: observer chỉ mở `stale` sau khi ngưỡng của nó đã trôi qua.
@@ -318,6 +321,12 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - `event` phải có một khoá tự nhiên, không chỉ `id AUTOINCREMENT`.
   Transcript được đọc lại toàn bộ mỗi vòng (vì `ParseTranscript` cố tình giữ lại message group cuối), nên không có khoá thì cùng một sự kiện sẽ thành hàng thứ hai với id thứ hai, và một dashboard theo `event.id > ?` sẽ phát lại lịch sử như tin mới.
   Thêm đúng một cột `event.dedup UNIQUE` so với schema mục M5; mọi bảng còn lại đã có khoá theo thứ đã sinh ra nó.
+- `input_tokens` của Codex đã bao gồm phần cache, `input_tokens` của Claude thì không - cùng tên cột, hai nghĩa khác nhau, và task 25 đã ghi số Codex thẳng vào `turn.input_tokens` mà không trừ phần cache.
+  Đo 2026-09-20 trên rollout thật (task 27, `TestLiveUsageMatchesTheHarness`): bản ghi `token_count` cuối là `{"input_tokens":232424,"cached_input_tokens":209152,...,"output_tokens":1544,"total_tokens":233968}`, và `232424+1544=233968` khớp `total_tokens` tuyệt đối - `cached_input_tokens` chỉ là tập con mô tả, không phải một khoản cộng thêm.
+  Claude thì ngược lại: ví dụ `turn.started` của mục 4 (`input_tokens:32, cache_read_tokens:57690, cache_write_tokens:739`) cộng đúng bằng `context_tokens_after:58461`, tức cả bốn nhóm token của Claude tách rời nhau, không nhóm nào là tập con của nhóm khác.
+  Hậu quả trước khi sửa: mọi tổng bốn nhóm (`v_task_ledger`, `v_now.tokens_today`, ngân sách, `matev2 usage`) đếm hai lần phần cache của Codex, và giá thành cũng tính tiền phần đó hai lần nếu captain đặt giá cho cả `input_per_m` lẫn `cache_read_per_m`.
+  Sửa tại nguồn, trong `internal/timeline/transcript.go`'s `codexTurns`: trừ delta `cache_read` khỏi delta `input` trước khi ghi vào `turn.input_tokens`, để cột đó mang cùng một nghĩa ("tính theo giá input, không phải giá cache") ở cả hai harness; từ đó mọi phép cộng bốn nhóm ở tầng trên không cần biết turn đến từ harness nào.
+  `context_tokens_after` của Codex không đổi, vì nó tính thẳng từ `last_token_usage` thô, không đi qua `turn.input_tokens` đã sửa.
 
 ## 8. Tái sử dụng từ v1
 
@@ -470,6 +479,6 @@ Lựa chọn có chủ ý: `transition` là lịch sử để replay và đo th�
 | --- | --- | --- |
 | 25 | `internal/db`: mở/migrate `matev2.db`, schema trên, `matev2 reindex <workspace>` dựng lại toàn bộ từ file và transcript (xoá và xây lại trong transaction). `internal/timeline` ingest: locator transcript cho Mate Claude và crew Codex, đọc từ `cursor`, parser v1, sinh `event`/`turn`/`action`/`message`/`usage_sample`/`question`/`incident`/`task`, nối `cause_event_id` theo luật ghi trong `docs/timeline.md`. Observer gọi ingest mỗi vòng poll. `matev2 events <project> [--follow] [--since]` in JSON lines từ `v_story`, `--narrate` in thành lời kể một dòng một event. | Unit: reindex hai lần cùng kết quả; fixture transcript Claude 2.1.278 và Codex 0.154 ra đúng turn/token/action; câu hỏi nối đúng câu trả lời. Live: chạy acceptance hai project rồi đối chiếu mọi tool call trong transcript và mọi dòng status đều thành event, không cửa sổ 10 giây nào agent bận mà timeline không giải thích. Đã xong 2026-09-20, evidence `docs/evidence/m5-timeline-2026-09-20.md`; hợp đồng dữ liệu ở `docs/timeline.md`. |
 | 26 | Projection cảnh: `internal/timeline/scene` với máy trạng thái ở trên, ghi `transition`, view `v_now`; `matev2 events --scene` in snapshot cảnh rồi transition. Bài kiểm tra độ sâu: từ fixture timeline của acceptance, mọi chuyển cảnh trong máy trạng thái đều có event kích hoạt và không event nào rơi vào trạng thái không xác định; `--narrate` đọc trôi như một câu chuyện (golden). | Unit trên fixture; golden narrate; live trên acceptance hai project. |
-| 27 | Kinh tế: `pricing.yaml` mẫu ở workspace nạp vào `pricing`, `v_task_ledger`, `context_tokens_after` và `context.compacted` cho Claude và Codex, `matev2 usage <project> [crew]` in ledger, cột TOKENS trên cây console (từ DB, chỉ đọc), `tokens:` trong health của `matev2 state`. Incident `budget` khi `project.yaml` có `budget` và task vượt; theo quyết định 2026-09-20 `budget` không làm crew `blocked`, chỉ vào inbox với chữ `over budget` (sửa mục 4b). | Unit; live: tổng của một crew Codex thật bằng `total_token_usage` cuối trong rollout, và một crew Claude bằng tổng usage theo message. |
+| 27 | Kinh tế: `pricing.yaml` mẫu ở workspace nạp vào `pricing`, `v_task_ledger`, `context_tokens_after` và `context.compacted` cho Claude và Codex, `matev2 usage <project> [crew]` in ledger, cột TOKENS trên cây console (từ DB, chỉ đọc), `tokens:` trong health của `matev2 state`. Incident `budget` khi `project.yaml` có `budget` và task vượt; theo quyết định 2026-09-20 `budget` không làm crew `blocked`, chỉ vào inbox với chữ `over budget` (sửa mục 4b). | Unit; live: tổng của một crew Codex thật bằng `total_token_usage` cuối trong rollout, và một crew Claude bằng tổng usage theo message. Đã xong 2026-09-20, live `TestLiveUsageMatchesTheHarness` (56s): crew Codex ledger 57774 = rollout 57774, Mate Claude ledger 57683 = tổng usage theo message 57683. |
 
 Sau M5: skin dashboard web (`matev2 dashboard`, SSE từ `event.id`, thư mục `.matev2/dashboard/` cho skin riêng), replay theo tốc độ, cảnh văn phòng làm skin tham chiếu.

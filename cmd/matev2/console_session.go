@@ -195,7 +195,7 @@ func crewRecordedStatus(ws *store.Workspace, project, crew string) string {
 	}
 	openIncident := false
 	if view, err := box.Load(ws, project); err == nil {
-		openIncident = len(box.OpenIncidents(view, crew)) > 0
+		openIncident = len(box.BlockingIncidents(view, crew)) > 0
 	}
 	verb := ""
 	if entries, _, err := ws.ReadStatus(project, crew, 0); err == nil {

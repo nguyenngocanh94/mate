@@ -130,6 +130,9 @@ func (i *Ingester) ingestAll(ctx context.Context, shared *sql.Tx) error {
 	if err := i.ws.LoadConfig(); err != nil {
 		return err
 	}
+	if err := i.ingestPricing(ctx, shared); err != nil {
+		return fmt.Errorf("timeline: pricing: %w", err)
+	}
 	var errs []error
 	for _, ref := range i.ws.Projects() {
 		if err := ctx.Err(); err != nil {

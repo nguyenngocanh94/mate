@@ -1,12 +1,12 @@
  matev2 console   workspace acme  /Users/dev/work/acme                                                                                          live · 14:02:11 
  ws_acme › payments-api                                                                                                                       Project · 2 crews 
 ───────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────
-  MATE                                            HARNESS STATUS    MODE                 BINDING   │ MATE  payments-api                                         
-▌ mate-payments-api                               claude  running   manual               active    │                                                            
+  MATE                             HARNESS STATUS    MODE                 BINDING   TOKENS         │ MATE  payments-api                                         
+▌ mate-payments-api                claude  running   manual               active                   │                                                            
                                                                                                    │ ID               mate_01J9M2G9N3X8D5J0B4H7V2T1WK           
-  CREWS  2          TASK                                  STATE            NOTE          UPDATED   │ Agent            mate-payments-api                         
-  crew_01J9P6…B8DT  Add idempotency-key index             working                        14:01:58  │ Harness          claude                                    
-  ↓ Completed (1)                                                          ! failed                │                                                            
+  CREWS  2          TASK                   STATE            NOTE          UPDATED   TOKENS         │ Agent            mate-payments-api                         
+  crew_01J9P6…B8DT  Add idempotency-key in…working                        14:01:58                 │ Harness          claude                                    
+  ↓ Completed (1)                                           ! failed                               │                                                            
                                                                                                    │ Recorded status  running                                   
                                                                                                    │ Binding          active                                    
                                                                                                    │                  recorded active; this does not prove the  

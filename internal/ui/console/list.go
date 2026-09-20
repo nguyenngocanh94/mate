@@ -39,6 +39,13 @@ const (
 	colBinding = 10 // the Project's Mate row: binding status
 	colStatus  = 17 // a Crew row: its declared state (mvp.md section 4b)
 	colCrewID  = 18 // a Crew row: abbreviated id
+	// colTokens is the Project level's TOKENS column, on the Mate row and
+	// every Crew row (mvp.md M5 task 27): a humanised total, plus a cost
+	// once pricing.yaml prices the model - "96k" or "96k $0.12". Read from
+	// `.matev2/matev2.db` and therefore, like Health, appears only once the
+	// Console's wiring has filled it in; a snapshot with none draws a blank
+	// cell here rather than "0".
+	colTokens = 15
 
 	// listWideMin is the list pane's own width (not the terminal's), at or
 	// above which the UPDATED column appears.
@@ -359,7 +366,11 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 	g, p := m.g, m.p
 	proj := m.currentProject()
 	iw := w - 2
+	wide := wideList(w)
 	agentW := iw - colHarness - colMateStatus - colMode - colBinding
+	if wide {
+		agentW -= colTokens
+	}
 
 	items := []listLine{headerListLine(func(focused bool) *line {
 		l := newLine().addSpans(rowPrefix(false, false, g, p)...)
@@ -368,6 +379,9 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		l.addSpans(fitCell([]span{columnHeaderSpan("STATUS", p)}, colMateStatus)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("MODE", p)}, colMode)...)
 		l.addSpans(fitCell([]span{columnHeaderSpan("BINDING", p)}, colBinding)...)
+		if wide {
+			l.addSpans(fitCell([]span{columnHeaderSpan("TOKENS", p)}, colTokens)...)
+		}
 		return l
 	})}
 
@@ -377,6 +391,9 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 			l := selectRow(newLine(), selected, p)
 			l.addSpans(rowPrefix(selected, focused, g, p)...)
 			l.addSpans(mateRowSpans(proj.Mate, proj.Mode, proj.Daemon, agentW, g, p)...)
+			if wide {
+				l.addSpans(fitCell(tokensSpans(proj.Mate.Tokens, p), colTokens)...)
+			}
 			return l
 		}))
 	}
@@ -388,14 +405,14 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		crewStart = 1
 	}
 	crewRowsOnScreen := rows[crewStart:]
-	crewsWide := wideList(w)
+	crewsWide := wide
 	// TASK is the one column allowed to cut a value short (titleCell): the
 	// job a Crew was spawned for is what a reader scans this list by, so it
 	// takes whatever width is left and truncates with an ellipsis rather
 	// than being dropped whole the way a NOTE item is.
 	taskW := iw - colCrewID - colStatus - colAttention
 	if crewsWide {
-		taskW -= colUpdated
+		taskW -= colUpdated + colTokens
 	}
 
 	// Every listed Crew is open: the snapshot already dropped the closed
@@ -410,6 +427,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 		l.addSpans(fitCell([]span{columnHeaderSpan("NOTE", p)}, colAttention)...)
 		if crewsWide {
 			l.addSpans(fitCell([]span{columnHeaderSpan("UPDATED", p)}, colUpdated)...)
+			l.addSpans(fitCell([]span{columnHeaderSpan("TOKENS", p)}, colTokens)...)
 		}
 		return l
 	}))
@@ -438,6 +456,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 				l.addSpans(fitCell(m.completedCrewNoteSpans(finished, colAttention), colAttention)...)
 				if crewsWide {
 					l.addSpans(fitCell(nil, colUpdated)...)
+					l.addSpans(fitCell(nil, colTokens)...)
 				}
 				return l
 			}))
@@ -460,6 +479,7 @@ func (m Model) projectListItems(rows []row, w int) []listLine {
 			l.addSpans(fitCell(m.crewRowNoteSpans(c, colAttention), colAttention)...)
 			if crewsWide {
 				l.addSpans(fitCell(updatedSpans(c.LastEvent, p), colUpdated)...)
+				l.addSpans(fitCell(tokensSpans(c.Tokens, p), colTokens)...)
 			}
 			return l
 		}))
@@ -686,6 +706,24 @@ func healthSpans(h query.Field[query.CrewHealth], p palette) []span {
 		return []span{{text: "pane unclear", style: p.Dim}}
 	}
 	return []span{{text: "pane idle " + shortDuration(v.QuietFor), style: p.Dim}}
+}
+
+// tokensSpans renders the TOKENS column (mvp.md M5 task 27): a humanised
+// total, plus a cost once `pricing.yaml` prices the model - "96k" or
+// "96k $0.12". Like healthSpans, Absent draws nothing rather than "0": the
+// value comes from the Console's wiring reading `.matev2/matev2.db` after
+// query.Load returns, and a snapshot nobody has read the database for is not
+// a snapshot of zero tokens spent.
+func tokensSpans(t query.Field[query.TokenValue], p palette) []span {
+	if t.State != query.Known {
+		return nil
+	}
+	v := t.Value
+	text := query.HumanizeTokens(v.Total)
+	if v.Cost != nil {
+		text += " " + query.HumanizeCost(*v.Cost)
+	}
+	return []span{{text: text, style: p.Dim}}
 }
 
 // shortDuration is a quiet time in the two or three cells the NOTE column can

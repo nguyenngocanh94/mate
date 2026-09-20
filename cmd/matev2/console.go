@@ -84,7 +84,7 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 		// crews it has not seen keep their Absent health. The daemon's own
 		// state - when it last sent, why it last could not - rides along the
 		// same way.
-		return withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), nil
+		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
 	}
 	var stream runtime.SessionStream
 	if s, ok := deps.Runtime.(runtime.SessionStream); ok {

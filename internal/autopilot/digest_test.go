@@ -108,6 +108,22 @@ func TestGatherSkipsTheDaemonsOwnWedgedIncident(t *testing.T) {
 	}
 }
 
+// A `budget` incident is gathered as ItemBudget, never ItemBlocked: decision
+// 2026-09-20 says a budget incident does not change the crew's state, and
+// the digest's vocabulary must say that too.
+func TestGatherReportsABudgetIncidentAsItsOwnKind(t *testing.T) {
+	f := newFixture(t)
+	f.incident("k9", box.IncidentBudget, store.IncidentOpen, "620,000 tokens of 500,000 tokens")
+
+	items := autopilot.Gather(f.view(), nil, f.clock.Now())
+	if len(items) != 1 || items[0].Kind != autopilot.ItemBudget || items[0].Crew != "k9" {
+		t.Fatalf("gathered %+v, want one ItemBudget for k9", items)
+	}
+	if items[0].Text != "620,000 tokens of 500,000 tokens" {
+		t.Fatalf("item text = %q, want the incident's own text", items[0].Text)
+	}
+}
+
 // A resolved incident is history, not an inbox item (mvp.md section 4b).
 func TestGatherSkipsAResolvedIncident(t *testing.T) {
 	f := newFixture(t)
@@ -130,6 +146,19 @@ func TestLineIsTheFormatTheSpecPromises(t *testing.T) {
 	want := `digest: 3 item(s) — k3 needs-decision: "pick A or B" · k9 blocked: stale, quiet for 4m0s · ` +
 		`k7 wait-mate: "report.md is ready" — status files under /w/.matev2/projects/shop/crews; ` +
 		`act per AGENTS.md section 10`
+	if got := autopilot.Line(items, "/w/.matev2/projects/shop/crews"); got != want {
+		t.Fatalf("Line =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// The fourth item shape mvp.md section 5 adds for task 27: no quotes, no
+// "blocked" word, just the crew and what it is over by.
+func TestLineRendersTheBudgetItemShape(t *testing.T) {
+	items := []autopilot.Item{
+		{Kind: autopilot.ItemBudget, Crew: "k9", Text: "620,000 tokens of 500,000 tokens"},
+	}
+	want := `digest: 1 item(s) — k9 over budget: 620,000 tokens of 500,000 tokens — ` +
+		`status files under /w/.matev2/projects/shop/crews; act per AGENTS.md section 10`
 	if got := autopilot.Line(items, "/w/.matev2/projects/shop/crews"); got != want {
 		t.Fatalf("Line =\n%s\nwant\n%s", got, want)
 	}

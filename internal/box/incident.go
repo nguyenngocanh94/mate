@@ -104,9 +104,9 @@ func loadIncidents(ws *store.Workspace, project string, from int64) ([]Entry, in
 }
 
 // OpenIncidents is the observer's unresolved findings for one crew, oldest
-// first. A non-empty result is what makes the crew's displayed state
-// `blocked` (mvp.md section 4b); the observer is the only writer of the
-// incidents this reads, so a crew's own status lines never affect it.
+// first, of every kind. It is what puts a crew in the inbox (mvp.md section
+// 4b: "một incident, mà chưa có ai trả lời"), not what decides `blocked` -
+// see BlockingIncidents for that.
 func OpenIncidents(v View, crew string) []Incident {
 	var out []Incident
 	for _, e := range v.Entries {
@@ -114,6 +114,24 @@ func OpenIncidents(v View, crew string) []Incident {
 			continue
 		}
 		out = append(out, *e.Incident)
+	}
+	return out
+}
+
+// BlockingIncidents is OpenIncidents narrowed to the two kinds that make a
+// crew `blocked` (mvp.md section 4b, decision 2026-09-20): `stale` and
+// `runtime_lost` - a crew that has stopped being able to speak for itself.
+// `budget` (and `wedged`, which is never filed under a real crew) are
+// deliberately excluded: going over budget does not mean the crew stopped
+// talking, so it must stay an inbox item, not a state that displaces
+// `working`/`needs-decision`/`wait-mate`.
+func BlockingIncidents(v View, crew string) []Incident {
+	var out []Incident
+	for _, inc := range OpenIncidents(v, crew) {
+		switch inc.Kind {
+		case IncidentStale, IncidentRuntimeLost:
+			out = append(out, inc)
+		}
 	}
 	return out
 }

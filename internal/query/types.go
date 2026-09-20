@@ -113,6 +113,10 @@ type MateNode struct {
 	Binding   Field[BindingValue]
 	LastEvent Field[EventValue]
 	Error     Field[ErrorReason]
+	// Tokens is the Mate's token usage today, read from `.matev2/matev2.db`
+	// (mvp.md M5 task 27) - see CrewNode.Tokens for why this package leaves
+	// it Absent and who fills it in.
+	Tokens Field[TokenValue]
 }
 
 // MateIdentity is the designated Mate row itself. Status is the durable
@@ -171,6 +175,31 @@ type CrewNode struct {
 	// Crew's Status comes from the meta, the incidents and the status file,
 	// in that order.
 	Health Field[CrewHealth]
+	// Tokens is this Crew's whole-task token usage, read from
+	// `.matev2/matev2.db`'s `v_task_ledger` (mvp.md M5 task 27). Like
+	// Health it is not this package's to fill: this package only reads
+	// `.matev2/`'s flat files, and the ledger lives in the derived
+	// database. The Console's wiring (cmd/matev2, alongside
+	// withCrewHealth) opens the database read-only and fills this in after
+	// Load returns; a one-shot CLI read or a console that has not opened
+	// the database yet leaves it at the Absent Load gave it.
+	Tokens Field[TokenValue]
+}
+
+// TokenValue is one actor's token usage as the ledger reports it: a total
+// across all four buckets, a cost that is nil until every turn's model has
+// a real price (mvp.md M5: "cost is NULL until then, because a missing
+// price is not a price of zero" - see docs/timeline.md), and a context
+// percentage that is nil until the actor has a turn whose model carries a
+// known context window in pricing.yaml.
+type TokenValue struct {
+	Total int64
+	// Cost is nil, not zero, until pricing.yaml prices every model this
+	// actor's turns used.
+	Cost *float64
+	// ContextPct is nil, not zero, until the actor's most recent turn's
+	// model has a known context_window.
+	ContextPct *float64
 }
 
 // CrewHealth is one observation of a Crew's pane and of Herdr's inventory,

@@ -293,7 +293,7 @@ func TestBoxNeedPhraseNamesTheNeedNotTheText(t *testing.T) {
 		{query.BoxEntry{Kind: query.BoxIncident, Verb: "stale", Text: "no pane change for 4m"}, "stuck, quiet too long"},
 		{query.BoxEntry{Kind: query.BoxIncident, Verb: "runtime_lost"}, "agent gone"},
 		{query.BoxEntry{Kind: query.BoxIncident, Verb: "wedged"}, "send wedged"},
-		{query.BoxEntry{Kind: query.BoxIncident, Verb: "budget"}, "out of budget"},
+		{query.BoxEntry{Kind: query.BoxIncident, Verb: "budget"}, "over budget"},
 		{query.BoxEntry{Kind: query.BoxIncident, Verb: "novel"}, "incident novel"},
 	}
 	for _, tc := range cases {

@@ -32,6 +32,37 @@ func TestGoldenProjectLevelAtEveryBreakpoint(t *testing.T) {
 	assertGolden(t, "project-140x40-ascii", renderFrame(t, intoProject(t, 140, 40, asciiGlyphs)))
 }
 
+// TestTokensColumnRendersHumanisedTotals (mvp.md M5 task 27): the Mate row
+// and a Crew row both show the TOKENS column once query.TokenValue is
+// Known, humanised the way `matev2 usage` renders the same numbers - a
+// total alone when the model has no price, a total plus cost once it does.
+func TestTokensColumnRendersHumanisedTotals(t *testing.T) {
+	tree := sampleTree()
+	tree.Projects[0].Mate.Tokens = query.KnownField(query.TokenValue{Total: 96_300})
+	cost := 0.12
+	tree.Projects[0].Crews[1].Tokens = query.KnownField(query.TokenValue{Total: 1_200_000, Cost: &cost})
+
+	m := newFixture(t, tree, 160, 48, unicodeGlyphs)
+	m, _ = send(t, m, key("enter")) // into payments-api
+	frame := renderFrame(t, m)
+
+	if !strings.Contains(frame, "mate-payments-api") || !frameHasOnSameLine(frame, "mate-payments-api", "96.3k") {
+		t.Fatalf("the Mate row does not show its token total:\n%s", frame)
+	}
+	if !frameHasOnSameLine(frame, "Add idempotency-key", "1.2M $0.12") {
+		t.Fatalf("the Crew row does not show its token total and cost:\n%s", frame)
+	}
+}
+
+func frameHasOnSameLine(frame, a, b string) bool {
+	for _, l := range strings.Split(frame, "\n") {
+		if strings.Contains(l, a) && strings.Contains(l, b) {
+			return true
+		}
+	}
+	return false
+}
+
 // TestGoldenProjectWithoutMateAndWithoutCrews pins the two empty-ish
 // Project states the gallery names explicitly: a Project with no designated
 // Mate ("! no mate" in the Binding cell) and a Project with a Mate but zero
@@ -104,7 +135,10 @@ func TestProjectLevelSelectionMarksTheRightRow(t *testing.T) {
 
 	running := sampleTree().Projects[0].Crews[1]
 	m, _ = send(t, m, key("down")) // sel == 1: the one active Crew
-	if got := markedLine(m); !strings.Contains(got, "Add idempotency-key index") {
+	// "Add idempotency-key index" itself: the TOKENS column (mvp.md M5 task
+	// 27) takes some of the width the TASK cell used to have at this pane
+	// size, so only a prefix survives the cut.
+	if got := markedLine(m); !strings.Contains(got, "Add idempotency-key") {
 		t.Fatalf("sel=1 marked %q, want the running Crew's task line", got)
 	}
 	if got := markedLine(m); strings.Contains(got, "mate-payments-api") {
@@ -589,8 +623,10 @@ func TestUnknownCrewLastEventRendersHonestlyInTheProjectCrewList(t *testing.T) {
 	m := newFixture(t, tree, 160, 48, unicodeGlyphs) // 160 wide: list pane clears the UPDATED boundary
 	m, _ = send(t, m, key("enter"))                  // into payments-api
 	frame := renderFrame(t, m)
+	// A prefix, not the whole title: the TOKENS column (mvp.md M5 task 27)
+	// leaves less room for TASK at this pane width, so the title is cut.
 	for _, l := range strings.Split(frame, "\n") {
-		if strings.Contains(l, "Add idempotency-key index") {
+		if strings.Contains(l, "Add idempotency-key") {
 			if !strings.Contains(l, "? unknown") {
 				t.Fatalf("an unreadable Crew event should render as unknown in the UPDATED column:\n%s", l)
 			}

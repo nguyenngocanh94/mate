@@ -175,6 +175,26 @@ func (p *pass) claudeTurns(loc Located, sessionRow string, tb harness.Transcript
 // Tokens come from the snapshot's delta, because Codex reports cumulative
 // totals; `context_tokens_after` comes from the same record's
 // `last_token_usage`, which is the prompt the call actually carried.
+//
+// `turn.input_tokens` is stored net of the cache-read delta, not the raw
+// delta Codex reports. Measured 2026-09-20 on the M5 acceptance fixture:
+// the rollout's last `total_token_usage` is
+// `{"input_tokens":232424,"cached_input_tokens":209152,...,"output_tokens":1544,"total_tokens":233968}`,
+// and 232424+1544 = 233968 exactly - Codex's own `input_tokens` already
+// counts every cached token, and `total_tokens` is simply input+output. A
+// Claude turn is the opposite: its `input_tokens` excludes both cache
+// buckets, so `input+cache_read+cache_write+output` is that call's real
+// cost with no overlap (docs/timeline.md's own turn.started example: 32
+// fresh + 57690 cache-read + 739 cache-write = 58461 = context_tokens_after).
+// Subtracting the cache-read delta here before it is stored makes
+// `turn.input_tokens` mean the same thing for both harnesses - "billed at
+// the input rate, not a cache rate" - so every sum across the four buckets
+// (`v_task_ledger`, `v_now.tokens_today`, the budget check, `matev2 usage`)
+// is correct without asking which harness a turn came from. Cache-write is
+// left alone: Codex's own `context_tokens_after` derivation
+// (`marks.lastTokenUsage`, below) already treats it as additional rather
+// than a subset of input, and this fixture's cache-write is always 0, so
+// there is nothing here to measure it against.
 func (p *pass) codexTurns(loc Located, sessionRow string, tb harness.TranscriptBatch) {
 	results := resultsByCall(tb)
 	marks := scanCodexMarks(tb)
@@ -211,15 +231,28 @@ func (p *pass) codexTurns(loc Located, sessionRow string, tb harness.TranscriptB
 		if _, ok := marks.taskCompleteAt(snap.Offset); ok {
 			outcome = "end_turn"
 		}
-		contextAfter := snap.Cumulative.Input + snap.Cumulative.CacheRead + snap.Cumulative.CacheWrite
+		// Cumulative.Input is cache-inclusive (see the function doc), so the
+		// fallback context size adds only the cache-write bucket - the same
+		// combination the primary `last_token_usage` rule below uses.
+		contextAfter := snap.Cumulative.Input + snap.Cumulative.CacheWrite
 		if last, ok := marks.lastTokenUsage[snap.Offset]; ok {
 			contextAfter = last
+		}
+		// freshInput is this call's input delta net of its cache-read delta:
+		// the portion Codex billed at the input rate rather than the cache
+		// rate. Clamped at zero defensively - Codex's own invariant is
+		// cached_input_tokens <= input_tokens at every cumulative snapshot,
+		// so a negative result here would mean that invariant broke, not
+		// that the crew somehow un-cached tokens.
+		freshInput := snap.Delta.Input - snap.Delta.CacheRead
+		if freshInput < 0 {
+			freshInput = 0
 		}
 		p.b.turn(pendingTurn{
 			ID: turnID, ActorID: loc.ActorID, SessionID: sessionRow, Ordinal: ordinal,
 			StartedAt: started, EndedAt: snap.OccurredAt,
 			Outcome: outcome, Model: snap.Model, HarnessTurnRef: snap.HarnessTurnRef,
-			Input: snap.Delta.Input, CacheRead: snap.Delta.CacheRead, CacheWrite: snap.Delta.CacheWrite,
+			Input: freshInput, CacheRead: snap.Delta.CacheRead, CacheWrite: snap.Delta.CacheWrite,
 			Output: snap.Delta.Output, Thinking: snap.Delta.Reasoning,
 			ContextAfter: contextAfter, ToolCount: len(calls),
 			RefPath: loc.Path, RefOffset: snap.Offset,
@@ -240,7 +273,7 @@ func (p *pass) codexTurns(loc Located, sessionRow string, tb harness.TranscriptB
 			"harness_turn":         snap.HarnessTurnRef,
 			"outcome":              outcome,
 			"tool_count":           len(calls),
-			"input_tokens":         snap.Delta.Input,
+			"input_tokens":         freshInput,
 			"cache_read_tokens":    snap.Delta.CacheRead,
 			"cache_write_tokens":   snap.Delta.CacheWrite,
 			"output_tokens":        snap.Delta.Output,

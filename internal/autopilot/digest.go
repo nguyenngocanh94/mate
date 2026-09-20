@@ -19,19 +19,27 @@ import (
 // still reported.
 const MateCrew = "mate"
 
-// ItemKind is what one digested thing is. The three spellings are the ones
-// mvp.md section 4b uses on screen, so a Mate reading a digest sees the same
-// words as a human reading the crews table.
+// ItemKind is what one digested thing is. The first three spellings are the
+// ones mvp.md section 4b uses on screen, so a Mate reading a digest sees the
+// same words as a human reading the crews table; ItemBudget is task 27's
+// fourth shape, which is deliberately not "blocked" (a budget incident never
+// makes a crew blocked, decision 2026-09-20).
 type ItemKind string
 
 const (
 	// ItemNeedsDecision is a crew's own question, still unanswered.
 	ItemNeedsDecision ItemKind = "needs-decision"
-	// ItemBlocked is an open observer incident - the crew cannot report for
-	// itself any more.
+	// ItemBlocked is an open observer incident of a blocking kind (`stale`
+	// or `runtime_lost`) - the crew cannot report for itself any more.
 	ItemBlocked ItemKind = "blocked"
 	// ItemWaitMate is a crew's latest status line handing the work back.
 	ItemWaitMate ItemKind = "wait-mate"
+	// ItemBudget is an open `budget` incident: the crew (or, with no crew
+	// name, the project) has crossed a limit in project.yaml's `budget:`
+	// block. It is its own kind, not ItemBlocked, because the digest's
+	// vocabulary must not tell the Mate a budget item changed the crew's
+	// state - it did not.
+	ItemBudget ItemKind = "over budget"
 )
 
 // Item is one thing a digest reports, with the entry it came from kept so a
@@ -125,8 +133,15 @@ func Gather(v box.View, cursor map[string]int64, now time.Time) []Item {
 				// just failed. The captain sees it in the inbox.
 				continue
 			}
+			kind := ItemBlocked
+			if item.Kind == box.IncidentBudget {
+				// Never ItemBlocked: a budget incident does not change the
+				// crew's state (decision 2026-09-20), and the digest's own
+				// vocabulary must not suggest otherwise.
+				kind = ItemBudget
+			}
 			out = append(out, Item{
-				Kind:         ItemBlocked,
+				Kind:         kind,
 				Crew:         e.Crew,
 				Text:         item.Text,
 				IncidentKind: item.Kind,
@@ -216,6 +231,12 @@ func itemText(item Item) string {
 			kind = "incident"
 		}
 		return fmt.Sprintf("%s blocked: %s, quiet for %s", crew, kind, quietWord(item.QuietFor))
+	case ItemBudget:
+		// item.Text is the observer's incident text, written as
+		// "<total> of <limit>" (internal/watch's budget check) - the fourth
+		// item shape of mvp.md section 5: "<crew> over budget: <total> of
+		// <limit>".
+		return fmt.Sprintf("%s over budget: %s", crew, item.Text)
 	default:
 		return fmt.Sprintf("%s %s: %q", crew, item.Kind, oneLine(item.Text, MaxItemRunes))
 	}

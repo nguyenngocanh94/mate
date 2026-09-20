@@ -115,6 +115,38 @@ func TestLoadKeepsIncidentKindsApart(t *testing.T) {
 	}
 }
 
+// A `budget` incident is in the inbox (OpenIncidents) but must never be a
+// blocking one (BlockingIncidents): mvp.md section 4b, decision 2026-09-20 -
+// only `stale` and `runtime_lost` make a crew `blocked`.
+func TestBlockingIncidentsExcludesBudget(t *testing.T) {
+	w := newFixtureWorkspace(t)
+	at := time.Date(2026, 9, 20, 11, 0, 0, 0, time.UTC)
+	appendIncident(t, w, at, "k3", string(box.IncidentBudget), store.IncidentOpen, "620,000 tokens of 500,000 tokens")
+
+	v, err := box.Load(w, "shop")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if open := box.OpenIncidents(v, "k3"); len(open) != 1 {
+		t.Fatalf("OpenIncidents(k3) = %+v, want the budget incident in the inbox", open)
+	}
+	if blocking := box.BlockingIncidents(v, "k3"); len(blocking) != 0 {
+		t.Fatalf("BlockingIncidents(k3) = %+v, want none: a budget incident never blocks", blocking)
+	}
+
+	// A stale incident alongside it still blocks; the budget one is simply
+	// not counted.
+	appendIncident(t, w, at.Add(time.Minute), "k3", string(box.IncidentStale), store.IncidentOpen, "quiet")
+	v, err = box.Load(w, "shop")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	blocking := box.BlockingIncidents(v, "k3")
+	if len(blocking) != 1 || blocking[0].Kind != box.IncidentStale {
+		t.Fatalf("BlockingIncidents(k3) = %+v, want only the stale one", blocking)
+	}
+}
+
 func TestLoadSinceDoesNotReplayAnIncidentItAlreadyReported(t *testing.T) {
 	w := newFixtureWorkspace(t)
 	at := time.Date(2026, 9, 18, 11, 0, 0, 0, time.UTC)

@@ -96,6 +96,14 @@ func Init(workspaceDir string) (*Workspace, error) {
 	if err := os.WriteFile(w.WorkspaceDoc(), []byte(workspaceDocSeed), 0o644); err != nil {
 		return nil, err
 	}
+	// The token price table (mvp.md M5 task 27). Seeded once, at zero, with
+	// a comment telling the captain it is theirs to fill in: matev2 records
+	// tokens whether or not anyone has priced them, and an init that left
+	// this file missing would make every ledger's cost column silently
+	// unreadable rather than honestly "?".
+	if err := os.WriteFile(w.PricingFile(), []byte(pricingFileSeed), 0o644); err != nil {
+		return nil, err
+	}
 	return w, nil
 }
 
