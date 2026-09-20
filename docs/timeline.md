@@ -242,7 +242,8 @@ A Mate's busy stretches are therefore explained by its transcript alone, which i
 ### `review.started`
 
 Nothing emits it yet.
-The kind is in M5's vocabulary and in the narrate table because the Mate's `reviewing(crew)` scene is task 26's, and the event that opens it is the one the scene machine will need; a reader of this document should know it is a name with no producer rather than assume a gap in the ingest.
+The kind is in M5's vocabulary and in the narrate table because the Mate's `reviewing(crew)` scene needs an event to open it; a reader of this document should know it is a name with no producer rather than assume a gap in the ingest.
+The scene machine has the edge for it (`mate.reviews`) and, until something emits it, reaches `reviewing` from the command the Mate actually runs to review a crew - `matev2 diff <project> <crew>`, which is a `tool.called` in its own transcript (section 9.4, `mate.reviews.diff`).
 
 ### `ingest.unresolved`
 
@@ -323,7 +324,8 @@ The Mate and the captain are named with an article because there is one of each;
 Cost is `NULL` until then, because a missing price is not a price of zero.
 
 `v_now` is one row per actor: the scene state, since when, who it faces, and what it has spent today.
-Its scene columns read `transition`, which task 26's projection writes; until then `state`, `since`, `target_actor_id` and `detail` are `NULL`, which is the honest answer for "no projection has run".
+Its scene columns read `transition`, which the scene projection of section 9 writes on every pass that recorded anything.
+An actor with no transition at all reads `NULL` in all four, which is the honest answer for "this actor is in no scene": the captain, matev2 and the observer are in the story and not in the office.
 
 ## 8. Known costs
 
@@ -335,7 +337,222 @@ A session long enough for that to hurt is the place to measure again.
 `matev2 reindex` empties the derived tables and refills them in one transaction, so a rebuild that fails halfway leaves the timeline it started with.
 An ordinary poll commits one transaction per project instead, for the opposite reason: a project whose `.meta` is half-written must not hold back the rest of the workspace.
 
-## 9. Economics (schema v2, task 27)
+## 9. The scene
+
+`internal/timeline/scene` projects the events onto the office of docs/mvp.md M5: the Mate is a CEO in its room, a crew is an employee at a desk, and a crew with a question carries the note to the CEO's door and waits there.
+The projection writes the `transition` table and is what fills `v_now`.
+
+It is a state machine spelled out as data - a table of edges, one per row below - and nothing moves an actor except an edge.
+An event that reaches an actor's machine and matches no edge is recorded as a transition to the state the actor is already in, with `unexplained: <kind>` in `detail`.
+That is the rule the whole section exists for: a scene that quietly dropped a fact would read as if the fact had never happened, and the depth test of task 26 fails on any row carrying it.
+
+### 9.1 The states
+
+A parameterised state - `walking_to_ceo(question)`, `leaving(merged)`, `reading(crew)` - is stored as a state plus `detail` plus `target_actor_id`, so the vocabulary stays finite and `SELECT ... WHERE to_state = 'waiting_at_ceo'` can ask how long anybody stood at the door.
+
+| State | Whose | What it means |
+| --- | --- | --- |
+| `arriving` | crew | hired, walking in, not yet seen working |
+| `at_desk_working` | crew | at its desk; the default place for a crew that is doing anything |
+| `walking_to_ceo` | crew | on its way to the CEO's office, `detail` `question` or `handback` |
+| `waiting_at_ceo` | crew | standing at the door with a question nobody has answered |
+| `waiting_review` | crew | standing at the door with finished work nobody has looked at |
+| `leaving` | crew | on its way out, `detail` `merged`, `closed` or `failed` |
+| `gone` | crew, Mate | out of the building |
+| `idle` | Mate | alone in its office |
+| `on_phone` | Mate | the captain typed into its pane |
+| `receiving_digest` | Mate | matev2 walked a note in, `detail` `digest` or `assign`; it is on the desk, unread |
+| `reading` | Mate | reading the note, `target_actor_id` the crew it is about |
+| `deciding` | Mate | working at its desk |
+| `answering` | Mate | answering the crew at its door |
+| `reviewing` | Mate | reading a crew's work |
+| `merging` | Mate | landing a crew's branch itself |
+| `asleep` | both | an incident says nothing has moved |
+| `blocked` | both | an incident says it cannot be reached |
+
+`walking_to_ceo` and `leaving` are instantaneous: the edge that produces one records both it and the state after it with the same `at`, so a renderer can animate the walk while `waiting_at_ceo`'s duration is still measured from the moment the waiting began.
+
+`asleep` and `blocked` are a pause and not a destination.
+Entering one remembers where the actor was, and `incident.resolved` puts it back there rather than guessing.
+An incident is also a report and not a cage: a crew the observer called asleep and which then writes a question into its status file is demonstrably awake and standing at the door, so the ordinary edges apply from `asleep` and `blocked` too, and the `resolved` line that follows finds the crew already moved and moves nobody.
+
+### 9.2 Which machine an event reaches
+
+An event is applied to the machine of its actor and to the machine of its subject.
+`crew.spawned` is something the Mate did to a crew, and it is the crew that walks in; `question.asked` is a crew's, and its subject is the Mate.
+The captain, matev2 and the observer have no machine: nobody draws the captain.
+
+Two events recorded at the same instant are applied in `(at, rank, id)` order, and only one kind needs a rank: `matev2 merge` closes the crew it merged, so `merge.done` and `crew.finished` share a timestamp, and the merge is applied first so a crew that landed its branch leaves `merged` rather than merely `closed`.
+
+### 9.3 The crew's table
+
+Rows are tried in order and the first match wins.
+"anywhere" is the last row for a kind and catches what the rows above it did not; "in the building" is every state but `gone`; "at work" is every state but `gone`, `asleep` and `blocked`.
+
+| id | From | Event | When | To | Facing, or why it moves nobody |
+| --- | --- | --- | --- | --- | --- |
+| `crew.hired` | in the building | `crew.spawned` | | `arriving` | the Mate |
+| `crew.hired.gone` | anywhere | `crew.spawned` | | - | |
+| `crew.merged` | in the building | `merge.done` | | `leaving(merged)` → `gone` | |
+| `crew.merged.gone` | anywhere | `merge.done` | | - | |
+| `crew.closed` | in the building | `crew.finished` | | `leaving(closed)` → `gone` | |
+| `crew.closed.gone` | anywhere | `crew.finished` | | - | |
+| `crew.failed` | in the building | `crew.failed` | | `leaving(failed)` → `gone` | |
+| `crew.failed.gone` | anywhere | `crew.failed` | | - | |
+| `crew.asleep` | at work | `incident.opened` | `stale` | `asleep(stale)` | |
+| `crew.blocked` | at work | `incident.opened` | `runtime_lost`, `wedged` | `blocked(<kind>)` | |
+| `crew.incident.other` | anywhere | `incident.opened` | | - | `budget` is an inbox item and not a state (docs/mvp.md section 4b) |
+| `crew.awake` | `asleep`, `blocked` | `incident.resolved` | | back where the incident found it | |
+| `crew.awake.other` | anywhere | `incident.resolved` | | - | |
+| `crew.asks` | in the building | `question.asked` | | `walking_to_ceo(question)` → `waiting_at_ceo` | the Mate |
+| `crew.asks.away` | anywhere | `question.asked` | | - | |
+| `crew.answered` | in the building | `question.answered` | | `at_desk_working` | |
+| `crew.answered.away` | anywhere | `question.answered` | | - | |
+| `crew.handback` | in the building, not `waiting_review` | `status.appended` | `verb: wait-mate` | `walking_to_ceo(handback)` → `waiting_review` | the Mate |
+| `crew.at.desk` | `arriving`, unknown | `status.appended` | | `at_desk_working` | |
+| `crew.status` | anywhere | `status.appended` | | - | a `working:` line is the crew saying what it is doing, not moving |
+| `crew.back.to.work` | `waiting_review` | `message.sent` | addressed to it | `at_desk_working` | the Mate sent it back with something to change |
+| `crew.message` | anywhere | `message.sent` | | - | |
+| `crew.turn.first` | `arriving`, unknown | `turn.started` | | `at_desk_working` | |
+| `crew.turn` | anywhere | `turn.started` | | - | a crew waiting at the door still burns turns; the turn does not fetch it back |
+| `crew.tool.first` | `arriving`, unknown | `tool.called` | | `at_desk_working` | |
+| `crew.tool` | anywhere | `tool.called` | | - | |
+| `crew.commit.first` | `arriving`, unknown | `git.committed` | | `at_desk_working` | |
+| `crew.commit` | anywhere | `git.committed` | | - | |
+| `crew.turn.ended` | anywhere | `turn.ended` | | - | |
+| `crew.tool.finished` | anywhere | `tool.finished` | | - | |
+| `crew.compacted` | anywhere | `context.compacted` | | - | its memory, not its position |
+| `crew.health` | anywhere | `health.changed` | | - | an observation of a pane, which a rebuild cannot read back |
+| `crew.unresolved` | anywhere | `ingest.unresolved` | | - | matev2's problem, not a move |
+| `crew.review` | anywhere | `review.started` | | - | being reviewed is where it already is |
+| `crew.mate.started` | anywhere | `mate.started` | | - | |
+| `crew.mate.stopped` | anywhere | `mate.stopped` | | - | |
+| `crew.mode` | anywhere | `mode.changed` | | - | |
+| `crew.digest` | anywhere | `digest.sent` | | - | addressed to the Mate |
+| `crew.assign` | anywhere | `assign.clicked` | | - | addressed to the Mate |
+
+### 9.4 The Mate's table
+
+| id | From | Event | When | To | Facing, or why it moves nobody |
+| --- | --- | --- | --- | --- | --- |
+| `mate.opens` | anywhere | `mate.started` | | `idle` | |
+| `mate.closes` | anywhere | `mate.stopped` | | `gone` | |
+| `mate.asleep` | at work | `incident.opened` | `stale` | `asleep(stale)` | |
+| `mate.blocked` | at work | `incident.opened` | `runtime_lost`, `wedged` | `blocked(<kind>)` | the daemon files `wedged` against the Mate (docs/mvp.md task 19) |
+| `mate.incident.other` | anywhere | `incident.opened` | | - | |
+| `mate.awake` | `asleep`, `blocked` | `incident.resolved` | | back where the incident found it | |
+| `mate.awake.other` | anywhere | `incident.resolved` | | - | |
+| `mate.phone` | in the building | `message.sent` | from the captain, channel `pane`, to the Mate | `on_phone` | the captain |
+| `mate.reads.echo` | `receiving_digest` | `message.sent` | `confirms: true`, to the Mate | `reading(crew)` | the crew the note is about |
+| `mate.message` | anywhere | `message.sent` | | - | its own line out, or an echo of a line already counted |
+| `mate.digest` | in the building | `digest.sent` | | `receiving_digest(digest)` | the crew the digest is about |
+| `mate.digest.away` | anywhere | `digest.sent` | | - | |
+| `mate.assign` | in the building | `assign.clicked` | | `receiving_digest(assign)` | the crew the note is about |
+| `mate.assign.away` | anywhere | `assign.clicked` | | - | |
+| `mate.reads` | `receiving_digest` | `turn.started` | | `reading(crew)` → `deciding` | the crew the note is about |
+| `mate.turn` | in the building | `turn.started` | | `deciding` | whoever it was already facing |
+| `mate.turn.away` | anywhere | `turn.started` | | - | |
+| `mate.turn.ended` | `reading`, `deciding`, `answering`, `reviewing`, `merging` | `turn.ended` | | `idle` | |
+| `mate.turn.ended.holding` | anywhere | `turn.ended` | | - | a note that arrived mid-turn is still unread when the turn ends, and the phone is still ringing |
+| `mate.answers` | in the building | `question.answered` | the Mate sent it | `answering(crew)` → `idle` | the crew |
+| `mate.answers.other` | anywhere | `question.answered` | | - | the captain answered it, which is the captain's doing |
+| `mate.reviews` | in the building | `review.started` | | `reviewing(crew)` | the crew |
+| `mate.reviews.away` | anywhere | `review.started` | | - | |
+| `mate.reviews.diff` | in the building | `tool.called` | the command is `matev2 diff <project> <crew>` | `reviewing(crew)` | the crew |
+| `mate.tool` | anywhere | `tool.called` | | - | |
+| `mate.merges` | in the building | `merge.done` | `by: mate` | `merging(crew)` → `idle` | the crew |
+| `mate.merges.captain` | anywhere | `merge.done` | | - | the captain merged from the console: the crew leaves, the Mate did nothing |
+| `mate.hires` | anywhere | `crew.spawned` | | - | hiring happens inside a turn it is already in |
+| `mate.status` | anywhere | `status.appended` | | - | |
+| `mate.asked` | anywhere | `question.asked` | | - | a crew at the door does not move the Mate; the note reaching its pane does |
+| `mate.crew.finished` | anywhere | `crew.finished` | | - | |
+| `mate.crew.failed` | anywhere | `crew.failed` | | - | |
+| `mate.commit` | anywhere | `git.committed` | | - | |
+| `mate.tool.finished` | anywhere | `tool.finished` | | - | |
+| `mate.compacted` | anywhere | `context.compacted` | | - | |
+| `mate.health` | anywhere | `health.changed` | | - | |
+| `mate.unresolved` | anywhere | `ingest.unresolved` | | - | |
+| `mate.mode` | anywhere | `mode.changed` | | - | |
+
+Four of these edges deserve their reason spelled out.
+
+`mate.reads` fires only from `receiving_digest`, and it does not look at what caused the turn.
+Both halves of that are measurements rather than taste.
+The causality rule of section 5 gives *every* Mate turn the last line that reached its composer as its cause, so a Mate that works through six model calls after one `[assign]` would read the same note six times if the cause were the trigger; the note is instead picked up once, by the first turn that starts after it landed on the desk.
+And the line the cause rule finds is usually not the `[assign]` at all: a Claude Mate's `UserPromptSubmit` hook writes the same line back to `sent.log` when the model reads it, and that echo is the newest line to the Mate when the turn starts.
+Measured 2026-09-20 in `TestLiveTimelineExplainsTheAcceptance`: the `[assign]` and its echo both at 16:47:57, the turn at 16:48:05, and a `mate.reads` that demanded an `[assign]` as the cause never fired at all, so the Mate never read anything in a run where it plainly did.
+
+`mate.reads.echo` is that echo used for what it is.
+The hook's line is the one fact in `sent.log` that proves the model read what matev2 typed (section 4), and "the Mate reads it" is already how the event narrates, so on a Claude Mate the note leaves the desk at the echo and the turn that follows finds the Mate already reading.
+A Codex Mate has no such hook, and `mate.reads` picks the note up at its next turn instead.
+
+`mate.turn.ended` deliberately does not fire from `receiving_digest` or `on_phone`.
+A line that arrives while the Mate is mid-turn has not been read when that turn ends, and a scene that returned the Mate to `idle` would lose the fact that something is waiting on its desk.
+
+`mate.reviews.diff` is the one edge that reads a command rather than an event kind.
+`review.started` has no producer (section 4), and the thing a Mate actually does to review a crew is run `matev2 diff <project> <crew>`, which is a `tool.called` in its own transcript and survives a rebuild.
+The `review.started` edge stays in the table for the day something emits it.
+
+### 9.5 The scene phrases
+
+`matev2 events <project> --scene --narrate` prints one sentence per transition, prefixed with the local time to the second, the same shape `--narrate` prints an event in.
+
+| To | Sentence |
+| --- | --- |
+| `arriving` | `k3 arrives at the office` |
+| `at_desk_working` (from `arriving`) | `k3 sits down at its desk` |
+| `at_desk_working` (from `waiting_at_ceo`) | `k3 goes back to its desk` |
+| `at_desk_working` (from `waiting_review`) | `k3 goes back to its desk with more to do` |
+| `walking_to_ceo(question)` | `k3 walks to the CEO's office with a question` |
+| `walking_to_ceo(handback)` | `k3 walks to the CEO's office with the finished work` |
+| `waiting_at_ceo` | `k3 waits at the CEO's door` |
+| `waiting_review` | `k3 waits for the Mate to review the work` |
+| `leaving(merged)` | `k3 leaves, merged` |
+| `leaving(closed)` | `k3 leaves, its task closed` |
+| `leaving(failed)` | `k3 leaves, its task failed` |
+| `gone` | `k3 is out of the building`, or `the Mate shuts the office` |
+| `asleep` | `k3 falls asleep (stale)` |
+| `blocked` | `k3 cannot be reached (runtime_lost)` |
+| out of `asleep` | `k3 wakes up, back waiting at the CEO's door` |
+| out of `blocked` | `k3 is back in touch, at its desk` |
+| `idle` (first) | `the Mate takes the office` |
+| `idle` | `the Mate is alone in its office again` |
+| `on_phone` | `the captain calls the Mate` |
+| `receiving_digest(digest)` | `matev2 walks a digest into the Mate's office` |
+| `receiving_digest(assign)` | `matev2 walks the captain's note into the Mate's office` |
+| `reading` | `the Mate reads k3's note` |
+| `deciding` | `the Mate thinks it over` |
+| `answering` | `the Mate answers k3` |
+| `reviewing` | `the Mate reviews k3's work` |
+| `merging` | `the Mate lands k3's work` |
+| unexplained | `k3: nothing in the scene explains <kind>` |
+
+The snapshot is the same vocabulary in the present tense, one line per actor, with the moment the actor arrived in that state: `now      k3 is waiting at the CEO's door (since 10:44:33)`.
+The captain, matev2 and the observer have no scene, so the narrated snapshot leaves them out; the JSON snapshot still carries their rows, with a `state` of `""`, because "this actor is in no scene" is an answer and not a gap.
+
+### 9.6 `matev2 events <project> --scene`
+
+`--scene` prints the `v_now` snapshot, one JSON line per actor, and stops.
+`--since <RFC3339|event id>` adds the transitions from that point, oldest first; `--since 0` is the whole history.
+`--follow` then keeps printing transitions as they are recorded, and `--narrate` turns both halves into the sentences above.
+
+The transition's id is its cursor: `<project>|<at>|<n>`, where `at` is the fixed-width timestamp `internal/db` stores and `n` counts the transitions inside that instant.
+It therefore sorts lexicographically into story order, which is what lets `v_now` break a tie inside one instant with `ORDER BY at DESC, id DESC` and read the state the machine actually ended in, and what lets `--follow` poll `id > <last>` instead of scanning.
+
+### 9.7 How the projection runs
+
+It runs inside `Ingester.Ingest` and `Reindex`, in the same transaction as the events of that pass and after the causality rules, because the crew a note walked into the office is about is found by following `cause_event_id`.
+The events and the transitions therefore commit together: a reader never sees a story the scene has not caught up with.
+
+The projection is recomputed whole, every time, and the project's `transition` rows are replaced.
+It is not incremental on purpose.
+An ingest pass can insert an event whose time is older than events it has already written - a commit read out of a transcript, a status line dated by the shell command that wrote it - and a machine fed that event out of order would be wrong from then on.
+Recomputing also makes the table a function of the events by construction: two rebuilds of the same files produce the same rows byte for byte, ids included.
+
+The cost is one ordered read of the project's events per pass that recorded anything, which is the same read `matev2 events` does; a pass that inserted no event skips the projection entirely.
+A workspace whose event count makes that read expensive is the place to measure again, and the answer then is a projection that resumes from the oldest event the pass touched rather than from the first.
+
+## 10. Economics (schema v2, task 27)
 
 ### `pricing.yaml`
 

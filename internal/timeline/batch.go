@@ -238,6 +238,11 @@ type writer struct {
 	tx  *sql.Tx
 	ids map[string]int64
 	now time.Time
+	// insertedEvents counts the events this pass actually wrote. The scene
+	// projection reads it: a pass that found nothing new cannot have moved
+	// anybody, and recomputing the projection for it would be work nobody
+	// asked for.
+	insertedEvents int
 }
 
 func newWriter(tx *sql.Tx, now time.Time) *writer {
@@ -434,6 +439,7 @@ func (w *writer) insertEvent(ctx context.Context, e pendingEvent) error {
 			return err
 		}
 		w.ids[e.Dedup] = id
+		w.insertedEvents++
 		return nil
 	}
 	// Already recorded by an earlier pass: keep the id so this pass's rows

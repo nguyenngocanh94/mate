@@ -228,6 +228,9 @@ func (i *Ingester) ingestProject(ctx context.Context, project string, shared *sq
 	if err = p.updateCounters(ctx); err != nil {
 		return err
 	}
+	if err = p.projectScene(ctx); err != nil {
+		return err
+	}
 	if shared != nil {
 		// The caller owns the transaction and commits every project at once.
 		return nil
