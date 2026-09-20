@@ -12,6 +12,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/matev2/internal/timeline/scene"
 )
 
 // followInterval is how often `--follow` asks for events after the last id it
@@ -19,9 +20,10 @@ import (
 // is a read of an indexed integer column, not a scan.
 const followInterval = time.Second
 
-// cmdEvents is `matev2 events <project> [--follow] [--since ...] [--narrate]`
-// (docs/mvp.md task 25): the timeline as JSON lines from `v_story`, or as one
-// sentence per event.
+// cmdEvents is `matev2 events <project> [--follow] [--since ...] [--narrate]
+// [--scene]` (docs/mvp.md tasks 25 and 26): the timeline as JSON lines from
+// `v_story`, or as one sentence per event, or - with `--scene` - the office
+// itself: where everybody is standing now, and then every move.
 //
 // It is read-only and takes no lock: the console's observer is the writer,
 // and SQLite's WAL lets this read the last committed story while an ingest is
@@ -34,11 +36,12 @@ func cmdEvents(args []string, stdout, stderr io.Writer) error {
 	since := fs.String("since", "", "start after an event id, or at an RFC3339 time")
 	narrate := fs.Bool("narrate", false, "print one human sentence per event instead of JSON")
 	limit := fs.Int("limit", 0, "print at most this many events (0 means all)")
+	sceneMode := fs.Bool("scene", false, "print the office scene: where everybody is now, then every move")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
 	if fs.NArg() != 1 {
-		return newUsageError("usage: matev2 events <project> [--follow] [--since <RFC3339|event id>] [--narrate] [--limit N]")
+		return newUsageError("usage: matev2 events <project> [--follow] [--since <RFC3339|event id>] [--narrate] [--scene] [--limit N]")
 	}
 	project := fs.Arg(0)
 
@@ -62,6 +65,13 @@ func cmdEvents(args []string, stdout, stderr io.Writer) error {
 	defer handle.Close()
 
 	ctx := context.Background()
+	if *sceneMode {
+		return printScene(ctx, handle, query, sceneHistory{
+			asked:   strings.TrimSpace(*since) != "",
+			follow:  *follow,
+			narrate: *narrate,
+		}, stdout)
+	}
 	lastID, err := printEvents(ctx, handle, query, *narrate, stdout)
 	if err != nil {
 		return err
@@ -80,6 +90,101 @@ func cmdEvents(args []string, stdout, stderr io.Writer) error {
 			lastID = next
 		}
 	}
+}
+
+// printScene is `matev2 events <project> --scene` (docs/mvp.md task 26): the
+// office as the projection last left it, and then every move.
+//
+// The snapshot comes first and always, because the question a reader arrives
+// with is "who is doing what right now" and an empty stream is an answer to
+// nothing. `--since` adds the moves since a moment or an event id, and
+// `--follow` keeps printing the ones that happen next.
+func printScene(ctx context.Context, handle *db.DB, query timeline.StoryQuery,
+	how sceneHistory, stdout io.Writer) error {
+
+	now, err := scene.Now(ctx, handle.SQL(), scene.NowQuery{Project: query.Project})
+	if err != nil {
+		return err
+	}
+	for _, row := range now {
+		line := scene.NarrateNow(row)
+		if how.narrate {
+			// The captain, matev2 and the observer are in the story and not
+			// in the office: they have no scene, and a narrated snapshot
+			// that said so three times over would be noise. The JSON
+			// snapshot still carries their rows.
+			if row.State == scene.Unknown {
+				continue
+			}
+		} else if line, err = row.JSONLine(); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(stdout, line); err != nil {
+			return err
+		}
+	}
+
+	cursor, err := scene.LastID(ctx, handle.SQL(), query.Project)
+	if err != nil {
+		return err
+	}
+	if how.asked {
+		past := scene.TransitionQuery{
+			Project:      query.Project,
+			SinceEventID: query.SinceID,
+			SinceTime:    query.SinceTime,
+			Limit:        query.Limit,
+		}
+		if _, err := printTransitions(ctx, handle, past, how.narrate, stdout); err != nil {
+			return err
+		}
+	}
+	if !how.follow {
+		return nil
+	}
+	for {
+		time.Sleep(followInterval)
+		next, err := printTransitions(ctx, handle,
+			scene.TransitionQuery{Project: query.Project, AfterID: cursor}, how.narrate, stdout)
+		if err != nil {
+			return err
+		}
+		if next != "" {
+			cursor = next
+		}
+	}
+}
+
+// sceneHistory is how much of the scene `--scene` was asked for. `asked` is
+// "the reader gave a --since", whatever it parsed to: `--since 0` is a
+// request for the whole history and not for nothing.
+type sceneHistory struct {
+	asked   bool
+	follow  bool
+	narrate bool
+}
+
+func printTransitions(ctx context.Context, handle *db.DB, query scene.TransitionQuery,
+	narrate bool, stdout io.Writer) (string, error) {
+
+	rows, err := scene.Transitions(ctx, handle.SQL(), query)
+	if err != nil {
+		return "", err
+	}
+	last := ""
+	for _, row := range rows {
+		line := scene.Narrate(row)
+		if !narrate {
+			if line, err = row.JSONLine(); err != nil {
+				return last, err
+			}
+		}
+		if _, err := fmt.Fprintln(stdout, line); err != nil {
+			return last, err
+		}
+		last = row.ID
+	}
+	return last, nil
 }
 
 func printEvents(ctx context.Context, handle *db.DB, query timeline.StoryQuery,

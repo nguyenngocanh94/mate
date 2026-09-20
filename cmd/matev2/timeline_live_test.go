@@ -18,6 +18,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/matev2/internal/timeline/scene"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
 
@@ -215,6 +216,117 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 		narrated.WriteString("\n")
 	}
 	t.Logf("shop, narrated (%d events):\n%s", len(events), narrated.String())
+
+	// Task 26: the office scene the same events project onto. The claim is
+	// that a real run falls entirely inside the state machine - every event
+	// either moves somebody or is a row of the table that says it moves
+	// nobody - and that the scene reads as the story of the run.
+	assertTheSceneExplainsTheWholeRun(t, ctx, timelineDB, "shop", crewActor)
+}
+
+// assertTheSceneExplainsTheWholeRun is the live half of task 26's depth test:
+// no `unexplained` transition on a real run, the states a ship task has to
+// pass through all reached, and every wait at the CEO's door a measurable
+// stretch that ends with the crew back at its desk.
+//
+// The narrated scene it prints is what goes into
+// docs/evidence/m5-scene-2026-09-20.md.
+func assertTheSceneExplainsTheWholeRun(t *testing.T, ctx context.Context, handle *db.DB,
+	project, crewActor string) {
+	t.Helper()
+
+	rows, err := scene.Transitions(ctx, handle.SQL(), scene.TransitionQuery{Project: project})
+	if err != nil {
+		t.Fatalf("Transitions: %v", err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("the scene projection wrote no transition at all")
+	}
+
+	var unexplained []string
+	reached := map[scene.State]bool{}
+	for _, r := range rows {
+		if r.Unexplained() {
+			unexplained = append(unexplained, r.At.Format(time.RFC3339)+" "+r.ActorName+" "+r.Detail)
+			continue
+		}
+		reached[r.To] = true
+	}
+	if len(unexplained) > 0 {
+		t.Fatalf("%d event(s) of the run no edge of the scene explains:\n%s",
+			len(unexplained), strings.Join(unexplained, "\n"))
+	}
+
+	// What a ship task cannot happen without. `reviewing` and `merging` are
+	// not here: the captain reviews the diff in the Console and merges from
+	// it, and neither gesture writes a file (docs/mvp.md section 7), so the
+	// Mate's own hands stay clean in this flow.
+	for _, want := range []scene.State{
+		scene.Arriving, scene.AtDeskWorking, scene.WalkingToCEO, scene.WaitingAtCEO,
+		scene.WaitingReview, scene.Leaving, scene.Gone,
+		scene.Idle, scene.OnPhone, scene.ReceivingDigest, scene.Reading, scene.Deciding, scene.Answering,
+	} {
+		if !reached[want] {
+			t.Fatalf("nothing in the run put anybody in %s", want)
+		}
+	}
+
+	for i, r := range rows {
+		if r.To != scene.WaitingAtCEO || r.ActorID != crewActor {
+			continue
+		}
+		if r.From == scene.Asleep || r.From == scene.Blocked {
+			continue // the same wait, resumed after an incident
+		}
+		ended := time.Time{}
+		for _, next := range rows[i+1:] {
+			if next.ActorID != r.ActorID || next.To == scene.WaitingAtCEO ||
+				next.To == scene.Asleep || next.To == scene.Blocked {
+				continue
+			}
+			if next.To != scene.AtDeskWorking {
+				t.Fatalf("the wait that began at %s ended in %s, not at the crew's desk",
+					r.At.Format(time.RFC3339), next.To)
+			}
+			ended = next.At
+			break
+		}
+		if ended.IsZero() || !ended.After(r.At) {
+			t.Fatalf("the wait that began at %s never ended at the desk", r.At.Format(time.RFC3339))
+		}
+		t.Logf("%s waited %s at the CEO's door", r.ActorName, ended.Sub(r.At).Round(time.Millisecond))
+	}
+
+	var scenery strings.Builder
+	for _, r := range rows {
+		scenery.WriteString(scene.NarrateIn(r, time.Local))
+		scenery.WriteString("\n")
+	}
+	now, err := scene.Now(ctx, handle.SQL(), scene.NowQuery{Project: project})
+	if err != nil {
+		t.Fatalf("Now: %v", err)
+	}
+	for _, n := range now {
+		if n.State == scene.Unknown {
+			continue
+		}
+		scenery.WriteString(scene.NarrateNow(n))
+		scenery.WriteString("\n")
+	}
+	t.Logf("shop, the scene (%d transition(s)):\n%s", len(rows), scenery.String())
+
+	// And the same scene as the JSON lines `matev2 events shop --scene`
+	// prints, because that is the surface a dashboard reads.
+	var lines strings.Builder
+	for _, n := range now {
+		line, err := n.JSONLine()
+		if err != nil {
+			t.Fatalf("snapshot line: %v", err)
+		}
+		lines.WriteString(line)
+		lines.WriteString("\n")
+	}
+	t.Logf("shop, v_now:\n%s", lines.String())
 }
 
 // waitForTimelineEvent waits for the observer's next passes to record a kind.

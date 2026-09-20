@@ -39,8 +39,13 @@ func eventsWorkspace(t *testing.T) *store.Workspace {
 	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
 		t.Fatalf("AppendStatus: %v", err)
 	}
+	// Two seconds after the status line, which AppendStatus dates by the
+	// file's mtime: an answer typed in the same second as the question reads
+	// as older than it, and a story in which the answer comes first is not
+	// the story that happened.
 	if err := w.AppendSent("shop", store.SentEntry{
-		Time: time.Now(), Source: store.SourceMate, Target: store.CrewTarget("k3"), Text: "A",
+		Time: time.Now().Add(2 * time.Second), Source: store.SourceMate,
+		Target: store.CrewTarget("k3"), Text: "A",
 	}); err != nil {
 		t.Fatalf("AppendSent: %v", err)
 	}
