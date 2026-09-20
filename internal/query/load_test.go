@@ -277,6 +277,65 @@ func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 	}
 }
 
+// Load reads only `.matev2/`'s flat files; token usage lives in the derived
+// `.matev2/matev2.db` (mvp.md M5 task 27), so both the Mate and a Crew must
+// come back with Tokens Absent, exactly the way Health does - the Console's
+// wiring fills it in afterwards, never this package.
+func TestLoadLeavesTokensAbsent(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	if err := ws.WriteMateMeta("shop", map[string]string{"harness": "claude"}); err != nil {
+		t.Fatalf("write mate meta: %v", err)
+	}
+	if err := ws.WriteCrewMeta("shop", "k3", map[string]string{"state": "spawned"}); err != nil {
+		t.Fatalf("write crew meta: %v", err)
+	}
+
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	p := snap.Projects[0]
+	if p.Mate.Tokens.State != Absent {
+		t.Fatalf("Mate.Tokens.State = %v, want Absent", p.Mate.Tokens.State)
+	}
+	if len(p.Crews) != 1 || p.Crews[0].Tokens.State != Absent {
+		t.Fatalf("Crew.Tokens.State = %+v, want Absent", p.Crews)
+	}
+}
+
+// TestLoadDoesNotBlockOnABudgetIncident: decision 2026-09-20 (mvp.md section
+// 4b) - a `budget` incident is real and stays in the box, but it must not
+// displace a crew's own declared state the way `stale`/`runtime_lost` do.
+func TestLoadDoesNotBlockOnABudgetIncident(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{"state": "spawned"}); err != nil {
+		t.Fatalf("write crew meta: %v", err)
+	}
+	if err := ws.AppendStatus("shop", "k9", "working: burning through the task"); err != nil {
+		t.Fatalf("append status: %v", err)
+	}
+	if err := ws.AppendIncident("shop", store.IncidentEntry{
+		Time: time.Now(), Crew: "k9", Kind: "budget", State: store.IncidentOpen,
+		Text: "620,000 tokens of 500,000 tokens",
+	}); err != nil {
+		t.Fatalf("AppendIncident: %v", err)
+	}
+
+	snap, err := Load(context.Background(), ws)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var got CrewStatus
+	for _, c := range snap.Projects[0].Crews {
+		if c.CrewID == "k9" {
+			got = c.Status
+		}
+	}
+	if got != CrewWorking {
+		t.Fatalf("k9 status = %q with only a budget incident open, want %q (never blocked)", got, CrewWorking)
+	}
+}
+
 // TestCrewStateOfBlocksOnAnOpenIncident: `blocked` is the observer's state
 // and the only way in is an unresolved incident, which outranks the crew's
 // own last verb but never a terminal meta state (mvp.md section 4b).

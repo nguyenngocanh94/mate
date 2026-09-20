@@ -445,7 +445,10 @@ Everything between that count and `status files under` is one or more items, eac
 <crew> needs-decision: "<text the Crew wrote, at most 120 runes, runs of whitespace collapsed to one space, any " turned into '>"
 <crew> blocked: <incident kind>, quiet for <duration>
 <crew> wait-mate: "<text the Crew wrote, the same truncation rule as needs-decision>"
+<crew> over budget: <total> of <limit>
 ```
+
+The fourth shape is a `budget` incident (project.yaml's `budget:` block crossed): it is a fact about spend, not a state change, so it never means the Crew is `blocked` - just mention it in your summary to the captain and keep going.
 
 A line lists at most 5 items; past that it ends the list with `· +N more`, and `N` plus the 5 shown always add up to `<k>` - do not assume 5 items is the whole story just because no `+N more` was appended.
 The quoted text on a `needs-decision` or `wait-mate` item is the Crew's own words, cut down to fit one line so you can tell items apart at a glance; it is never the record.

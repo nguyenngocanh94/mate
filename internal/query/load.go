@@ -158,6 +158,7 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 		}),
 		LastEvent: AbsentField[EventValue]("matev2 records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
+		Tokens:    AbsentField[TokenValue](noTimeline),
 	}
 	if agent := meta["agent"]; agent != "" {
 		out.AgentName = KnownField(agent)
@@ -190,6 +191,7 @@ func absentMate(why string) MateNode {
 		Binding:    AbsentField[BindingValue](why),
 		LastEvent:  AbsentField[EventValue](why),
 		Error:      AbsentField[ErrorReason](notAnErrorState),
+		Tokens:     AbsentField[TokenValue](why),
 	}
 }
 
@@ -200,6 +202,7 @@ func unknownMate(reason string, w *warnings, row RowRef) MateNode {
 		Binding:    UnknownField[BindingValue](reason),
 		LastEvent:  UnknownField[EventValue](reason),
 		Error:      UnknownField[ErrorReason](reason),
+		Tokens:     AbsentField[TokenValue](noTimeline),
 	}
 }
 
@@ -210,6 +213,14 @@ const notAnErrorState = "the recorded status is not an error state"
 // one-shot CLI read never has one, and a console that has just opened has
 // not polled yet.
 const noObserver = "no observer has looked at this crew yet"
+
+// noTimeline is why a Crew or Mate row carries no token usage: this
+// package reads only `.matev2/`'s flat files, and the ledger lives in the
+// derived `.matev2/matev2.db` (mvp.md M5 task 27). A one-shot CLI read that
+// never opens that database, or a console that has not read it yet, keeps
+// this reason rather than a zero total that would render as "no tokens
+// spent".
+const noTimeline = "no timeline database has been read for this row yet"
 
 // loadCrews lists `crews/*.meta` and reads each one, resolving the Crew's
 // state through CrewStateOf - the one ordering of mvp.md section 4b.
@@ -280,6 +291,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		// health, and says so - the Console's wiring fills this in from
 		// internal/watch when one is running (CrewNode.Health).
 		Health: AbsentField[CrewHealth](noObserver),
+		Tokens: AbsentField[TokenValue](noTimeline),
 	}
 	if viewOK {
 		c.LastEvent = lastActivity(view.ByCrew[id], "no status line or message for this crew yet")
@@ -336,7 +348,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		}, "recorded in crews/"+id+".meta; this does not prove the agent is alive")
 	}
 
-	openIncident := viewOK && len(box.OpenIncidents(view, id)) > 0
+	openIncident := viewOK && len(box.BlockingIncidents(view, id)) > 0
 	c.Status = CrewStateOf(meta, openIncident, lastStatusVerb(ws, project, id, w, row))
 	c.Closed = c.Status.Closed()
 	return c

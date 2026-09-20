@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/matev2/internal/timeline"
 )
 
 // TestStateOfCrewGathersTheInputs exercises stateOfCrew - the CLI's
@@ -116,6 +118,35 @@ func TestStateOfCrewWithNoMetaAtAll(t *testing.T) {
 	var oerr *observability.Error
 	if !errors.As(err, &oerr) || oerr.Code != observability.CodeNotFound {
 		t.Fatalf("err = %v, want a not-found refusal", err)
+	}
+}
+
+// tokensSuffix (mvp.md M5 task 27): empty with no database at all, and
+// " · tokens: … · ctx: …%" once the ledger has a row for the crew.
+func TestTokensSuffix(t *testing.T) {
+	w := liveCrewWorkspace(t, "shop")
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"state": "spawned"}); err != nil {
+		t.Fatalf("WriteCrewMeta: %v", err)
+	}
+	if got := tokensSuffix(w, "shop", "k3"); got != "" {
+		t.Fatalf("tokensSuffix with no database = %q, want empty", got)
+	}
+
+	handle, err := db.Open(w)
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	defer handle.Close()
+	actorID := timeline.CrewActorID("shop", "k3")
+	seedActorTurnAndPricing(t, handle, actorID, "shop", "crew", "test-model", 90_000, 6_000, 0, 300, 100_000)
+
+	if got := tokensSuffix(w, "shop", "k3"); got != " · tokens: 96.3k · ctx: 96%" {
+		t.Fatalf("tokensSuffix = %q, want tokens and ctx", got)
+	}
+
+	// A crew nothing has been recorded for yet has no row in the ledger.
+	if got := tokensSuffix(w, "shop", "k9"); got != "" {
+		t.Fatalf("tokensSuffix for an unrecorded crew = %q, want empty", got)
 	}
 }
 

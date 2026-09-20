@@ -4,7 +4,7 @@ package db
 // same number docs/timeline.md prints at the top of its schema section; a
 // reader that finds a different one in `schema_version` is reading a file
 // this build does not understand.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // migration is one ordered, all-or-nothing step. Each runs inside the same
 // transaction that records its version, so a half-applied schema cannot
@@ -19,6 +19,7 @@ type migration struct {
 // with the next version.
 var migrations = []migration{
 	{version: 1, stmts: schema1},
+	{version: 2, stmts: schema2},
 }
 
 // schema1 is the M5 schema of docs/mvp.md. Times are RFC3339 with nanosecond
@@ -316,10 +317,105 @@ var schema1 = []string{
 		              ORDER BY x.at DESC, x.id DESC LIMIT 1)`,
 }
 
+// schema2 is task 27's economics migration (mvp.md M5 task 27,
+// docs/timeline.md's Economics section): a context window per model, and
+// the two views recreated with the columns that need it.
+//
+// A view is not data - dropping and recreating one changes no row - so this
+// migration is free to give `v_task_ledger` a richer shape outright. `v_now`
+// gets exactly one column added at the end, `context_pct`: task 26 owns
+// `state`/`since`/`target_actor_id`/`detail` and reads them by name, so
+// every one of those keeps its old position and its old SQL untouched here.
+var schema2 = []string{
+	`ALTER TABLE pricing ADD COLUMN context_window INTEGER NOT NULL DEFAULT 0`,
+
+	`DROP VIEW v_task_ledger`,
+
+	// v_task_ledger, plus: the model and context size of the crew's most
+	// recent turn, and the resulting context_pct - NULL when either the
+	// crew has no turn yet or that turn's model has no context_window
+	// priced. cost keeps the meaning docs/timeline.md already gives it:
+	// NULL until pricing has a row for every turn's model, never zero.
+	`CREATE VIEW v_task_ledger AS
+		SELECT
+			t.crew_actor_id   AS crew_actor_id,
+			t.project         AS project,
+			a.name            AS crew,
+			t.text            AS text,
+			t.branch          AS branch,
+			t.spawned_at      AS spawned_at,
+			t.closed_at       AS closed_at,
+			t.close_state     AS close_state,
+			t.question_count  AS question_count,
+			t.handback_count  AS handback_count,
+			(SELECT COUNT(*) FROM turn u WHERE u.actor_id = t.crew_actor_id) AS turns,
+			(SELECT COALESCE(SUM(u.input_tokens),0)       FROM turn u WHERE u.actor_id = t.crew_actor_id) AS input_tokens,
+			(SELECT COALESCE(SUM(u.cache_read_tokens),0)  FROM turn u WHERE u.actor_id = t.crew_actor_id) AS cache_read_tokens,
+			(SELECT COALESCE(SUM(u.cache_write_tokens),0) FROM turn u WHERE u.actor_id = t.crew_actor_id) AS cache_write_tokens,
+			(SELECT COALESCE(SUM(u.output_tokens),0)      FROM turn u WHERE u.actor_id = t.crew_actor_id) AS output_tokens,
+			(SELECT COALESCE(SUM(u.thinking_tokens),0)    FROM turn u WHERE u.actor_id = t.crew_actor_id) AS thinking_tokens,
+			(SELECT u.context_tokens_after FROM turn u WHERE u.actor_id = t.crew_actor_id
+			  ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1) AS context_tokens_last,
+			(SELECT u.model FROM turn u WHERE u.actor_id = t.crew_actor_id
+			  ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1) AS last_model,
+			(SELECT p.context_window FROM turn u JOIN pricing p ON p.model = u.model
+			  WHERE u.actor_id = t.crew_actor_id
+			  ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1) AS context_window,
+			(SELECT CASE WHEN p.context_window > 0
+			         THEN 100.0 * u.context_tokens_after / p.context_window
+			         ELSE NULL END
+			   FROM turn u JOIN pricing p ON p.model = u.model
+			  WHERE u.actor_id = t.crew_actor_id
+			  ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1) AS context_pct,
+			(SELECT COALESCE(SUM(q.waited_ms),0) FROM question q WHERE q.crew_actor_id = t.crew_actor_id) AS waited_ms,
+			(SELECT SUM(
+				u.input_tokens       * COALESCE(p.input_per_m, 0) / 1000000.0 +
+				u.cache_read_tokens  * COALESCE(p.cache_read_per_m, 0) / 1000000.0 +
+				u.cache_write_tokens * COALESCE(p.cache_write_per_m, 0) / 1000000.0 +
+				u.output_tokens      * COALESCE(p.output_per_m, 0) / 1000000.0)
+			  FROM turn u JOIN pricing p ON p.model = u.model
+			  WHERE u.actor_id = t.crew_actor_id
+			    AND (p.input_per_m > 0 OR p.cache_read_per_m > 0 OR p.cache_write_per_m > 0 OR p.output_per_m > 0)
+			 ) AS cost,
+			(SELECT e.at FROM event e WHERE e.id = t.merged_event_id) AS merged_at
+		FROM task t
+		JOIN actor a ON a.id = t.crew_actor_id`,
+
+	`DROP VIEW v_now`,
+
+	// v_now, unchanged except for one column appended at the end:
+	// context_pct, the same computation v_task_ledger now does, over
+	// whichever actor's most recent turn this row is (Mate or crew alike).
+	`CREATE VIEW v_now AS
+		SELECT
+			a.id      AS actor_id,
+			a.kind    AS actor_kind,
+			a.name    AS actor_name,
+			a.project AS project,
+			r.to_state        AS state,
+			r.at              AS since,
+			r.target_actor_id AS target_actor_id,
+			r.detail          AS detail,
+			(SELECT COALESCE(SUM(u.input_tokens + u.cache_read_tokens + u.cache_write_tokens + u.output_tokens), 0)
+			   FROM turn u
+			  WHERE u.actor_id = a.id
+			    AND substr(u.started_at, 1, 10) = strftime('%Y-%m-%d', 'now')) AS tokens_today,
+			(SELECT CASE WHEN p.context_window > 0
+			         THEN 100.0 * u.context_tokens_after / p.context_window
+			         ELSE NULL END
+			   FROM turn u JOIN pricing p ON p.model = u.model
+			  WHERE u.actor_id = a.id
+			  ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1) AS context_pct
+		FROM actor a
+		LEFT JOIN transition r
+		  ON r.id = (SELECT x.id FROM transition x WHERE x.actor_id = a.id
+		              ORDER BY x.at DESC, x.id DESC LIMIT 1)`,
+}
+
 // derivedTables are every table `matev2 reindex` empties before rebuilding.
 // `schema_version` is not one of them: the schema is not derived from the
 // files, it is what the files are read into.
 var derivedTables = []string{
 	"transition", "usage_sample", "incident", "question", "message",
-	"action", "turn", "event", "task", "session", "actor", "cursor",
+	"action", "turn", "event", "task", "session", "actor", "cursor", "pricing",
 }

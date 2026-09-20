@@ -17,12 +17,13 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project add", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: matev2 project add <name> <repo-path> [--workspace <dir>] [--default-branch <branch>] [--mode local-only] [--yolo]")
+		fmt.Fprintln(stderr, "usage: matev2 project add <name> <repo-path> [--workspace <dir>] [--default-branch <branch>] [--mode local-only] [--yolo] [--budget-usd <amount>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	defaultBranchFlag := fs.String("default-branch", "", "override the detected default branch")
 	modeFlag := fs.String("mode", store.ModeLocalOnly, "project mode (only local-only is supported)")
 	yoloFlag := fs.Bool("yolo", false, "let Mate merge without asking the user")
+	budgetUSDFlag := fs.Float64("budget-usd", 0, "open a budget incident once this project's total cost crosses this amount; hand-edit project.yaml for crew_tokens/crew_usd")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -76,6 +77,9 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 		DefaultBranch: branch,
 		Mode:          *modeFlag,
 		Yolo:          *yoloFlag,
+	}
+	if *budgetUSDFlag > 0 {
+		cfg.Budget = &store.BudgetConfig{ProjectUSD: *budgetUSDFlag}
 	}
 	if err := w.AddProject(name, cfg); err != nil {
 		return fmt.Errorf("project add %s: %w", name, err)

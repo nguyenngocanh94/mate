@@ -25,6 +25,36 @@ type ProjectConfig struct {
 	Mode string `yaml:"mode"`
 	// Yolo lets Mate merge without asking the user.
 	Yolo bool `yaml:"yolo"`
+	// Budget is the optional token/cost ceiling mvp.md M5 task 27 checks at
+	// the end of every observer poll. A nil Budget (the field absent from
+	// project.yaml) means no limit is configured, not a limit of zero:
+	// BudgetConfig's own fields carry that same "unset means no limit"
+	// convention one level down.
+	Budget *BudgetConfig `yaml:"budget,omitempty"`
+}
+
+// BudgetConfig is `project.yaml`'s `budget:` block. Every field is optional
+// and a zero value means "no limit on this dimension" - hand-editing the
+// file to add one line is the whole interface for the MVP; `project add
+// --budget-usd` is the one flag that also writes it, for the caller who
+// wants a project-wide ceiling at creation time.
+//
+// Crossing a limit opens an incident (`budget`, mvp.md section 4b) on the
+// crew (for the two crew-scoped fields) or on the project's Mate (for
+// ProjectUSD); per the 2026-09-20 decision it never makes a crew `blocked`
+// and it is never resolved, because going over budget is a fact about the
+// task's past spend, not a condition that clears.
+type BudgetConfig struct {
+	// CrewTokens is the total token ceiling (all four buckets summed) for
+	// one crew's whole task.
+	CrewTokens int64 `yaml:"crew_tokens,omitempty"`
+	// CrewUSD is the cost ceiling for one crew's whole task, using
+	// `pricing.yaml`. A crew whose model has no price never crosses this,
+	// because its cost is unknown rather than zero.
+	CrewUSD float64 `yaml:"crew_usd,omitempty"`
+	// ProjectUSD is the cost ceiling across every crew this project has
+	// ever spawned, checked against the Mate rather than any one crew.
+	ProjectUSD float64 `yaml:"project_usd,omitempty"`
 }
 
 // AddProject registers a project: it normalises the repository path, creates

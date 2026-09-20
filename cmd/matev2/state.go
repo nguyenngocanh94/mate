@@ -2,17 +2,21 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"io"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/matev2/internal/timeline"
 )
 
 // cmdState implements `matev2 state <project> <crew>` (docs/mvp.md task 13,
@@ -48,8 +52,45 @@ func cmdState(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(stdout, result.Line())
+	fmt.Fprint(stdout, result.Line())
+	fmt.Fprint(stdout, tokensSuffix(w, fs.Arg(0), fs.Arg(1)))
+	fmt.Fprintln(stdout)
 	return nil
+}
+
+// tokensSuffix is `matev2 state`'s own addition to crewstate.Result.Line()
+// (mvp.md M5 task 27): " · tokens: 96k" and, once the crew's most recent
+// turn has a priced context window, " · ctx: 62%". It lives here rather
+// than in internal/crewstate because that package is a deliberate leaf that
+// imports nothing else in this module (internal/crewstate/state.go's own
+// doc comment) - the ledger is this command's business, not the state
+// machine's.
+//
+// No database yet, or no ledger row for this crew, renders as nothing at
+// all: `matev2 state` printed a state before M5 existed, and a workspace
+// that has not opened a console yet must keep printing exactly that.
+func tokensSuffix(w *store.Workspace, project, crew string) string {
+	handle, err := db.OpenRead(w)
+	if err != nil {
+		return ""
+	}
+	defer handle.Close()
+
+	var total int64
+	var contextPct sql.NullFloat64
+	err = handle.SQL().QueryRow(`
+		SELECT COALESCE(input_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)+COALESCE(output_tokens,0),
+		       context_pct
+		  FROM v_task_ledger WHERE crew_actor_id = ?`, timeline.CrewActorID(project, crew)).
+		Scan(&total, &contextPct)
+	if err != nil {
+		return ""
+	}
+	out := " · tokens: " + query.HumanizeTokens(total)
+	if contextPct.Valid {
+		out += fmt.Sprintf(" · ctx: %.0f%%", contextPct.Float64)
+	}
+	return out
 }
 
 // stateOfCrew is state's core, kept separate from flag parsing so a test can
@@ -125,16 +166,17 @@ func composerReading(state send.ComposerState) crewstate.Composer {
 }
 
 // crewHasOpenIncident asks the merged box view whether the observer has an
-// unresolved finding for this crew - the one thing that makes a crew
-// `blocked` (mvp.md section 4b). A box that cannot be read is reported as
-// no incident: `blocked` is a claim, and a failed read has not established
-// it.
+// unresolved *blocking* finding for this crew - `stale` or `runtime_lost`,
+// the two kinds that make a crew `blocked` (mvp.md section 4b; `budget` is
+// excluded by decision 2026-09-20, box.BlockingIncidents). A box that cannot
+// be read is reported as no incident: `blocked` is a claim, and a failed
+// read has not established it.
 func crewHasOpenIncident(w *store.Workspace, project, crew string) bool {
 	view, err := box.Load(w, project)
 	if err != nil {
 		return false
 	}
-	return len(box.OpenIncidents(view, crew)) > 0
+	return len(box.BlockingIncidents(view, crew)) > 0
 }
 
 // lastCrewVerb is the verb of the crew's last recognised status line, ""

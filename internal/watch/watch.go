@@ -81,6 +81,20 @@ type Ingest interface {
 	Ingest(ctx context.Context) error
 }
 
+// BudgetChecker is mvp.md M5 task 27's budget check
+// (internal/timeline.Ingester.CheckBudgets): at the end of a poll, for every
+// project with a `budget:` block in project.yaml, it opens a `budget`
+// incident on whichever crew (or the project) has crossed a limit.
+//
+// It is a seam for the same reason Ingest is: this package must not import
+// internal/db or parse project.yaml's price arithmetic itself, and a
+// Watcher with none (every test and every build that predates M5) simply
+// checks no budgets, which is the honest behaviour for a workspace with no
+// timeline database.
+type BudgetChecker interface {
+	CheckBudgets(ctx context.Context) error
+}
+
 // Deps are the observer's collaborators. Runtime and Handle are required;
 // everything else has a default.
 type Deps struct {
@@ -92,6 +106,11 @@ type Deps struct {
 	// means no timeline is kept, which is a workspace opened by a build that
 	// has none and not an error.
 	Timeline Ingest
+	// Budget checks every project's `budget:` block against the ledger
+	// Timeline just wrote, at the end of every poll. Nil means no budgets
+	// are checked, the honest behaviour when there is no timeline database
+	// to check them against.
+	Budget BudgetChecker
 	// PollInterval is the pause between rounds; zero means
 	// DefaultPollInterval.
 	PollInterval time.Duration
@@ -279,6 +298,14 @@ func (w *Watcher) Poll(ctx context.Context) error {
 	if w.deps.Timeline != nil {
 		if err := w.deps.Timeline.Ingest(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("watch: record the timeline: %w", err))
+		}
+	}
+	// The budget check reads the ledger the ingest above just wrote, so it
+	// has to run after it: a crossing this poll's turns caused must already
+	// be in the database before anything can check it against a limit.
+	if w.deps.Budget != nil {
+		if err := w.deps.Budget.CheckBudgets(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("watch: check budgets: %w", err))
 		}
 	}
 	return errors.Join(errs...)

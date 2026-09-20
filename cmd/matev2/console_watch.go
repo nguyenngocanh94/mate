@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"sort"
 
@@ -85,6 +86,11 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 		Runtime:  deps.Runtime,
 		Handle:   consoleCrewHandle(ws, deps),
 		Timeline: ingest,
+		// The same *timeline.Ingester also implements watch.BudgetChecker
+		// (mvp.md M5 task 27): it already holds the writable db.DB and the
+		// workspace handle a budget check needs, and it is the same single
+		// writer the rest of M5 keeps to one.
+		Budget: ingest,
 	})
 	return watcher, handle, nil
 }
@@ -196,6 +202,87 @@ func healthReadings(snapshot map[watch.CrewRef]watch.Health) []timeline.HealthRe
 		return out[i].Crew < out[j].Crew
 	})
 	return out
+}
+
+// withTokens puts each row's token usage into a snapshot query.Load built
+// out of files alone (mvp.md M5 task 27): it opens `.matev2/matev2.db`
+// read-only - the console never needs the writer's lock to read a ledger
+// the observer already committed - and fills CrewNode.Tokens from
+// `v_task_ledger` and MateNode.Tokens from `v_now`.
+//
+// A workspace with no database yet (no console has ever ingested it) is not
+// an error: every row simply keeps the Absent Load already gave it, the
+// same as a Crew health's snapshot pattern of Console.withCrewHealth.
+func withTokens(snap query.Snapshot, ws *store.Workspace) query.Snapshot {
+	handle, err := db.OpenRead(ws)
+	if err != nil {
+		return snap
+	}
+	defer handle.Close()
+
+	for p := range snap.Projects {
+		project := &snap.Projects[p]
+		if tok, ok := mateTokens(handle, project.ProjectID); ok {
+			project.Mate.Tokens = query.KnownField(tok)
+		}
+		for c := range project.Crews {
+			crew := &project.Crews[c]
+			if tok, ok := crewTokens(handle, project.ProjectID, crew.CrewID); ok {
+				crew.Tokens = query.KnownField(tok)
+			}
+		}
+	}
+	return snap
+}
+
+// crewTokens reads one crew's row of `v_task_ledger`. No row (the crew has
+// no turn recorded yet, or the timeline has not ingested it) reports ok=
+// false, which leaves the Absent field Load gave it rather than a Known
+// zero that would render as "no tokens spent".
+func crewTokens(handle *db.DB, project, crew string) (query.TokenValue, bool) {
+	actorID := timeline.CrewActorID(project, crew)
+	var total int64
+	var cost, contextPct sql.NullFloat64
+	err := handle.SQL().QueryRow(`
+		SELECT COALESCE(input_tokens,0)+COALESCE(cache_read_tokens,0)+COALESCE(cache_write_tokens,0)+COALESCE(output_tokens,0),
+		       cost, context_pct
+		  FROM v_task_ledger WHERE crew_actor_id = ?`, actorID).Scan(&total, &cost, &contextPct)
+	if err != nil {
+		return query.TokenValue{}, false
+	}
+	return tokenValue(total, cost, contextPct), true
+}
+
+// mateTokens reads the Mate's row of `v_now`: tokens_today and
+// context_pct. There is no per-task ledger for a Mate - its turns belong to
+// the project rather than to any one task (docs/timeline.md) - so "today"
+// is the best whole-task-shaped number `v_now` offers, and cost is left nil
+// rather than approximated from it: a day boundary is not a task boundary,
+// and a wrong-looking dollar figure is worse than none.
+func mateTokens(handle *db.DB, project string) (query.TokenValue, bool) {
+	actorID := timeline.MateActorID(project)
+	var total int64
+	var contextPct sql.NullFloat64
+	err := handle.SQL().QueryRow(`
+		SELECT COALESCE(tokens_today,0), context_pct FROM v_now WHERE actor_id = ?`,
+		actorID).Scan(&total, &contextPct)
+	if err != nil {
+		return query.TokenValue{}, false
+	}
+	return tokenValue(total, sql.NullFloat64{}, contextPct), true
+}
+
+func tokenValue(total int64, cost, contextPct sql.NullFloat64) query.TokenValue {
+	v := query.TokenValue{Total: total}
+	if cost.Valid {
+		c := cost.Float64
+		v.Cost = &c
+	}
+	if contextPct.Valid {
+		p := contextPct.Float64
+		v.ContextPct = &p
+	}
+	return v
 }
 
 func composerWord(state send.ComposerState) crewstate.Composer {
