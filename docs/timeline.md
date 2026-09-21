@@ -327,6 +327,8 @@ Cost is `NULL` until then, because a missing price is not a price of zero.
 Its scene columns read `transition`, which the scene projection of section 9 writes on every pass that recorded anything.
 An actor with no transition at all reads `NULL` in all four, which is the honest answer for "this actor is in no scene": the captain, matev2 and the observer are in the story and not in the office.
 
+`docs/dashboard.md` is the JSON contract of the read-only HTTP API over these three views (`matev2 dashboard`, docs/mvp.md M6), including the five places it has to query a table directly because no view carries the field.
+
 ## 8. Known costs
 
 A transcript is re-read whole on every pass rather than tailed from `cursor`.

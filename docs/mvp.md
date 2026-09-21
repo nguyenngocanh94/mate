@@ -512,13 +512,13 @@ Ba tầng, mỗi tầng một trang:
 2. Project: Mate ở trên (trạng thái, turn gần nhất, token và context %), rồi bảng task (mọi crew, mở và đã đóng, lọc theo trạng thái): id, task, trạng thái, tuổi, token tổng, chi phí, số câu hỏi, thời gian chờ, branch. Inbox đang chờ hiển thị bên cạnh, chỉ đọc.
 3. Task: đầu trang là ledger của task (token bốn loại, chi phí, số turn, số tool call, thời gian spawn→đóng); dưới là timeline các turn theo thứ tự, mỗi turn mở ra được: trigger, thời lượng, token, danh sách tool call với target và thời lượng, dòng status crew ghi trong turn, câu hỏi và câu trả lời nối theo `cause`. Cuối trang là diff của branch nếu còn.
 
-Kỹ thuật: `matev2 dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open]`, HTTP local, UI tĩnh nhúng vào binary (HTML + JS thuần, không build step, không CDN), JSON API đọc từ `matev2.db` qua `db.OpenRead` và các view, `GET /api/events?since=<id>` long-poll hoặc SSE để trang tự cập nhật trong 2 giây, không cần bấm refresh.
+Kỹ thuật: `matev2 dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open]`, HTTP local, hợp đồng API đầy đủ ở `docs/dashboard.md`, UI tĩnh nhúng vào binary (HTML + JS thuần, không build step, không CDN), JSON API đọc từ `matev2.db` qua `db.OpenRead` và các view, `GET /api/events?since=<id>` long-poll hoặc SSE để trang tự cập nhật trong 2 giây, không cần bấm refresh.
 Chỉ đọc: không có nút nào ghi vào workspace; hành động vẫn ở console TUI.
 Mọi số trên trang truy ngược được: mỗi turn và action có link `ref` tới đường dẫn và offset transcript, hiện khi rê chuột.
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 28 | `internal/dashboard`: server, JSON API (`/api/workspace`, `/api/projects/<p>`, `/api/projects/<p>/tasks/<crew>`, `/api/projects/<p>/tasks/<crew>/turns/<id>`, `/api/events?since=`), đọc từ DB qua view, cache theo `event.id` cuối. `matev2 dashboard`. | Unit trên fixture db: mọi endpoint trả đúng số từ `v_task_ledger`/`v_now`/`v_story`; live: chạy acceptance rồi so API với `matev2 usage`. |
+| 28 | `internal/dashboard`: server, JSON API (`/api/workspace`, `/api/projects/<p>`, `/api/projects/<p>/tasks/<crew>`, `/api/projects/<p>/tasks/<crew>/turns/<id>`, `/api/projects/<p>/tasks/<crew>/diff`, `/api/events?since=&wait=`), đọc từ DB qua view, cache theo `event.id` cuối, từ chối bind không loopback trừ khi `--allow-remote`. `matev2 dashboard`. | Unit trên fixture db: mọi endpoint trả đúng số từ `v_task_ledger`/`v_now`/`v_story`; live: chạy acceptance rồi so API với `matev2 usage`. Đã xong 2026-09-21, live `TestLiveDashboardMatchesUsage` (104s): crew `rd1` API total 143896 == dòng `matev2 usage shop` `18.6k/124.2k/1.1k/143.9k`, `/api/events?since=0` 46 event == story 46. Hợp đồng API ở `docs/dashboard.md` (task 29 dựng UI theo tài liệu đó). |
 | 29 | UI ba tầng nhúng, tự cập nhật qua `/api/events`, lọc trạng thái, mở rộng turn, link ref, sáng/tối theo hệ. | Screenshot ba tầng trên workspace thật (Playwright) trong `docs/evidence/`; không request nào ra ngoài localhost. |
 
 Sau M6: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.

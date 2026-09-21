@@ -1,0 +1,389 @@
+# Dashboard
+
+This is the contract of `matev2 dashboard` and of `internal/dashboard` (docs/mvp.md M6, tasks 28 and 29).
+Task 28 owns the server and this document; task 29 builds the three-tier UI against it.
+
+The dashboard is read-only and local.
+It opens `.matev2/matev2.db` with `db.OpenRead`, which takes no lock, so it runs beside an open console rather than instead of it.
+There is no endpoint that writes: every action stays in the console TUI, which is where a reader who can act already is.
+
+```
+matev2 dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open] [--allow-remote]
+```
+
+`--addr` must be a loopback address unless `--allow-remote` is passed.
+A workspace's timeline quotes every line the captain typed and names every path a crew touched, so putting it on a routable address has to be a decision rather than a default.
+`--open` runs the platform opener (`open`, `xdg-open`, `rundll32`) on the URL; a machine with none of them says so and keeps serving.
+The server prints its URL and runs until Ctrl+C.
+
+## 1. Conventions
+
+Every response carries two fields before anything else.
+
+```json
+{"generated_at": "2026-09-19T10:47:00.000000000Z", "last_event_id": 412}
+```
+
+`last_event_id` is `MAX(event.id)` over the whole workspace: the one freshness signal this database has, because the ingest only ever appends.
+It is the number to hand back to `/api/events?since=`, so a page always polls from the exact id the data it is showing was computed at.
+
+`generated_at` is when the snapshot behind the bytes was computed, not when they were served.
+Responses are cached per `last_event_id`: while the id stands still every endpoint returns the bytes it already built, and when it moves every cached answer is dropped at once.
+A repeated request therefore repeats `generated_at` too, which is the honest reading - nothing in it has changed since.
+
+A timestamp is the database's own string: RFC3339 with nanoseconds, in UTC (`db.TimeFormat`).
+It is passed through and never reformatted, so a value on the page and a row in the database compare byte for byte.
+
+A nullable number is `null`, never `0`.
+A cost with no `pricing` row and a context percentage with no known context window are unknown, and docs/timeline.md's "a missing price is not a price of zero" is the same rule `matev2 usage` prints as `?`.
+
+Token buckets are always this object.
+
+```json
+{"input": 32, "cache_read": 57690, "cache_write": 739, "output": 911, "thinking": 73, "total": 59372}
+```
+
+`total` is `input + cache_read + cache_write + output` and excludes `thinking`, which is exactly what `matev2 usage`'s TOTAL column and `v_now.tokens_today` sum.
+
+A `ref` is a transcript locator - the file a fact was read out of and the byte offset inside it - and it is what makes every number on the page traceable back to the harness's own record.
+
+```json
+{"path": "/Users/x/.codex/sessions/2026/09/19/rollout-01a0b944.jsonl", "offset": 18422}
+```
+
+Errors are JSON with the same envelope.
+An unknown project or crew is `404` and the reason names what was missing and what there is instead.
+
+```json
+{"generated_at": "…", "last_event_id": 412, "error": "no project \"nosuch\" in this workspace; it has shop, site"}
+```
+
+There is no `Access-Control-Allow-Origin` header of any kind.
+The only page that reads this API is the one this server serves.
+
+## 2. `GET /api/workspace`
+
+Tier 1: one card per registered project.
+
+`mate.harness` and `mate.running` come from the `actor` row (`harness`, `first_seen`, `gone_at`), which `v_now` has no column for; running means started and not stopped.
+`mate.state`, `mate.since`, `mate.tokens_today` and `mate.context_pct` are `v_now`.
+`crews_by_state` counts this project's crew actors by their `v_now` scene state, and a crew no projection has placed counts under `"unknown"` rather than being dropped.
+`inbox_waiting` is the length of `box.Inbox` through `query.LoadBox`, the same loader and the same number the console's rail header shows.
+`mode` is `store.Auto`: `"auto"` or `"manual"`.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "root": "/Users/x/work",
+  "projects": [
+    {
+      "name": "shop",
+      "mode": "manual",
+      "mate": {
+        "harness": "claude",
+        "running": true,
+        "state": "idle",
+        "since": "2026-09-19T10:46:40.000000000Z",
+        "tokens_today": 57683,
+        "context_pct": 29.2
+      },
+      "crews_by_state": {"waiting_review": 1},
+      "inbox_waiting": 1
+    }
+  ]
+}
+```
+
+A project whose box could not be read still gets a card, with `"error"` saying why: one broken project must not blank the workspace.
+
+## 3. `GET /api/projects/{project}`
+
+Tier 2: the Mate above, the task table below, the inbox beside it.
+
+`mate` is the card's block plus what the Mate has spent and what it last did.
+There is no `task` row for a Mate - its turns belong to the project and not to any one task (docs/timeline.md) - so `turns`, `tokens` and `cost` are computed from `turn` directly, with the same all-zeroes-is-not-a-price guard `v_task_ledger` uses.
+This is the same SQL `cmd/matev2/usage.go`'s `mateLedgerRow` runs, and the unit tests compare the two number for number.
+`last_turn` is `null` for a Mate that has taken no turn yet, and otherwise the full turn object of section 4.
+
+`tasks` is every crew the project has ever recorded, open and closed, oldest spawn first: one row of `v_task_ledger` each, with the crew's current `v_now` state, target and detail hung on it, plus two things no view carries.
+`tool_count` is `SUM(turn.tool_count)` for the crew, which the tier-3 ledger asks for and `v_task_ledger` has no column for.
+`age_ms` is `closed_at - spawned_at` for a closed task and `now - spawned_at` for an open one.
+`closed` is true when the task has a `close_state` or a `closed_at`.
+
+`inbox` is `box.Inbox` flattened through `query.LoadBox`, oldest first, the same rows in the same order the console's rail draws.
+A failed box read leaves `inbox` empty and puts the reason in `inbox_error` rather than failing the page.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "project": "shop",
+  "mode": "manual",
+  "mate": {
+    "harness": "claude",
+    "running": true,
+    "state": "idle",
+    "since": "2026-09-19T10:46:40.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 57683,
+    "context_pct": 29.2,
+    "turns": 6,
+    "tokens": {"input": 212, "cache_read": 55112, "cache_write": 1840, "output": 519, "thinking": 84, "total": 57683},
+    "cost": null,
+    "last_turn": {"…": "a turn object, section 4"}
+  },
+  "tasks": [
+    {
+      "crew": "buybtn",
+      "text": "Add a Buy button to README.md linking to the checkout page",
+      "branch": "matev2/buybtn",
+      "state": "waiting_review",
+      "since": "2026-09-19T10:46:12.000000000Z",
+      "target": "mate",
+      "detail": "",
+      "close_state": "",
+      "closed": false,
+      "spawned_at": "2026-09-19T10:44:09.000000000Z",
+      "closed_at": "",
+      "merged_at": "",
+      "age_ms": 171000,
+      "turns": 9,
+      "tokens": {"input": 23400, "cache_read": 32100, "cache_write": 1120, "output": 1154, "thinking": 351, "total": 57774},
+      "cost": null,
+      "last_model": "gpt-5-codex",
+      "context_tokens_last": 41220,
+      "context_pct": null,
+      "question_count": 1,
+      "handback_count": 1,
+      "waited_ms": 86721,
+      "tool_count": 14
+    }
+  ],
+  "inbox": [
+    {
+      "seq": 3,
+      "at": "2026-09-19T10:45:12.000000000Z",
+      "kind": "status",
+      "source": "crew",
+      "target": "",
+      "crew": "buybtn",
+      "verb": "needs-decision",
+      "text": "what is the checkout page URL for the Buy button?",
+      "attention": true
+    }
+  ]
+}
+```
+
+## 4. `GET /api/projects/{project}/tasks/{crew}`
+
+Tier 3, the top of the page: the ledger, then every turn in the order it happened, then what the crew said and asked, then the branch.
+
+`ledger` is the same task object as tier 2's row.
+
+`turns` is one object per model call, oldest first.
+`trigger_kind` is the `kind` of the event named by `turn.trigger_event_id`, joined on because a page showing a bare id would be showing the reader a number they cannot read.
+`duration_ms` is `ended_at - started_at`, and `0` for a turn that has not ended.
+`context_pct` is `100 * context_tokens_after / pricing.context_window` for that turn's model, `null` when the model has no priced window.
+`ref` is the turn's own `ref_path`/`ref_offset`.
+
+`status_lines` is the crew's `status.appended` events, with `verb`, `text` and `line` read out of the payload docs/timeline.md section 4 documents.
+
+`questions` is the `question` table for this crew.
+The answer's text is not on that table - it records which event answered, not what the answer said - so it is read from the answering event: `message.text` when a `message` row exists for it, otherwise that event's own payload, whose `text` is the answer verbatim.
+`answered_by` is the answering actor's name.
+`waited_ms` is `null` while a question is still waiting, which is not the same as having waited zero.
+
+`branch` is the task's recorded branch and whether git still has it.
+A branch that is gone is not an error: the crew was torn down and its work landed or was discarded, and `reason` says so.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "project": "shop",
+  "crew": "buybtn",
+  "ledger": {"…": "a task object, section 3"},
+  "turns": [
+    {
+      "id": "crew:shop:buybtn#t7",
+      "ordinal": 6,
+      "started_at": "2026-09-19T10:45:58.000000000Z",
+      "ended_at": "2026-09-19T10:46:04.000000000Z",
+      "duration_ms": 6000,
+      "trigger_event_id": 288,
+      "trigger_kind": "message.sent",
+      "outcome": "tool_use",
+      "model": "gpt-5-codex",
+      "tokens": {"input": 2140, "cache_read": 9120, "cache_write": 0, "output": 142, "thinking": 33, "total": 11402},
+      "context_tokens_after": 41220,
+      "context_pct": null,
+      "tool_count": 3,
+      "ref": {"path": "/Users/x/.codex/sessions/…/rollout-01a0b944.jsonl", "offset": 18422}
+    }
+  ],
+  "status_lines": [
+    {
+      "event_id": 231,
+      "at": "2026-09-19T10:44:31.000000000Z",
+      "turn_id": "crew:shop:buybtn#t2",
+      "verb": "working",
+      "text": "verifying isolated worktree and task brief",
+      "line": "working: verifying isolated worktree and task brief",
+      "ref": {"path": "/Users/x/.codex/sessions/…/rollout-01a0b944.jsonl", "offset": 9004}
+    }
+  ],
+  "questions": [
+    {
+      "id": "crew:shop:buybtn#q1",
+      "asked_event_id": 252,
+      "asked_at": "2026-09-19T10:45:12.000000000Z",
+      "text": "what is the checkout page URL for the Buy button?",
+      "answered_event_id": 288,
+      "answered_at": "2026-09-19T10:46:00.000000000Z",
+      "answered_by": "mate",
+      "answer": "Use pages/checkout-express.html for the Buy button.",
+      "waited_ms": 48000
+    }
+  ],
+  "branch": {"name": "matev2/buybtn", "exists": true}
+}
+```
+
+## 5. `GET /api/projects/{project}/tasks/{crew}/turns/{turn}`
+
+One turn opened: the turn itself, its tool calls, and the story rows recorded inside it.
+
+`actions` is the `action` rows of that turn, oldest first.
+`action` carries no locator of its own - the schema puts `ref_path`/`ref_offset` on `event` - so each action's `ref` comes from the `tool.called` event it was written beside, through `action.event_id`.
+`duration_ms` and `ok` are `null` for a call whose result the transcript did not carry.
+`actions` can be longer than the turn's `tool_count`: the count is the calls the harness made, while `action` also holds the synthesised `thinking` rows the ingest writes for a busy stretch no call explains (docs/timeline.md section 4).
+A UI that draws them should say which is which by the tool name.
+
+`events` is `v_story` filtered to `turn_id`, in exactly the shape and field order `matev2 events` prints as JSON lines: `id`, `at`, `project`, `kind`, `actor`, `actor_kind`, `subject`, `task`, `turn`, `cause`, `cause_kind`, `payload`, `ref`, `ref_offset`.
+It is produced by `timeline.Story`, the same function the CLI calls, so the two cannot drift.
+
+A turn id belonging to another crew is a `404`: a link built from one page must not render under another page's heading.
+
+Turn ids contain `#` (`crew:shop:buybtn#<session>#turn#20`), so the path segment must be percent-encoded - `encodeURIComponent` in the UI.
+An unescaped `#` makes the browser send only the part before it and treat the rest as a fragment, which arrives here as a turn id that matches nothing.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "project": "shop",
+  "crew": "buybtn",
+  "turn": {"…": "a turn object, section 4"},
+  "actions": [
+    {
+      "id": "crew:shop:buybtn#a21",
+      "at": "2026-09-19T10:46:01.000000000Z",
+      "ended_at": "2026-09-19T10:46:01.131000000Z",
+      "tool": "exec",
+      "target": "git add README.md && git commit -m \"docs: add Buy link\"",
+      "summary": "",
+      "duration_ms": 131,
+      "ok": true,
+      "event_id": 301,
+      "ref": {"path": "/Users/x/.codex/sessions/…/rollout-01a0b944.jsonl", "offset": 19110}
+    }
+  ],
+  "events": [
+    {
+      "id": 301,
+      "at": "2026-09-19T10:46:01.000000000Z",
+      "project": "shop",
+      "kind": "tool.called",
+      "actor": "buybtn",
+      "actor_kind": "crew",
+      "task": "buybtn",
+      "turn": "crew:shop:buybtn#t7",
+      "payload": {"class": "shell", "target": "git add README.md && …", "tool": "exec"},
+      "ref": "/Users/x/.codex/sessions/…/rollout-01a0b944.jsonl",
+      "ref_offset": 19110
+    }
+  ]
+}
+```
+
+## 6. `GET /api/projects/{project}/tasks/{crew}/diff`
+
+The bottom of the task page: `matev2 diff <project> <crew>`, verbatim.
+
+The CLI's own `crewDiffText` produces it, so the page and the terminal can never disagree about what a branch contains.
+A branch git no longer has returns `200` with an empty `text` and a `reason`, not an error, for the same reason the CLI says it plainly: a crew whose branch was deleted is a crew whose work landed or was discarded.
+A diff that fails for any other reason answers the same way - the rest of the task page is still true, and a `500` here would take it down with the branch.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "project": "shop",
+  "crew": "buybtn",
+  "branch": "matev2/buybtn",
+  "exists": true,
+  "text": "0d2d20d docs: add Buy link\n\ndiff --git a/README.md b/README.md\n…"
+}
+```
+
+## 7. `GET /api/events?since=<id>&wait=<seconds>&project=<p>`
+
+The long poll that keeps a page current without a refresh button.
+
+It returns as soon as an event with `id > since` exists.
+Otherwise it waits up to `wait` seconds, polling the database once a second, and then returns an empty list - an empty answer is the honest "still nothing", and the client polls again with the same cursor.
+`wait` is clamped to 25 seconds, which is under every default proxy and browser idle timeout a local page can meet.
+`since` defaults to 0, which returns the whole story.
+`project` is optional; without it the story of every project is returned, merged and sorted by `(at, id)`.
+
+`events` are `v_story` rows through `timeline.Story`, the same shape and field order `matev2 events` prints.
+
+`now` are the `v_now` rows of the actors that moved, so one call refreshes both the story and the scene.
+`v_now` has no "changed since" of its own, so which actors moved is read off `transition` - the table the view's scene columns already come from - as the distinct actors with a transition whose `event_id > since`.
+
+This endpoint is not cached: every other endpoint answers "what is true now", which is a function of the generation, while this one answers "what happened after the id you hold", which is a function of the caller's cursor.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:00.000000000Z",
+  "last_event_id": 412,
+  "project": "shop",
+  "since": 400,
+  "events": [{"id": 401, "at": "…", "project": "shop", "kind": "turn.ended", "…": "…"}],
+  "now": [
+    {
+      "actor_id": "crew:shop:buybtn",
+      "actor": "buybtn",
+      "actor_kind": "crew",
+      "project": "shop",
+      "state": "waiting_review",
+      "since": "2026-09-19T10:46:12.000000000Z",
+      "target": "mate",
+      "detail": "",
+      "tokens_today": 57774,
+      "context_pct": null
+    }
+  ]
+}
+```
+
+## 8. `GET /` - the UI
+
+`/` serves an embedded `embed.FS` rooted at `internal/dashboard/ui/`: plain HTML and JS, no build step and no CDN, so the dashboard is a single binary that works with no network at all.
+Task 28 ships a placeholder that lists these endpoints and fetches `/api/workspace` to prove the wiring; task 29 owns everything else under that directory.
+
+## 9. What is read directly rather than through a view
+
+The views are the contract, and these are the five places they do not reach.
+Each is named here because a later change to a view should absorb them rather than leave two ways to ask the same question.
+
+1. `actor.harness`, `actor.first_seen` and `actor.gone_at`, for a Mate card's harness and whether it is running. `v_now` carries neither.
+2. `SUM(turn.tool_count)` per actor, for the tier-3 ledger's tool-call count. `v_task_ledger` has no such column.
+3. The Mate's own turn count, token buckets and cost, from `turn`. `v_task_ledger` joins `task`, and a Mate has no task row.
+4. `turn`, `action`, `question` and `message` themselves, for the turn timeline: the views summarise a task, they do not enumerate what happened inside it.
+5. `transition`, for which actors moved since an event id, because `v_now` is a snapshot with no history in it.
+
+`v_now`'s `context_pct` is read from the view directly rather than through `scene.Now`, which selects only the eight columns `matev2 events --scene` prints.
