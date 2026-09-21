@@ -503,4 +503,22 @@ Lựa chọn có chủ ý: `transition` là lịch sử để replay và đo th�
 | 26 | Projection cảnh: `internal/timeline/scene` với máy trạng thái ở trên, ghi `transition`, view `v_now`; `matev2 events --scene` in snapshot cảnh rồi transition. Bài kiểm tra độ sâu: từ fixture timeline của acceptance, mọi chuyển cảnh trong máy trạng thái đều có event kích hoạt và không event nào rơi vào trạng thái không xác định; `--narrate` đọc trôi như một câu chuyện (golden). | Unit trên fixture; golden narrate; live trên acceptance hai project. Đã xong 2026-09-20, evidence `docs/evidence/m5-scene-2026-09-20.md`; bảng cạnh và từ vựng cảnh ở `docs/timeline.md` mục 9. |
 | 27 | Kinh tế: `pricing.yaml` mẫu ở workspace nạp vào `pricing`, `v_task_ledger`, `context_tokens_after` và `context.compacted` cho Claude và Codex, `matev2 usage <project> [crew]` in ledger, cột TOKENS trên cây console (từ DB, chỉ đọc), `tokens:` trong health của `matev2 state`. Incident `budget` khi `project.yaml` có `budget` và task vượt; theo quyết định 2026-09-20 `budget` không làm crew `blocked`, chỉ vào inbox với chữ `over budget` (sửa mục 4b). | Unit; live: tổng của một crew Codex thật bằng `total_token_usage` cuối trong rollout, và một crew Claude bằng tổng usage theo message. Đã xong 2026-09-20, live `TestLiveUsageMatchesTheHarness` (56s): crew Codex ledger 57774 = rollout 57774, Mate Claude ledger 57683 = tổng usage theo message 57683. |
 
-Sau M5: skin dashboard web (`matev2 dashboard`, SSE từ `event.id`, thư mục `.matev2/dashboard/` cho skin riêng), replay theo tốc độ, cảnh văn phòng làm skin tham chiếu.
+### M6. Dashboard admin
+
+Chốt 2026-09-21: cảnh văn phòng chỉ là ý tưởng minh hoạ độ sâu dữ liệu; dashboard thật là admin phẳng, chỉ đọc, nhìn được từ trình duyệt.
+Ba tầng, mỗi tầng một trang:
+
+1. Workspace: danh sách project, mỗi project một thẻ: Mate (harness, đang chạy hay dừng, trạng thái cảnh, token hôm nay), số crew mở theo trạng thái, số mục đang chờ trong inbox, chế độ manual/auto.
+2. Project: Mate ở trên (trạng thái, turn gần nhất, token và context %), rồi bảng task (mọi crew, mở và đã đóng, lọc theo trạng thái): id, task, trạng thái, tuổi, token tổng, chi phí, số câu hỏi, thời gian chờ, branch. Inbox đang chờ hiển thị bên cạnh, chỉ đọc.
+3. Task: đầu trang là ledger của task (token bốn loại, chi phí, số turn, số tool call, thời gian spawn→đóng); dưới là timeline các turn theo thứ tự, mỗi turn mở ra được: trigger, thời lượng, token, danh sách tool call với target và thời lượng, dòng status crew ghi trong turn, câu hỏi và câu trả lời nối theo `cause`. Cuối trang là diff của branch nếu còn.
+
+Kỹ thuật: `matev2 dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open]`, HTTP local, UI tĩnh nhúng vào binary (HTML + JS thuần, không build step, không CDN), JSON API đọc từ `matev2.db` qua `db.OpenRead` và các view, `GET /api/events?since=<id>` long-poll hoặc SSE để trang tự cập nhật trong 2 giây, không cần bấm refresh.
+Chỉ đọc: không có nút nào ghi vào workspace; hành động vẫn ở console TUI.
+Mọi số trên trang truy ngược được: mỗi turn và action có link `ref` tới đường dẫn và offset transcript, hiện khi rê chuột.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 28 | `internal/dashboard`: server, JSON API (`/api/workspace`, `/api/projects/<p>`, `/api/projects/<p>/tasks/<crew>`, `/api/projects/<p>/tasks/<crew>/turns/<id>`, `/api/events?since=`), đọc từ DB qua view, cache theo `event.id` cuối. `matev2 dashboard`. | Unit trên fixture db: mọi endpoint trả đúng số từ `v_task_ledger`/`v_now`/`v_story`; live: chạy acceptance rồi so API với `matev2 usage`. |
+| 29 | UI ba tầng nhúng, tự cập nhật qua `/api/events`, lọc trạng thái, mở rộng turn, link ref, sáng/tối theo hệ. | Screenshot ba tầng trên workspace thật (Playwright) trong `docs/evidence/`; không request nào ra ngoài localhost. |
+
+Sau M6: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.
