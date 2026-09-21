@@ -81,6 +81,11 @@ type StoryQuery struct {
 	SinceTime time.Time
 	// Limit bounds the result; zero means no bound.
 	Limit int
+	// TurnID returns only the events recorded inside one turn, which is
+	// what the dashboard asks for when a reader opens one. It is here
+	// rather than in the caller so a page showing one turn does not read
+	// the whole project's story to throw most of it away.
+	TurnID string
 }
 
 // Story reads `v_story` in story order: oldest first, and by id within one
@@ -97,6 +102,10 @@ func Story(ctx context.Context, sqlDB *sql.DB, q StoryQuery) ([]StoryEvent, erro
 	if !q.SinceTime.IsZero() {
 		query += ` AND at >= ?`
 		args = append(args, db.FormatTime(q.SinceTime))
+	}
+	if q.TurnID != "" {
+		query += ` AND turn_id = ?`
+		args = append(args, q.TurnID)
 	}
 	query += ` ORDER BY at, id`
 	if q.Limit > 0 {
