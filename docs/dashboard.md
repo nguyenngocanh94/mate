@@ -387,3 +387,53 @@ Each is named here because a later change to a view should absorb them rather th
 5. `transition`, for which actors moved since an event id, because `v_now` is a snapshot with no history in it.
 
 `v_now`'s `context_pct` is read from the view directly rather than through `scene.Now`, which selects only the eight columns `matev2 events --scene` prints.
+
+## 10. The UI
+
+Task 29's page, under `internal/dashboard/ui/`: `index.html`, `app.css`, `app.js` and `humanize.js`.
+Plain HTML, CSS and JavaScript loaded as classic scripts - no build step, no framework, no CDN and no off-origin request of any kind.
+`internal/dashboard/ui_assets_test.go` walks every embedded file and fails the build on a `<script src=`, `<link href=`, `<img src=`, `fetch(`, `url(`, `@import` or `new WebSocket/EventSource/Worker` pointing anywhere but this origin, and on any bare `http://` or `https://` outside a comment.
+
+### Routes
+
+The three tiers are one document, routed on the hash, so a link to a task survives a copy-paste and the back button works.
+
+| Hash | Tier |
+| --- | --- |
+| `#/` | workspace: one card per project - mode, the Mate's harness, running/stopped, scene state, since, tokens today, context %, crews counted by state, `N waiting` |
+| `#/p/<project>` | project: the Mate panel, the task table (filter chips, default `open`), the inbox beside it |
+| `#/p/<project>/t/<crew>` | task: the ledger header, the turn timeline, status lines, questions, the branch diff |
+
+A project or crew name is `encodeURIComponent`-ed into the hash, and a turn id into the path of `/turns/{turn}` (section 5).
+
+### Live update
+
+One loop, one request at a time: `GET /api/events?since=<the last_event_id the page's data was built at>&wait=20`, plus `&project=<p>` on tiers 2 and 3.
+On any `events` or `now` the page re-fetches only the endpoint the current tier reads and re-renders, keeping scroll position, the expanded turns and keyboard focus.
+Because the API is cached per `last_event_id` and the page always polls from the id its own bytes carry, a re-fetch after an event that changed nothing it shows costs the server a cache hit.
+
+The header carries the state as words: `live · HH:MM:SS` after every answered poll, `stale · <reason>` when one fails, where the reason is the API's own `reason` or, for a transport failure, "the dashboard is not answering".
+A failed poll retries every 3 seconds rather than spinning.
+
+One thing the `since` contract does not cover: `matev2 reindex` deletes and re-inserts every event, so `MAX(event.id)` can go *backwards*.
+A page holding a cursor from before a rebuild would poll a dead id for ever while reporting `live`, so the page treats a `last_event_id` lower than its own cursor as a rebuild, takes the server's number and re-fetches.
+
+### Numbers
+
+`humanize.js` re-implements `internal/query`'s `HumanizeTokens` and `HumanizeCost` - `523`, `96.3k`, `1.2M`, `$0.12`, `$1.2k` - including Go's round-half-to-even, which JavaScript's own `toFixed` does not do (`$0.125` is `$0.12` in Go and `$0.13` in `toFixed`).
+`TestUIHumanizeMatchesGo` builds a table of ~900 cases from the Go functions, sweeping every boundary plus a deterministic spread, and replays it through the page's own file in node when the machine has one.
+Durations (`840ms`, `6.2s`, `1m7s`, `2h04m`, `3d 4h`) are the page's own: the console's `shortDuration` answers a different question and rounds a minute and seven seconds down to `1m`.
+
+A `null` cost or context percentage renders `?`, never `0` - the same answer `matev2 usage` prints.
+A timestamp is shown as a local clock time with the database's own RFC3339 string on hover, so a value on the page and a row in the database stay comparable.
+Every turn, action, status line and event carries its `ref` as a `path:offset` tooltip.
+
+### Vocabulary and colour
+
+The state words are `internal/timeline/scene`'s own (`at_desk_working`, `waiting_review`, `walking_to_ceo`, …) and the inbox's phrases are the console's (`needs an answer`, `stuck, quiet too long`, `agent gone`, `over budget`, `send wedged`), so the TUI and the browser describe the same workspace in the same words.
+Every state word is a glyph plus the word: colour is never the only difference between a crew working and a crew blocked.
+
+Colour is defined once as tokens on `:root` and redefined under `prefers-color-scheme: dark`; the dark series steps are chosen for the dark surface rather than flipped.
+The four token buckets are a stacked meter in a fixed slot order - input, cache read, cache write, output - assigned to the bucket and not to its size, with a 2px surface gap between segments and a legend that always shows the numbers.
+Context % is a single-hue meter, because it is one magnitude against one window.
+Below 720px the tables collapse to one card per row and the page does not scroll sideways.

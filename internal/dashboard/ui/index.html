@@ -4,43 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>matev2 dashboard</title>
-<style>
-  :root { color-scheme: light dark; }
-  body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 2rem auto; max-width: 52rem; padding: 0 1rem; }
-  h1 { font-size: 1.1rem; }
-  p.note { opacity: .7; }
-  ul { padding-left: 1.2rem; }
-  code { white-space: pre-wrap; word-break: break-all; }
-  pre { overflow-x: auto; padding: .75rem; border: 1px solid currentColor; border-radius: 4px; opacity: .9; }
-</style>
+<!--
+  The three-tier admin UI of docs/mvp.md M6, task 29.
+
+  Everything it loads is served from this origin and embedded in the binary:
+  no build step, no framework, no CDN, no font or script from anywhere else,
+  so the dashboard works on a machine with no network at all. The asset test
+  in internal/dashboard/ui_assets_test.go fails the build on any off-origin
+  reference.
+-->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<h1>matev2 dashboard</h1>
-<p class="note">
-  This is the placeholder page of task 28. The three-tier UI is task 29;
-  the JSON shape of every endpoint below is written out in
-  <code>docs/dashboard.md</code>.
-</p>
-<h2>API</h2>
-<ul>
-  <li><code>GET /api/workspace</code></li>
-  <li><code>GET /api/projects/{project}</code></li>
-  <li><code>GET /api/projects/{project}/tasks/{crew}</code></li>
-  <li><code>GET /api/projects/{project}/tasks/{crew}/turns/{turn}</code></li>
-  <li><code>GET /api/projects/{project}/tasks/{crew}/diff</code></li>
-  <li><code>GET /api/events?since=&lt;id&gt;&amp;wait=&lt;seconds&gt;&amp;project=&lt;p&gt;</code></li>
-</ul>
-<h2>GET /api/workspace</h2>
-<pre id="out">loading…</pre>
-<script>
-  fetch("/api/workspace")
-    .then(function (r) { return r.json(); })
-    .then(function (body) {
-      document.getElementById("out").textContent = JSON.stringify(body, null, 2);
-    })
-    .catch(function (err) {
-      document.getElementById("out").textContent = "could not read /api/workspace: " + err;
-    });
-</script>
+<header class="topbar">
+  <span class="brand">matev2</span>
+  <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+  <span class="live" id="live" data-state="loading" role="status" aria-live="polite">
+    <span class="dot" aria-hidden="true">&#9679;</span><span class="text">loading</span>
+  </span>
+</header>
+<main id="view">
+  <p class="empty">loading&#8230;</p>
+</main>
+<script src="humanize.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
