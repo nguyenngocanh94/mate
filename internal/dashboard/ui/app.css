@@ -1,0 +1,591 @@
+/*
+ * app.css - the flat admin skin of docs/mvp.md M6.
+ *
+ * Every colour is a token on :root, redefined once under
+ * prefers-color-scheme: dark. The dark column is not a flip of the light
+ * one: the series steps are chosen for the dark surface and validated
+ * against it (the dataviz skill's validator, both modes).
+ *
+ * A state word never carries its meaning in colour alone - it is always a
+ * glyph plus the word, because a reader who cannot separate amber from
+ * green still has to be able to tell a crew waiting for review from a crew
+ * working.
+ */
+
+:root {
+  color-scheme: light;
+
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f2f1ed;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+
+  /* Token buckets, in stack order: slots 1-4 of the validated order. */
+  --series-1: #2a78d6; /* input */
+  --series-2: #eb6834; /* cache read */
+  --series-3: #1baf7a; /* cache write */
+  --series-4: #eda100; /* output */
+
+  /* Status - fixed in both modes, never reused for a series. */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+
+  --radius: 6px;
+  --gutter: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #3987e5;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+}
+
+* { box-sizing: border-box; }
+
+/*
+ * overflow-x: clip, not hidden. `hidden` would make the body a scroll
+ * container, and a scroll container is what silently turns the sticky
+ * header into a header that scrolls away.
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: clip;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.45 var(--font);
+}
+
+a { color: inherit; }
+
+/* ---------------------------------------------------------------- header */
+
+header.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px var(--gutter);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+nav.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--ink-2);
+  overflow: hidden;
+}
+
+nav.crumbs a {
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+nav.crumbs a:hover { border-bottom-color: var(--accent); }
+
+nav.crumbs .sep { color: var(--muted); }
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px/1 var(--mono);
+  color: var(--ink-2);
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.live .dot { color: var(--good); }
+.live[data-state="stale"] .dot { color: var(--critical); }
+.live[data-state="stale"] { color: var(--critical); }
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px var(--gutter) 64px;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { font-size: 18px; }
+h2 { font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+h3 { font-size: 13px; }
+
+.section { margin-top: 24px; }
+.section > h2 { margin-bottom: 10px; }
+
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ containers */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+a.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+a.card:hover { border-color: var(--accent); }
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-head .name { font-size: 16px; font-weight: 600; }
+
+.badge {
+  font: 11px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.badge[data-mode="auto"] { color: var(--ink); border-color: var(--accent); }
+
+/* A filesystem path is not a label: it keeps the case it has on disk. */
+.badge.path {
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  font-size: 13px;
+}
+
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; color: var(--ink); }
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.facts .sep { color: var(--grid); }
+
+/* ---------------------------------------------------------- state words */
+
+.state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.state .glyph {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.state[data-tone="good"] .glyph { color: var(--good); }
+.state[data-tone="warning"] .glyph { color: var(--warning); }
+.state[data-tone="serious"] .glyph { color: var(--serious); }
+.state[data-tone="critical"] .glyph { color: var(--critical); }
+.state[data-tone="muted"] .glyph { color: var(--muted); }
+.state[data-tone="info"] .glyph { color: var(--accent); }
+
+.counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.counters .count { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* --------------------------------------------------------------- meters */
+
+.meter {
+  margin-top: 10px;
+}
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.meter-label .value { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.bar {
+  display: flex;
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* A 2px surface gap between stacked segments, so two fills never touch. */
+.bar > span {
+  display: block;
+  height: 100%;
+  border-right: 2px solid var(--surface);
+  border-radius: 4px;
+}
+
+.bar > span:last-child { border-right: 0; }
+
+.bar > span[data-slot="1"] { background: var(--series-1); }
+.bar > span[data-slot="2"] { background: var(--series-2); }
+.bar > span[data-slot="3"] { background: var(--series-3); }
+.bar > span[data-slot="4"] { background: var(--series-4); }
+.bar > span[data-slot="ctx"] { background: var(--accent); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.legend .item { display: inline-flex; align-items: center; gap: 6px; }
+
+.legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--border);
+  flex: none;
+}
+
+.legend .swatch[data-slot="1"] { background: var(--series-1); }
+.legend .swatch[data-slot="2"] { background: var(--series-2); }
+.legend .swatch[data-slot="3"] { background: var(--series-3); }
+.legend .swatch[data-slot="4"] { background: var(--series-4); }
+
+.legend .n { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* --------------------------------------------------------------- tables */
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+th, td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: top;
+}
+
+th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: var(--surface-2); }
+
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The task text is the column that gives: it is prose and wraps cleanly,
+   while a branch name broken mid-word is a branch name nobody can read. */
+td.task-text { min-width: 10em; }
+td.branch { font-size: 12px; white-space: nowrap; }
+
+/* A payload is one long unbroken JSON string with no spaces to break at, so
+   it is allowed to break anywhere rather than to push the table sideways. */
+td.payload { overflow-wrap: anywhere; font-size: 12px; }
+
+/* ---------------------------------------------------------------- chips */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chip {
+  font: 12px/1 var(--font);
+  padding: 5px 9px;
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.chip .n { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* ---------------------------------------------------------------- inbox */
+
+.split {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  align-items: start;
+}
+
+ul.inbox { list-style: none; margin: 0; padding: 0; }
+
+ul.inbox li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--grid);
+  font-size: 13px;
+}
+
+ul.inbox li:last-child { border-bottom: 0; }
+ul.inbox .at { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+ul.inbox .who { font-weight: 600; }
+ul.inbox .need { color: var(--ink-2); }
+ul.inbox li[data-attention="true"] .need { color: var(--ink); }
+ul.inbox .said { display: block; color: var(--muted); font-size: 12px; }
+
+/* ---------------------------------------------------------------- turns */
+
+ol.turns { list-style: none; margin: 0; padding: 0; }
+
+li.turn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+button.turn-head {
+  display: grid;
+  grid-template-columns: 2.5rem 5.5rem 4rem minmax(0, 1fr) 5.5rem 5rem;
+  gap: 10px;
+  width: 100%;
+  align-items: baseline;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.turn-head:hover { background: var(--surface-2); }
+button.turn-head .ord { font-family: var(--mono); color: var(--muted); }
+button.turn-head .when { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+button.turn-head .num { text-align: right; color: var(--ink-2); }
+button.turn-head .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+li.turn .body {
+  padding: 0 10px 12px;
+  border-top: 1px solid var(--grid);
+}
+
+li.turn .body > .section:first-child { margin-top: 12px; }
+
+/* ----------------------------------------------------------------- diff */
+
+pre.diff {
+  font: 12px/1.45 var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+pre.diff .add { color: var(--good); }
+pre.diff .del { color: var(--critical); }
+pre.diff .hunk { color: var(--accent); }
+pre.diff .meta { color: var(--muted); }
+
+/* ---------------------------------------------------------- notices etc */
+
+.notice {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--critical);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.notice .what { font-weight: 600; }
+.notice .why { color: var(--ink-2); }
+.notice[data-tone="quiet"] { border-left-color: var(--muted); }
+
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+[data-ref] { cursor: help; border-bottom: 1px dotted var(--border); }
+
+.actions-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* ---------------------------------------------------------------- phone */
+
+@media (max-width: 720px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+
+  main { padding-left: var(--gutter); padding-right: var(--gutter); }
+
+  .table-wrap { overflow-x: visible; }
+
+  table, thead, tbody, tr, th, td { display: block; }
+
+  thead { display: none; }
+
+  table { border: 0; background: none; }
+
+  tbody tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    padding: 6px 10px;
+  }
+
+  tbody tr:last-child td { border-bottom: 1px solid var(--grid); }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--grid);
+    text-align: left;
+  }
+
+  td:last-child { border-bottom: 0; }
+
+  td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  td.n { text-align: right; }
+
+  button.turn-head {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    row-gap: 2px;
+  }
+
+  button.turn-head .ord { grid-row: span 3; }
+}
