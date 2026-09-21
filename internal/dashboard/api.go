@@ -25,7 +25,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/turns/{turn}", s.cached(s.handleTurn))
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/diff", s.cached(s.handleDiff))
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
-	s.mux.Handle("GET /", http.FileServerFS(uiFS()))
+	s.mux.Handle("GET /", etagFileServer(uiFS()))
 }
 
 // builder computes one response's body at a known generation.

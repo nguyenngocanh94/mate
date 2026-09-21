@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/fs"
 	"math/rand"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -301,4 +303,31 @@ func fetchText(t *testing.T, f *fixture, path string) string {
 		t.Fatalf("GET %s = %d, want 200\n%s", path, resp.StatusCode, body)
 	}
 	return string(body)
+}
+
+// TestUIAssetsCarryAContentETag: an embedded asset has no mtime, so the
+// server must give the browser another way to know app.js changed after a
+// binary upgrade; a matching If-None-Match gets 304.
+func TestUIAssetsCarryAContentETag(t *testing.T) {
+	srv := httptest.NewServer(etagFileServer(uiFS()))
+	defer srv.Close()
+	res, err := http.Get(srv.URL + "/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	tag := res.Header.Get("ETag")
+	if tag == "" {
+		t.Fatal("app.js served without an ETag")
+	}
+	req, _ := http.NewRequest("GET", srv.URL+"/app.js", nil)
+	req.Header.Set("If-None-Match", tag)
+	res2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2.Body.Close()
+	if res2.StatusCode != http.StatusNotModified {
+		t.Fatalf("status with matching If-None-Match = %d, want 304", res2.StatusCode)
+	}
 }
