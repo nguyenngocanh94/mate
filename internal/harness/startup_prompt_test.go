@@ -3,6 +3,7 @@ package harness
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -29,9 +30,20 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		{KindCodex, "codex-0.154.0-trust-dialog.txt", StartupScreenTrustDialog},
 		{KindCodex, "codex-0.154.0-trust-dialog-quit-selected.txt", StartupScreenTrustDialog},
 		{KindCodex, "codex-0.154.0-ready.txt", StartupScreenReady},
+		// codex-cli 0.156.1 redrew the trust dialog (task 35).
+		{KindCodex, "codex-0.156.1-trust-dialog.txt", StartupScreenTrustDialog},
+		{KindCodex, "codex-0.156.1-trust-dialog-quit-selected.txt", StartupScreenTrustDialog},
+		{KindCodex, "codex-0.156.1-ready.txt", StartupScreenReady},
 		{KindClaude, "claude-2.1.270-trust-dialog.txt", StartupScreenTrustDialog},
 		{KindClaude, "claude-2.1.270-trust-dialog-accept-selected.txt", StartupScreenTrustDialog},
 		{KindClaude, "claude-2.1.270-ready.txt", StartupScreenReady},
+		// `codex resume <id>` (task 35): the old conversation is replayed
+		// above the composer, prompt lines and all.
+		{KindCodex, "codex-0.154.0-resume-ready.txt", StartupScreenReady},
+		// Codex's hook-trust review is a real startup dialog, but matev2
+		// installs no Codex hook, so it is refused unanswered (task 37 owns
+		// the decision).
+		{KindCodex, "codex-0.154.0-hooks-review.txt", StartupScreenUnrecognized},
 		// A harness's dialog is not another harness's dialog: the wording is
 		// matched per profile, never as "anything with Yes/No on it".
 		{KindClaude, "codex-0.154.0-trust-dialog.txt", StartupScreenUnrecognized},
@@ -136,6 +148,9 @@ func TestTrustDialogAcceptSelectedReadsTheHighlightMarker(t *testing.T) {
 		{KindClaude, "claude-2.1.270-trust-dialog-accept-selected.txt", true},
 		{KindCodex, "codex-0.154.0-trust-dialog.txt", true},
 		{KindCodex, "codex-0.154.0-trust-dialog-quit-selected.txt", false},
+		{KindCodex, "codex-0.156.1-trust-dialog.txt", true},
+		{KindCodex, "codex-0.156.1-trust-dialog-quit-selected.txt", false},
+		{KindCodex, "codex-0.156.1-ready.txt", false},
 		// The ready screen has no dialog, so nothing is "selected" on it.
 		{KindClaude, "claude-2.1.270-ready.txt", false},
 		{KindCodex, "codex-0.154.0-ready.txt", false},
@@ -277,6 +292,9 @@ func TestClassifyStartupScreenOnCapturedUpdateDialogScreens(t *testing.T) {
 	}{
 		{KindCodex, "codex_update_dialog.txt", StartupScreenUpdateDialog},
 		{KindCodex, "codex_update_dialog_skip_selected.txt", StartupScreenUpdateDialog},
+		// The same prompt drawn by `codex resume <id>` without the update
+		// flag (task 35): history above, the dialog's shape at the bottom.
+		{KindCodex, "codex-0.154.0-resume-update-dialog.txt", StartupScreenUpdateDialog},
 		// What the pane showed after Enter on "3. Skip until next version":
 		// the directory-trust dialog for a directory codex had not seen.
 		{KindCodex, "codex_update_dialog_after_enter.txt", StartupScreenTrustDialog},
@@ -406,5 +424,25 @@ func TestClassifyStartupScreenUpdateDialogToleratesTheInstallCommand(t *testing.
 	}
 	if got != StartupScreenUpdateDialog {
 		t.Fatalf("update dialog with another install command = %s, want update_dialog", got)
+	}
+}
+
+// TestStartupDialogLayoutsOfOneScreenShareTheirAnswer holds the rule that
+// lets one screen have several measured layouts: the settle presses one
+// answer for the screen, so every layout of it must take the same keys to
+// the same option position.
+func TestStartupDialogLayoutsOfOneScreenShareTheirAnswer(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []Kind{KindClaude, KindCodex} {
+		p, err := startupProfileFor(kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range p.dialogs {
+			first := p.dialogsFor(d.screen)[0]
+			if !slices.Equal(d.selectKeys, first.selectKeys) || d.target != first.target {
+				t.Fatalf("%s %s layouts disagree: %v/%d vs %v/%d", kind, d.screen, d.selectKeys, d.target, first.selectKeys, first.target)
+			}
+		}
 	}
 }

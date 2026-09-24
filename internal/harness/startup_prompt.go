@@ -64,6 +64,16 @@ const (
 	codexTrustQuit       = "2. No, quit"
 	codexDialogFooter    = "Press enter to continue"
 	codexHighlightMarker = "›"
+	// codex-cli 0.156.1 redrew the directory-trust dialog (captured
+	// 2026-09-24, task 35, after the installed codex moved from 0.154.0 to
+	// 0.156.1 mid-session): a "Folder access" header, the path, a wrapped
+	// paragraph that opens with this question, two new option labels and a
+	// new footer. The highlight still opens on option 1 and "1" still moves
+	// it there without confirming, so the answer is the same sequence.
+	codexTrustQuestionV156 = "Trust this folder?"
+	codexTrustAcceptV156   = "1. Trust and continue"
+	codexTrustQuitV156     = "2. Quit"
+	codexDialogFooterV156  = "enter continue · esc quit"
 	// CodexComposerPlaceholder is the empty composer's placeholder text; its
 	// presence is what classifies a Codex pane as ready.
 	CodexComposerPlaceholder = "Ask Codex to do anything"
@@ -145,14 +155,18 @@ type startupProfile struct {
 	composer func(lines []string) bool
 }
 
-// dialog returns the profile for one recognised screen.
-func (p startupProfile) dialog(screen StartupScreen) (dialogProfile, bool) {
+// dialogsFor returns every profile that classifies as one screen: a harness
+// can draw the same dialog in more than one measured layout (Codex's trust
+// dialog before and after 0.156.1). Every layout of one screen is answered
+// with the same keys (TestStartupDialogLayoutsOfOneScreenShareTheirAnswer).
+func (p startupProfile) dialogsFor(screen StartupScreen) []dialogProfile {
+	var out []dialogProfile
 	for _, d := range p.dialogs {
 		if d.screen == screen {
-			return d, true
+			out = append(out, d)
 		}
 	}
-	return dialogProfile{}, false
+	return out
 }
 
 func startupProfileFor(kind Kind) (startupProfile, error) {
@@ -176,6 +190,22 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 					// re-read after it is what the accept check reads.
 					selectKeys:  []string{"1"},
 					targetLabel: codexTrustAccept,
+				},
+				{
+					screen:   StartupScreenTrustDialog,
+					question: codexTrustQuestionV156,
+					options: []optionSpec{
+						{label: codexTrustAcceptV156},
+						{label: codexTrustQuitV156},
+					},
+					target: 0,
+					footer: codexDialogFooterV156,
+					marker: codexHighlightMarker,
+					// The question opens a paragraph that wraps to three
+					// lines at 93 columns; a narrower pane wraps it to more.
+					questionWindow: 6,
+					selectKeys:     []string{"1"},
+					targetLabel:    codexTrustAcceptV156,
 				},
 				{
 					screen:   StartupScreenUpdateDialog,
@@ -359,12 +389,12 @@ func dialogAnswerFor(kind Kind, screen StartupScreen) (StartupDialogAnswer, erro
 	if err != nil {
 		return StartupDialogAnswer{}, err
 	}
-	d, ok := p.dialog(screen)
-	if !ok {
+	layouts := p.dialogsFor(screen)
+	if len(layouts) == 0 {
 		return StartupDialogAnswer{}, observability.NewError(observability.CodeUsage,
 			fmt.Sprintf("harness %q has no measured %s; mate refuses to invent one", kind, screen))
 	}
-	return d.answer(), nil
+	return layouts[0].answer(), nil
 }
 
 // targetSelected reports whether the structurally confirmed dialog is on
@@ -374,12 +404,12 @@ func targetSelected(kind Kind, screen StartupScreen, snapshot string) (bool, err
 	if err != nil {
 		return false, err
 	}
-	d, ok := p.dialog(screen)
-	if !ok {
-		return false, nil
+	for _, d := range p.dialogsFor(screen) {
+		if highlighted, parsed := d.parse(snapshot); parsed {
+			return highlighted == d.target, nil
+		}
 	}
-	highlighted, parsed := d.parse(snapshot)
-	return parsed && highlighted == d.target, nil
+	return false, nil
 }
 
 // TrustDialogAnswerFor returns the measured accept sequence for one harness.

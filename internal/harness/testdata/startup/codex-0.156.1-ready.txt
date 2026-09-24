@@ -1,0 +1,18 @@
+
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.156.1)                               │
+│                                                          │
+│ model:       GPT-5.6-Terra high   /model to change       │
+│ directory:   /private/tmp/claude-501/…/scratchpad/w35/a6 │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+  Tip: Try the Desktop app. Run 'codex app' or visit
+  https://chatgpt.com/codex?app-landing-page=true
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+› Ask Codex to do anything
+
+  GPT-5.6-Terra high · /private/tmp/claude-501/-Volumes-Work-Works…  ⚠ 1 warning · f2 to view
