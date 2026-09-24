@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/hook"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/hook"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // A digest or an `[assign]` line reaches `sent.log` twice - once from the
@@ -319,7 +319,7 @@ func TestTheQuestionIsLinkedToTheAnswerWithThePositiveWaitBetweenThem(t *testing
 	if waited <= 0 {
 		t.Fatalf("waited_ms = %d; a question answered after it was asked waits a positive time", waited)
 	}
-	// 10:44:33.279 (the crew's echo) to 10:46:00 (the Mate's `matev2 send`,
+	// 10:44:33.279 (the crew's echo) to 10:46:00 (the Mate's `mate send`,
 	// which its own transcript shows finishing at 10:46:00.581).
 	if want := int64(86721); waited != want {
 		t.Fatalf("waited_ms = %d, want %d", waited, want)
@@ -357,7 +357,7 @@ func TestTheCausalChainFromQuestionToAnswerIsLinked(t *testing.T) {
 	}
 	answered := only(t, byKind, timeline.KindQuestionAnsw)
 	if answered.CauseKind != timeline.KindTurnStarted {
-		t.Fatalf("question.answered is caused by %q, want the Mate turn that ran matev2 send", answered.CauseKind)
+		t.Fatalf("question.answered is caused by %q, want the Mate turn that ran mate send", answered.CauseKind)
 	}
 	spawned := only(t, byKind, timeline.KindCrewSpawned)
 	if spawned.CauseKind != timeline.KindTurnStarted {
@@ -441,7 +441,7 @@ func TestIngestingTwiceRecordsNothingNew(t *testing.T) {
 	}
 }
 
-// `matev2 reindex` drops every derived table and rebuilds from the files, and
+// `mate reindex` drops every derived table and rebuilds from the files, and
 // two rebuilds are byte-identical - including the `event.id`s, which is what
 // lets a reader quote one.
 func TestReindexingTwiceProducesAByteIdenticalStory(t *testing.T) {
@@ -493,7 +493,7 @@ func TestAFailedReindexLeavesThePreviousTimelineInPlace(t *testing.T) {
 }
 
 // The narrated story is the readable half of M5: a person who has never seen
-// matev2 should follow it. The golden is the whole run, so a phrase that
+// mate should follow it. The golden is the whole run, so a phrase that
 // changes shows up as a diff rather than as a sentence nobody reads.
 func TestNarrateGolden(t *testing.T) {
 	f := newFixture(t)
@@ -506,14 +506,14 @@ func TestNarrateGolden(t *testing.T) {
 	got := strings.Join(lines, "\n") + "\n"
 
 	golden := "testdata/narrate.golden"
-	if os.Getenv("MATEV2_UPDATE_GOLDEN") == "1" {
+	if os.Getenv("MATE_UPDATE_GOLDEN") == "1" {
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatalf("write golden: %v", err)
 		}
 	}
 	want, err := os.ReadFile(golden)
 	if err != nil {
-		t.Fatalf("read golden: %v (re-run with MATEV2_UPDATE_GOLDEN=1 to create it)", err)
+		t.Fatalf("read golden: %v (re-run with MATE_UPDATE_GOLDEN=1 to create it)", err)
 	}
 	if got != string(want) {
 		t.Fatalf("the narrated story changed.\n--- got ---\n%s\n--- want ---\n%s", got, want)
@@ -556,11 +556,11 @@ func TestTaskLedgerCountsTheTaskAndLeavesCostNullUntilThereIsAPrice(t *testing.T
 	}
 
 	// INSERT OR REPLACE, not a plain INSERT: task 27's ingest already seeded
-	// a placeholder row for every model `.matev2/pricing.yaml` names at
+	// a placeholder row for every model `.mate/pricing.yaml` names at
 	// init, priced at 0 (which is why the assertion above still saw a NULL
 	// cost - a price of 0 does not count as priced). This overwrites that
 	// placeholder with a real price, which is what a captain editing the
-	// file and matev2 reloading it would produce.
+	// file and mate reloading it would produce.
 	if _, err := f.db.SQL().Exec(
 		`INSERT OR REPLACE INTO pricing(model, input_per_m, cache_read_per_m, cache_write_per_m, output_per_m)
 		 VALUES (?, 1000000, 0, 0, 0)`, model); err != nil {
@@ -574,7 +574,7 @@ func TestTaskLedgerCountsTheTaskAndLeavesCostNullUntilThereIsAPrice(t *testing.T
 	}
 }
 
-// task 27: `.matev2/pricing.yaml` loads into the `pricing` table, and a
+// task 27: `.mate/pricing.yaml` loads into the `pricing` table, and a
 // second edit-then-ingest cycle updates the same row rather than adding a
 // second one - the upsert docs/timeline.md's Economics section promises.
 func TestIngestPricingLoadsAndUpdatesFromPricingYAML(t *testing.T) {

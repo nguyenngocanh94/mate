@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Resolving a recorded `.meta` into the live Herdr handle a pane operation
 // needs. StopMate, StopCrew and MateStatus each did this inline for their
-// own step; the console's message box (mvp.md task 15) and `matev2 send`
+// own step; the console's message box (mvp.md task 15) and `mate send`
 // need exactly the same resolution for a pane they only want to type into,
 // so it is spelled once here.
 //

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // routes is the whole API surface. Every pattern names GET explicitly: a
@@ -244,7 +244,7 @@ const maxWaitSeconds = 25
 
 // pollInterval is how often a waiting request asks whether the id moved.
 // One second is what docs/mvp.md M5 names for a live reader and what
-// `matev2 events --follow` already uses.
+// `mate events --follow` already uses.
 const pollInterval = time.Second
 
 // handleEvents is GET /api/events?since=<id>&wait=<seconds>[&project=<p>]:
@@ -326,7 +326,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 // actor that moved in it.
 //
 // The story goes through timeline.Story, one project at a time, so the JSON
-// on the wire is the same shape and the same field order `matev2 events`
+// on the wire is the same shape and the same field order `mate events`
 // prints - one contract, not two. `v_now` has no "changed since" of its
 // own, so which actors moved is read off `transition`, the table the view's
 // scene columns already come from: an actor with a transition caused by an

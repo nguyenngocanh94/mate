@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/brief"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/mateassets"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/mateassets"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Crew naming. A crew's branch, worktree, Herdr tab and live agent name are
@@ -27,7 +27,7 @@ import (
 // again after a crash.
 const (
 	// CrewBranchPrefix + id is the branch a crew works on.
-	CrewBranchPrefix = "matev2/"
+	CrewBranchPrefix = "mate/"
 	// CrewTabLabelPrefix + id is the Herdr tab label of a crew pane.
 	CrewTabLabelPrefix = "crew-"
 	// CrewAgentNamePrefix is the first half of a crew's live agent name.
@@ -75,7 +75,7 @@ var ErrCrewRunning = errors.New("crew is already running")
 // is still idle after this long is reported as a warning, never as a failure.
 const DefaultBriefDeliveryTimeout = 30 * time.Second
 
-// SpawnCrewRequest is one `matev2 crew spawn`.
+// SpawnCrewRequest is one `mate crew spawn`.
 type SpawnCrewRequest struct {
 	// Project is the registered project the crew works in.
 	Project string
@@ -274,7 +274,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 //
 // It keeps only the facts that were settled before the failure. The agent,
 // pane and tab are deliberately absent: compensation removed them, and a
-// meta naming a pane nobody has is what `matev2 state` would then have to
+// meta naming a pane nobody has is what `mate state` would then have to
 // explain away.
 //
 // Its own failure is swallowed. The caller must see why the spawn was
@@ -362,7 +362,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	}
 
 	// 4. Herdr: the project's own workspace, a tab labelled crew-<id> whose
-	// cwd is the worktree and whose environment carries MATEV2_STATUS.
+	// cwd is the worktree and whose environment carries MATE_STATUS.
 	sessionSpec, err := deps.sessionSpec(w)
 	if err != nil {
 		return CrewResult{}, err
@@ -716,7 +716,7 @@ func prepareCrewHarnessFiles(ctx context.Context, w *store.Workspace, deps Deps,
 		if err := os.WriteFile(override, brief, 0o644); err != nil {
 			return "", "", err
 		}
-		// The discovery file is matev2's, not the crew's work: excluding it
+		// The discovery file is mate's, not the crew's work: excluding it
 		// locally keeps a `git add -A` from committing it onto the branch the
 		// Mate will review and fast-forward.
 		if err := excludeGeneratedFile(ctx, git, plan.worktree, filepath.Base(override)); err != nil {
@@ -770,7 +770,7 @@ func excludeGeneratedFile(ctx context.Context, git gitx.Git, worktree, name stri
 	if err != nil {
 		return err
 	}
-	_, writeErr := fmt.Fprintf(f, "\n# matev2 generated crew context (local, never committed)\n%s\n", rule)
+	_, writeErr := fmt.Fprintf(f, "\n# mate generated crew context (local, never committed)\n%s\n", rule)
 	closeErr := f.Close()
 	if writeErr != nil {
 		return writeErr
@@ -792,7 +792,7 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionI
 		Kind: plan.kind,
 		Cwd:  plan.worktree,
 		// No launch env: Herdr 0.8.2 applies `--env` when a pane is created,
-		// so the crew's identity (and MATEV2_STATUS) is injected by the tab
+		// so the crew's identity (and MATE_STATUS) is injected by the tab
 		// create above.
 		Config: harness.Config{Kind: plan.kind},
 	}
@@ -808,7 +808,7 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionI
 }
 
 // crewPaneEnv is the crew's identity, injected when its pane is created.
-// MATEV2_STATUS is what the brief's `echo ... >> $MATEV2_STATUS` resolves to;
+// MATE_STATUS is what the brief's `echo ... >> $MATE_STATUS` resolves to;
 // without it every status line a crew reported would go nowhere.
 func crewPaneEnv(plan crewPlan, session runtime.SessionHandle, statusPath string) []runtime.EnvVar {
 	return []runtime.EnvVar{

@@ -11,21 +11,21 @@ import (
 
 	_ "modernc.org/sqlite" // pure Go SQLite driver; no cgo, so `make check` cross-compiles
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// FileName is the database file inside `.matev2/`, and LockName the advisory
+// FileName is the database file inside `.mate/`, and LockName the advisory
 // lock beside it. Both are spelled once, here.
 const (
-	FileName = "matev2.db"
-	LockName = "matev2.db.lock"
+	FileName = "mate.db"
+	LockName = "mate.db.lock"
 )
 
 // ErrLocked is the refusal a second writer gets. It names the file rather
 // than the process, because the process holding it may be a console on
 // another terminal and the only thing this one can prove is that the lock is
 // taken.
-var ErrLocked = errors.New("db: another matev2 process is already writing this workspace's timeline")
+var ErrLocked = errors.New("db: another mate process is already writing this workspace's timeline")
 
 // TimeFormat is how every timestamp is stored: RFC3339 with nanoseconds, in
 // UTC. It is fixed width up to the fractional part and lexicographically
@@ -66,7 +66,7 @@ type DB struct {
 	writer bool
 }
 
-// Path is `<workspace>/.matev2/matev2.db`, resolved through the workspace
+// Path is `<workspace>/.mate/mate.db`, resolved through the workspace
 // boundary so a symlink at that name cannot move the database out of the
 // workspace.
 func Path(ws *store.Workspace) (string, error) {
@@ -123,7 +123,7 @@ func OpenRead(ws *store.Workspace) (*DB, error) {
 func OpenReadPath(path string) (*DB, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("db: no timeline at %s yet; open the workspace console once, or run `matev2 reindex`", path)
+			return nil, fmt.Errorf("db: no timeline at %s yet; open the workspace console once, or run `mate reindex`", path)
 		}
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func OpenReadPath(path string) (*DB, error) {
 	}
 	if version != SchemaVersion {
 		_ = d.Close()
-		return nil, fmt.Errorf("db: %s is at schema version %d, this build reads %d; run `matev2 reindex`",
+		return nil, fmt.Errorf("db: %s is at schema version %d, this build reads %d; run `mate reindex`",
 			path, version, SchemaVersion)
 	}
 	return d, nil
@@ -255,7 +255,7 @@ func (d *DB) applyMigration(m migration) error {
 }
 
 // ResetDerived empties every derived table inside one transaction: it is what
-// `matev2 reindex` runs before rebuilding from the files. The schema and its
+// `mate reindex` runs before rebuilding from the files. The schema and its
 // version are left alone.
 //
 // AUTOINCREMENT keeps its high-water mark in `sqlite_sequence`, so the

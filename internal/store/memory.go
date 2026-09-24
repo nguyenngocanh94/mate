@@ -1,7 +1,7 @@
 package store
 
 // ReplaceMemoryFile rewrites `mate/memory.md` atomically, through the
-// workspace boundary. Its one caller is `matev2 remember`, which reads the
+// workspace boundary. Its one caller is `mate remember`, which reads the
 // file, adds one entry and writes the whole result back; the Mate edits the
 // file itself when it curates, and the app's start never overwrites it
 // (internal/mateassets.Write).

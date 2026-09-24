@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/box"
 )
 
 // The event vocabulary, spelled here because this package must not import
@@ -265,7 +265,7 @@ var crewEdges = []Edge{
 	{ID: "crew.health", Kind: KindHealthChanged, To: stay,
 		Why: "the composer is an observation of a pane and keeps nothing a rebuild could read back"},
 	{ID: "crew.unresolved", Kind: KindIngestUnresolved, To: stay,
-		Why: "matev2 cannot find its transcript; that is matev2's problem, not a move"},
+		Why: "mate cannot find its transcript; that is mate's problem, not a move"},
 	{ID: "crew.review", Kind: KindReviewStarted, To: stay,
 		Why: "being reviewed is where it already is: waiting for the review"},
 	{ID: "crew.mate.started", Kind: KindMateStarted, To: stay, Why: "the CEO's day, not the crew's"},
@@ -296,17 +296,17 @@ var mateEdges = []Edge{
 		Why: "the captain typed into its pane: the phone is ringing in the CEO's office"},
 	{ID: "mate.reads.echo", Kind: KindMessageSent, From: []State{ReceivingDigest}, When: theHooksEcho,
 		To: Reading, Target: keepTarget,
-		Why: "the Mate's own hook recording that it read the line matev2 typed: the note is off the desk and in its hands"},
+		Why: "the Mate's own hook recording that it read the line mate typed: the note is off the desk and in its hands"},
 	{ID: "mate.message", Kind: KindMessageSent, To: stay,
 		Why: "its own line out, or an echo of a line already counted"},
 
 	{ID: "mate.digest", Kind: KindDigestSent, From: mateHere, To: ReceivingDigest,
 		Detail: word(DetailDigest), Target: crewOfTheNote,
-		Why: "matev2 walks the digest in and puts it on the desk"},
+		Why: "mate walks the digest in and puts it on the desk"},
 	{ID: "mate.digest.away", Kind: KindDigestSent, To: stay, Why: "there is nobody in the office"},
 	{ID: "mate.assign", Kind: KindAssignClicked, From: mateHere, To: ReceivingDigest,
 		Detail: word(DetailAssign), Target: crewOfTheNote,
-		Why: "matev2 walks the captain's note in and puts it on the desk"},
+		Why: "mate walks the captain's note in and puts it on the desk"},
 	{ID: "mate.assign.away", Kind: KindAssignClicked, To: stay, Why: "there is nobody in the office"},
 
 	{ID: "mate.reads", Kind: KindTurnStarted, From: []State{ReceivingDigest}, Via: Reading, To: Deciding,
@@ -329,14 +329,14 @@ var mateEdges = []Edge{
 	{ID: "mate.reviews", Kind: KindReviewStarted, From: mateHere, To: Reviewing, Target: subject,
 		Why: "the review starts"},
 	{ID: "mate.reviews.away", Kind: KindReviewStarted, To: stay, Why: "there is nobody in the office"},
-	{ID: "mate.reviews.diff", Kind: KindToolCalled, From: mateHere, When: runsMatev2Diff,
+	{ID: "mate.reviews.diff", Kind: KindToolCalled, From: mateHere, When: runsMateDiff,
 		To: Reviewing, Target: crewOfTheDiff,
-		Why: "`matev2 diff <project> <crew>` is the Mate reading a crew's work; nothing emits `review.started` yet"},
+		Why: "`mate diff <project> <crew>` is the Mate reading a crew's work; nothing emits `review.started` yet"},
 	{ID: "mate.tool", Kind: KindToolCalled, To: stay, Why: "the work inside a turn is the turn's"},
 
 	{ID: "mate.merges", Kind: KindMergeDone, From: mateHere, When: mergedByTheMate,
 		Via: Merging, To: Idle, Target: subject,
-		Why: "the Mate ran `matev2 merge` itself (yolo), so it lands the work"},
+		Why: "the Mate ran `mate merge` itself (yolo), so it lands the work"},
 	{ID: "mate.merges.captain", Kind: KindMergeDone, To: stay,
 		Why: "the captain merged from the console: the crew leaves, the Mate did nothing"},
 
@@ -350,7 +350,7 @@ var mateEdges = []Edge{
 	{ID: "mate.tool.finished", Kind: KindToolFinished, To: stay, Why: "desk work"},
 	{ID: "mate.compacted", Kind: KindContextCompac, To: stay, Why: "its memory, not its position"},
 	{ID: "mate.health", Kind: KindHealthChanged, To: stay, Why: "an observation of a pane"},
-	{ID: "mate.unresolved", Kind: KindIngestUnresolved, To: stay, Why: "matev2 cannot find its transcript"},
+	{ID: "mate.unresolved", Kind: KindIngestUnresolved, To: stay, Why: "mate cannot find its transcript"},
 	{ID: "mate.mode", Kind: KindModeChanged, To: stay, Why: "the project's mode, not the Mate's position"},
 }
 
@@ -386,7 +386,7 @@ func toThisActor(v view) bool { return v.ev.SubjectID == v.m.actor.ID }
 func byThisActor(v view) bool { return v.ev.ActorID == v.m.actor.ID }
 
 // captainsOwnLine is a line the captain typed into the Mate's pane. It is
-// neither a digest nor an `[assign]` - those are matev2's own, and have their
+// neither a digest nor an `[assign]` - those are mate's own, and have their
 // own kinds - and it is not the hook's echo, whose channel is `hook`.
 func captainsOwnLine(v view) bool {
 	return v.p.actors[v.ev.ActorID].Kind == ActorUser &&
@@ -395,21 +395,21 @@ func captainsOwnLine(v view) bool {
 }
 
 // theHooksEcho is the Mate's own UserPromptSubmit hook writing back the line
-// matev2 typed into its pane, which is the one fact in `sent.log` that proves
+// mate typed into its pane, which is the one fact in `sent.log` that proves
 // the model read it (docs/timeline.md section 4, `"confirms": true`).
 func theHooksEcho(v view) bool {
 	return v.ev.field("confirms") == "true" && v.ev.SubjectID == v.m.actor.ID
 }
 
 // mergedByTheMate reads the `by` the causality pass wrote: `mate` when a Mate
-// turn ran `matev2 merge`, `captain` when the console did and no event exists
+// turn ran `mate merge`, `captain` when the console did and no event exists
 // to point at (docs/timeline.md section 5).
 func mergedByTheMate(v view) bool { return v.ev.field("by") == ActorMate }
 
 // theMate is the project's Mate: who a crew faces when it walks to the door.
 func theMate(v view) string { return v.p.mateID }
 
-// fromActor is whoever sent the line: the captain for a pane message, matev2
+// fromActor is whoever sent the line: the captain for a pane message, mate
 // for a digest or an `[assign]`.
 func fromActor(v view) string { return v.ev.ActorID }
 
@@ -452,21 +452,21 @@ func noteInHand(v view) string {
 // keepTarget leaves the Mate facing whoever it was already facing.
 func keepTarget(v view) string { return v.m.target }
 
-// matev2Diff finds `matev2 diff <project> <crew>` in a shell command. The
+// mateDiff finds `mate diff <project> <crew>` in a shell command. The
 // command is the `target` of the tool call, which internal/timeline already
 // unwrapped and shortened to its first 80 runes - long enough for the two
 // words after `diff`, which is all this needs.
-var matev2Diff = regexp.MustCompile(`matev2 diff\s+(\S+)\s+(\S+)`)
+var mateDiff = regexp.MustCompile(`mate diff\s+(\S+)\s+(\S+)`)
 
 func crewOfTheDiff(v view) string {
 	if v.ev.field("class") != "shell" {
 		return ""
 	}
-	match := matev2Diff.FindStringSubmatch(v.ev.field("target"))
+	match := mateDiff.FindStringSubmatch(v.ev.field("target"))
 	if match == nil {
 		return ""
 	}
 	return v.p.crewByName[strings.Trim(match[2], `"'`)]
 }
 
-func runsMatev2Diff(v view) bool { return crewOfTheDiff(v) != "" }
+func runsMateDiff(v view) bool { return crewOfTheDiff(v) != "" }

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
-	"github.com/nguyenngocanh94/matev2/internal/timeline/scene"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/timeline/scene"
 )
 
 // The depth test of docs/mvp.md task 26. The claim is that the office scene
@@ -83,7 +83,7 @@ func newSceneFixture(t *testing.T) *fixture {
 }
 
 // mergeFixtureBranch puts the crew's branch into the default branch the way
-// `matev2 merge` does: fast-forward, and the branch left behind is not what
+// `mate merge` does: fast-forward, and the branch left behind is not what
 // the ingest keys on anyway.
 func mergeFixtureBranch(t *testing.T, f *fixture) {
 	t.Helper()
@@ -244,7 +244,7 @@ func TestTheSceneReachesEveryStateOrNamesTheOnesItCannot(t *testing.T) {
 	// covered by the scene package's own table-driven test instead.
 	expectedMisses := map[scene.State]string{
 		scene.Reviewing: "the captain reviewed the diff in the console, which writes no file; " +
-			"the Mate never ran `matev2 diff` and nothing emits `review.started`",
+			"the Mate never ran `mate diff` and nothing emits `review.started`",
 		scene.Merging: "the captain merged from the console, so `merge.done` carries `by: captain` " +
 			"and the Mate's own hands stayed clean",
 	}
@@ -311,7 +311,7 @@ func TestVNowReadsTheProjection(t *testing.T) {
 	if mate.State != scene.Idle {
 		t.Fatalf("the Mate ends the run in %s, want idle", mate.State)
 	}
-	// The captain, matev2 and the observer are actors with no scene, and
+	// The captain, mate and the observer are actors with no scene, and
 	// v_now still lists them: a row with no state is the honest answer.
 	if len(rows) < 3 {
 		t.Fatalf("v_now lists %d actor(s)", len(rows))
@@ -365,7 +365,7 @@ func dumpTransitions(t *testing.T, f *fixture) string {
 }
 
 // The narrated scene is the M5 claim in one file: somebody who has never seen
-// matev2 reads this and knows what happened in the office. The golden is the
+// mate reads this and knows what happened in the office. The golden is the
 // whole run, so a phrase that changes shows up as a diff rather than as a
 // sentence nobody reads.
 func TestSceneNarrateGolden(t *testing.T) {
@@ -389,14 +389,14 @@ func TestSceneNarrateGolden(t *testing.T) {
 	got := strings.Join(lines, "\n") + "\n"
 
 	golden := "testdata/scene.golden"
-	if os.Getenv("MATEV2_UPDATE_GOLDEN") == "1" {
+	if os.Getenv("MATE_UPDATE_GOLDEN") == "1" {
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatalf("write golden: %v", err)
 		}
 	}
 	want, err := os.ReadFile(golden)
 	if err != nil {
-		t.Fatalf("read golden: %v (re-run with MATEV2_UPDATE_GOLDEN=1 to create it)", err)
+		t.Fatalf("read golden: %v (re-run with MATE_UPDATE_GOLDEN=1 to create it)", err)
 	}
 	if got != string(want) {
 		t.Fatalf("the narrated scene changed.\n--- got ---\n%s\n--- want ---\n%s", got, want)

@@ -1,10 +1,10 @@
-// Package timeline reads the files matev2 already writes - `crews/<id>.status`,
+// Package timeline reads the files mate already writes - `crews/<id>.status`,
 // `sent.log`, `incidents.log`, the `.meta` files, the harness transcripts and
 // the crews' git branches - and records what they say into `internal/db` as
 // one causally linked story (docs/mvp.md section M5, task 25).
 //
 // It writes nothing back. Every rule here is a reading rule, and
-// `matev2 reindex` proves it: dropping every derived table and running the
+// `mate reindex` proves it: dropping every derived table and running the
 // same ingest over the same files rebuilds the same rows, with the same
 // `event.id`s, so nothing in the database is a fact the files do not carry.
 // The one exception is written down rather than hidden - see `mode.changed`

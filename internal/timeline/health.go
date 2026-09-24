@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
 // ToolThinking is the tool name of a synthesised action: the stretch where an

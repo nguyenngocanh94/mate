@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/query"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // errNotFound is a 404 with a sentence: an unknown project or an unknown
@@ -37,7 +37,7 @@ func (s *Server) lastEventID(ctx context.Context) (int64, error) {
 
 // sceneRows reads `v_now` for one project, keyed by actor id.
 //
-// It does not go through scene.Now: that helper is `matev2 events --scene`'s
+// It does not go through scene.Now: that helper is `mate events --scene`'s
 // and selects the eight columns the snapshot line prints, which do not
 // include `context_pct` (added to the view by schema v2 for task 27). The
 // page needs it on every row, so this reads the view directly and joins
@@ -104,7 +104,7 @@ func (s *Server) actorFacts(ctx context.Context, actorID string) (actorFacts, bo
 // pricing row of all zeroes is not a price (docs/timeline.md section 10).
 // There is no task row for a Mate, so `v_task_ledger` cannot answer for
 // one and this does, from `turn` directly. It is the same SQL
-// cmd/matev2/usage.go's mateLedgerRow runs, and the unit tests compare the
+// cmd/mate/usage.go's mateLedgerRow runs, and the unit tests compare the
 // two number for number.
 func (s *Server) actorTotals(ctx context.Context, actorID string) (int64, Tokens, *float64, error) {
 	var turns int64
@@ -215,7 +215,7 @@ func (s *Server) task(ctx context.Context, project, crew string, now time.Time) 
 			return t, nil
 		}
 	}
-	return Task{}, notFound("no crew %q in project %q; `matev2 crew list %s --all` names the ones there are", crew, project, project)
+	return Task{}, notFound("no crew %q in project %q; `mate crew list %s --all` names the ones there are", crew, project, project)
 }
 
 // turns reads an actor's turns in the order they happened, with the kind of
@@ -320,7 +320,7 @@ func (s *Server) actions(ctx context.Context, turnID string) ([]Action, error) {
 }
 
 // turnEvents are the `v_story` rows recorded inside one turn - the same
-// rows, in the same shape and the same field order, that `matev2 events`
+// rows, in the same shape and the same field order, that `mate events`
 // prints as JSON lines.
 func (s *Server) turnEvents(ctx context.Context, project, turnID string) ([]timeline.StoryEvent, error) {
 	out, err := timeline.Story(ctx, s.db.SQL(), timeline.StoryQuery{Project: project, TurnID: turnID})
@@ -413,7 +413,7 @@ func (s *Server) questions(ctx context.Context, actorID string) ([]Question, err
 }
 
 // inbox is the project's waiting decisions, through query.LoadBox - the
-// exact loader cmd/matev2/console_session.go hands the console's rail, so
+// exact loader cmd/mate/console_session.go hands the console's rail, so
 // the page and the TUI cannot disagree about what is waiting. It reads
 // files and writes none.
 func (s *Server) inbox(project string) ([]InboxItem, string) {

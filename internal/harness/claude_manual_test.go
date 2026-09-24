@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // manualInCwdSpec is a Mate-shaped Claude launch: a cwd that already holds

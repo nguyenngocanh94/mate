@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The incidents.log contract is docs/mvp.md section 4b: append-only,

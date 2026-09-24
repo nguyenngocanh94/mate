@@ -1,7 +1,7 @@
-MODULE := github.com/nguyenngocanh94/matev2
+MODULE := github.com/nguyenngocanh94/mate
 GO ?= go
 GOFMT ?= gofmt
-BIN ?= bin/matev2
+BIN ?= bin/mate
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -19,11 +19,11 @@ SHELL := /bin/bash
 all: check build
 
 build:
-	$(GO) build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/matev2
+	$(GO) build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/mate
 
 # gotestreport prints every skip and fails on any skip not declared in
 # scripts/gotestreport/expected-skips.txt. Live Herdr/harness tests run
-# only with MATEV2_LIVE=1.
+# only with MATE_LIVE=1.
 test:
 	set -o pipefail; $(GO) test -json ./... | $(GO) run ./scripts/gotestreport
 

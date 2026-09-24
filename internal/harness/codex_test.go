@@ -150,7 +150,7 @@ func TestCodexBindsCwdAndOverride(t *testing.T) {
 	// opposite.
 	for _, must := range []string{
 		"can write outside its own worktree",
-		".matev2/mate.db",
+		".mate/mate.db",
 		"other Crews' worktrees",
 		"operator's home directory",
 	} {

@@ -5,7 +5,7 @@
       {
         "hooks": [
           {
-            "command": "'/usr/local/bin/matev2' hook mate-session",
+            "command": "'/usr/local/bin/mate' hook mate-session",
             "type": "command"
           }
         ]
@@ -15,7 +15,7 @@
       {
         "hooks": [
           {
-            "command": "'/usr/local/bin/matev2' hook mate-stop",
+            "command": "'/usr/local/bin/mate' hook mate-stop",
             "type": "command"
           }
         ]
@@ -25,7 +25,7 @@
       {
         "hooks": [
           {
-            "command": "'/usr/local/bin/matev2' hook mate-prompt",
+            "command": "'/usr/local/bin/mate' hook mate-prompt",
             "type": "command"
           }
         ]

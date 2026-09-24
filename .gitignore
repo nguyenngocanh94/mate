@@ -4,9 +4,9 @@
 *.test
 *.out
 .DS_Store
-/.matev2/
+/.mate/
 /.worktrees/
 /skip-report.md
 /skip-report-race.md
 /.claude/worktrees/
-/matev2
+/mate

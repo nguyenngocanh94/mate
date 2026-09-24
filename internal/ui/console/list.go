@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The list pane: the left-hand region showing Projects, then a Project's
@@ -42,7 +42,7 @@ const (
 	// colTokens is the Project level's TOKENS column, on the Mate row and
 	// every Crew row (mvp.md M5 task 27): a humanised total, plus a cost
 	// once pricing.yaml prices the model - "96k" or "96k $0.12". Read from
-	// `.matev2/matev2.db` and therefore, like Health, appears only once the
+	// `.mate/mate.db` and therefore, like Health, appears only once the
 	// Console's wiring has filled it in; a snapshot with none draws a blank
 	// cell here rather than "0".
 	colTokens = 15
@@ -711,7 +711,7 @@ func healthSpans(h query.Field[query.CrewHealth], p palette) []span {
 // tokensSpans renders the TOKENS column (mvp.md M5 task 27): a humanised
 // total, plus a cost once `pricing.yaml` prices the model - "96k" or
 // "96k $0.12". Like healthSpans, Absent draws nothing rather than "0": the
-// value comes from the Console's wiring reading `.matev2/matev2.db` after
+// value comes from the Console's wiring reading `.mate/mate.db` after
 // query.Load returns, and a snapshot nobody has read the database for is not
 // a snapshot of zero tokens spent.
 func tokensSpans(t query.Field[query.TokenValue], p palette) []span {

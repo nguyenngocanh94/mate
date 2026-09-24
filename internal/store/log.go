@@ -11,7 +11,7 @@ import (
 )
 
 // The three append-only logs. `crews/<id>.status` is what a crew writes with
-// `echo "state: one line" >> $MATEV2_STATUS`, so its format is whatever the
+// `echo "state: one line" >> $MATE_STATUS`, so its format is whatever the
 // crew echoed: one line, no escaping. `sent.log` records every line the app
 // put into a pane, so it is written only by this package and can afford a
 // fixed shape; `incidents.log` is the observer's (docs/mvp.md section 4b) and

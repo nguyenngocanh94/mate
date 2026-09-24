@@ -2,7 +2,7 @@ package gitx_test
 
 // The review pair of mvp.md task 21: LogOneline lists what a crew branch
 // carries, Diff shows it. Both run the real git against temp repositories
-// here, because what the `matev2 diff` command depends on is what git
+// here, because what the `mate diff` command depends on is what git
 // actually does with the ranges - the argv-level test at the bottom is the
 // fake-runner half, and it exists to pin the two dot counts apart.
 
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 func TestLogOnelineListsTheBranchsOwnCommitsNewestFirst(t *testing.T) {
@@ -21,7 +21,7 @@ func TestLogOnelineListsTheBranchsOwnCommitsNewestFirst(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(wt, "README.md"), []byte("shop\nfirst\n"), 0o644); err != nil {
@@ -33,7 +33,7 @@ func TestLogOnelineListsTheBranchsOwnCommitsNewestFirst(t *testing.T) {
 	}
 	run(t, wt, "commit", "-am", "add second line")
 
-	out, err := g.LogOneline(ctx, wt, "main", "matev2/k3")
+	out, err := g.LogOneline(ctx, wt, "main", "mate/k3")
 	if err != nil {
 		t.Fatalf("LogOneline: %v", err)
 	}
@@ -55,18 +55,18 @@ func TestLogOnelineAndDiffAreEmptyForABranchWithNoCommits(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
 
-	log, err := g.LogOneline(ctx, wt, "main", "matev2/k3")
+	log, err := g.LogOneline(ctx, wt, "main", "mate/k3")
 	if err != nil {
 		t.Fatalf("LogOneline: %v", err)
 	}
 	if strings.TrimSpace(log) != "" {
 		t.Fatalf("LogOneline on a branch with no commits = %q, want empty", log)
 	}
-	diff, err := g.Diff(ctx, wt, "main", "matev2/k3", false)
+	diff, err := g.Diff(ctx, wt, "main", "mate/k3", false)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestDiffIgnoresCommitsTheBaseGainedAfterTheBranchStarted(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(wt, "crew.txt"), []byte("crew work\n"), 0o644); err != nil {
@@ -100,7 +100,7 @@ func TestDiffIgnoresCommitsTheBaseGainedAfterTheBranchStarted(t *testing.T) {
 	run(t, repo, "add", "captain.txt")
 	run(t, repo, "commit", "-m", "captain adds a file")
 
-	diff, err := g.Diff(ctx, wt, "main", "matev2/k3", false)
+	diff, err := g.Diff(ctx, wt, "main", "mate/k3", false)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestDiffIgnoresCommitsTheBaseGainedAfterTheBranchStarted(t *testing.T) {
 		t.Fatalf("Diff reported base's own commit as the crew's change (two-dot range):\n%s", diff)
 	}
 
-	stat, err := g.Diff(ctx, wt, "main", "matev2/k3", true)
+	stat, err := g.Diff(ctx, wt, "main", "mate/k3", true)
 	if err != nil {
 		t.Fatalf("Diff --stat: %v", err)
 	}
@@ -131,20 +131,20 @@ func TestDiffAndLogArgvAreExactlyWhatGitIsGiven(t *testing.T) {
 	g := gitx.Git{Runner: f}
 	ctx := context.Background()
 
-	if _, err := g.LogOneline(ctx, "/w/.worktrees/shop-k3", "main", "matev2/k3"); err != nil {
+	if _, err := g.LogOneline(ctx, "/w/.worktrees/shop-k3", "main", "mate/k3"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := g.Diff(ctx, "/w/.worktrees/shop-k3", "main", "matev2/k3", false); err != nil {
+	if _, err := g.Diff(ctx, "/w/.worktrees/shop-k3", "main", "mate/k3", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := g.Diff(ctx, "/w/.worktrees/shop-k3", "main", "matev2/k3", true); err != nil {
+	if _, err := g.Diff(ctx, "/w/.worktrees/shop-k3", "main", "mate/k3", true); err != nil {
 		t.Fatal(err)
 	}
 
 	want := [][]string{
-		{"log", "--oneline", "main..matev2/k3"},
-		{"diff", "main...matev2/k3"},
-		{"diff", "--stat", "main...matev2/k3"},
+		{"log", "--oneline", "main..mate/k3"},
+		{"diff", "main...mate/k3"},
+		{"diff", "--stat", "main...mate/k3"},
 	}
 	if len(f.calls) != len(want) {
 		t.Fatalf("calls = %d, want %d", len(f.calls), len(want))

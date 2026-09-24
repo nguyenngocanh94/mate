@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/autopilot"
+	"github.com/nguyenngocanh94/mate/internal/autopilot"
 )
 
 // section extracts the text between a heading and the next numbered

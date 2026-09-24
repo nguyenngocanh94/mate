@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The message box's own fixtures (mvp.md task 15). The session-mate-* and
@@ -106,7 +106,7 @@ func TestGoldenSessionHeaderLabelsAutoMode(t *testing.T) {
 func sessionGoldenTerminal(t *testing.T) *TerminalBuffer {
 	t.Helper()
 	b := NewTerminalBuffer(83, 33)
-	if _, err := b.Write([]byte("shop-mate $ matev2 crew list\r\nk3  needs-decision\r\nshop-mate $ ")); err != nil {
+	if _, err := b.Write([]byte("shop-mate $ mate crew list\r\nk3  needs-decision\r\nshop-mate $ ")); err != nil {
 		t.Fatalf("seed the terminal buffer: %v", err)
 	}
 	b.Flush()

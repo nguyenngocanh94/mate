@@ -1,6 +1,6 @@
 10:43:30 the Mate starts up (claude)
 10:43:38 the Mate starts a turn
-10:43:43 the Mate runs: for f in /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.matev2/WORKSP…
+10:43:43 the Mate runs: for f in /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/WORKSPAC…
 10:43:43 the Mate ends a turn after 4.7s (1 tool call(s), 408 output tokens)
 10:43:43 the Mate finishes Bash in 488ms
 10:43:50 the captain tells the Mate: "Add a Buy button to the end of README.md in project shop, linking to our checkout page. Us…"
@@ -10,16 +10,16 @@
 10:44:11 buybtn starts a turn
 10:44:12 the Mate ends a turn after 20.9s (1 tool call(s), 911 output tokens)
 10:44:12 the Mate finishes Bash in 11.4s
-10:44:19 buybtn runs: echo "working: verifying isolated worktree and task brief" >> "$MATEV2_STATUS" p…
+10:44:19 buybtn runs: echo "working: verifying isolated worktree and task brief" >> "$MATE_STATUS" pwd…
 10:44:19 buybtn reports: verifying isolated worktree and task brief
 10:44:19 buybtn finishes exec in 105ms
 10:44:19 buybtn ends a turn after 7.5s (1 tool call(s), 173 output tokens)
 10:44:19 buybtn starts a turn
 10:44:21 the Mate starts a turn
-10:44:21 the Mate runs: cat >> backlog.md <<'EOF' ## In flight - buybtn — branch `matev2/buybtn` — appen…
+10:44:21 the Mate runs: cat >> backlog.md <<'EOF' ## In flight - buybtn — branch `mate/buybtn` — append …
 10:44:21 the Mate ends a turn after 71ms (1 tool call(s), 309 output tokens)
 10:44:21 the Mate finishes Bash in 71ms
-10:44:23 buybtn runs: sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.matev2…
+10:44:23 buybtn runs: sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/p…
 10:44:23 buybtn finishes exec in 78ms
 10:44:23 buybtn ends a turn after 4.2s (1 tool call(s), 111 output tokens)
 10:44:23 buybtn starts a turn
@@ -28,7 +28,7 @@
 10:44:28 buybtn finishes exec in 112ms
 10:44:28 buybtn ends a turn after 5.2s (1 tool call(s), 188 output tokens)
 10:44:28 buybtn starts a turn
-10:44:28 the Mate runs: sleep 20; /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/matev2 state …
+10:44:28 the Mate runs: sleep 20; /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/mate state sh…
 10:44:33 buybtn runs: echo "needs-decision: what is the checkout page URL for the Buy button?" >> "$MA…
 10:44:33 buybtn writes a question into its status file
 10:44:33 crew buybtn asks the Mate: "what is the checkout page URL for the Buy button?"
@@ -40,25 +40,25 @@
 10:44:48 the Mate ends a turn after 21.1s (1 tool call(s), 152 output tokens)
 10:44:48 the Mate finishes Bash in 20.1s
 10:44:54 the Mate starts a turn
-10:44:54 the Mate runs: cat /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.matev2/projects/sh…
+10:44:54 the Mate runs: cat /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop…
 10:44:54 the Mate ends a turn after 54ms (1 tool call(s), 188 output tokens)
 10:44:54 the Mate's Bash fails
 10:44:59 the Mate starts a turn
-10:44:59 the Mate runs: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/matev2 peek shop buybtn…
+10:44:59 the Mate runs: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/mate peek shop buybtn 2…
 10:44:59 the Mate ends a turn after 62ms (1 tool call(s), 129 output tokens)
 10:44:59 the Mate finishes Bash in 62ms
 10:45:10 the Mate starts a turn
-10:45:12 the Mate runs: sed -i '' 's|^- buybtn — branch `matev2/buybtn` — append a Buy button.*|& — WAIT…
+10:45:12 the Mate runs: sed -i '' 's|^- buybtn — branch `mate/buybtn` — append a Buy button.*|& — WAITIN…
 10:45:13 the Mate ends a turn after 2.6s (1 tool call(s), 343 output tokens)
 10:45:13 the Mate finishes Bash in 53ms
 10:45:23 the Mate starts a turn
 10:45:23 the Mate ends a turn after 0ms (0 tool call(s), 206 output tokens)
 10:45:45 the Mate starts a turn
-10:45:47 the Mate runs: cat /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.matev2/projects/sh…
+10:45:47 the Mate runs: cat /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop…
 10:45:47 the Mate ends a turn after 1.6s (1 tool call(s), 800 output tokens)
 10:45:47 the Mate finishes Bash in 89ms
 10:45:57 the Mate starts a turn
-10:45:59 the Mate runs: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/matev2 send shop buybtn…
+10:45:59 the Mate runs: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/mate send shop buybtn "…
 10:46:00 the Mate sends buybtn: "Use pages/checkout-express.html for the Buy button."
 10:46:00 the Mate answers buybtn: "Use pages/checkout-express.html for the Buy button." (it waited 1m27s)
 10:46:00 buybtn starts a turn
@@ -69,7 +69,7 @@
 10:46:05 buybtn ends a turn after 5.7s (1 tool call(s), 202 output tokens)
 10:46:05 buybtn starts a turn
 10:46:10 the Mate starts a turn
-10:46:10 the Mate runs: sleep 20; /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/matev2 state …
+10:46:10 the Mate runs: sleep 20; /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/mate state sh…
 10:46:11 buybtn edits …/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn/README.md
 10:46:11 buybtn finishes exec in 24ms
 10:46:11 buybtn ends a turn after 5.5s (1 tool call(s), 208 output tokens)
@@ -82,12 +82,12 @@
 10:46:20 buybtn finishes exec in 131ms
 10:46:20 buybtn ends a turn after 4.9s (1 tool call(s), 171 output tokens)
 10:46:20 buybtn starts a turn
-10:46:24 buybtn runs: echo "wait-mate: ready in branch matev2/buybtn" >> "$MATEV2_STATUS"
-10:46:24 buybtn hands back: ready in branch matev2/buybtn
+10:46:24 buybtn runs: echo "wait-mate: ready in branch mate/buybtn" >> "$MATE_STATUS"
+10:46:24 buybtn hands back: ready in branch mate/buybtn
 10:46:24 buybtn finishes exec in 62ms
 10:46:24 buybtn ends a turn after 4.1s (1 tool call(s), 133 output tokens)
 10:46:24 buybtn starts a turn
 10:46:27 buybtn ends a turn after 2.7s (0 tool call(s), 52 output tokens)
 10:46:30 the Mate ends a turn after 20.1s (1 tool call(s), 125 output tokens)
 10:46:30 the Mate finishes Bash in 20.1s
-10:46:40 the Mate reports to the captain: "buybtn is ready in branch matev2/buybtn; say the word and I will land it."
+10:46:40 the Mate reports to the captain: "buybtn is ready in branch mate/buybtn; say the word and I will land it."

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// These identity types lived in v1's internal/domain, which matev2 does not
+// These identity types lived in v1's internal/domain, which mate does not
 // have. They are the only pieces of it the harness and runtime adapters
 // used, so they live with the harness that gives them meaning.
 
@@ -17,7 +17,7 @@ var (
 	ErrInvalidValue = errors.New("invalid value")
 )
 
-// Kind is a supported agent harness. matev2 launches the two v1 probed:
+// Kind is a supported agent harness. mate launches the two v1 probed:
 // Claude Code and Codex CLI.
 type Kind string
 
@@ -75,7 +75,7 @@ func (m ModelRef) IsZero() bool {
 }
 
 // AgentRole is the caller role. Agents never self-declare a different
-// identity; the binary injects this via MATEV2_AGENT_ROLE.
+// identity; the binary injects this via MATE_AGENT_ROLE.
 type AgentRole string
 
 const (
@@ -96,7 +96,7 @@ func ParseAgentRole(s string) (AgentRole, error) {
 	case "":
 		return "", fmt.Errorf("agent role: %w", ErrEmptyValue)
 	default:
-		// Enum-shaped and caller-supplied (MATEV2_AGENT_ROLE): list what is
+		// Enum-shaped and caller-supplied (MATE_AGENT_ROLE): list what is
 		// allowed rather than echoing a value that may be a secret.
 		return "", fmt.Errorf("agent role must be one of user, mate, crew: %w", ErrInvalidValue)
 	}

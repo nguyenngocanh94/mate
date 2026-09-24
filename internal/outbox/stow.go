@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/memory"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Stow before a restart (docs/mvp.md task 37,
 // docs/research/firstmate-memory-2026-09-24.md B7). A restart loses the
-// Mate's conversation, and whatever it did not file is gone; matev2 owns the
+// Mate's conversation, and whatever it did not file is gone; mate owns the
 // one place a Mate is restarted, so it asks first, through the same queue
 // and the same verified send as every other line the app types into a Mate:
-// `⟦matev2⟧ stow: ...` (memory.StowLine), then a wait for that turn to end,
+// `⟦mate⟧ stow: ...` (memory.StowLine), then a wait for that turn to end,
 // bounded, then the restart.
 
 // DefaultStowCeiling bounds the whole stow: the line reaching the composer
@@ -39,7 +39,7 @@ type StowOptions struct {
 	// Poll is the pause between looks; zero means the sender's Interval.
 	Poll time.Duration
 	// RequireEmpty stows only into a composer that is empty right now: a
-	// Mate mid-turn is reported and not stowed (`matev2 mate stop`, where
+	// Mate mid-turn is reported and not stowed (`mate mate stop`, where
 	// the captain may want the Mate gone now). Without it a busy Mate is
 	// stowed once its turn ends, as any queued line is.
 	RequireEmpty bool

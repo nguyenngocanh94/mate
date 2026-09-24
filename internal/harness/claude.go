@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Claude is the HarnessAdapter for Claude Code. Default delivery is

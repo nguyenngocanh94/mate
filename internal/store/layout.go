@@ -5,7 +5,7 @@ import "path/filepath"
 // Names of the directories and files of docs/mvp.md section 3. They are here
 // so no other package spells them.
 const (
-	StateDirName     = ".matev2"
+	StateDirName     = ".mate"
 	WorktreesDirName = ".worktrees"
 
 	workspaceFileName = "workspace.yaml"
@@ -39,27 +39,27 @@ const (
 // Root is the resolved absolute path of the workspace.
 func (w *Workspace) Root() string { return w.root }
 
-// StateDir is `<root>/.matev2`.
+// StateDir is `<root>/.mate`.
 func (w *Workspace) StateDir() string { return filepath.Join(w.root, StateDirName) }
 
-// WorkspaceFile is `<root>/.matev2/workspace.yaml`.
+// WorkspaceFile is `<root>/.mate/workspace.yaml`.
 func (w *Workspace) WorkspaceFile() string { return filepath.Join(w.StateDir(), workspaceFileName) }
 
-// WorkspaceDoc is `<root>/.matev2/WORKSPACE.md`, the user's rules for every Mate.
+// WorkspaceDoc is `<root>/.mate/WORKSPACE.md`, the user's rules for every Mate.
 func (w *Workspace) WorkspaceDoc() string { return filepath.Join(w.StateDir(), workspaceDocName) }
 
-// WorkspaceCrewDoc is `<root>/.matev2/CREW.md`, the captain's standing rules
+// WorkspaceCrewDoc is `<root>/.mate/CREW.md`, the captain's standing rules
 // for every Crew in the workspace, appended to the end of every brief
 // (docs/mvp.md M7). Optional.
 func (w *Workspace) WorkspaceCrewDoc() string { return filepath.Join(w.StateDir(), crewDocName) }
 
-// PricingFile is `<root>/.matev2/pricing.yaml`, unused before the token monitor.
+// PricingFile is `<root>/.mate/pricing.yaml`, unused before the token monitor.
 func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pricingFileName) }
 
-// ProjectsDir is `<root>/.matev2/projects`.
+// ProjectsDir is `<root>/.mate/projects`.
 func (w *Workspace) ProjectsDir() string { return filepath.Join(w.StateDir(), projectsDirName) }
 
-// ProjectDir is `<root>/.matev2/projects/<project>`.
+// ProjectDir is `<root>/.mate/projects/<project>`.
 func (w *Workspace) ProjectDir(project string) string {
 	return filepath.Join(w.ProjectsDir(), project)
 }

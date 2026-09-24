@@ -5,9 +5,9 @@ import (
 )
 
 // The paths and command the task 37 lab captures were taken with: a lab
-// Mate directory under /private/tmp, and a stand-in matev2 path.
+// Mate directory under /private/tmp, and a stand-in mate path.
 const (
-	fixtureOwnCommand = "'/usr/local/bin/matev2' hook mate-session"
+	fixtureOwnCommand = "'/usr/local/bin/mate' hook mate-session"
 	fixtureOneSource  = "/private/tmp/TestLiveZZMeasureCodexHookReview323707510/001/codexlab/.codex/hooks.json"
 	fixtureTwoSource  = "/private/tmp/TestLiveZZMeasureCodexHookReview8854139/001/codexlab/.codex/hooks.json"
 )
@@ -76,12 +76,12 @@ func TestHookEventReadsTheSelectedHook(t *testing.T) {
 		t.Fatalf("source = %q: the wrapped path was not joined", e.Detail.Source)
 	}
 	if !own.Matches(e.Detail) || e.Detail.Trusted() {
-		t.Fatalf("detail %+v: want matev2's own, untrusted", e.Detail)
+		t.Fatalf("detail %+v: want mate's own, untrusted", e.Detail)
 	}
 	// A different command, or the same command from another file, is not
-	// matev2's own hook.
+	// mate's own hook.
 	for _, other := range []OwnHook{
-		{Event: "SessionStart", Source: fixtureOneSource, Command: "'/usr/local/bin/matev2' hook mate-stop"},
+		{Event: "SessionStart", Source: fixtureOneSource, Command: "'/usr/local/bin/mate' hook mate-stop"},
 		{Event: "SessionStart", Source: "/elsewhere/.codex/hooks.json", Command: fixtureOwnCommand},
 		{Event: "Stop", Source: fixtureOneSource, Command: fixtureOwnCommand},
 	} {
@@ -98,8 +98,8 @@ func TestHookEventReadsTheSelectedHook(t *testing.T) {
 func TestHookEventMatchesAcrossAWrapThatDroppedASlash(t *testing.T) {
 	const (
 		root    = "/private/tmp/TestLiveCodexMateRecallHook1077437764"
-		source  = root + "/001/.matev2/projects/shop/mate/.codex/hooks.json"
-		command = "'" + root + "/002/matev2' hook mate-session --harness codex"
+		source  = root + "/001/.mate/projects/shop/mate/.codex/hooks.json"
+		command = "'" + root + "/002/mate' hook mate-session --harness codex"
 	)
 	e, ok := ParseCodexHookEvent(startupFixture(t, "codex-0.156.1-hooks-sessionstart-own-wrapped.txt"))
 	if !ok {
@@ -110,21 +110,21 @@ func TestHookEventMatchesAcrossAWrapThatDroppedASlash(t *testing.T) {
 	}
 	own := OwnHook{Event: "SessionStart", Source: source, Command: command}
 	if !own.Matches(e.Detail) {
-		t.Fatalf("matev2's own hook did not match its wrapped drawing: %+v", e.Detail)
+		t.Fatalf("mate's own hook did not match its wrapped drawing: %+v", e.Detail)
 	}
 	// Forgiving one dropped separator at a break forgives nothing else.
-	// (`.matev2projects` and `mate- session` do draw exactly like the real
+	// (`.mateprojects` and `mate- session` do draw exactly like the real
 	// values here - the screen lost that one character - and cannot be told
 	// apart by any reader of it. Neither can occur as a hook in this
 	// review: Codex loads project hooks only from the Mate cwd's own
 	// `.codex/hooks.json` chain, and a different command in that file means
-	// the file matev2 writes was rewritten.)
+	// the file mate writes was rewritten.)
 	for _, other := range []OwnHook{
-		{Event: "SessionStart", Source: root + "/001/.matev2//projects/shop/mate/.codex/hooks.json", Command: command},
-		{Event: "SessionStart", Source: root + "/001/.matev2/projects/shop/mate/.codex/hooks.json.bak", Command: command},
-		{Event: "SessionStart", Source: root + "/001/.matev2-projects/shop/mate/.codex/hooks.json", Command: command},
-		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/matev2' hook mate-sessionX --harness codex"},
-		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/matev2' hook mate-session"},
+		{Event: "SessionStart", Source: root + "/001/.mate//projects/shop/mate/.codex/hooks.json", Command: command},
+		{Event: "SessionStart", Source: root + "/001/.mate/projects/shop/mate/.codex/hooks.json.bak", Command: command},
+		{Event: "SessionStart", Source: root + "/001/.mate-projects/shop/mate/.codex/hooks.json", Command: command},
+		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/mate' hook mate-sessionX --harness codex"},
+		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/mate' hook mate-session"},
 		{Event: "Stop", Source: source, Command: command},
 	} {
 		if other.Matches(e.Detail) {
@@ -163,7 +163,7 @@ func TestHookEventTwoHooksOneForeign(t *testing.T) {
 		t.Fatalf("two-hook list = %+v (ok %v)", first, ok)
 	}
 	if own.Matches(first.Detail) {
-		t.Fatalf("the operator's user-config hook matched matev2's: %+v", first.Detail)
+		t.Fatalf("the operator's user-config hook matched mate's: %+v", first.Detail)
 	}
 	if first.Detail.Source[:len("User config - ")] != "User config - " {
 		t.Fatalf("source = %q", first.Detail.Source)

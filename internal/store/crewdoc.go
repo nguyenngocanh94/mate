@@ -19,7 +19,7 @@ import (
 const workspaceCrewDocSeed = `<!--
 Standing rules for every Crew in every project of this workspace, for example
 "Reproduce a bug end-to-end before you fix it."
-matev2 appends whatever you write below this comment to the end of every
+mate appends whatever you write below this comment to the end of every
 Crew's brief, under "Captain's standing crew rules". Every other part of the
 brief takes precedence over these rules where they conflict. A project's own
 CREW.md is appended after this one and wins over it.
@@ -31,8 +31,8 @@ func projectCrewDocSeed(project string) string {
 	return fmt.Sprintf(`<!--
 Standing rules for every Crew of project %s, for example
 "Run make check before you hand back."
-matev2 appends whatever you write below this comment to the end of every
-Crew's brief for this project, after the workspace's .matev2/CREW.md, and
+mate appends whatever you write below this comment to the end of every
+Crew's brief for this project, after the workspace's .mate/CREW.md, and
 these win where the two conflict. Every other part of the brief takes
 precedence over both.
 This comment is never sent.
@@ -85,7 +85,7 @@ func readRules(path string) (string, error) {
 }
 
 // ReplaceCrewBrief rewrites `crews/<crew>/brief.md` atomically. Its one
-// caller is `matev2 brief append`, the only edit the app makes to a brief
+// caller is `mate brief append`, the only edit the app makes to a brief
 // after spawn; the brief must already exist, because appending the
 // captain's words to a crew that was never briefed has no meaning.
 func (w *Workspace) ReplaceCrewBrief(project, crew string, data []byte) error {

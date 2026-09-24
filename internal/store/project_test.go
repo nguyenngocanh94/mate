@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // newProjectWorkspace initialises a workspace with the `shop` project already
@@ -148,7 +148,7 @@ func TestStoreAddProjectRejectsBadConfig(t *testing.T) {
 		{"repo outside workspace", "shop", store.ProjectConfig{Repo: outside}},
 		{"repo escaping with ..", "shop", store.ProjectConfig{Repo: "../elsewhere"}},
 		{"repo is the root", "shop", store.ProjectConfig{Repo: "."}},
-		{"repo inside state dir", "shop", store.ProjectConfig{Repo: ".matev2/projects"}},
+		{"repo inside state dir", "shop", store.ProjectConfig{Repo: ".mate/projects"}},
 		{"unsupported mode", "shop", store.ProjectConfig{Repo: "shop", Mode: "remote"}},
 	}
 	for _, tc := range cases {

@@ -49,7 +49,7 @@ type WorkspaceValue struct {
 // registered repos and its Crews.
 //
 // v1 hung Crews off a Task and a Task off the Project, so a Crew was one
-// numbered attempt at a Task. matev2 has no Task: mvp.md's model is
+// numbered attempt at a Task. mate has no Task: mvp.md's model is
 // Project -> {Mate, Crew}, where a Crew is spawned for one job, runs once
 // and is torn down (mvp.md sections 1 and 3). The attempts level went with
 // it.
@@ -64,7 +64,7 @@ type ProjectNode struct {
 	// Console's, not the Mate's.
 	Mode Mode
 	// Daemon is what the auto-mode daemon has done for this Project in this
-	// console's lifetime (mvp.md task 19). It is filled by cmd/matev2 after
+	// console's lifetime (mvp.md task 19). It is filled by cmd/mate after
 	// Load, not by Load: the daemon is a live thing in the console process,
 	// the way the observer's crew health is.
 	Daemon AutoDaemon
@@ -75,7 +75,7 @@ type ProjectNode struct {
 	// repo read.
 	Repos Field[[]RepoValue]
 	// Crews are the Project's open Crews, oldest first. A Crew is open
-	// until the Mate or the captain closes it with `matev2 crew stop`
+	// until the Mate or the captain closes it with `mate crew stop`
 	// (mvp.md section 4): a `done:` line is the Crew's report, not the end
 	// of its task - a scout ends when the captain accepts the report, a
 	// ship ends when its branch is merged - so a Crew that said `done`
@@ -113,7 +113,7 @@ type MateNode struct {
 	Binding   Field[BindingValue]
 	LastEvent Field[EventValue]
 	Error     Field[ErrorReason]
-	// Tokens is the Mate's token usage today, read from `.matev2/matev2.db`
+	// Tokens is the Mate's token usage today, read from `.mate/mate.db`
 	// (mvp.md M5 task 27) - see CrewNode.Tokens for why this package leaves
 	// it Absent and who fills it in.
 	Tokens Field[TokenValue]
@@ -137,7 +137,7 @@ type MateIdentity struct {
 // unrecognised word renders as itself rather than as a blank cell.
 type CrewNode struct {
 	// Closed is `stopped_at` in the Crew's meta: the Mate or the captain
-	// ran `matev2 crew stop`. Load drops closed Crews from ProjectNode.Crews
+	// ran `mate crew stop`. Load drops closed Crews from ProjectNode.Crews
 	// and counts them in ClosedCrews; the field is here for readers that
 	// load a single Crew.
 	Closed    bool
@@ -165,8 +165,8 @@ type CrewNode struct {
 	// section 4b: "Bên cạnh trạng thái luôn có một cột sức khỏe do quan
 	// sát, không phải trạng thái"). It is the one field in this package
 	// that is not recorded state, and it is deliberately not filled by
-	// Load: this package only reads `.matev2/`, and an observation comes
-	// from Herdr. The Console's wiring (cmd/matev2) asks internal/watch for
+	// Load: this package only reads `.mate/`, and an observation comes
+	// from Herdr. The Console's wiring (cmd/mate) asks internal/watch for
 	// its latest snapshot and fills this in after Load returns, so a Crew
 	// nobody is watching keeps the Absent field Load left - never a zero
 	// value that would render as "the agent is gone".
@@ -176,10 +176,10 @@ type CrewNode struct {
 	// in that order.
 	Health Field[CrewHealth]
 	// Tokens is this Crew's whole-task token usage, read from
-	// `.matev2/matev2.db`'s `v_task_ledger` (mvp.md M5 task 27). Like
+	// `.mate/mate.db`'s `v_task_ledger` (mvp.md M5 task 27). Like
 	// Health it is not this package's to fill: this package only reads
-	// `.matev2/`'s flat files, and the ledger lives in the derived
-	// database. The Console's wiring (cmd/matev2, alongside
+	// `.mate/`'s flat files, and the ledger lives in the derived
+	// database. The Console's wiring (cmd/mate, alongside
 	// withCrewHealth) opens the database read-only and fills this in after
 	// Load returns; a one-shot CLI read or a console that has not opened
 	// the database yet leaves it at the Absent Load gave it.

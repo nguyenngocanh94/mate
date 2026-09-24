@@ -25,7 +25,7 @@ const (
 	// the Crew cannot report for itself any more (mvp.md section 4b).
 	AttentionBlocked AttentionKind = "blocked"
 	// AttentionStaleBinding: the Crew's status looks fine but its runtime
-	// binding is recorded stale, so matev2 could not confirm the agent
+	// binding is recorded stale, so mate could not confirm the agent
 	// stopped and attach is refused.
 	AttentionStaleBinding AttentionKind = "stale"
 	// AttentionUnreadable: a field this row's health depends on came back

@@ -1,15 +1,15 @@
 // Package brief owns the shape of the `# Task` part of a Crew brief: the
 // sections the Mate fills (docs/mvp.md M7, schema from
 // docs/research/firstmate-prompting-2026-09-24.md section 11), the machine
-// check `matev2 brief check` and `matev2 crew spawn` run on it, and the one
-// edit the app makes to a brief after spawn, `matev2 brief append`.
+// check `mate brief check` and `mate crew spawn` run on it, and the one
+// edit the app makes to a brief after spawn, `mate brief append`.
 //
 // The check is shape only, never meaning, after firstmate's "Logic that can
 // be exact lives in deterministic scripts; work that requires understanding
 // lives in an agent" (VISION.md): it decides by headings, list items and a
 // handful of literal markers, and it never judges whether a sentence is a
 // good acceptance criterion. firstmate's own check (bin/fm-spawn.sh 2830-2842)
-// covers two sections; matev2 checks more because its Mate reviews without a
+// covers two sections; mate checks more because its Mate reviews without a
 // pipeline and writes briefs without reading the repository (decision 1), so
 // `## Acceptance` and `## Open decisions` carry what firstmate gets from
 // no-mistakes and from reading the code.
@@ -523,7 +523,7 @@ func placeholder(s section) (Problem, bool) {
 
 // speakerLabel matches a line that opens with a label saying who spoke,
 // after firstmate's fm_brief_intent_address_line ("Captain:", "Captain's
-// words:", "Captain,", "[captain]"), widened to the spellings a matev2 Mate
+// words:", "Captain,", "[captain]"), widened to the spellings a mate Mate
 // has actually produced or could: "The captain said:", "User:", and the
 // Vietnamese the captain writes in ("Người dùng nói:", "Thuyền trưởng:").
 var speakerLabel = regexp.MustCompile(`(?i)^(?:\[captain\]|(?:the\s+)?(?:captain|user)(?:'s\s+(?:words|ask|intent|message|request))?(?:\s+(?:said|says|wrote|writes|asked|asks))?\s*[:,]|(?:người dùng|thuyền trưởng)(?:\s+(?:nói|viết|hỏi))?\s*:)`)

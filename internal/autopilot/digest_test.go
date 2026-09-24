@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/autopilot"
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/autopilot"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The three things a digest reports, and the two it does not: a `working`
@@ -144,9 +144,9 @@ func TestLineIsTheFormatTheSpecPromises(t *testing.T) {
 		{Kind: autopilot.ItemWaitMate, Crew: "k7", Text: "report.md is ready"},
 	}
 	want := `digest: 3 item(s) — k3 needs-decision: "pick A or B" · k9 blocked: stale, quiet for 4m0s · ` +
-		`k7 wait-mate: "report.md is ready" — status files under /w/.matev2/projects/shop/crews; ` +
+		`k7 wait-mate: "report.md is ready" — status files under /w/.mate/projects/shop/crews; ` +
 		`act per AGENTS.md section 10`
-	if got := autopilot.Line(items, "/w/.matev2/projects/shop/crews"); got != want {
+	if got := autopilot.Line(items, "/w/.mate/projects/shop/crews"); got != want {
 		t.Fatalf("Line =\n%s\nwant\n%s", got, want)
 	}
 }
@@ -158,8 +158,8 @@ func TestLineRendersTheBudgetItemShape(t *testing.T) {
 		{Kind: autopilot.ItemBudget, Crew: "k9", Text: "620,000 tokens of 500,000 tokens"},
 	}
 	want := `digest: 1 item(s) — k9 over budget: 620,000 tokens of 500,000 tokens — ` +
-		`status files under /w/.matev2/projects/shop/crews; act per AGENTS.md section 10`
-	if got := autopilot.Line(items, "/w/.matev2/projects/shop/crews"); got != want {
+		`status files under /w/.mate/projects/shop/crews; act per AGENTS.md section 10`
+	if got := autopilot.Line(items, "/w/.mate/projects/shop/crews"); got != want {
 		t.Fatalf("Line =\n%s\nwant\n%s", got, want)
 	}
 }

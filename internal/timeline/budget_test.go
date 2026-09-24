@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The fixture crew's turns total 23272+209152+0+1544 = 233968 tokens

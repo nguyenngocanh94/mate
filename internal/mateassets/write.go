@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nguyenngocanh94/matev2/assets"
-	"github.com/nguyenngocanh94/matev2/internal/memory"
+	"github.com/nguyenngocanh94/mate/assets"
+	"github.com/nguyenngocanh94/mate/internal/memory"
 )
 
 // Write renders AGENTS.md and CLAUDE.md into dir, replacing whatever is

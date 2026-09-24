@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 func TestStartMateWritesManualAndMeta(t *testing.T) {
@@ -138,7 +138,7 @@ func TestStartMateProceedsOverStaleMeta(t *testing.T) {
 		t.Fatalf("first StartMate: %v", err)
 	}
 
-	// The pane died behind matev2's back: the meta still names the agent,
+	// The pane died behind mate's back: the meta still names the agent,
 	// Herdr no longer does.
 	rt.ClosePane(first.Pane)
 
@@ -286,7 +286,7 @@ func TestStartMateResumesRecordedSessionID(t *testing.T) {
 	}
 }
 
-// TestStartMateFreshMintsANewSessionID covers `matev2 mate start --fresh`:
+// TestStartMateFreshMintsANewSessionID covers `mate mate start --fresh`:
 // it must overwrite the recorded session_id with a brand new one rather
 // than resuming, even though mate.meta still carries one to resume.
 func TestStartMateFreshMintsANewSessionID(t *testing.T) {

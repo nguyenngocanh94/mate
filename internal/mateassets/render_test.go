@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/brief"
 )
 
 var update = flag.Bool("update", false, "update golden files in testdata/")
@@ -23,15 +23,15 @@ func fixedParams() Params {
 		Mode:             "local-only",
 		Yolo:             false,
 		Harness:          "claude-code",
-		WorkspaceDoc:     "/ws/.matev2/WORKSPACE.md",
-		ProjectDoc:       "/ws/.matev2/projects/shop/PROJECT.md",
-		WorkspaceCrewDoc: "/ws/.matev2/CREW.md",
-		ProjectCrewDoc:   "/ws/.matev2/projects/shop/CREW.md",
-		MemoryFile:       "/ws/.matev2/projects/shop/mate/memory.md",
-		BacklogFile:      "/ws/.matev2/projects/shop/mate/backlog.md",
-		MatevBin:         "/usr/local/bin/matev2",
-		MateDir:          "/ws/.matev2/projects/shop/mate",
-		CrewsDir:         "/ws/.matev2/projects/shop/crews",
+		WorkspaceDoc:     "/ws/.mate/WORKSPACE.md",
+		ProjectDoc:       "/ws/.mate/projects/shop/PROJECT.md",
+		WorkspaceCrewDoc: "/ws/.mate/CREW.md",
+		ProjectCrewDoc:   "/ws/.mate/projects/shop/CREW.md",
+		MemoryFile:       "/ws/.mate/projects/shop/mate/memory.md",
+		BacklogFile:      "/ws/.mate/projects/shop/mate/backlog.md",
+		MatevBin:         "/usr/local/bin/mate",
+		MateDir:          "/ws/.mate/projects/shop/mate",
+		CrewsDir:         "/ws/.mate/projects/shop/crews",
 	}
 }
 
@@ -88,11 +88,11 @@ func fixedBriefParams() BriefParams {
 		Task:          exampleShipTask,
 		RepoPath:      "/ws/shop",
 		WorktreePath:  "/ws/.worktrees/shop-k3",
-		Branch:        "matev2/k3",
+		Branch:        "mate/k3",
 		DefaultBranch: "main",
-		BriefPath:     "/ws/.matev2/projects/shop/crews/k3/brief.md",
-		ReportPath:    "/ws/.matev2/projects/shop/crews/k3/report.md",
-		HandbackPath:  "/ws/.matev2/projects/shop/crews/k3/handback.md",
+		BriefPath:     "/ws/.mate/projects/shop/crews/k3/brief.md",
+		ReportPath:    "/ws/.mate/projects/shop/crews/k3/report.md",
+		HandbackPath:  "/ws/.mate/projects/shop/crews/k3/handback.md",
 		// Both CREW.md files carry a rule, so the golden pins the whole
 		// section, precedence sentences included.
 		WorkspaceCrewRules: "- Reproduce a bug end-to-end before you fix it.",
@@ -152,7 +152,7 @@ func TestRenderBriefGolden(t *testing.T) {
 }
 
 // TestRenderedBriefPassesTheCheck: what the app renders from a good task is
-// itself a good brief, so `matev2 brief check` on crews/<id>/brief.md agrees
+// itself a good brief, so `mate brief check` on crews/<id>/brief.md agrees
 // with the check `crew spawn` ran - and the template's own sections, which
 // mention the schema's headings in prose, are never mistaken for the task's.
 func TestRenderedBriefPassesTheCheck(t *testing.T) {
@@ -185,7 +185,7 @@ func TestRenderBriefShapes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"# Before you hand back", "# Project memory", "/ws/.matev2/projects/shop/crews/k3/handback.md", "wait-mate: ready in branch matev2/k3", "## Deviations from Build", "## Still open", "# Captain's standing crew rules"} {
+	for _, want := range []string{"# Before you hand back", "# Project memory", "/ws/.mate/projects/shop/crews/k3/handback.md", "wait-mate: ready in branch mate/k3", "## Deviations from Build", "## Still open", "# Captain's standing crew rules"} {
 		if !strings.Contains(string(ship), want) {
 			t.Errorf("ship brief lacks %q", want)
 		}
@@ -193,7 +193,7 @@ func TestRenderBriefShapes(t *testing.T) {
 			t.Errorf("scout brief carries ship-only %q", want)
 		}
 	}
-	for _, want := range []string{"wait-mate: report ready at /ws/.matev2/projects/shop/crews/k3/report.md", "## Durable facts", "propose the acceptance lines", "file:line references"} {
+	for _, want := range []string{"wait-mate: report ready at /ws/.mate/projects/shop/crews/k3/report.md", "## Durable facts", "propose the acceptance lines", "file:line references"} {
 		if !strings.Contains(string(scout), want) {
 			t.Errorf("scout brief lacks %q", want)
 		}
@@ -236,11 +236,11 @@ func TestRenderBriefNoUnexpandedVars(t *testing.T) {
 }
 
 // forbiddenWords are v1/firstmate concepts and spellings that must never
-// survive into matev2's Mate manual or crew brief: tmux and treehouse are
-// firstmate's terminal/worktree-pool tooling matev2 does not use, no-mistakes
-// and secondmate are firstmate concepts matev2 has no equivalent of, fm- is
-// firstmate's script-name prefix, gh-axi is a firstmate tool, and MATE_ is
-// the old v1 env prefix (matev2 uses MATEV2_ only).
+// survive into mate's Mate manual or crew brief: tmux and treehouse are
+// firstmate's terminal/worktree-pool tooling mate does not use, no-mistakes
+// and secondmate are firstmate concepts mate has no equivalent of, fm- is
+// firstmate's script-name prefix, gh-axi is a firstmate tool, and matev2/MATEV2_ are
+// this repo's names before the 2026-09-24 rename.
 var forbiddenWords = []string{
 	"tmux",
 	"treehouse",
@@ -248,7 +248,8 @@ var forbiddenWords = []string{
 	"secondmate",
 	"fm-",
 	"gh-axi",
-	"MATE_",
+	"matev2",
+	"MATEV2_",
 }
 
 func TestRenderAgentsNoForbiddenWords(t *testing.T) {

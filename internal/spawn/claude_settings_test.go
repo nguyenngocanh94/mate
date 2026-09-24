@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 var updateSettings = flag.Bool("update-settings", false, "update testdata/claude-settings.json.golden")
 
 func TestClaudeSettingsGolden(t *testing.T) {
-	got, err := spawn.ClaudeSettings("/usr/local/bin/matev2")
+	got, err := spawn.ClaudeSettings("/usr/local/bin/mate")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestClaudeSettingsGolden(t *testing.T) {
 // JSON, and both hooks must invoke the given binary with the right
 // subcommand.
 func TestClaudeSettingsParsesAndPointsAtTheBinary(t *testing.T) {
-	const binary = "/opt/mate space/matev2"
+	const binary = "/opt/mate space/mate"
 	data, err := spawn.ClaudeSettings(binary)
 	if err != nil {
 		t.Fatal(err)

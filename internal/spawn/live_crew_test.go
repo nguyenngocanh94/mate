@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestLiveSpawnCrewCodex is the task 11 proof: a real Codex crew in a real
-// Herdr pane, in its own git worktree, that reads the brief matev2 pointed it
-// at, commits in its branch, and reports `wait-mate:` through $MATEV2_STATUS.
+// Herdr pane, in its own git worktree, that reads the brief mate pointed it
+// at, commits in its branch, and reports `wait-mate:` through $MATE_STATUS.
 //
 // It asserts the work, not the screen: a new commit on the crew branch that
 // touches README.md, and a status file the crew itself appended to.
@@ -45,8 +45,8 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# shop\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

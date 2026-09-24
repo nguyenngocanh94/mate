@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Defaults of docs/mvp.md task 18. The poll is short because the console
@@ -49,7 +49,7 @@ var _ Runtime = runtime.Adapter(nil)
 
 // HandleFunc resolves the Herdr handle and harness kind recorded for one
 // crew. It is a seam rather than a direct call to internal/spawn so the
-// observer imports no code that can start or stop an agent; cmd/matev2 wires
+// observer imports no code that can start or stop an agent; cmd/mate wires
 // spawn.CrewHandle into it.
 //
 // An error means "mate could not resolve a handle to look at" - the crew has
@@ -102,7 +102,7 @@ type Deps struct {
 	Handle  HandleFunc
 	Clock   Clock
 	Sleeper Sleeper
-	// Timeline records what the files say into `.matev2/matev2.db`. Nil
+	// Timeline records what the files say into `.mate/mate.db`. Nil
 	// means no timeline is kept, which is a workspace opened by a build that
 	// has none and not an error.
 	Timeline Ingest
@@ -162,7 +162,7 @@ func (d Deps) staleAfter() time.Duration {
 //
 // The workspace handle is this package's own: store.Workspace caches
 // workspace.yaml and re-reads it on LoadConfig, so the observer opens a
-// second handle rather than sharing the console's (cmd/matev2 does the
+// second handle rather than sharing the console's (cmd/mate does the
 // opening).
 type Watcher struct {
 	ws   *store.Workspace

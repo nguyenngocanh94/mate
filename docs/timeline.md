@@ -2,12 +2,12 @@
 
 Schema version: **2**.
 
-This is the contract of `.matev2/matev2.db` and of `internal/timeline`.
-The database is derived: every row here is read out of `crews/<id>.status`, `sent.log`, `incidents.log`, the `.meta` files, the harness transcripts or git, and `matev2 reindex <workspace>` rebuilds all of it from those sources.
+This is the contract of `.mate/mate.db` and of `internal/timeline`.
+The database is derived: every row here is read out of `crews/<id>.status`, `sent.log`, `incidents.log`, the `.meta` files, the harness transcripts or git, and `mate reindex <workspace>` rebuilds all of it from those sources.
 Losing the file loses no work (docs/mvp.md decision 6).
 Two rebuilds of the same sources produce byte-identical `v_story` output, `event.id` included, which is what lets a reader quote an id.
 
-The observer inside the console is the single writer: it calls `Ingest` at the end of every poll, and `internal/db` holds an advisory lock on `matev2.db.lock` so a second writer is refused rather than interleaved.
+The observer inside the console is the single writer: it calls `Ingest` at the end of every poll, and `internal/db` holds an advisory lock on `mate.db.lock` so a second writer is refused rather than interleaved.
 Readers take no lock at all.
 
 ## 1. What the schema adds to the spec
@@ -48,7 +48,7 @@ It is an event rather than a log line because the consequence is otherwise invis
 A `crews/<id>.status` line carries no timestamp of its own.
 Two rules, in order, and the `status.appended` payload records which one fired in `dated_by`.
 
-1. `transcript.shell` - the crew wrote the line with `echo "state: one line" >> $MATEV2_STATUS`, and that shell command is in the crew's own transcript with a timestamp on it, so the line is dated by the earliest action whose command contains it verbatim.
+1. `transcript.shell` - the crew wrote the line with `echo "state: one line" >> $MATE_STATUS`, and that shell command is in the crew's own transcript with a timestamp on it, so the line is dated by the earliest action whose command contains it verbatim.
    This rule is exact and it survives a rebuild.
 2. `status.mtime` - the file's modification time, clamped so a file's lines never go backwards.
    It is a fallback and not the primary rule because mtime is the time of the file's *last* line: dating every line by it would put a question after the answer to it the moment the crew wrote anything else, and `question.waited_ms` would go negative on the first reindex.
@@ -71,7 +71,7 @@ From `crews/<id>.meta`, dated by `started_at`.
 The actor is the Mate, the subject is the crew: hiring is something the Mate did to somebody.
 
 ```json
-{"branch":"matev2/buybtn","crew":"buybtn","harness":"codex","task":"Add a Buy button to README.md","worktree":".worktrees/shop-buybtn"}
+{"branch":"mate/buybtn","crew":"buybtn","harness":"codex","task":"Add a Buy button to README.md","worktree":".worktrees/shop-buybtn"}
 ```
 
 ### `crew.finished`, `crew.failed`
@@ -141,15 +141,15 @@ Two rules produce one: a gap of at least five seconds inside a turn, which is de
 
 From two sources, keyed by the full sha so a commit both find is one event.
 
-The first is `git log <default>..<branch>` of an open crew - two dots, the commits that belong to this branch alone, the same spelling `matev2 diff` uses for its commit list.
+The first is `git log <default>..<branch>` of an open crew - two dots, the commits that belong to this branch alone, the same spelling `mate diff` uses for its commit list.
 
 The second is the crew's own transcript.
-A branch is short-lived: `matev2 merge` deletes it on its way out, so a crew that commits a few seconds before somebody merges can leave no window in which a five-second poll could read `git log` at all.
+A branch is short-lived: `mate merge` deletes it on its way out, so a crew that commits a few seconds before somebody merges can leave no window in which a five-second poll could read `git log` at all.
 Measured 2026-09-20 in a live run: six seconds between the commit and the merge, no poll inside it, and the merge could not be proved.
-But git echoes the sha back at the crew - `[matev2/buybtn 6b8ee07] docs: add …` - and that line is in the crew's transcript for ever, so a shell action that ran `git commit` and got that echo names a commit, which is then read out of git by its sha.
+But git echoes the sha back at the crew - `[mate/buybtn 6b8ee07] docs: add …` - and that line is in the crew's transcript for ever, so a shell action that ran `git commit` and got that echo names a commit, which is then read out of git by its sha.
 
 ```json
-{"branch":"matev2/buybtn","files":["README.md"],"sha":"0d2d20d…","short":"0d2d20d","subject":"docs: add Buy link"}
+{"branch":"mate/buybtn","files":["README.md"],"sha":"0d2d20d…","short":"0d2d20d","subject":"docs: add Buy link"}
 ```
 
 ### `status.appended`
@@ -186,7 +186,7 @@ Three kinds rather than one event plus two duplicates, because a line is one thi
 ```
 
 The channel is read off the line's shape, not off the sentinel: `sent.log` holds the text with `send.Marker` already stripped, both because the daemon writes the line it built and because the Mate's `UserPromptSubmit` hook strips the marker before appending.
-`marked` records that matev2 typed the line itself.
+`marked` records that mate typed the line itself.
 An app line into the Mate's pane whose text is neither a digest nor a resolve is `hook` - the hook's own note that an unmarked prompt ended auto mode, which was typed into no pane at all.
 
 A digest and an `[assign]` line reach `sent.log` **twice**: once written by the sender after the composer cleared, and once by the Mate's own hook when the model read it.
@@ -209,13 +209,13 @@ The daemon files its own `wedged` finding under the crew name `mate`, and that o
 ### `merge.done`
 
 From git: the crew is closed `finished` and its branch tip is now an ancestor of the default branch.
-Nothing else records a merge - `matev2 merge` types into no pane, so `sent.log` is silent about it (docs/mvp.md section 7) - which is also why this survives a rebuild.
+Nothing else records a merge - `mate merge` types into no pane, so `sent.log` is silent about it (docs/mvp.md section 7) - which is also why this survives a rebuild.
 
-`matev2 merge` deletes the branch on its way out, so by the next poll there is no branch to ask about.
+`mate merge` deletes the branch on its way out, so by the next poll there is no branch to ask about.
 The tip that is tested is then the last `git.committed` this ingest recorded for the crew - which is why a crew's commits are read from its transcript as well as from `git log`, so the merge does not depend on a poll having fallen inside the window between the commit and the merge.
 
 ```json
-{"branch":"matev2/buybtn","by":"captain","cause_rule":"crew.handback","crew":"buybtn","into":"main","sha":"df7e0de…","short":"df7e0de"}
+{"branch":"mate/buybtn","by":"captain","cause_rule":"crew.handback","crew":"buybtn","into":"main","sha":"df7e0de…","short":"df7e0de"}
 ```
 
 ### `context.compacted`
@@ -246,7 +246,7 @@ A Mate's busy stretches are therefore explained by its transcript alone, which i
 
 Nothing emits it yet.
 The kind is in M5's vocabulary and in the narrate table because the Mate's `reviewing(crew)` scene needs an event to open it; a reader of this document should know it is a name with no producer rather than assume a gap in the ingest.
-The scene machine has the edge for it (`mate.reviews`) and, until something emits it, reaches `reviewing` from the command the Mate actually runs to review a crew - `matev2 diff <project> <crew>`, which is a `tool.called` in its own transcript (section 9.4, `mate.reviews.diff`).
+The scene machine has the edge for it (`mate.reviews`) and, until something emits it, reaches `reviewing` from the command the Mate actually runs to review a crew - `mate diff <project> <crew>`, which is a `tool.called` in its own transcript (section 9.4, `mate.reviews.diff`).
 
 ### `ingest.unresolved`
 
@@ -268,10 +268,10 @@ An event with no cause keeps `NULL`, which is a fact and not a gap to be filled 
 | `question.asked` | the crew's own `turn.ended`: the turn it asked in. |
 | `digest.sent`, `assign.clicked` | the first `question.asked` the line carries; the crews it names are read out of its text, and the payload of each question event says which crew. |
 | `turn.started` of the Mate | the `message.sent` / `digest.sent` / `assign.clicked` addressed to the Mate that reached its composer. |
-| `question.answered` | the Mate turn that sent it - the turn holding the `matev2 send <project> <crew>` the answer came out of, within ten minutes. An answer the captain typed has no such turn and keeps `NULL`. |
+| `question.answered` | the Mate turn that sent it - the turn holding the `mate send <project> <crew>` the answer came out of, within ten minutes. An answer the captain typed has no such turn and keeps `NULL`. |
 | `turn.started` of a crew | the `question.answered` addressed to it, when there is one: a crew takes an answer as an ordinary new prompt. |
-| `crew.spawned` | the Mate turn that ran `matev2 crew spawn` for that crew id, within thirty minutes. |
-| `merge.done` | the Mate turn that ran `matev2 merge <project> <crew>` (`cause_rule: mate.turn.ran.merge`, `by: mate`); failing that, the crew's last `wait-mate` status line before the merge (`cause_rule: crew.handback`, `by: captain`). |
+| `crew.spawned` | the Mate turn that ran `mate crew spawn` for that crew id, within thirty minutes. |
+| `merge.done` | the Mate turn that ran `mate merge <project> <crew>` (`cause_rule: mate.turn.ran.merge`, `by: mate`); failing that, the crew's last `wait-mate` status line before the merge (`cause_rule: crew.handback`, `by: captain`). |
 
 The second merge rule is weaker on purpose and says so in its payload.
 A merge run from the Console writes to no file at all, so no event exists that can be pointed at as "the gesture that ran it"; the handback is what the captain acted on, and it is the most the files can say.
@@ -280,7 +280,7 @@ A merge run from the Console writes to no file at all, so no event exists that c
 
 ## 6. The narrate phrases
 
-`matev2 events <project> --narrate` prints one sentence per event, prefixed with the local time to the second.
+`mate events <project> --narrate` prints one sentence per event, prefixed with the local time to the second.
 The Mate and the captain are named with an article because there is one of each; a crew is called by its name, which is what everybody in the story calls it.
 
 | Kind | Sentence |
@@ -300,7 +300,7 @@ The Mate and the captain are named with an article because there is one of each;
 | `tool.finished` | `k3 finishes exec in 131ms`, or `k3's exec fails` |
 | `git.committed` | `k3 commits 0d2d20d "docs: add Buy link"` |
 | `status.appended` (working) | `k3 reports: verifying the worktree` |
-| `status.appended` (wait-mate) | `k3 hands back: ready in branch matev2/k3` |
+| `status.appended` (wait-mate) | `k3 hands back: ready in branch mate/k3` |
 | `status.appended` (needs-decision) | `k3 writes a question into its status file` |
 | `message.sent` (captain → Mate) | `the captain tells the Mate: "add a Buy button"` |
 | `message.sent` (Mate → captain) | `the Mate reports to the captain: "k3 is ready"` |
@@ -308,7 +308,7 @@ The Mate and the captain are named with an article because there is one of each;
 | `message.sent` (the hook's echo) | `the Mate reads it` |
 | `question.asked` | `crew k3 asks the Mate: "pick A or B"` |
 | `question.answered` | `the Mate answers k3: "A" (it waited 28.7s)` |
-| `digest.sent` | `matev2 walks a digest into the Mate's office: "digest: 1 item(s) — …"` |
+| `digest.sent` | `mate walks a digest into the Mate's office: "digest: 1 item(s) — …"` |
 | `assign.clicked` | `the captain hands the Mate a question to resolve: "resolve: k3 asked: …"` |
 | `incident.opened` | `the observer flags k3: stale` |
 | `incident.resolved` | `the observer clears k3's stale` |
@@ -316,21 +316,21 @@ The Mate and the captain are named with an article because there is one of each;
 | `merge.done` | `the captain merges k3 into main` |
 | `context.compacted` | `the Mate's context is compacted` |
 | `health.changed` | `k3's composer goes busy` |
-| `ingest.unresolved` | `matev2 cannot find k3's transcript (rollout_not_adopted)` |
+| `ingest.unresolved` | `mate cannot find k3's transcript (rollout_not_adopted)` |
 
 ## 7. Views
 
 `v_story` is one row per event with the names a reader would say out loud: the actor's and subject's names, the task's name, and the kind of the cause.
-`matev2 events` prints it as JSON lines in a fixed field order, one event per line, so a consumer can diff two runs and `--follow` can stream.
+`mate events` prints it as JSON lines in a fixed field order, one event per line, so a consumer can diff two runs and `--follow` can stream.
 
 `v_task_ledger` is one row per task: tokens by bucket, the number of turns, how often the crew had to come back and ask, how long it stood at the CEO's door, and the cost when `pricing` has a row for the model.
 Cost is `NULL` until then, because a missing price is not a price of zero.
 
 `v_now` is one row per actor: the scene state, since when, who it faces, and what it has spent today.
 Its scene columns read `transition`, which the scene projection of section 9 writes on every pass that recorded anything.
-An actor with no transition at all reads `NULL` in all four, which is the honest answer for "this actor is in no scene": the captain, matev2 and the observer are in the story and not in the office.
+An actor with no transition at all reads `NULL` in all four, which is the honest answer for "this actor is in no scene": the captain, mate and the observer are in the story and not in the office.
 
-`docs/dashboard.md` is the JSON contract of the read-only HTTP API over these three views (`matev2 dashboard`, docs/mvp.md M6), including the five places it has to query a table directly because no view carries the field.
+`docs/dashboard.md` is the JSON contract of the read-only HTTP API over these three views (`mate dashboard`, docs/mvp.md M6), including the five places it has to query a table directly because no view carries the field.
 
 ## 8. Known costs
 
@@ -339,7 +339,7 @@ The reason is `harness.ParseTranscript`: it withholds the trailing message group
 The cost is one JSON pass over each live transcript every five seconds, which is a few hundred kilobytes; `cursor` still records how far the parser trusted the file, so a withheld group is visible rather than silent.
 A session long enough for that to hurt is the place to measure again.
 
-`matev2 reindex` empties the derived tables and refills them in one transaction, so a rebuild that fails halfway leaves the timeline it started with.
+`mate reindex` empties the derived tables and refills them in one transaction, so a rebuild that fails halfway leaves the timeline it started with.
 An ordinary poll commits one transaction per project instead, for the opposite reason: a project whose `.meta` is half-written must not hold back the rest of the workspace.
 
 ## 9. The scene
@@ -366,7 +366,7 @@ A parameterised state - `walking_to_ceo(question)`, `leaving(merged)`, `reading(
 | `gone` | crew, Mate | out of the building |
 | `idle` | Mate | alone in its office |
 | `on_phone` | Mate | the captain typed into its pane |
-| `receiving_digest` | Mate | matev2 walked a note in, `detail` `digest` or `assign`; it is on the desk, unread |
+| `receiving_digest` | Mate | mate walked a note in, `detail` `digest` or `assign`; it is on the desk, unread |
 | `reading` | Mate | reading the note, `target_actor_id` the crew it is about |
 | `deciding` | Mate | working at its desk |
 | `answering` | Mate | answering the crew at its door |
@@ -385,9 +385,9 @@ An incident is also a report and not a cage: a crew the observer called asleep a
 
 An event is applied to the machine of its actor and to the machine of its subject.
 `crew.spawned` is something the Mate did to a crew, and it is the crew that walks in; `question.asked` is a crew's, and its subject is the Mate.
-The captain, matev2 and the observer have no machine: nobody draws the captain.
+The captain, mate and the observer have no machine: nobody draws the captain.
 
-Two events recorded at the same instant are applied in `(at, rank, id)` order, and only one kind needs a rank: `matev2 merge` closes the crew it merged, so `merge.done` and `crew.finished` share a timestamp, and the merge is applied first so a crew that landed its branch leaves `merged` rather than merely `closed`.
+Two events recorded at the same instant are applied in `(at, rank, id)` order, and only one kind needs a rank: `mate merge` closes the crew it merged, so `merge.done` and `crew.finished` share a timestamp, and the merge is applied first so a crew that landed its branch leaves `merged` rather than merely `closed`.
 
 ### 9.3 The crew's table
 
@@ -428,7 +428,7 @@ Rows are tried in order and the first match wins.
 | `crew.tool.finished` | anywhere | `tool.finished` | | - | |
 | `crew.compacted` | anywhere | `context.compacted` | | - | its memory, not its position |
 | `crew.health` | anywhere | `health.changed` | | - | an observation of a pane, which a rebuild cannot read back |
-| `crew.unresolved` | anywhere | `ingest.unresolved` | | - | matev2's problem, not a move |
+| `crew.unresolved` | anywhere | `ingest.unresolved` | | - | mate's problem, not a move |
 | `crew.review` | anywhere | `review.started` | | - | being reviewed is where it already is |
 | `crew.mate.started` | anywhere | `mate.started` | | - | |
 | `crew.mate.stopped` | anywhere | `mate.stopped` | | - | |
@@ -463,7 +463,7 @@ Rows are tried in order and the first match wins.
 | `mate.answers.other` | anywhere | `question.answered` | | - | the captain answered it, which is the captain's doing |
 | `mate.reviews` | in the building | `review.started` | | `reviewing(crew)` | the crew |
 | `mate.reviews.away` | anywhere | `review.started` | | - | |
-| `mate.reviews.diff` | in the building | `tool.called` | the command is `matev2 diff <project> <crew>` | `reviewing(crew)` | the crew |
+| `mate.reviews.diff` | in the building | `tool.called` | the command is `mate diff <project> <crew>` | `reviewing(crew)` | the crew |
 | `mate.tool` | anywhere | `tool.called` | | - | |
 | `mate.merges` | in the building | `merge.done` | `by: mate` | `merging(crew)` → `idle` | the crew |
 | `mate.merges.captain` | anywhere | `merge.done` | | - | the captain merged from the console: the crew leaves, the Mate did nothing |
@@ -488,19 +488,19 @@ And the line the cause rule finds is usually not the `[assign]` at all: a Claude
 Measured 2026-09-20 in `TestLiveTimelineExplainsTheAcceptance`: the `[assign]` and its echo both at 16:47:57, the turn at 16:48:05, and a `mate.reads` that demanded an `[assign]` as the cause never fired at all, so the Mate never read anything in a run where it plainly did.
 
 `mate.reads.echo` is that echo used for what it is.
-The hook's line is the one fact in `sent.log` that proves the model read what matev2 typed (section 4), and "the Mate reads it" is already how the event narrates, so on a Claude Mate the note leaves the desk at the echo and the turn that follows finds the Mate already reading.
+The hook's line is the one fact in `sent.log` that proves the model read what mate typed (section 4), and "the Mate reads it" is already how the event narrates, so on a Claude Mate the note leaves the desk at the echo and the turn that follows finds the Mate already reading.
 A Codex Mate has no such hook, and `mate.reads` picks the note up at its next turn instead.
 
 `mate.turn.ended` deliberately does not fire from `receiving_digest` or `on_phone`.
 A line that arrives while the Mate is mid-turn has not been read when that turn ends, and a scene that returned the Mate to `idle` would lose the fact that something is waiting on its desk.
 
 `mate.reviews.diff` is the one edge that reads a command rather than an event kind.
-`review.started` has no producer (section 4), and the thing a Mate actually does to review a crew is run `matev2 diff <project> <crew>`, which is a `tool.called` in its own transcript and survives a rebuild.
+`review.started` has no producer (section 4), and the thing a Mate actually does to review a crew is run `mate diff <project> <crew>`, which is a `tool.called` in its own transcript and survives a rebuild.
 The `review.started` edge stays in the table for the day something emits it.
 
 ### 9.5 The scene phrases
 
-`matev2 events <project> --scene --narrate` prints one sentence per transition, prefixed with the local time to the second, the same shape `--narrate` prints an event in.
+`mate events <project> --scene --narrate` prints one sentence per transition, prefixed with the local time to the second, the same shape `--narrate` prints an event in.
 
 | To | Sentence |
 | --- | --- |
@@ -523,8 +523,8 @@ The `review.started` edge stays in the table for the day something emits it.
 | `idle` (first) | `the Mate takes the office` |
 | `idle` | `the Mate is alone in its office again` |
 | `on_phone` | `the captain calls the Mate` |
-| `receiving_digest(digest)` | `matev2 walks a digest into the Mate's office` |
-| `receiving_digest(assign)` | `matev2 walks the captain's note into the Mate's office` |
+| `receiving_digest(digest)` | `mate walks a digest into the Mate's office` |
+| `receiving_digest(assign)` | `mate walks the captain's note into the Mate's office` |
 | `reading` | `the Mate reads k3's note` |
 | `deciding` | `the Mate thinks it over` |
 | `answering` | `the Mate answers k3` |
@@ -533,9 +533,9 @@ The `review.started` edge stays in the table for the day something emits it.
 | unexplained | `k3: nothing in the scene explains <kind>` |
 
 The snapshot is the same vocabulary in the present tense, one line per actor, with the moment the actor arrived in that state: `now      k3 is waiting at the CEO's door (since 10:44:33)`.
-The captain, matev2 and the observer have no scene, so the narrated snapshot leaves them out; the JSON snapshot still carries their rows, with a `state` of `""`, because "this actor is in no scene" is an answer and not a gap.
+The captain, mate and the observer have no scene, so the narrated snapshot leaves them out; the JSON snapshot still carries their rows, with a `state` of `""`, because "this actor is in no scene" is an answer and not a gap.
 
-### 9.6 `matev2 events <project> --scene`
+### 9.6 `mate events <project> --scene`
 
 `--scene` prints the `v_now` snapshot, one JSON line per actor, and stops.
 `--since <RFC3339|event id>` adds the transitions from that point, oldest first; `--since 0` is the whole history.
@@ -554,18 +554,18 @@ It is not incremental on purpose.
 An ingest pass can insert an event whose time is older than events it has already written - a commit read out of a transcript, a status line dated by the shell command that wrote it - and a machine fed that event out of order would be wrong from then on.
 Recomputing also makes the table a function of the events by construction: two rebuilds of the same files produce the same rows byte for byte, ids included.
 
-The cost is one ordered read of the project's events per pass that recorded anything, which is the same read `matev2 events` does; a pass that inserted no event skips the projection entirely.
+The cost is one ordered read of the project's events per pass that recorded anything, which is the same read `mate events` does; a pass that inserted no event skips the projection entirely.
 A workspace whose event count makes that read expensive is the place to measure again, and the answer then is a projection that resumes from the oldest event the pass touched rather than from the first.
 
 ## 10. Economics (schema v2, task 27)
 
 ### `pricing.yaml`
 
-`store.Init` seeds `.matev2/pricing.yaml` once, at `PricingModel` rows for every model id matev2 has actually seen in a transcript, every price at 0 and a comment that the captain owns the numbers.
+`store.Init` seeds `.mate/pricing.yaml` once, at `PricingModel` rows for every model id mate has actually seen in a transcript, every price at 0 and a comment that the captain owns the numbers.
 `timeline.Ingester.ingestPricing` loads the file and upserts it into the `pricing` table on every pass, before any project's own pass, because `v_task_ledger` and `v_now` read `pricing` by model on every query and pricing has no project of its own to be ordered by.
-A missing or empty file is not an error - every model stays unpriced, which the views already render as a `NULL` cost rather than a free one - and `matev2 reindex` clears `pricing` along with everything else it rebuilds, so a model the captain removed from the file does not linger as a stale row.
+A missing or empty file is not an error - every model stays unpriced, which the views already render as a `NULL` cost rather than a free one - and `mate reindex` clears `pricing` along with everything else it rebuilds, so a model the captain removed from the file does not linger as a stale row.
 
-A price of exactly 0 across all four columns does not count as priced: `v_task_ledger.cost` and `matev2 usage`'s cost columns only join a `pricing` row into the sum when at least one of `input_per_m`, `cache_read_per_m`, `cache_write_per_m`, `output_per_m` is greater than zero.
+A price of exactly 0 across all four columns does not count as priced: `v_task_ledger.cost` and `mate usage`'s cost columns only join a `pricing` row into the sum when at least one of `input_per_m`, `cache_read_per_m`, `cache_write_per_m`, `output_per_m` is greater than zero.
 Without that guard the seeded placeholder rows would make every crew's cost `$0.00` from the moment `store.Init` runs, which is the exact falsehood "cost is NULL until priced" exists to prevent.
 
 ### `context_window` and `context_pct`
@@ -580,21 +580,21 @@ Measured 2026-09-20 on a real rollout (`TestLiveUsageMatchesTheHarness`): the la
 
 Claude's turn is the opposite: section 4's `turn.started` example (`input_tokens: 32, cache_read_tokens: 57690, cache_write_tokens: 739`) sums to exactly `context_tokens_after: 58461` - all four buckets are disjoint, and none is a subset of another.
 
-Before this was noticed, `codexTurns` stored Codex's raw `input_tokens` delta as `turn.input_tokens` unchanged, so every sum across the four buckets (`v_task_ledger`'s token columns and cost, `v_now.tokens_today`, the budget check, `matev2 usage`) double-counted the cached portion of a Codex crew's usage, and would have double-billed it too for a captain who priced both `input_per_m` and `cache_read_per_m`.
+Before this was noticed, `codexTurns` stored Codex's raw `input_tokens` delta as `turn.input_tokens` unchanged, so every sum across the four buckets (`v_task_ledger`'s token columns and cost, `v_now.tokens_today`, the budget check, `mate usage`) double-counted the cached portion of a Codex crew's usage, and would have double-billed it too for a captain who priced both `input_per_m` and `cache_read_per_m`.
 The fix is in `codexTurns` itself: it subtracts the cache-read delta from the input delta before either is stored, so `turn.input_tokens` means "billed at the input rate, not a cache rate" for both harnesses, and every view built on top of `turn` sums correctly without asking which harness a turn came from.
 `context_tokens_after` is untouched by this - it is derived straight from the raw `last_token_usage` block, not from the corrected `turn.input_tokens`.
 
-### `matev2 usage`
+### `mate usage`
 
-`matev2 usage <project>` prints `v_task_ledger` as a table, the Mate's own row first (computed the same way but read straight off `turn` rather than `task`, since a Mate's turns belong to the project and not to any one task), then one row per task, oldest spawn first, then a totals footer.
-`matev2 usage <project> <crew>` instead prints that crew's own `turn` rows, one per model call, in the shape `matev2 events --narrate` calls "ends a turn".
-Every number is humanised (`query.HumanizeTokens`, `query.HumanizeCost`: `96.3k`, `$0.12`), and a `NULL` cost or context percentage prints as `?`, never as `0` or `0%` - the same rule the console's TOKENS column and `matev2 state`'s `tokens:`/`ctx:` suffix follow, all three built on the same two functions so a number reads the same everywhere it appears.
+`mate usage <project>` prints `v_task_ledger` as a table, the Mate's own row first (computed the same way but read straight off `turn` rather than `task`, since a Mate's turns belong to the project and not to any one task), then one row per task, oldest spawn first, then a totals footer.
+`mate usage <project> <crew>` instead prints that crew's own `turn` rows, one per model call, in the shape `mate events --narrate` calls "ends a turn".
+Every number is humanised (`query.HumanizeTokens`, `query.HumanizeCost`: `96.3k`, `$0.12`), and a `NULL` cost or context percentage prints as `?`, never as `0` or `0%` - the same rule the console's TOKENS column and `mate state`'s `tokens:`/`ctx:` suffix follow, all three built on the same two functions so a number reads the same everywhere it appears.
 
-### The console's TOKENS column and `matev2 state`
+### The console's TOKENS column and `mate state`
 
-`query.CrewNode.Tokens` and `query.MateNode.Tokens` are `Field[TokenValue]`, filled the same way `Health` is: `query.Load` reads only `.matev2/`'s files and leaves them `Absent`, and the Console's wiring (`cmd/matev2/console_watch.go`'s `withTokens`, beside `withCrewHealth`) opens `.matev2/matev2.db` read-only afterwards and fills them from `v_task_ledger` and `v_now`.
+`query.CrewNode.Tokens` and `query.MateNode.Tokens` are `Field[TokenValue]`, filled the same way `Health` is: `query.Load` reads only `.mate/`'s files and leaves them `Absent`, and the Console's wiring (`cmd/mate/console_watch.go`'s `withTokens`, beside `withCrewHealth`) opens `.mate/mate.db` read-only afterwards and fills them from `v_task_ledger` and `v_now`.
 `internal/ui/console/list.go` draws a TOKENS column on the Mate row and every Crew row, at the same width breakpoint `colUpdated` already uses (`wideList`), so a narrow pane drops it before it drops anything a reader is more likely to need.
-`matev2 state <project> <crew>` appends ` · tokens: 96k` and, once the crew's last turn has a priced context window, ` · ctx: 62%` after `crewstate.Result.Line()` - built in `cmd/matev2/state.go`, not in `internal/crewstate`, because that package is a deliberate leaf that imports nothing else in this module.
+`mate state <project> <crew>` appends ` · tokens: 96k` and, once the crew's last turn has a priced context window, ` · ctx: 62%` after `crewstate.Result.Line()` - built in `cmd/mate/state.go`, not in `internal/crewstate`, because that package is a deliberate leaf that imports nothing else in this module.
 
 ### Budget (`project.yaml`'s `budget:` block)
 
@@ -603,6 +603,6 @@ Every number is humanised (`query.HumanizeTokens`, `query.HumanizeCost`: `96.3k`
 It opens a `budget` incident (`box.IncidentBudget`) on a crossing crew exactly once: a crew already carrying an open one is left alone even if it has since spent more, because the incident is a fact about spend that already happened, not a condition that clears - it is never resolved.
 The incident's text is `"<humanised total> tokens of <humanised limit> tokens"` or `"<humanised cost> of <humanised limit>"`, which a digest's fourth item shape reads verbatim as `<crew> over budget: <text>`.
 
-Per the 2026-09-20 decision (mvp.md section 4b), a `budget` incident is deliberately excluded from what makes a crew `blocked`: `box.BlockingIncidents` narrows `box.OpenIncidents` to `stale` and `runtime_lost` only, and every caller that used to feed `OpenIncidents` into `crewstate.Declaration.OpenIncident` (`query.CrewStateOf`, `spawn.crew_stop`'s open-crew resolution, the Console's session metadata, `matev2 state`) now goes through `BlockingIncidents` instead.
+Per the 2026-09-20 decision (mvp.md section 4b), a `budget` incident is deliberately excluded from what makes a crew `blocked`: `box.BlockingIncidents` narrows `box.OpenIncidents` to `stale` and `runtime_lost` only, and every caller that used to feed `OpenIncidents` into `crewstate.Declaration.OpenIncident` (`query.CrewStateOf`, `spawn.crew_stop`'s open-crew resolution, the Console's session metadata, `mate state`) now goes through `BlockingIncidents` instead.
 `box.OpenIncidents` itself is unchanged and still puts a `budget` incident in the inbox, where the phrase table (`internal/ui/console/box.go`'s `boxNeedPhrase`) reads it as `over budget`.
 `internal/autopilot.Gather` gives a `budget` incident its own `ItemBudget` kind rather than `ItemBlocked`, so the digest vocabulary itself cannot claim a budget crossing changed the crew's state; `Line`'s fourth item shape is `<crew> over budget: <total> of <limit>`, spelled once in `internal/autopilot/digest.go`'s `itemText` and in the Mate manual's section 10.

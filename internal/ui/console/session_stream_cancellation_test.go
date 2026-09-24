@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // TestContextCancellationIsNotReportedAsAStreamFailure: the Console's own

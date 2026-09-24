@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // The hand-over notice's own tests.
@@ -119,7 +119,7 @@ func TestTheHandOverNoticeReportsAWriteFailureRatherThanAttachingSilently(t *tes
 // hand-off. Exit 1 alone is deliberately insufficient; this fixture is the
 // captain's unknown attach failure and must not render as generic failure.
 func TestTheHandOverCarriesTheChildErrorCodeBackToTheConsole(t *testing.T) {
-	child := exec.Command("sh", "-c", `printf '%s' '{"ok":false,"schema_version":1,"command":"attach","error":{"code":"unknown","message":"terminal already has an attached client","details":{"exit":1}}}' > "$MATEV2_ATTACH_RESULT_FILE"; exit 1`)
+	child := exec.Command("sh", "-c", `printf '%s' '{"ok":false,"schema_version":1,"command":"attach","error":{"code":"unknown","message":"terminal already has an attached client","details":{"exit":1}}}' > "$MATE_ATTACH_RESULT_FILE"; exit 1`)
 	var terminal bytes.Buffer
 	notice := newHandoverNotice("attaching", child)
 	notice.SetStdout(&terminal)
@@ -161,7 +161,7 @@ func TestTheNoticeCarriesTheDetachKeystrokeAndSaysItDoesNotStopTheAgent(t *testi
 	for _, g := range []glyphSet{unicodeGlyphs, asciiGlyphs} {
 		text := handoverNoticeText("crew-payments-api-2", g)
 		for _, want := range []string{
-			"matev2 attach",
+			"mate attach",
 			"crew-payments-api-2",
 			"Ctrl+b then q",
 			"does not stop the agent",
@@ -367,7 +367,7 @@ func TestARealProgramPutsTheNoticeOnTheTerminalAfterReleasingTheAltScreen(t *tes
 		t.Fatalf("the child did not write after the alt screen was released (alt=%d child=%d):\n%q", altGone, childAt, stream)
 	}
 	handover := stream[altGone:childAt]
-	for _, want := range []string{"matev2 attach", "Ctrl+b then q", "does not stop the agent"} {
+	for _, want := range []string{"mate attach", "Ctrl+b then q", "does not stop the agent"} {
 		if !strings.Contains(handover, want) {
 			t.Fatalf("the terminal never showed %q between releasing the alt screen and the child's first byte; what it got was:\n%q", want, handover)
 		}

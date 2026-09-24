@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/outbox"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/outbox"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The rules of docs/mvp.md task 30, each against runtime.Fake panes and a
@@ -169,7 +169,7 @@ func claudeBusyScreen() string {
 	return "some transcript\n✶ Pollinating…\n" + rule + "\n❯ \n" + rule + "\n"
 }
 
-const resolveLine = `resolve: k3 asked: "pick A or B" — read /w/crews/k3.status, decide, and answer with matev2 send shop k3 "<one line>"`
+const resolveLine = `resolve: k3 asked: "pick A or B" — read /w/crews/k3.status, decide, and answer with mate send shop k3 "<one line>"`
 
 // Busy, then empty: the line waits, is typed once on the first empty
 // composer, and is recorded in sent.log exactly as the old synchronous

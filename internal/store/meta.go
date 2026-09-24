@@ -17,7 +17,7 @@ import (
 // empty map, because a crew that has not been recorded yet has no meta.
 //
 // ReadMeta and WriteMeta are the file format only; they do not check the
-// workspace boundary. Use the Workspace methods for anything under `.matev2/`.
+// workspace boundary. Use the Workspace methods for anything under `.mate/`.
 func ReadMeta(path string) (map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {

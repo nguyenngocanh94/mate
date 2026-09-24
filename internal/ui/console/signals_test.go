@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // TestSelectionFocusAndStatusAreThreeDistinctDrawings is the rule the

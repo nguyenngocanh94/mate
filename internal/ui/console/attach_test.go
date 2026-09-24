@@ -12,8 +12,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The attach lifecycle's tests. What each group is evidence for:
@@ -172,7 +172,7 @@ func TestAttachAnnouncesHandsOverAndReReadsExactlyOnce(t *testing.T) {
 		t.Fatalf("announcing an attach read the snapshot again (loads=%d)", spy.loads)
 	}
 	view := renderFrame(t, m)
-	for _, want := range []string{"Attaching to crew-payments-api-2", "via matev2 attach", "detach: Ctrl+b then q"} {
+	for _, want := range []string{"Attaching to crew-payments-api-2", "via mate attach", "detach: Ctrl+b then q"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("the announcement frame does not say %q:\n%s", want, view)
 		}
@@ -377,7 +377,7 @@ func TestAFailureWhoseReReadFailsKeepsTheCause(t *testing.T) {
 		t.Fatalf("e must open the failure detail view while a failure is recorded")
 	}
 	detail := renderFrame(t, m)
-	for _, want := range []string{"Session open failed", "runtime_unavailable (derived from exit 20)", "matev2 attach exit 20", "Exit"} {
+	for _, want := range []string{"Session open failed", "runtime_unavailable (derived from exit 20)", "mate attach exit 20", "Exit"} {
 		if !strings.Contains(detail, want) {
 			t.Fatalf("detail view must say %q, got:\n%s", want, detail)
 		}
@@ -519,9 +519,9 @@ func TestRefusedFailedAndStoppedAreThreeDistinctOutcomes(t *testing.T) {
 		notSays []string
 		spawned int
 	}{
-		{"stale", []string{"Attach refused", "stale", "stop unconfirmed", "nothing started"}, []string{"matev2 attach exit", "failed"}, 0},
+		{"stale", []string{"Attach refused", "stale", "stop unconfirmed", "nothing started"}, []string{"mate attach exit", "failed"}, 0},
 		{"runtime failure", []string{"Attach failed", "the runtime is not reachable", "runtime_unavailable"}, []string{"refused", "nothing started"}, 1},
-		{"stopped mate", []string{"Attach refused", "stopped", "no session to attach", "nothing started"}, []string{"stale", "matev2 attach exit"}, 0},
+		{"stopped mate", []string{"Attach refused", "stopped", "no session to attach", "nothing started"}, []string{"stale", "mate attach exit"}, 0},
 	}
 	for i, w := range want {
 		if got[i].name != w.name {
@@ -553,7 +553,7 @@ func TestRefusedFailedAndStoppedAreThreeDistinctOutcomes(t *testing.T) {
 // TestTheMateRefusalIsDecidedFromTheSnapshotBinding: the Mate branch reads
 // MateNode.Binding exactly as the Crew branch reads CrewNode.Binding. A
 // Mate recorded running whose binding is stale, absent or unknown is
-// refused here, with no subprocess - not handed to `matev2 attach` to refuse.
+// refused here, with no subprocess - not handed to `mate attach` to refuse.
 func TestTheMateRefusalIsDecidedFromTheSnapshotBinding(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -957,7 +957,7 @@ func TestEveryAttachMessageFitsAnEightyColumnFrame(t *testing.T) {
 		collect(name, m)
 	}
 
-	// The same states through the Model shape cmd/matev2 actually builds:
+	// The same states through the Model shape cmd/mate actually builds:
 	// session ports wired and a reader that fails every entry read, so a row
 	// the Agent View can open takes the entry-read-failure fallback into the
 	// classic hand-off, and a row it cannot takes the refusal directly. Before
@@ -1219,7 +1219,7 @@ func attachGallery() []attachGalleryState {
 			return renderFrame(t, announcing(t))
 		},
 		says: []string{
-			"Attaching to crew-payments-api-2", "via matev2 attach",
+			"Attaching to crew-payments-api-2", "via mate attach",
 			"detach: Ctrl+b then q",
 			// the key line, which is all the reader has once the child owns
 			// the keyboard
@@ -1269,7 +1269,7 @@ func attachGallery() []attachGalleryState {
 		},
 		// The one thing a stale binding must never read as: a failure that
 		// ran, or a confirmed stop.
-		notSays: []string{"Attach failed", "matev2 attach exit", "not active"},
+		notSays: []string{"Attach failed", "mate attach exit", "not active"},
 	}, {
 		name:  "attach-failed-runtime-120x36-unicode",
 		build: func(t *testing.T) string { return runtimeFailure(t, 120, 36) },
@@ -1303,7 +1303,7 @@ func attachGallery() []attachGalleryState {
 			"Attach refused", "Mate recorded stopped", "no session to attach",
 			"nothing started",
 		},
-		notSays: []string{"Attach failed", "matev2 attach exit", "stale"},
+		notSays: []string{"Attach failed", "mate attach exit", "stale"},
 	}}
 }
 

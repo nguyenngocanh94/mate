@@ -35,7 +35,7 @@ import "time"
 //     finished - and the question is no longer waiting on anybody.
 //
 //  2. A `sent.log` entry addressed to `crew:<id>` after the question's time -
-//     somebody (the user through `r`, or the Mate through `matev2 send`)
+//     somebody (the user through `r`, or the Mate through `mate send`)
 //     replied. This one is an approximation, and the package doc says why:
 //     a status line carries no time of its own, so every line in a file is
 //     stamped with the file's mtime, which is when its *last* line was

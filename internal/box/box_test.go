@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // newFixtureWorkspace builds a workspace with one project "shop" and two
@@ -196,7 +196,7 @@ func TestParseStatusVocabulary(t *testing.T) {
 	}{
 		{"working: on it", box.StateWorking, "on it"},
 		{"needs-decision: pick one", box.StateNeedsDecision, "pick one"},
-		{"wait-mate: ready in branch matev2/k3", box.StateWaitMate, "ready in branch matev2/k3"},
+		{"wait-mate: ready in branch mate/k3", box.StateWaitMate, "ready in branch mate/k3"},
 		// Legacy. `done:` is the old spelling of `wait-mate:`.
 		{"done: shipped", box.StateWaitMate, "shipped"},
 		// A crew that said `blocked:` could still speak, which is a

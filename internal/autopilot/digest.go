@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/outbox"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/outbox"
 )
 
 // MateCrew is the crew field the daemon's own incidents carry. The Mate is

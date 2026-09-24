@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/hook"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/hook"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestPromptMarkerMatchesSend keeps hook.PromptMarker (which cannot import
@@ -69,7 +69,7 @@ func TestHandlePromptTableDriven(t *testing.T) {
 		},
 		{
 			name:       "marker-prefixed prompt is recorded as app and never clears auto",
-			payload:    "{\"prompt\":\"\u27e6matev2\u27e7 signal: crews/k3.status\"}",
+			payload:    "{\"prompt\":\"\u27e6mate\u27e7 signal: crews/k3.status\"}",
 			autoBefore: true,
 			wantAuto:   true,
 			wantSent: []store.SentEntry{

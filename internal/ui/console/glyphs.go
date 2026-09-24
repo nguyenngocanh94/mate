@@ -94,15 +94,15 @@ var asciiGlyphs = glyphSet{
 // glyphsFor picks the set from the environment. This is the only place the
 // package reads the environment.
 //
-//	MATEV2_ASCII truthy  -> ASCII, whatever the locale says
-//	MATEV2_ASCII falsy   -> Unicode, whatever the locale says (the escape
+//	MATE_ASCII truthy  -> ASCII, whatever the locale says
+//	MATE_ASCII falsy   -> Unicode, whatever the locale says (the escape
 //	                      hatch for a terminal that draws box glyphs fine
 //	                      but reports a C locale)
-//	MATEV2_ASCII unset   -> the locale decides: UTF-8 gets Unicode, anything
+//	MATE_ASCII unset   -> the locale decides: UTF-8 gets Unicode, anything
 //	                      else - including an unset locale, which is the C
 //	                      locale - gets ASCII.
 func glyphsFor(getenv func(string) string) glyphSet {
-	switch strings.ToLower(strings.TrimSpace(getenv("MATEV2_ASCII"))) {
+	switch strings.ToLower(strings.TrimSpace(getenv("MATE_ASCII"))) {
 	case "1", "true", "yes", "on":
 		return asciiGlyphs
 	case "0", "false", "no", "off":

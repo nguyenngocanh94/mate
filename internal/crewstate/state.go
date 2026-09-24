@@ -1,7 +1,7 @@
 // Package crewstate holds the crew state machine of docs/mvp.md section 4b:
 // the seven states, who is allowed to set each one, and the fixed order a
 // displayed state is resolved in. It also decides the second column
-// `matev2 state <project> <crew>` prints - health, which is an observation
+// `mate state <project> <crew>` prints - health, which is an observation
 // of the pane and not a state at all.
 //
 // Everything here is pure. Declare takes the three recorded facts (the
@@ -12,7 +12,7 @@
 // a table and lets every caller - the CLI, internal/query, a test - agree
 // on one answer.
 //
-// The package deliberately imports nothing from the rest of matev2. Its
+// The package deliberately imports nothing from the rest of mate. Its
 // vocabulary for a status verb and for a composer reading is spelled out
 // here rather than imported from internal/box and internal/send, so that
 // crewstate stays a leaf a CLI, a read model and a console can all depend
@@ -186,7 +186,7 @@ type Observation struct {
 	Evidence string
 }
 
-// Health is the observation half of the `matev2 state` line.
+// Health is the observation half of the `mate state` line.
 type Health struct {
 	Kind   HealthKind
 	Detail string
@@ -246,7 +246,7 @@ func (r Result) Line() string {
 }
 
 // Decide is Declare and Observe together, which is exactly what
-// `matev2 state` prints. The two halves never consult each other: a state
+// `mate state` prints. The two halves never consult each other: a state
 // is what the record says and health is what the pane looks like, and
 // letting one correct the other is how the two columns stop meaning
 // anything.

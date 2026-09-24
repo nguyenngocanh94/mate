@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // The API's whole claim is that it repeats the database rather than
@@ -112,7 +112,7 @@ func TestProjectTasksEqualTheTaskLedger(t *testing.T) {
 	}
 
 	// The Mate's block is computed from `turn` because no task row exists
-	// for a Mate - the same reason cmd/matev2's mateLedgerRow exists.
+	// for a Mate - the same reason cmd/mate's mateLedgerRow exists.
 	var mateIn, mateCacheRead, mateCacheWrite, mateOut int64
 	if err := f.read.SQL().QueryRow(`
 		SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(cache_read_tokens),0),

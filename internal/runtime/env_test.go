@@ -8,14 +8,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 func TestAllowlistedEnvRefusesUnknownKeysRatherThanDroppingThem(t *testing.T) {
 	t.Parallel()
 	_, err := AllowlistedEnv([]EnvVar{
-		{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
+		{Key: "MATE_AGENT_ID", Value: "mate_001"},
 		{Key: "SECRET", Value: "nope"},
 	})
 	if err == nil {
@@ -39,12 +39,12 @@ func TestAllowlistedEnvRefusesHerdrKeys(t *testing.T) {
 
 func TestAllowlistedEnvRefusesEmptyValuesAndDuplicates(t *testing.T) {
 	t.Parallel()
-	if _, err := AllowlistedEnv([]EnvVar{{Key: "MATEV2_AGENT_ID", Value: ""}}); err == nil {
+	if _, err := AllowlistedEnv([]EnvVar{{Key: "MATE_AGENT_ID", Value: ""}}); err == nil {
 		t.Fatal("empty value must be omitted by the caller, not injected")
 	}
 	if _, err := AllowlistedEnv([]EnvVar{
-		{Key: "MATEV2_AGENT_ID", Value: "a"},
-		{Key: "MATEV2_AGENT_ID", Value: "b"},
+		{Key: "MATE_AGENT_ID", Value: "a"},
+		{Key: "MATE_AGENT_ID", Value: "b"},
 	}); err == nil {
 		t.Fatal("duplicate keys must be refused")
 	}
@@ -53,8 +53,8 @@ func TestAllowlistedEnvRefusesEmptyValuesAndDuplicates(t *testing.T) {
 func TestAllowlistedEnvKeepsIdentityKeys(t *testing.T) {
 	t.Parallel()
 	got, err := AllowlistedEnv([]EnvVar{
-		{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
-		{Key: "MATEV2_AGENT_ROLE", Value: "mate"},
+		{Key: "MATE_AGENT_ID", Value: "mate_001"},
+		{Key: "MATE_AGENT_ROLE", Value: "mate"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,8 +76,8 @@ func TestPaneEnvCopiesLaunchSpecEnv(t *testing.T) {
 		Cwd:         cwd,
 		ContextPath: path,
 		Env: []harness.EnvVar{
-			{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
-			{Key: "MATEV2_AGENT_ROLE", Value: "mate"},
+			{Key: "MATE_AGENT_ID", Value: "mate_001"},
+			{Key: "MATE_AGENT_ROLE", Value: "mate"},
 		},
 	})
 	if err != nil {
@@ -90,7 +90,7 @@ func TestPaneEnvCopiesLaunchSpecEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].Key != "MATEV2_AGENT_ID" || got[0].Value != "mate_001" || got[1].Key != "MATEV2_AGENT_ROLE" {
+	if len(got) != 2 || got[0].Key != "MATE_AGENT_ID" || got[0].Value != "mate_001" || got[1].Key != "MATE_AGENT_ROLE" {
 		t.Fatalf("PaneEnv = %#v", got)
 	}
 	if got := launch.UnsetEnv(); !slices.Equal(got, append([]string{"CLAUDE_CONFIG_DIR"}, harness.NestedSessionEnv...)) {

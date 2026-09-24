@@ -1,14 +1,14 @@
 {{- /*
 Adapted from firstmate's .agents/skills/ask-user-authority/SKILL.md at
-795e4b58. Deviations, each forced by a matev2 constraint:
-- firstmate decides no-mistakes "ask-user findings"; matev2 has no pipeline
+795e4b58. Deviations, each forced by a mate constraint:
+- firstmate decides no-mistakes "ask-user findings"; mate has no pipeline
   (local-only, docs/mvp.md decision 2), so the same procedure is applied to
   what the Mate actually decides: a Crew's needs-decision (resolve:/digest:)
   and the Mate's own review of a wait-mate.
 - "## Captain's intent" / "## Firstmate spec" become the M7 sections
   "## Captain's words" and "## Build", "## Acceptance", "## Open decisions".
 - "Reviewer language cannot amend that contract" becomes the Crew's
-  language (status line, hand-back), because in matev2 the Crew is the only
+  language (status line, hand-back), because in mate the Crew is the only
   other voice.
 - The --intent and no-mistakes paragraphs are dropped; decides: captain
   from the brief is added as an always-escalate rule.

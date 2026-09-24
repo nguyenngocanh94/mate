@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 // The tests in this file run the real git against temporary repositories.
@@ -51,7 +51,7 @@ func TestAddWorktreeCreatesALinkedWorktreeOnANewBranch(t *testing.T) {
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
 
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 
@@ -71,12 +71,12 @@ func TestAddWorktreeCreatesALinkedWorktreeOnANewBranch(t *testing.T) {
 	if gitx.SamePath(top, primary) {
 		t.Fatalf("worktree top level %q is the primary checkout %q", top, primary)
 	}
-	if got := strings.TrimSpace(run(t, wt, "rev-parse", "--abbrev-ref", "HEAD")); got != "matev2/k3" {
-		t.Fatalf("worktree branch = %q, want matev2/k3", got)
+	if got := strings.TrimSpace(run(t, wt, "rev-parse", "--abbrev-ref", "HEAD")); got != "mate/k3" {
+		t.Fatalf("worktree branch = %q, want mate/k3", got)
 	}
-	exists, err := g.BranchExists(ctx, repo, "matev2/k3")
+	exists, err := g.BranchExists(ctx, repo, "mate/k3")
 	if err != nil || !exists {
-		t.Fatalf("BranchExists(matev2/k3) = %v, %v; want true", exists, err)
+		t.Fatalf("BranchExists(mate/k3) = %v, %v; want true", exists, err)
 	}
 }
 
@@ -84,9 +84,9 @@ func TestAddWorktreeRefusesABranchThatExists(t *testing.T) {
 	repo := newRepo(t)
 	g := gitx.New()
 	ctx := context.Background()
-	run(t, repo, "branch", "matev2/k3")
+	run(t, repo, "branch", "mate/k3")
 
-	err := g.AddWorktree(ctx, repo, filepath.Join(t.TempDir(), "shop-k3"), "matev2/k3", "main")
+	err := g.AddWorktree(ctx, repo, filepath.Join(t.TempDir(), "shop-k3"), "mate/k3", "main")
 	if err == nil {
 		t.Fatal("git worktree add -b must fail on an existing branch")
 	}
@@ -103,7 +103,7 @@ func TestBranchAndRevisionProbesAnswerWithoutFailing(t *testing.T) {
 	for _, tc := range []struct {
 		branch string
 		want   bool
-	}{{"main", true}, {"matev2/nope", false}} {
+	}{{"main", true}, {"mate/nope", false}} {
 		got, err := g.BranchExists(ctx, repo, tc.branch)
 		if err != nil {
 			t.Fatalf("BranchExists(%s): %v", tc.branch, err)
@@ -143,7 +143,7 @@ func TestRemoveWorktreeAndDeleteBranchUndoAnAdd(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
 	// A crew that has already written something must not stop the removal:
@@ -158,15 +158,15 @@ func TestRemoveWorktreeAndDeleteBranchUndoAnAdd(t *testing.T) {
 	if _, err := os.Stat(wt); !os.IsNotExist(err) {
 		t.Fatalf("worktree directory survived removal: %v", err)
 	}
-	if err := g.DeleteBranch(ctx, repo, "matev2/k3"); err != nil {
+	if err := g.DeleteBranch(ctx, repo, "mate/k3"); err != nil {
 		t.Fatalf("DeleteBranch: %v", err)
 	}
-	exists, err := g.BranchExists(ctx, repo, "matev2/k3")
+	exists, err := g.BranchExists(ctx, repo, "mate/k3")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if exists {
-		t.Fatal("branch matev2/k3 survived the delete")
+		t.Fatal("branch mate/k3 survived the delete")
 	}
 	if listed := run(t, repo, "worktree", "list"); strings.Contains(listed, "shop-k3") {
 		t.Fatalf("worktree list still names the removed worktree:\n%s", listed)
@@ -178,10 +178,10 @@ func TestHeadCommitReadsTheWorktreeBranch(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
-	before, err := g.HeadCommit(ctx, repo, "matev2/k3")
+	before, err := g.HeadCommit(ctx, repo, "mate/k3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestHeadCommitReadsTheWorktreeBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	run(t, wt, "commit", "-am", "hello")
-	after, err := g.HeadCommit(ctx, repo, "matev2/k3")
+	after, err := g.HeadCommit(ctx, repo, "mate/k3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,20 +203,20 @@ func TestIsAncestorAheadCountAndIsDirtyAnswerFromRealHistory(t *testing.T) {
 	g := gitx.New()
 	ctx := context.Background()
 	wt := filepath.Join(t.TempDir(), "shop-k3")
-	if err := g.AddWorktree(ctx, repo, wt, "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
 
 	// A brand new branch is trivially contained in its base: no commits,
 	// no dirt.
-	isAnc, err := g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	isAnc, err := g.IsAncestor(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatalf("IsAncestor: %v", err)
 	}
 	if !isAnc {
 		t.Fatal("a freshly branched worktree must be an ancestor of its base")
 	}
-	ahead, err := g.AheadCount(ctx, repo, "matev2/k3", "main")
+	ahead, err := g.AheadCount(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatalf("AheadCount: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestIsAncestorAheadCountAndIsDirtyAnswerFromRealHistory(t *testing.T) {
 	if dirty != 1 {
 		t.Fatalf("IsDirty = %d, want 1 for one untracked file", dirty)
 	}
-	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	isAnc, err = g.IsAncestor(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,14 +254,14 @@ func TestIsAncestorAheadCountAndIsDirtyAnswerFromRealHistory(t *testing.T) {
 	// A real commit on the branch makes it strictly ahead of base.
 	run(t, wt, "add", "scratch.txt")
 	run(t, wt, "commit", "-m", "wip")
-	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	isAnc, err = g.IsAncestor(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if isAnc {
 		t.Fatal("a branch with a commit base lacks must not be an ancestor")
 	}
-	ahead, err = g.AheadCount(ctx, repo, "matev2/k3", "main")
+	ahead, err = g.AheadCount(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,8 +277,8 @@ func TestIsAncestorAheadCountAndIsDirtyAnswerFromRealHistory(t *testing.T) {
 	}
 
 	// Fast-forwarding base to the branch makes it an ancestor again.
-	run(t, repo, "merge", "--ff-only", "matev2/k3")
-	isAnc, err = g.IsAncestor(ctx, repo, "matev2/k3", "main")
+	run(t, repo, "merge", "--ff-only", "mate/k3")
+	isAnc, err = g.IsAncestor(ctx, repo, "mate/k3", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestRunnerIsAPortAndNoShellIsInvolved(t *testing.T) {
 			"rev-parse --show-toplevel": {Stdout: "/tmp/ws/.worktrees/shop-k3\n"},
 		},
 		errs: map[string]error{
-			"branch -D matev2/k3": errors.New("git is gone"),
+			"branch -D mate/k3": errors.New("git is gone"),
 		},
 	}
 	g := gitx.Git{Runner: f}
@@ -326,17 +326,17 @@ func TestRunnerIsAPortAndNoShellIsInvolved(t *testing.T) {
 	if top != "/tmp/ws/.worktrees/shop-k3" {
 		t.Fatalf("Toplevel = %q", top)
 	}
-	if err := g.AddWorktree(ctx, "/tmp/ws/shop", "/tmp/ws/.worktrees/shop-k3", "matev2/k3", "main"); err != nil {
+	if err := g.AddWorktree(ctx, "/tmp/ws/shop", "/tmp/ws/.worktrees/shop-k3", "mate/k3", "main"); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.DeleteBranch(ctx, "/tmp/ws/shop", "matev2/k3"); err == nil {
+	if err := g.DeleteBranch(ctx, "/tmp/ws/shop", "mate/k3"); err == nil {
 		t.Fatal("a runner error must reach the caller")
 	}
 
 	// Every argument is its own argv element: nothing is ever concatenated
 	// into a string a shell would re-split.
 	add := f.calls[1]
-	want := []string{"worktree", "add", "-b", "matev2/k3", "/tmp/ws/.worktrees/shop-k3", "main"}
+	want := []string{"worktree", "add", "-b", "mate/k3", "/tmp/ws/.worktrees/shop-k3", "main"}
 	if strings.Join(add.Args, "\x00") != strings.Join(want, "\x00") {
 		t.Fatalf("add argv = %q, want %q", add.Args, want)
 	}

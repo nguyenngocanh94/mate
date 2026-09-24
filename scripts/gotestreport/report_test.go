@@ -55,10 +55,10 @@ func TestEmbeddedAllowlistDeclaresKnownSkips(t *testing.T) {
 	t.Parallel()
 	rules := parseRules(expectedSkipsFile)
 	if !skipExpected("TestLiveHerdrSessionWorkspaceTabStart", "linux", rules) {
-		t.Fatal("live Herdr tests skip without MATEV2_LIVE=1")
+		t.Fatal("live Herdr tests skip without MATE_LIVE=1")
 	}
 	if !skipExpected("TestLiveSpawnCrewCodex", "darwin", rules) {
-		t.Fatal("live harness tests skip without MATEV2_LIVE=1")
+		t.Fatal("live harness tests skip without MATE_LIVE=1")
 	}
 	if skipExpected("TestStoreAppendStatusRefusesSymlinkEscape", "darwin", rules) {
 		t.Fatal("ordinary unit tests must never be allowlisted")
@@ -94,7 +94,7 @@ func TestRunAllowsDeclaredSkipAndStillFailsOnTestFailure(t *testing.T) {
 	t.Parallel()
 	in := strings.NewReader(strings.Join([]string{
 		`{"Action":"run","Package":"example.com/p","Test":"TestLiveAttachX"}`,
-		`{"Action":"output","Package":"example.com/p","Test":"TestLiveAttachX","Output":"    live_test.go:1: set MATEV2_LIVE\n"}`,
+		`{"Action":"output","Package":"example.com/p","Test":"TestLiveAttachX","Output":"    live_test.go:1: set MATE_LIVE\n"}`,
 		`{"Action":"skip","Package":"example.com/p","Test":"TestLiveAttachX","Elapsed":0}`,
 		`{"Action":"run","Package":"example.com/p","Test":"TestBoom"}`,
 		`{"Action":"output","Package":"example.com/p","Test":"TestBoom","Output":"    boom_test.go:1: exploded\n"}`,
@@ -220,7 +220,7 @@ func TestSkipReportFileNamesExpectedSkips(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "skip.md")
 	in := strings.NewReader(strings.Join([]string{
-		`{"Action":"output","Package":"example.com/p","Test":"TestLiveAttachX","Output":"    live_test.go:1: set MATEV2_LIVE\n"}`,
+		`{"Action":"output","Package":"example.com/p","Test":"TestLiveAttachX","Output":"    live_test.go:1: set MATE_LIVE\n"}`,
 		`{"Action":"skip","Package":"example.com/p","Test":"TestLiveAttachX","Elapsed":0}`,
 		`{"Action":"pass","Package":"example.com/p"}`,
 	}, "\n") + "\n")
@@ -240,7 +240,7 @@ func TestSkipReportFileNamesExpectedSkips(t *testing.T) {
 	if !strings.Contains(got, "`example.com/p TestLiveAttachX`") {
 		t.Fatalf("report must name the skipped test:\n%s", got)
 	}
-	if !strings.Contains(got, "set MATEV2_LIVE") {
+	if !strings.Contains(got, "set MATE_LIVE") {
 		t.Fatalf("report must carry the skip reason:\n%s", got)
 	}
 }

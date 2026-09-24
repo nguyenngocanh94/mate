@@ -1,5 +1,5 @@
 // Package outbox is the one sender into a Mate's composer (docs/mvp.md task
-// 30): every line matev2 types into a Mate on its own initiative - an
+// 30): every line mate types into a Mate on its own initiative - an
 // `[assign]` the captain pressed, a digest the auto daemon built - is queued
 // in `mate/.outbox` (internal/store/outbox.go) and delivered from here.
 //
@@ -45,11 +45,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // MateCrew is the crew field of the `wedged` incident this package opens.
@@ -80,7 +80,7 @@ type Runtime interface {
 var _ Runtime = runtime.Adapter(nil)
 
 // HandleFunc resolves the Herdr handle and harness of one project's Mate.
-// cmd/matev2 wires spawn.MateHandle into it, so this package imports nothing
+// cmd/mate wires spawn.MateHandle into it, so this package imports nothing
 // that can start or stop an agent. An error means the line has nowhere to
 // go yet: the Mate is not running, or Herdr is not answering.
 type HandleFunc func(ctx context.Context, project string) (runtime.AgentHandle, harness.Kind, error)

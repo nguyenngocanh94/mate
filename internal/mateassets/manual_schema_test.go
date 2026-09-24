@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief"
-	"github.com/nguyenngocanh94/matev2/internal/facts"
-	"github.com/nguyenngocanh94/matev2/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/facts"
+	"github.com/nguyenngocanh94/mate/internal/memory"
 )
 
 // The brief schema has one source of truth, internal/brief. These tests
@@ -70,7 +70,7 @@ func TestManualSection6ExamplePassesTheCheck(t *testing.T) {
 // TestManualSection4TeachesTheCheckRules: section 4's list of what `brief
 // check` checks names every marker the check looks for.
 func TestManualSection4TeachesTheCheckRules(t *testing.T) {
-	sec := section(t, renderedManual(t), "## 4. The `matev2` command contract")
+	sec := section(t, renderedManual(t), "## 4. The `mate` command contract")
 	for _, want := range []string{"brief check <file> [--scout]", "brief append <project> <crew>", "project facts <project>", "--scout",
 		brief.OutOfScopeMarker, brief.VerifyMarker, brief.UnknownMarker, "decides: captain", brief.TaskHeading} {
 		if !strings.Contains(sec, want) {

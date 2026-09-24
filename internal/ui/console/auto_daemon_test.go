@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The auto daemon's two surfaces in the Console (mvp.md task 19): the MODE

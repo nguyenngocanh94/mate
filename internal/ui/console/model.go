@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // LoadFunc reads the current navigation tree. Called once at startup, again
@@ -21,7 +21,7 @@ import (
 // changed since.
 type LoadFunc func(context.Context) (query.Snapshot, error)
 
-// AttachCmdFunc builds the *exec.Cmd that runs `matev2 attach <target>`. The
+// AttachCmdFunc builds the *exec.Cmd that runs `mate attach <target>`. The
 // Console runs it through tea.Exec, wrapped in a handoverNotice, which
 // releases the terminal to the child and restores the Console's own render
 // loop when it exits - Herdr's own UI is never drawn by this process.
@@ -52,7 +52,7 @@ const (
 	//
 	// ActionResolve hands one inbox item to the Mate as a `resolve:` line,
 	// typed into its composer behind the from-app sentinel: the crew's
-	// question, the status file to read, and the `matev2 send` that answers
+	// question, the status file to read, and the `mate send` that answers
 	// the crew. It is the console's `[assign]` button and `a` key - the word
 	// on the button is the reader's ("give this away"), the word on the wire
 	// is the Mate's manual's, and they are deliberately not the same.
@@ -61,7 +61,7 @@ const (
 	// console surface issues either one since 2026-09-19 - a reader who
 	// wants to talk to a crew or read its screen opens that crew's pane,
 	// which is what a box row now does. They stay in the enum because
-	// cmd/matev2 implements them and an ActionFunc is free to be asked.
+	// cmd/mate implements them and an ActionFunc is free to be asked.
 	ActionResolve Action = "resolve"
 	ActionReply   Action = "reply"
 	ActionPeek    Action = "peek"
@@ -80,7 +80,7 @@ const (
 	ActionRestartMate   Action = "restart_mate"
 	ActionClearComposer Action = "clear_composer"
 	// ActionDiff is a Crew row's review surface (mvp.md task 21): what
-	// `matev2 diff <project> <crew>` prints - the commits the crew's branch
+	// `mate diff <project> <crew>` prints - the commits the crew's branch
 	// carries beyond the project's default branch, then the patch. It writes
 	// nothing, so it is the one action with no confirmation, and its result
 	// is a screenful rather than a line: the Console puts it in the scrolling
@@ -99,9 +99,9 @@ const (
 	// restriction: a reader looks at a branch to decide whether it is worth
 	// landing, which is before, not after, the Crew says `wait-mate`.
 	ActionMerge Action = "merge"
-	// TODO: v1 also had retry, discard and switch_harness. matev2 has no
+	// TODO: v1 also had retry, discard and switch_harness. mate has no
 	// retry (a Crew runs once), and no discard action: throwing work away
-	// is `matev2 crew stop --discard`, on the captain's explicit word.
+	// is `mate crew stop --discard`, on the captain's explicit word.
 )
 
 // ActionRequest is the identity selected from the snapshot. TargetKind is
@@ -153,7 +153,7 @@ const (
 )
 
 // TODO(task 21): v1 had a third level, frameTask, listing one Task's Crew
-// attempts. matev2 has no Task and a Crew runs once, so the Project frame
+// attempts. mate has no Task and a Crew runs once, so the Project frame
 // lists Crews directly.
 
 func (k frameKind) String() string {
@@ -228,10 +228,10 @@ type Model struct {
 	action    ActionFunc
 
 	// sessionReader, sessionPrompt and sessionClose are the ADR 0025 snapshot
-	// ports, built by cmd/matev2's bridge from internal/query,
+	// ports, built by cmd/mate's bridge from internal/query,
 	// internal/application and runtime.Adapter - this package never reaches
 	// those directly. A nil sessionReader is a test-only configuration:
-	// cmd/matev2 always wires the ports (console.go's handleConsole, which
+	// cmd/mate always wires the ports (console.go's handleConsole, which
 	// treats runtimeAdapter's error branch as a test seam), so in production
 	// Enter on a Mate/Crew row always tries the Agent View first. Without
 	// the ports it takes the classic tea.Exec hand-off (attach.go)
@@ -240,7 +240,7 @@ type Model struct {
 	sessionPrompt SessionPrompt
 	sessionClose  SessionClose
 	// sessionStream is the primary Agent View transport. It is a Console
-	// boundary closure; cmd/matev2 adapts runtime.SessionStream into it.
+	// boundary closure; cmd/mate adapts runtime.SessionStream into it.
 	sessionStream SessionStreamFactory
 	// sessionMetadata refreshes status/runtime/inbox without touching the
 	// terminal buffer or calling the snapshot transcript path.
@@ -404,7 +404,7 @@ type Model struct {
 	// one signal quitting mid-action can still send it.
 	actionCancel context.CancelFunc
 	// actionAbandoned is set when the operator quits while actionBusy: the
-	// description of what was abandoned, surfaced to cmd/matev2 via
+	// description of what was abandoned, surfaced to cmd/mate via
 	// AbandonedAction so it can tell the operator plainly after the
 	// terminal is restored, since the Console itself has nothing left to
 	// draw by then.
@@ -419,7 +419,7 @@ type Model struct {
 	// overlay lived on the Model here. mvp.md defers the observer that
 	// feeds them (internal/watch) to task 18.
 
-	// ctx is the context the program itself was started with (cmd/matev2's
+	// ctx is the context the program itself was started with (cmd/mate's
 	// handleConsole, via WithContext) - not context.Background(), so an
 	// in-flight action's own context is a child of something the program
 	// actually owns and can act on. nil in tests that build a Model
@@ -429,7 +429,7 @@ type Model struct {
 	quitting bool
 }
 
-// WithContext attaches the context the program itself owns - cmd/matev2's
+// WithContext attaches the context the program itself owns - cmd/mate's
 // handleConsole passes the same context it gave tea.WithContext. Every
 // in-flight ActionFunc call is a child of this context rather than of
 // context.Background(), so quitting mid-action has something to cancel.
@@ -471,7 +471,7 @@ func (m Model) baseCtx() context.Context {
 }
 
 // AbandonedAction reports what was abandoned if the operator quit while an
-// action was in flight (empty, false otherwise). cmd/matev2 checks this after
+// action was in flight (empty, false otherwise). cmd/mate checks this after
 // tea.Program.Run returns and tells the operator plainly - the Console's own
 // screen is gone by then, so this is the one place left to say it.
 func (m Model) AbandonedAction() (string, bool) {
@@ -530,8 +530,8 @@ type treeLoadedMsg struct {
 	err  error
 }
 
-// AttachFinishedMsg is sent after the `matev2 attach` subprocess started by
-// tea.Exec returns - exported so cmd/matev2's wiring and tests can recognize
+// AttachFinishedMsg is sent after the `mate attach` subprocess started by
+// tea.Exec returns - exported so cmd/mate's wiring and tests can recognize
 // it without reaching into package internals.
 type AttachFinishedMsg struct {
 	Err error

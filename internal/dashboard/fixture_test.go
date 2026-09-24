@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // The fixture is the acceptance run task 25 captured: a Mate running Claude
@@ -27,7 +27,7 @@ const (
 
 	fixtureProject = "shop"
 	fixtureCrew    = "buybtn"
-	fixtureBranch  = "matev2/buybtn"
+	fixtureBranch  = "mate/buybtn"
 )
 
 var (
@@ -55,7 +55,7 @@ type fixture struct {
 }
 
 // newFixture builds the workspace, reindexes it, and puts a dashboard on
-// top of a read-only handle - the same handle `matev2 dashboard` opens
+// top of a read-only handle - the same handle `mate dashboard` opens
 // while a console holds the writer.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
@@ -98,7 +98,7 @@ func newFixture(t *testing.T) *fixture {
 	for _, line := range []string{
 		"working: verifying isolated worktree and task brief",
 		"needs-decision: what is the checkout page URL for the Buy button?",
-		"wait-mate: ready in branch matev2/buybtn",
+		"wait-mate: ready in branch mate/buybtn",
 	} {
 		if err := ws.AppendStatus(fixtureProject, fixtureCrew, line); err != nil {
 			t.Fatalf("AppendStatus: %v", err)
@@ -112,7 +112,7 @@ func newFixture(t *testing.T) *fixture {
 		{Time: fixtureAnswerAt, Source: store.SourceMate, Target: store.CrewTarget(fixtureCrew),
 			Text: "Use pages/checkout-express.html for the Buy button."},
 		{Time: fixtureReportAt, Source: store.SourceMate, Target: store.SourceUser,
-			Text: "buybtn is ready in branch matev2/buybtn; say the word and I will land it."},
+			Text: "buybtn is ready in branch mate/buybtn; say the word and I will land it."},
 	} {
 		if err := ws.AppendSent(fixtureProject, entry); err != nil {
 			t.Fatalf("AppendSent: %v", err)

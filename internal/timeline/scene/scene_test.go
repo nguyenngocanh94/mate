@@ -27,7 +27,7 @@ var testActors = []Actor{
 	{ID: mateID, Kind: ActorMate, Name: "mate", Project: project},
 	{ID: crewID, Kind: ActorCrew, Name: "k3", Project: project},
 	{ID: userID, Kind: ActorUser, Name: "captain", Project: project},
-	{ID: appID, Kind: ActorApp, Name: "matev2", Project: project},
+	{ID: appID, Kind: ActorApp, Name: "app", Project: project},
 	{ID: obsID, Kind: "observer", Name: "observer", Project: project},
 }
 
@@ -240,7 +240,7 @@ var cases = []sceneCase{
 				"to", "mate", "text", "add a Buy button")
 			s.add(2, KindTurnStarted, mateID, "")
 			s.caused(call)
-			s.add(3, KindToolCalled, mateID, "", "class", "shell", "target", "matev2 crew spawn shop k3")
+			s.add(3, KindToolCalled, mateID, "", "class", "shell", "target", "mate crew spawn shop k3")
 			s.add(4, KindCrewSpawned, mateID, crewID, "crew", "k3")
 			s.add(5, KindTurnEnded, mateID, "")
 			s.add(6, KindMateStopped, mateID, "")
@@ -256,7 +256,7 @@ var cases = []sceneCase{
 		},
 	},
 	{
-		name: "matev2 walks the captain's note in, the Mate reads it, thinks, and answers",
+		name: "mate walks the captain's note in, the Mate reads it, thinks, and answers",
 		build: func(s *script) {
 			s.add(0, KindMateStarted, mateID, "", "harness", "claude")
 			asked := s.add(1, KindQuestionAsked, crewID, mateID, "crew", "k3", "text", "A or B?")
@@ -342,7 +342,7 @@ var cases = []sceneCase{
 		build: func(s *script) {
 			s.add(0, KindMateStarted, mateID, "", "harness", "claude")
 			s.add(1, KindTurnStarted, mateID, "")
-			s.add(2, KindToolCalled, mateID, "", "class", "shell", "target", "matev2 diff shop k3 --stat")
+			s.add(2, KindToolCalled, mateID, "", "class", "shell", "target", "mate diff shop k3 --stat")
 			s.add(3, KindToolFinished, mateID, "", "tool", "Bash", "ok", true)
 			s.add(4, KindMergeDone, mateID, crewID, "crew", "k3", "by", "mate", "into", "main")
 			s.add(5, KindTurnEnded, mateID, "")
@@ -501,7 +501,7 @@ func TestTheMachineMovesEverybodyTheSpecSays(t *testing.T) {
 // neverRoutedHere is every row of the machine no event can reach, because the
 // kind never names that actor. `health.changed` is written about a crew's
 // pane and carries no subject, so it cannot reach the Mate's table;
-// `mode.changed` belongs to matev2 itself and names nobody; `mate.started`
+// `mode.changed` belongs to mate itself and names nobody; `mate.started`
 // never mentions a crew.
 //
 // The rows exist anyway, because a kind with no unconditional row in a table

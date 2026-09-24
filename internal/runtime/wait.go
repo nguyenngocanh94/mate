@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // AgentStatus is a Herdr-observed agent status. These are adapter facts,

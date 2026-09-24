@@ -10,7 +10,7 @@ import (
 )
 
 // This file holds the few pieces of v1's internal/domain and
-// internal/fsboundary that the Herdr adapter actually uses. matev2 does not
+// internal/fsboundary that the Herdr adapter actually uses. mate does not
 // have those packages, so they are inlined here rather than carried across.
 
 // WorkspaceID is the opaque identity of a workspace. It seeds the Herdr

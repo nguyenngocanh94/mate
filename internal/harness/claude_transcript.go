@@ -812,7 +812,7 @@ func ClassifyClaudeTool(name string) CommandClass {
 // $PWD and not of an unresolved spelling: launched in a directory whose given
 // path contains a symlinked component with PWD pointing elsewhere, Claude Code
 // 2.1.269 wrote its transcript under the slug of the resolved path.
-// TestLiveClaudeProjectSlugResolution (opt in with MATEV2_CLAUDE_LIVE=1) creates
+// TestLiveClaudeProjectSlugResolution (opt in with MATE_CLAUDE_LIVE=1) creates
 // that fixture - a physical path holding a dot, a dash, a space and an astral
 // character, reached once directly and once through a symlink, with a
 // divergent PWD - and fails if the observed directory is not this function's

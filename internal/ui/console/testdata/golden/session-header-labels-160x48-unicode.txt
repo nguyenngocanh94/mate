@@ -12,7 +12,7 @@
                                                                         │                                                                                       
                                                                         │                                                                                       
                                                                         │                                                                                       
-                                                                        │shop-mate $ matev2 crew list                                                           
+                                                                        │shop-mate $ mate crew list                                                             
                                                                         │k3  needs-decision                                                                     
                                                                         │shop-mate $                                                                            
                                                                         │                                                                                       

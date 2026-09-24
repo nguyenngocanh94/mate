@@ -1,6 +1,6 @@
 package dashboard
 
-import "github.com/nguyenngocanh94/matev2/internal/timeline"
+import "github.com/nguyenngocanh94/mate/internal/timeline"
 
 // The JSON shapes of docs/dashboard.md. Field order here is the field order
 // on the wire, and a field is added at the end rather than in the middle,
@@ -9,7 +9,7 @@ import "github.com/nguyenngocanh94/matev2/internal/timeline"
 // Two conventions run through all of them. A nullable number is a pointer
 // and renders as `null`, never as 0: a cost with no price and a context
 // percentage with no known window are unknown, and docs/timeline.md's
-// "a missing price is not a price of zero" is the same rule `matev2 usage`
+// "a missing price is not a price of zero" is the same rule `mate usage`
 // prints as `?`. A timestamp is the database's own string - RFC3339 with
 // nanoseconds, in UTC (db.TimeFormat) - passed through rather than
 // reformatted, so a number on the page and a row in the database compare
@@ -34,7 +34,7 @@ type Ref struct {
 
 // Tokens is the four billed buckets plus thinking. Total is
 // input+cache_read+cache_write+output and excludes thinking, which is what
-// `matev2 usage`'s TOTAL column sums and what `v_now.tokens_today` sums:
+// `mate usage`'s TOTAL column sums and what `v_now.tokens_today` sums:
 // thinking tokens are reported by the harness inside the output it already
 // counted, so adding them would count them twice.
 type Tokens struct {
@@ -48,7 +48,7 @@ type Tokens struct {
 
 // SceneRow is one row of `v_now`: where the scene projection last put an
 // actor. State is empty for an actor no projection has placed - the
-// captain, matev2 and the observer are in the story and not in the office
+// captain, mate and the observer are in the story and not in the office
 // (docs/timeline.md section 7).
 type SceneRow struct {
 	ActorID     string   `json:"actor_id"`
@@ -93,7 +93,7 @@ type Mate struct {
 // ProjectCard is one project on the workspace page.
 type ProjectCard struct {
 	Name string `json:"name"`
-	// Mode is "auto" or "manual" - `.matev2/projects/<p>/auto` (store.Auto).
+	// Mode is "auto" or "manual" - `.mate/projects/<p>/auto` (store.Auto).
 	Mode string   `json:"mode"`
 	Mate MateCard `json:"mate"`
 	// CrewsByState counts this project's crew actors by scene state. A crew
@@ -265,7 +265,7 @@ type TurnResponse struct {
 }
 
 // DiffResponse is GET /api/projects/{project}/tasks/{crew}/diff. Text is
-// `matev2 diff <project> <crew>` verbatim, and empty with a Reason when
+// `mate diff <project> <crew>` verbatim, and empty with a Reason when
 // there is nothing to show.
 type DiffResponse struct {
 	envelope

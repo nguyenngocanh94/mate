@@ -1,7 +1,7 @@
 erics@Ericss-Mac-mini claude % claude
  ▐▛███▛█   Claude Code v2.1.274
 ▝▜██████▀  Sonnet 5 with medium effort · Claude Team
-  ▝▝ ▝▝    /private/tmp/matev2-12-cap/claude
+  ▝▝ ▝▝    /private/tmp/mate-12-cap/claude
 
 
 ─────────────────────────────────────────────────────────────────────────────────────────────

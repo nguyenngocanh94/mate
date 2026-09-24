@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // AutoMemoryKey is the Claude Code setting that turns its auto-memory off
@@ -24,19 +24,19 @@ const AutoMemoryKey = "autoMemoryEnabled"
 // that let `sent.log` capture the conversation and let the app know when the
 // user is back (docs/mvp.md task 08), and auto-memory off, because the
 // Mate's memory is `mate/memory.md` and nothing else (docs/mvp.md M8, B6).
-// It is a pure function of the matev2 binary path, so it can be
+// It is a pure function of the mate binary path, so it can be
 // golden-tested without touching Herdr or the filesystem, and both
 // `StartMate` and its tests build the same file this way.
 //
-// UserPromptSubmit invokes `matev2 hook mate-prompt`; Stop invokes `matev2
+// UserPromptSubmit invokes `mate hook mate-prompt`; Stop invokes `mate
 // hook mate-stop`. Both read the hook's JSON payload from their own stdin,
 // which Claude Code always supplies, so no `--` argument or extra flag is
 // needed here.
 //
-// SessionStart invokes `matev2 hook mate-session` (docs/mvp.md task 37,
+// SessionStart invokes `mate hook mate-session` (docs/mvp.md task 37,
 // B2): one hook with no matcher, which Claude Code 2.1.281 fires once each
 // for startup, clear, compact and resume in a Herdr pane, its stdout reaching
-// the model before the next turn (task 35, A2). It prints `matev2 recall`.
+// the model before the next turn (task 35, A2). It prints `mate recall`.
 func ClaudeSettings(binary string) ([]byte, error) {
 	settings := map[string]any{
 		AutoMemoryKey: false,
@@ -53,7 +53,7 @@ func ClaudeSettings(binary string) ([]byte, error) {
 	return append(data, '\n'), nil
 }
 
-// SessionHookName is the `matev2 hook` subcommand both harnesses' SessionStart
+// SessionHookName is the `mate hook` subcommand both harnesses' SessionStart
 // hook runs.
 const SessionHookName = "mate-session"
 
@@ -110,7 +110,7 @@ func hookMatcher(binary string, args ...string) map[string]any {
 	}
 }
 
-// EnsureSessionHook adds matev2's SessionStart hook to an existing settings
+// EnsureSessionHook adds mate's SessionStart hook to an existing settings
 // file that has none, keeping every other key and every SessionStart entry
 // already there (the captain's own included). A file that already runs
 // `hook mate-session` from any SessionStart entry is left byte for byte
@@ -191,7 +191,7 @@ func CodexHooks(binary string) []byte {
 }
 
 // shellQuote wraps s in single quotes for the shell Claude Code runs hook
-// commands through, escaping any single quote already in s. The matev2
+// commands through, escaping any single quote already in s. The mate
 // binary path is the only thing quoted here; it comes from os.Executable or
 // an operator-supplied override, never from harness or hook input.
 func shellQuote(s string) string {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // resolvedTempDir is t.TempDir with symlinks resolved, so a fixture's spelled

@@ -3,7 +3,7 @@
 │ >_ OpenAI Codex (v0.154.0)                       │
 │                                                  │
 │ model:     gpt-5.6-terra high   /model to change │
-│ directory: /private/tmp/matev2-12-cap/codex      │
+│ directory: /private/tmp/mate-12-cap/codex      │
 ╰──────────────────────────────────────────────────╯
 
   Tip: New Use /fast to enable our fastest inference with increased plan usage.
@@ -11,4 +11,4 @@
 
 › half typed
 
-  gpt-5.6-terra high · /private/tmp/matev2-12-cap/codex
+  gpt-5.6-terra high · /private/tmp/mate-12-cap/codex

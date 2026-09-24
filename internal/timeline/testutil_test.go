@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // The fixture is one acceptance run, captured live on 2026-09-19 and trimmed:
@@ -25,19 +25,19 @@ const (
 
 	fixtureCrew    = "buybtn"
 	fixtureProject = "shop"
-	fixtureBranch  = "matev2/buybtn"
+	fixtureBranch  = "mate/buybtn"
 
 	// The three status lines the crew echoed, verbatim. Each appears inside
 	// the `exec` command that wrote it, which is how the ingest dates them.
 	statusWorking  = "working: verifying isolated worktree and task brief"
 	statusQuestion = "needs-decision: what is the checkout page URL for the Buy button?"
-	statusHandback = "wait-mate: ready in branch matev2/buybtn"
+	statusHandback = "wait-mate: ready in branch mate/buybtn"
 
 	// What the captain and the Mate said, in the order the real run said it.
 	captainRequest = "Add a Buy button to the end of README.md in project shop, linking to our checkout page. Use a crew."
-	assignLine     = `resolve: buybtn asked: "what is the checkout page URL for the Buy button?" — read /w/.matev2/projects/shop/crews/buybtn.status, decide, and answer with matev2 send shop buybtn "<one line>"`
+	assignLine     = `resolve: buybtn asked: "what is the checkout page URL for the Buy button?" — read /w/.mate/projects/shop/crews/buybtn.status, decide, and answer with mate send shop buybtn "<one line>"`
 	mateAnswer     = "Use pages/checkout-express.html for the Buy button."
-	mateReport     = "buybtn is ready in branch matev2/buybtn; say the word and I will land it."
+	mateReport     = "buybtn is ready in branch mate/buybtn; say the word and I will land it."
 )
 
 // The clock of the captured run, so every assertion is against real moments

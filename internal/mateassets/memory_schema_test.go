@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/memory"
-	"github.com/nguyenngocanh94/matev2/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
 // The memory shape has one source of truth, internal/memory. These tests
@@ -35,12 +35,12 @@ func markdownBlock(t *testing.T, what, text string) string {
 }
 
 // TestManualSection14MemoryShapeIsWhatRememberWrites: the entry shape
-// section 14 documents is the one `matev2 remember` writes, byte for byte,
+// section 14 documents is the one `mate remember` writes, byte for byte,
 // for all three tiers, and it passes `memory check`.
 func TestManualSection14MemoryShapeIsWhatRememberWrites(t *testing.T) {
 	sec := section(t, renderedManual(t), "## 14. Project memory")
 	example := markdownBlock(t, "section 14", sec)
-	entries, problems := memory.Check(example, memoryExampleDay, "/ws", "/ws/.matev2/projects/shop")
+	entries, problems := memory.Check(example, memoryExampleDay, "/ws", "/ws/.mate/projects/shop")
 	if len(problems) != 0 {
 		t.Fatalf("section 14's memory example fails memory check: %v\n%s", problems, example)
 	}
@@ -79,10 +79,10 @@ func TestManualSection14MemoryShapeIsWhatRememberWrites(t *testing.T) {
 // "append it yourself" stop-gap is gone.
 func TestManualSection4DocumentsTheMemoryCommands(t *testing.T) {
 	text := renderedManual(t)
-	sec := section(t, text, "## 4. The `matev2` command contract")
+	sec := section(t, text, "## 4. The `mate` command contract")
 	for _, want := range []string{
-		`matev2 remember <project> --captain|--lesson [--perishable "<expiry condition>"] --source <src> "<one line>"`,
-		"matev2 memory check <project>",
+		`mate remember <project> --captain|--lesson [--perishable "<expiry condition>"] --source <src> "<one line>"`,
+		"mate memory check <project>",
 		fmt.Sprintf("%d estimated tokens", memory.BudgetTokens),
 		"ceil(bytes / 3)",
 		"head: <sha>",
@@ -152,7 +152,7 @@ func TestWriteSeedsMemoryAndBacklogWithTheirSections(t *testing.T) {
 	if string(mem) != memory.Header {
 		t.Fatalf("memory.md = %q, want %q", mem, memory.Header)
 	}
-	if _, problems := memory.Check(string(mem), memoryExampleDay, "/ws", "/ws/.matev2/projects/shop"); len(problems) != 0 {
+	if _, problems := memory.Check(string(mem), memoryExampleDay, "/ws", "/ws/.mate/projects/shop"); len(problems) != 0 {
 		t.Fatalf("a fresh memory.md fails memory check: %v", problems)
 	}
 	backlog, err := os.ReadFile(filepath.Join(dir, "backlog.md"))
@@ -180,7 +180,7 @@ func TestStowSkillQuotesTheStowLine(t *testing.T) {
 		t.Error("the manual's skill list does not name the stow: line")
 	}
 	example := markdownBlock(t, "stow skill", text)
-	if _, problems := memory.Check(example, memoryExampleDay, "/ws", "/ws/.matev2/projects/shop"); len(problems) != 0 {
+	if _, problems := memory.Check(example, memoryExampleDay, "/ws", "/ws/.mate/projects/shop"); len(problems) != 0 {
 		t.Fatalf("the stow skill's example fails memory check: %v", problems)
 	}
 	for _, want := range []string{

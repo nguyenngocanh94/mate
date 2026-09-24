@@ -11,7 +11,7 @@ import (
 // "Hooks need review" dialog right after the directory-trust dialog. Its
 // options are counts, not names: "1 hook is new or changed." says nothing
 // about whose hook it is, so "2. Trust all and continue" would trust the
-// operator's own untrusted hooks along with matev2's. What does name each
+// operator's own untrusted hooks along with mate's. What does name each
 // hook is the review behind option 1, measured 2026-09-24 on codex-cli
 // 0.156.1 in a Herdr 0.8.2 lab pane (captures in testdata/startup):
 //
@@ -32,7 +32,7 @@ import (
 //     details · esc close"), esc again to the composer.
 //
 // The settle walks exactly that, and trusts a hook only when every hook the
-// review lists is one it was told is matev2's own (OwnHook). It never
+// review lists is one it was told is mate's own (OwnHook). It never
 // presses "Trust all", and it never trusts anything it did not read.
 
 // StartupScreenHooksReview is codex-cli's "Hooks need review" dialog.
@@ -85,7 +85,7 @@ func HooksReviewSelected(screen string) bool {
 	return ok
 }
 
-// OwnHook is one hook the settle may trust: matev2 wrote it, in this file,
+// OwnHook is one hook the settle may trust: mate wrote it, in this file,
 // with this command, for this event.
 type OwnHook struct {
 	Event   string
@@ -95,11 +95,11 @@ type OwnHook struct {
 
 // Matches reports whether a reviewed hook is exactly this one: the same
 // event, a project config at this path, this command. The source must be a
-// project config: matev2 never writes the operator's user config.
+// project config: mate never writes the operator's user config.
 //
 // The review wraps a long value over lines at the pane width, and the break
 // may swallow the character it broke at: measured 2026-09-24 (codex-cli
-// 0.156.1, task 37), `…/001/.matev2/projects/…` drew as `…/001/.matev2` and
+// 0.156.1, task 37), `…/001/.mate/projects/…` drew as `…/001/.mate` and
 // `projects/…` on the next line, the `/` gone, while `…/001/` + `codexlab/…`
 // kept it and `mate-` + `session` broke after a hyphen. So a value is
 // matched line by line, and at each line break exactly one space or `/` may

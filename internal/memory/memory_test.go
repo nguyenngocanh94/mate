@@ -10,7 +10,7 @@ var today = time.Date(2026, 9, 24, 15, 0, 0, 0, time.UTC)
 
 const (
 	root = "/ws"
-	base = "/ws/.matev2/projects/shop"
+	base = "/ws/.mate/projects/shop"
 )
 
 func TestNewEntryShapes(t *testing.T) {
@@ -82,8 +82,8 @@ func TestCheckSourcePaths(t *testing.T) {
 		`captain, "bạn có đang spawn 1 crew mới ko? hay tự làm /checkout", 2026-09-18`,
 		"crews/k1/report.md §Durable facts",
 		"sent.log to rpi35 2026-09-18, power12 2026-09-19",
-		"matev2 project facts, main@3f2a91c, 2026-09-24",
-		"../../WORKSPACE.md", // .matev2/WORKSPACE.md: inside
+		"mate project facts, main@3f2a91c, 2026-09-24",
+		"../../WORKSPACE.md", // .mate/WORKSPACE.md: inside
 		"https://example.com/docs/x",
 	}
 	for _, s := range ok {
@@ -92,12 +92,12 @@ func TestCheckSourcePaths(t *testing.T) {
 		}
 	}
 	bad := map[string]string{
-		"/ws/.matev2/projects/shop/crews/k1/report.md §2": "write it relative to the project directory: crews/k1/report.md",
-		"/private/tmp/claude-501/scratch/report.md":       "outside the workspace",
-		"~/notes.md":                           "outside the workspace",
-		"../../../../etc/passwd":               "climbs out of the workspace",
-		"crews/k1/report.md, /tmp/x.md":        "outside the workspace",
-		"`/ws/.matev2/projects/shop/sent.log`": "relative to the project directory: sent.log",
+		"/ws/.mate/projects/shop/crews/k1/report.md §2": "write it relative to the project directory: crews/k1/report.md",
+		"/private/tmp/claude-501/scratch/report.md":     "outside the workspace",
+		"~/notes.md":                         "outside the workspace",
+		"../../../../etc/passwd":             "climbs out of the workspace",
+		"crews/k1/report.md, /tmp/x.md":      "outside the workspace",
+		"`/ws/.mate/projects/shop/sent.log`": "relative to the project directory: sent.log",
 	}
 	for s, want := range bad {
 		err := CheckSourcePaths(s, root, base)
@@ -180,7 +180,7 @@ func TestCheckRules(t *testing.T) {
 		{"bad date", "## Lessons\n- l (captain) <!--a:2026-13-01-->", `memory.md:2: marker date "2026-13-01" is not a date`},
 		{"unknown marker", "## Lessons\n- l (captain) <!--P-->", "memory.md:2: unknown tier marker"},
 		{"absolute source", "## Lessons\n- l (/private/tmp/x/report.md) <!--a:2026-09-20-->", `memory.md:2: source "/private/tmp/x/report.md" is an absolute path outside the workspace`},
-		{"absolute source in workspace", "## Captain\n- p (/ws/.matev2/projects/shop/crews/k1/report.md)", "memory.md:2: source \"/ws/.matev2/projects/shop/crews/k1/report.md\" is an absolute path; write it relative to the project directory: crews/k1/report.md"},
+		{"absolute source in workspace", "## Captain\n- p (/ws/.mate/projects/shop/crews/k1/report.md)", "memory.md:2: source \"/ws/.mate/projects/shop/crews/k1/report.md\" is an absolute path; write it relative to the project directory: crews/k1/report.md"},
 		{"out of workspace source", "## Captain\n- p (../../../../x.md)", `memory.md:2: source "../../../../x.md" climbs out of the workspace`},
 		{"unknown section", "## Notes\n- n (captain)", "memory.md:1: unknown section `## Notes`"},
 		{"entry before section", "# Memory\n- n (captain)", "memory.md:2: entry before any section"},
@@ -214,7 +214,7 @@ func TestCheckProjectAnchors(t *testing.T) {
 		"## What this project is",
 		"- A storefront. (captain, 2026-09-17)", // not repo state: no anchor needed
 		"## Layout and state",
-		"- main has no commit. (matev2 project facts, main@none, 2026-09-19)",
+		"- main has no commit. (mate project facts, main@none, 2026-09-19)",
 		"- A Hugo site. (crews/k1/report.md §Durable facts, main@3f2a91c, 2026-09-24)",
 		"- An app with no anchor. (crews/k1/report.md)",
 		"- Anchored on another branch. (dev@3f2a91c)",

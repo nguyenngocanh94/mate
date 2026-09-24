@@ -1,5 +1,5 @@
 // Package watch is the observer of docs/mvp.md section 4b: the one thing in
-// matev2 that notices a crew which can no longer speak for itself.
+// mate that notices a crew which can no longer speak for itself.
 //
 // Every poll, for every open crew of every project, it asks three questions
 // and nothing more:

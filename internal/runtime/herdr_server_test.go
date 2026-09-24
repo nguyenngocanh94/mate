@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"os"
 	"os/exec"
 	"strings"
@@ -32,13 +32,13 @@ func TestStartHerdrServerRefusesSunPathOverflow(t *testing.T) {
 // permanently (agent_pane_busy), not transiently: proven live not to clear
 // after 20s of extra warm-up or on a second pane in the same session. The
 // fix inherits the calling process's own environment (already just the
-// operator's shell environment) and strips only mate's own MATEV2_* namespace
+// operator's shell environment) and strips only mate's own MATE_* namespace
 // - deliberately not ambient here (ADR 0007), injected per pane instead via
 // `--env` / AllowlistedEnv.
 func TestHerdrServerEnvPassesOperatorEnvironmentMinusMateNamespace(t *testing.T) {
 	t.Setenv("SOME_SHELL_INTEGRATION_VAR", "keep-me")
-	t.Setenv("MATEV2_AGENT_ID", "strip-me")
-	t.Setenv("MATEV2_WORKSPACE_ID", "strip-me-too")
+	t.Setenv("MATE_AGENT_ID", "strip-me")
+	t.Setenv("MATE_WORKSPACE_ID", "strip-me-too")
 	t.Setenv("CLAUDECODE", "1")
 	t.Setenv("CLAUDE_CODE_SESSION_ID", "outer-agent-session")
 
@@ -48,7 +48,7 @@ func TestHerdrServerEnvPassesOperatorEnvironmentMinusMateNamespace(t *testing.T)
 	for _, kv := range env {
 		key, _, _ := strings.Cut(kv, "=")
 		found[key] = true
-		if strings.HasPrefix(key, "MATEV2_") {
+		if strings.HasPrefix(key, "MATE_") {
 			t.Fatalf("herdrServerEnv leaked a mate identity var into the spawned server: %q", kv)
 		}
 		if harness.IsNestedSessionEnv(key) {

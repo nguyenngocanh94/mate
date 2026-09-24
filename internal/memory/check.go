@@ -32,7 +32,7 @@ type Parsed struct {
 
 // markerPattern is a trailing tier marker. Only the two dated spellings of
 // B3 are accepted; firstmate's `<!--P-->`, `<!--g-->` and `/N` counters
-// have no use in matev2 (a Captain entry is pinned by default, there is no
+// have no use in mate (a Captain entry is pinned by default, there is no
 // legacy memory to migrate, and there is no pass horizon).
 var (
 	markerPattern  = regexp.MustCompile(`\s*<!--([ap]):(\d{4}-\d{2}-\d{2})-->$`)

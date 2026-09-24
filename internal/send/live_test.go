@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/harness/codexlab"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // requireLive gates this package's live proof the same way internal/spawn
@@ -24,16 +24,16 @@ import (
 // else to skip.
 func requireLive(t *testing.T) {
 	t.Helper()
-	if os.Getenv("MATEV2_LIVE") != "1" {
-		t.Skip("set MATEV2_LIVE=1 to run live Herdr proofs")
+	if os.Getenv("MATE_LIVE") != "1" {
+		t.Skip("set MATE_LIVE=1 to run live Herdr proofs")
 	}
 }
 
 func liveLabSession(t *testing.T) (session, configHome string) {
 	t.Helper()
-	session = strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
+	session = strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
 	if session == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
+		t.Skip("set MATE_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
 	}
 	if session == "default" || session == "firstmate" {
 		t.Fatal("refusing to run a live send against the default or firstmate session")
@@ -82,8 +82,8 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	liveGit(t, repo, "commit", "--allow-empty", "-m", "init")
 	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatalf("AddProject: %v", err)
@@ -304,13 +304,13 @@ func useLabSession(t *testing.T, w *store.Workspace, session string) {
 	}
 }
 
-// binaryPath builds the matev2 binary the Mate's hooks and manual point at.
+// binaryPath builds the mate binary the Mate's hooks and manual point at.
 func binaryPath(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "matev2")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/nguyenngocanh94/matev2/cmd/matev2")
+	bin := filepath.Join(t.TempDir(), "mate")
+	cmd := exec.Command("go", "build", "-o", bin, "github.com/nguyenngocanh94/mate/cmd/mate")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go build matev2: %v\n%s", err, out)
+		t.Fatalf("go build mate: %v\n%s", err, out)
 	}
 	return bin
 }

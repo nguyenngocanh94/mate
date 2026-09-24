@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // newWorkspace creates a workspace with one registered git project. It is
 // the fixture every test in this package starts from: `store.Init`, a real
-// `git init` repository beside `.matev2/`, and the registration between them.
+// `git init` repository beside `.mate/`, and the registration between them.
 func newWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
@@ -51,7 +51,7 @@ func fakeDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 		Runtime:              rt,
 		Names:                rt.Names,
 		ConfigHome:           t.TempDir(),
-		Binary:               filepath.Join(t.TempDir(), "matev2"),
+		Binary:               filepath.Join(t.TempDir(), "mate"),
 		ReadinessTimeout:     time.Second,
 		StartupPromptTimeout: 50 * time.Millisecond,
 		StartTimeout:         10 * time.Second,

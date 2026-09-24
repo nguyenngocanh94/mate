@@ -7,14 +7,14 @@ import (
 )
 
 // requireLive gates every TestLive* proof in this package. They need a
-// provisioned Herdr lab session, or the herdr binary itself, so MATEV2_LIVE=1
+// provisioned Herdr lab session, or the herdr binary itself, so MATE_LIVE=1
 // is the single opt-in that says this machine has one. scripts/gotestreport
 // allows TestLive* and nothing else to skip: a green suite that skipped these
 // is not evidence the Herdr call paths work.
 func requireLive(t *testing.T) {
 	t.Helper()
-	if os.Getenv("MATEV2_LIVE") != "1" {
-		t.Skip("set MATEV2_LIVE=1 to run live Herdr proofs")
+	if os.Getenv("MATE_LIVE") != "1" {
+		t.Skip("set MATE_LIVE=1 to run live Herdr proofs")
 	}
 }
 

@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// ingestPricing loads `.matev2/pricing.yaml` and upserts it into the
+// ingestPricing loads `.mate/pricing.yaml` and upserts it into the
 // `pricing` table (mvp.md M5 task 27): this is the one writer of that table,
 // the same way the rest of this package is the one writer of everything
 // else derived from the workspace's files.

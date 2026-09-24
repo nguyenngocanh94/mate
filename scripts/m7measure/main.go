@@ -1,10 +1,10 @@
 // Command m7measure prints docs/mvp.md task 34's before/after comparison of
 // the M7 prompting from one or more timeline databases.
 //
-//	go run ./scripts/m7measure [--reindex] <label>=<workspace dir or .matev2/matev2.db> ...
+//	go run ./scripts/m7measure [--reindex] <label>=<workspace dir or .mate/mate.db> ...
 //
 // Each argument is one run. With --reindex each workspace's timeline is
-// first rebuilt from its own files and transcripts, exactly as `matev2
+// first rebuilt from its own files and transcripts, exactly as `mate
 // reindex` does with no Herdr to ask, so the numbers come from what the run
 // left on disk rather than from whatever a live observer happened to catch.
 // The output is two Markdown tables: one row per task (crew), and one row
@@ -78,7 +78,7 @@ func printTables(out io.Writer, tasks []Task, mates []Mate) {
 	}
 }
 
-// k prints a token count the way `matev2 usage` does: exact below a
+// k prints a token count the way `mate usage` does: exact below a
 // thousand, then one decimal of k.
 func k(n int64) string {
 	if n < 1000 {

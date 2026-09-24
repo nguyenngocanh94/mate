@@ -7,7 +7,7 @@
 ⏺ Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. 
   Reading its report before reviewing attempt 2.                                
                                                                                 
-⏺ Read(.matev2/reports/crew-01j9p4p5v9d4.json)                                  
+⏺ Read(.mate/reports/crew-01j9p4p5v9d4.json)                                    
   ⎟  Read 84 lines (ctrl+o to expand)                                           
                                                                                 
 ⏺ Reply(a1 · Upgrade database adapter)                                          

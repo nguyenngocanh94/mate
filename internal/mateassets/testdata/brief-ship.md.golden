@@ -38,7 +38,7 @@ When you reach one of these, append `needs-decision:` naming it, and stop.
 Do not pick an option, even the obvious one.
 
 # Setup
-You are in a disposable git worktree of `/ws/shop`, on branch `matev2/k3`, branched from `main`.
+You are in a disposable git worktree of `/ws/shop`, on branch `mate/k3`, branched from `main`.
 
 Verify isolation before anything else.
 Run `pwd -P` and `git rev-parse --show-toplevel`; both must resolve to `/ws/.worktrees/shop-k3`, not the project's primary checkout at `/ws/shop`.
@@ -46,9 +46,9 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 
 # Rules
 1. Never push to any remote and never open a pull request.
-2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `/ws/.matev2/projects/shop/crews/k3/handback.md`.
+2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `/ws/.mate/projects/shop/crews/k3/handback.md`.
 3. Report status by appending one line:
-   `echo "{state}: {one short line}" >> $MATEV2_STATUS`
+   `echo "{state}: {one short line}" >> $MATE_STATUS`
    You have exactly three states, and no others: `working`, `needs-decision`, `wait-mate`.
    - `working: {phase}` - you are making progress.
    - `needs-decision: {summary of the options}` - you cannot decide this yourself. Stop your turn; somebody will type an answer into this pane and you carry on.
@@ -60,7 +60,7 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 5. If a decision belongs to a human - a product choice, a destructive action, anything under `## Open decisions`, or anything else the task left open that the repository does not settle for you - append `needs-decision: {summary of the options}` and stop. The Mate will reply with the decision.
    Do not settle it by taking whichever option looks most natural and mentioning it afterwards. Once you have shipped a guess it is indistinguishable from an instruction you were given, and the only moment anyone could have corrected it has passed.
 6. If you genuinely cannot finish the task, that is not a failure you declare: append `wait-mate: could not do X because Y` and stop. The Mate decides what happens next.
-7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.matev2/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
+7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.mate/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
 
 # Project memory
 If this task produced durable project-intrinsic knowledge, record it in the repository's own committed `AGENTS.md` on this branch, creating the file if there is none (or in `CLAUDE.md`, if that is the file the repository already keeps it in).
@@ -76,7 +76,7 @@ Keep the branch a clean fast-forward onto `main`; if it has advanced, rebase ont
 # Before you hand back
 Run every `verify:` under `## Acceptance` yourself, against the committed branch.
 Where a `verify:` asks you to find the project's own check, find it, run it, and name the exact command you ran.
-Then write `/ws/.matev2/projects/shop/crews/k3/handback.md`.
+Then write `/ws/.mate/projects/shop/crews/k3/handback.md`.
 It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.
 It has exactly these three parts:
 
@@ -93,7 +93,7 @@ What you could not settle, follow-up work you noticed but did not do, and anythi
 ```
 
 A criterion that fails is reported as `fail` with its output, never left out or softened.
-When the work is committed and the hand-back is written, append `wait-mate: ready in branch matev2/k3` to the status file and stop.
+When the work is committed and the hand-back is written, append `wait-mate: ready in branch mate/k3` to the status file and stop.
 If you could not finish, write the hand-back anyway, then append `wait-mate: could not do X because Y`.
 The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the branch is merged into local `main`.
 

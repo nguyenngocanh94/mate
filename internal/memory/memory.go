@@ -1,7 +1,7 @@
 // Package memory owns the shape of the Mate's own memory (docs/mvp.md M8,
 // docs/research/firstmate-memory-2026-09-24.md B3, B5, B8): the one-line
-// entry `matev2 remember` writes into `mate/memory.md`, and the shape gate
-// `matev2 memory check` runs over it and over `PROJECT.md`.
+// entry `mate remember` writes into `mate/memory.md`, and the shape gate
+// `mate memory check` runs over it and over `PROJECT.md`.
 //
 // It follows firstmate's split (VISION.md "Scripts own the mechanics, agents
 // own the judgment"): this package formats, parses, dates and counts, and
@@ -112,7 +112,7 @@ func (e Entry) Marker() string {
 	return ""
 }
 
-// NewEntry builds the entry `matev2 remember` writes, dated today, and
+// NewEntry builds the entry `mate remember` writes, dated today, and
 // refuses any part that would not survive a round trip through Parse: a
 // second line, a marker of its own, a parenthesis in the source or the
 // expiry. The section decides the default tier: pinned for the captain,

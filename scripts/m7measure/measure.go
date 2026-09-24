@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief"
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // Task is one crew's row of the comparison: what docs/mvp.md task 34 asks
@@ -55,7 +55,7 @@ type Mate struct {
 }
 
 // Measure reads one run's timeline. path is the database file or the
-// workspace directory holding `.matev2/matev2.db`; the run's own files are
+// workspace directory holding `.mate/mate.db`; the run's own files are
 // read only for the two facts the database does not hold: a brief's shape
 // and a hand-back's table.
 func Measure(ctx context.Context, label, path string) ([]Task, []Mate, error) {
@@ -171,7 +171,7 @@ func sumTurns(ctx context.Context, q *sql.DB, actor string, calls, turns *int, i
 }
 
 // Reindex rebuilds one run's timeline from its files and transcripts, the
-// way `matev2 reindex` does when no Herdr answers: a Codex crew's rollout is
+// way `mate reindex` does when no Herdr answers: a Codex crew's rollout is
 // then found by its cwd and launch time.
 func Reindex(ctx context.Context, path string) error {
 	_, root, err := locate(path)
@@ -197,9 +197,9 @@ func locate(path string) (dbPath, root string, err error) {
 		return "", "", err
 	}
 	if info.IsDir() {
-		return filepath.Join(path, ".matev2", "matev2.db"), path, nil
+		return filepath.Join(path, ".mate", "mate.db"), path, nil
 	}
-	// <root>/.matev2/matev2.db
+	// <root>/.mate/mate.db
 	return path, filepath.Dir(filepath.Dir(path)), nil
 }
 

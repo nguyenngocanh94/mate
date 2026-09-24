@@ -8,17 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestLiveHookMateRoundTrip is the task 08 proof: a real Claude Code Mate,
 // started with the hooks StartMate now wires into `.claude/settings.json`,
 // records a real prompt/answer turn in sent.log and keeps mate.meta's
-// session_id/transcript current, without matev2 ever reading Herdr's pane
+// session_id/transcript current, without mate ever reading Herdr's pane
 // text to find out.
 func TestLiveHookMateRoundTrip(t *testing.T) {
 	requireLive(t)
@@ -41,8 +41,8 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	liveGit(t, repo, "commit", "--allow-empty", "-m", "init")
 	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatalf("AddProject: %v", err)
@@ -83,7 +83,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 	t.Logf("started agent %s in pane %s (session_id %s)", started.Agent, started.Pane, started.SessionID)
 
 	// The settings file StartMate wrote must be the one this task generates,
-	// wired to the same matev2 binary the Mate's manual names - otherwise a
+	// wired to the same mate binary the Mate's manual names - otherwise a
 	// silent fallback to an empty {} would make the rest of this test prove
 	// nothing about the real hooks.
 	settingsPath := filepath.Join(started.MateDir, spawn.ClaudeSettingsDir, spawn.ClaudeSettingsFile)
@@ -127,10 +127,10 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 	if !hasUser {
-		t.Fatal("sent.log never recorded a user entry; the UserPromptSubmit hook did not fire (or matev2 hook mate-prompt failed)")
+		t.Fatal("sent.log never recorded a user entry; the UserPromptSubmit hook did not fire (or mate hook mate-prompt failed)")
 	}
 	if !hasPong {
-		t.Fatal("sent.log never recorded a mate entry with PONG; the Stop hook did not fire (or matev2 hook mate-stop failed)")
+		t.Fatal("sent.log never recorded a mate entry with PONG; the Stop hook did not fire (or mate hook mate-stop failed)")
 	}
 	entries, _, err := w.ReadSent("shop", 0)
 	if err != nil {

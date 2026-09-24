@@ -1,7 +1,7 @@
 // Package dashboard is the read-only HTTP face of the timeline
 // (docs/mvp.md M6, docs/dashboard.md).
 //
-// Everything it answers comes out of `.matev2/matev2.db` through
+// Everything it answers comes out of `.mate/mate.db` through
 // db.OpenRead, which takes no lock, so the dashboard runs while the console
 // holds the writer. The views are the contract: `v_now` for where an actor
 // stands, `v_task_ledger` for what a task cost, `v_story` for what happened.

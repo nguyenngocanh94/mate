@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // renderSpans is a small test helper: render a span slice through a bare
@@ -17,7 +17,7 @@ func renderSpans(spans []span, w int) string {
 
 // TestAttentionSpansDistinguishesStaleBindingFromLive: a Crew's
 // HeldBindingsForAgent-style status alone cannot tell a live agent from one
-// matev2 could not confirm stopped, so the Crew row's ATTENTION
+// mate could not confirm stopped, so the Crew row's ATTENTION
 // cell must say so - crewAttention (internal/query/attention.go) already
 // derives a stale binding as its own Kind, and attentionSpans (list.go) must
 // carry it through rather than treating every non-error status alike.

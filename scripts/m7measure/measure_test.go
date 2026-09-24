@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // fixture is a one-project run: ship k1 asks once, hands back, is told to
@@ -114,7 +114,7 @@ none
 func TestMeasureReadsEveryMetricFromTheRun(t *testing.T) {
 	root := fixture(t)
 	// A workspace directory and its database file are the same run.
-	for _, path := range []string{root, filepath.Join(root, ".matev2", "matev2.db")} {
+	for _, path := range []string{root, filepath.Join(root, ".mate", "mate.db")} {
 		tasks, mates, err := Measure(context.Background(), "after", path)
 		if err != nil {
 			t.Fatal(err)

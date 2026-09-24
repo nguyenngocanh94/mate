@@ -6,6 +6,6 @@
 # TestName may end with * for a prefix match.
 # GOOS, if present, restricts the allow to that runtime.GOOS.
 #
-# Live Herdr/harness proofs are named TestLive* and skip unless MATEV2_LIVE=1. A green
+# Live Herdr/harness proofs are named TestLive* and skip unless MATE_LIVE=1. A green
 # suite that skipped them is not evidence those features work.
 TestLive*

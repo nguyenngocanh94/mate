@@ -1,5 +1,5 @@
 erics@Ericss-Mac-mini codex % codex
->─You are in /private/tmp/matev2-12-cap/codex─╮
+>─You are in /private/tmp/mate-12-cap/codex─╮
 
   Do you trust the contents of this directory? Working with untrusted contents comes with
   higher risk of prompt injection. Trusting the directory allows project-local config, hooks,

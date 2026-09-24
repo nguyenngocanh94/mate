@@ -1,8 +1,8 @@
-// Package query is the read boundary between matev2's state and its UI: a
+// Package query is the read boundary between mate's state and its UI: a
 // set of DTOs plus the pure functions that derive capability and attention
 // from them. It opens nothing. There is no database connection, no Herdr
 // session and no file handle in here - load.go is the one file that reads
-// `.matev2/` through internal/store, and everything else in the package is
+// `.mate/` through internal/store, and everything else in the package is
 // types and derivation.
 //
 // That split is what keeps internal/ui/console honest: the Console imports
@@ -20,7 +20,7 @@
 //
 // Nothing is guessed. Any value whose read can fail is a Field[T] carrying
 // Known/Absent/Unknown plus the reason - authored here, not in the UI, so
-// `matev2` command output and the Console say the same thing about the same
+// `mate` command output and the Console say the same thing about the same
 // row. A read failure is Unknown, never Absent, and every Unknown field in
 // a snapshot is also listed in Snapshot.Warnings so a footer can report
 // them without walking the tree itself.

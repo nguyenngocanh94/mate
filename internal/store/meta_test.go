@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 func TestStoreMetaRoundTrip(t *testing.T) {
@@ -21,7 +21,7 @@ func TestStoreMetaRoundTrip(t *testing.T) {
 		"harness":    "codex",
 		"pane":       "%12",
 		"worktree":   w.WorktreeDir("shop", "k3"),
-		"branch":     "matev2/k3",
+		"branch":     "mate/k3",
 		"transcript": "",
 		"session_id": "abc-123",
 	}
@@ -66,7 +66,7 @@ func TestStoreMetaWritesDeterministicOrder(t *testing.T) {
 		"worktree": "/tmp/wt",
 		"task":     "one",
 		"harness":  "codex",
-		"branch":   "matev2/k3",
+		"branch":   "mate/k3",
 	}
 	if err := store.WriteMeta(path, meta); err != nil {
 		t.Fatalf("WriteMeta: %v", err)
@@ -75,7 +75,7 @@ func TestStoreMetaWritesDeterministicOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "branch=matev2/k3\nharness=codex\ntask=one\nworktree=/tmp/wt\n"
+	want := "branch=mate/k3\nharness=codex\ntask=one\nworktree=/tmp/wt\n"
 	if string(first) != want {
 		t.Fatalf("meta file =\n%q\nwant\n%q", first, want)
 	}

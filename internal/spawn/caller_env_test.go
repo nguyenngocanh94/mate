@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/outbox"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/outbox"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
-// MATEV2_CALLER is how `matev2 merge` tells a Mate, a Crew and the captain
+// MATE_CALLER is how `mate merge` tells a Mate, a Crew and the captain
 // apart (docs/mvp.md M4 decisions), and a pane is the only place it can come
 // from: Herdr applies `--env` when a pane is made and never afterwards, so a
 // variable missing here cannot be recovered later. A Mate whose pane lost it

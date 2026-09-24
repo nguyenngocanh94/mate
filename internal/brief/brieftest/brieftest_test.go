@@ -3,7 +3,7 @@ package brieftest
 import (
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/brief"
 )
 
 func TestHelpersPassTheCheck(t *testing.T) {

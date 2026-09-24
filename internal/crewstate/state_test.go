@@ -3,7 +3,7 @@ package crewstate_test
 import (
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
 )
 
 // TestDeclare is the resolution order of mvp.md section 4b, one case per

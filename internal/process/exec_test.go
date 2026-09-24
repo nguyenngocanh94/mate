@@ -24,8 +24,8 @@ func TestExecRunnerHonoursDirStdinAndEnv(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	res, err := ExecRunner{}.Run(context.Background(), Spec{
-		Name: "sh", Args: []string{"-c", "pwd; cat; echo $MATEV2_PROBE"}, Dir: dir, Stdin: []byte("in\n"),
-		Env: []string{"PATH=/usr/bin:/bin", "MATEV2_PROBE=yes"},
+		Name: "sh", Args: []string{"-c", "pwd; cat; echo $MATE_PROBE"}, Dir: dir, Stdin: []byte("in\n"),
+		Env: []string{"PATH=/usr/bin:/bin", "MATE_PROBE=yes"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestExecRunnerHonoursDirStdinAndEnv(t *testing.T) {
 
 func TestExecRunnerMissingBinaryIsError(t *testing.T) {
 	t.Parallel()
-	_, err := ExecRunner{}.Run(context.Background(), Spec{Name: "matev2-definitely-not-a-binary"})
+	_, err := ExecRunner{}.Run(context.Background(), Spec{Name: "mate-definitely-not-a-binary"})
 	if err == nil {
 		t.Fatal("missing binary must be an error")
 	}

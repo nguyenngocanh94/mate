@@ -3,10 +3,10 @@ package scene
 import (
 	"encoding/json"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
-// The two line shapes `matev2 events --scene` prints. The field order is the
+// The two line shapes `mate events --scene` prints. The field order is the
 // JSON field order and it is part of the contract, the same way
 // timeline.StoryEvent's is: one row per line, a field is added at the end and
 // never in the middle, so a consumer can diff two runs byte for byte.

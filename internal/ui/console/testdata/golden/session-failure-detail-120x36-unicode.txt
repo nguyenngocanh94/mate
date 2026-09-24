@@ -1,4 +1,4 @@
- matev2 console   workspace acme  /Users/dev/work/acme                                                  live · 14:02:11 
+ mate console   workspace acme  /Users/dev/work/acme                                                    live · 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
  Session open failed                                                                                                    
@@ -22,7 +22,7 @@
  3. Attach failed                                                                                                       
  Cause            the runtime is not reachable                                                                          
  Code             runtime_unavailable (derived from exit 20)                                                            
- Exit             matev2 attach exit 20                                                                                 
+ Exit             mate attach exit 20                                                                                   
  Message          (no message recorded)                                                                                 
  Next             check the runtime is running, then retry                                                              
                                                                                                                         

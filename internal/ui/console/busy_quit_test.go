@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // ---------- N13: quitting during an in-flight action must not abandon it silently ----------
@@ -24,7 +24,7 @@ import (
 // context an in-flight ActionFunc runs under is now a cancellable child of
 // the program's own context (model.baseCtx, set via WithContext), and
 // quitting while actionBusy cancels it and records what was abandoned
-// (Model.AbandonedAction) instead of leaving silently. cmd/matev2's
+// (Model.AbandonedAction) instead of leaving silently. cmd/mate's
 // handleConsole is where that gets told to the operator, since the Console
 // itself has nothing left to draw once tea.Quit takes effect.
 
@@ -125,7 +125,7 @@ func TestQuittingWhileAnActionIsRunningReportsWhatWasAbandoned(t *testing.T) {
 // TestActionRunsUnderTheProgramsOwnContextNotBackground pins the other half
 // of N13: runAction must not hand the ActionFunc context.Background()
 // directly - a context nothing can ever cancel - regardless of whether the
-// operator quits. WithContext is how cmd/matev2 attaches the context it
+// operator quits. WithContext is how cmd/mate attaches the context it
 // already gave tea.WithContext; a Model built without it (every other test
 // in this package) still gets a context of its own, just rooted at
 // context.Background() rather than handed that literal value.

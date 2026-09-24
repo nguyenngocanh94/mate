@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/config"
 )
 
 // EffectiveClaudeConfigDir resolves the provider config root used to find
@@ -82,10 +82,10 @@ func EffectiveCodexHome(codexHome string) (string, error) {
 // run in, or a pane is about to be given. Every Codex launch and every Mate
 // pane goes through it.
 //
-// Under MATEV2_LIVE=1 (a live test run) it refuses any home outside the temp
+// Under MATE_LIVE=1 (a live test run) it refuses any home outside the temp
 // directory. Measured 2026-09-24: 115 of the 138 `[projects."…"]` trust
 // entries in an operator's ~/.codex/config.toml named deleted temp
-// directories of matev2 live tests, because every Codex crew they spawned
+// directories of mate live tests, because every Codex crew they spawned
 // trusted its worktree in the operator's home. A live test gets its own home
 // from internal/harness/codexlab; a live test that forgot to is refused here,
 // before anything is launched, instead of being found in the operator's

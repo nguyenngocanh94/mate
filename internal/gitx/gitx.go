@@ -1,5 +1,5 @@
-// Package gitx is the only place matev2 runs git. It is deliberately tiny:
-// the worktree saga of `matev2 crew spawn` (docs/mvp.md task 11) is the
+// Package gitx is the only place mate runs git. It is deliberately tiny:
+// the worktree saga of `mate crew spawn` (docs/mvp.md task 11) is the
 // single caller, and every command is argv over os/exec - never a shell, so
 // a branch or path containing a space, a quote or a `$` cannot become
 // another command.
@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Command is one git invocation: the directory git runs in and the argv
@@ -160,7 +160,7 @@ func (g Git) RevisionExists(ctx context.Context, repo, rev string) (bool, error)
 // AddWorktree is `git -C repo worktree add -b <branch> <path> <base>`: a new
 // linked worktree on a brand new branch. git itself refuses an existing
 // branch or a non-empty path; the caller checks both first so the refusal
-// names what matev2 would have done.
+// names what mate would have done.
 func (g Git) AddWorktree(ctx context.Context, repo, path, branch, base string) error {
 	_, err := g.run(ctx, repo, "worktree", "add", "-b", branch, path, base)
 	return err

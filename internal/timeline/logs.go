@@ -10,16 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The two shapes an app line into the Mate's pane can have. `sent.log` holds
 // them with the sentinel already stripped - the daemon writes the line it
 // built and the Mate's own UserPromptSubmit hook strips the marker before
 // appending (internal/hook) - so the channel is read from the verb, not from
-// the marker, and `marked` records that the line was one matev2 typed itself.
+// the marker, and `marked` records that the line was one mate typed itself.
 const (
 	digestPrefix = "digest: "
 	assignPrefix = "resolve: "
@@ -30,14 +30,14 @@ const (
 	HookAutoOffText = "auto mode off: user prompt"
 )
 
-// hookEchoWindow bounds how long after a line matev2 typed the Mate's hook
+// hookEchoWindow bounds how long after a line mate typed the Mate's hook
 // may still be recording that the model read it. It is generous because a
 // Mate mid-turn can take a minute to reach the prompt (docs/mvp.md section 7),
 // and short enough that a digest re-sent much later is a new handover.
 const hookEchoWindow = 10 * time.Minute
 
 // isHookEcho reports whether this line is the Mate's hook recording a line
-// matev2 had already written, rather than a new one.
+// mate had already written, rather than a new one.
 func isHookEcho(entry, previous store.SentEntry) bool {
 	if entry.Source != store.SourceApp || entry.Target != store.TargetMate {
 		return false
@@ -54,7 +54,7 @@ func isHookEcho(entry, previous store.SentEntry) bool {
 // ingestStatus reads each crew's `crews/<id>.status` from its cursor.
 //
 // A status line has no timestamp. The crew wrote it with
-// `echo "state: one line" >> $MATEV2_STATUS`, and that shell command is in
+// `echo "state: one line" >> $MATE_STATUS`, and that shell command is in
 // the crew's own transcript with a timestamp on it, so the first rule is to
 // find the line inside the command that echoed it. That rule is exact and it
 // survives a rebuild, which matters more than it looks: the file's mtime -
@@ -150,7 +150,7 @@ func (p *pass) dateStatusLine(actorID, line string, mtime, previous time.Time) (
 	return at, "status.mtime"
 }
 
-// lastAppLineToMate is the newest line matev2 typed into the Mate's pane that
+// lastAppLineToMate is the newest line mate typed into the Mate's pane that
 // an earlier pass already recorded, so a hook echo split across two passes is
 // still recognised.
 func (p *pass) lastAppLineToMate(ctx context.Context) (store.SentEntry, error) {
@@ -184,7 +184,7 @@ func (p *pass) lastStatusTime(ctx context.Context, actorID string) (time.Time, e
 	return db.ParseTime(value.String), nil
 }
 
-// ingestSent reads `sent.log` from its cursor: every line matev2 or a human
+// ingestSent reads `sent.log` from its cursor: every line mate or a human
 // typed into a pane, with who typed it and where it went.
 //
 // One event per line, and its kind is the channel: a daemon digest is

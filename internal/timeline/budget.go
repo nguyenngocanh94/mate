@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/query"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // projectBudgetCrew is the crew name a project-wide budget crossing is filed

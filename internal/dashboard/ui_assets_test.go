@@ -14,13 +14,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The task 29 UI's own proofs: that `/` serves the real three-tier page and
 // not task 28's placeholder, that every asset the page asks for is actually
 // in the binary, that nothing it loads comes from anywhere but this origin,
-// and that the numbers it prints are the numbers `matev2 usage` prints.
+// and that the numbers it prints are the numbers `mate usage` prints.
 //
 // The off-origin check is the one that earns its place: a dashboard is a
 // single binary a reader runs on a machine with no network, and one `<script
@@ -121,7 +121,7 @@ func TestUIMakesNoOffOriginRequest(t *testing.T) {
 
 // TestUIHumanizeMatchesGo is the table docs/mvp.md M6 asks for: the page's
 // own humanizeTokens and humanizeCost against internal/query's, value for
-// value. A number that reads "96.3k" on the page and "96.2k" in `matev2
+// value. A number that reads "96.3k" on the page and "96.2k" in `mate
 // usage` would make the dashboard's whole claim - that every number is
 // traceable - false.
 //

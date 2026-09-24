@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestLiveMarkerSurvivesToTheHook is the task 15 live-run defect-1 proof.
@@ -35,8 +35,8 @@ import (
 //
 // Measured 2026-09-17, Herdr 0.8.2, Claude Code 2.1.274:
 //   - "\x1f" (the old byte)      : stripped before the hook ever saw it.
-//   - "⟦matev2⟧ " (chosen)       : arrives intact, byte for byte.
-//   - "[matev2] " (ASCII fallback): arrives intact, byte for byte.
+//   - "⟦mate⟧ " (chosen)       : arrives intact, byte for byte.
+//   - "[mate] " (ASCII fallback): arrives intact, byte for byte.
 //
 // The bracket sentinel was kept over the plain ASCII fallback because it is
 // visually distinct from anything a captain would type by hand while still
@@ -62,8 +62,8 @@ func TestLiveMarkerSurvivesToTheHook(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	liveGit(t, repo, "commit", "--allow-empty", "-m", "init")
 	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatalf("AddProject: %v", err)
@@ -117,8 +117,8 @@ func TestLiveMarkerSurvivesToTheHook(t *testing.T) {
 	}
 	candidates := []candidate{
 		{name: "old 0x1f byte", prefix: "\x1f"},
-		{name: "bracket sentinel (chosen)", prefix: "⟦matev2⟧ "},
-		{name: "ASCII fallback", prefix: "[matev2] "},
+		{name: "bracket sentinel (chosen)", prefix: "⟦mate⟧ "},
+		{name: "ASCII fallback", prefix: "[mate] "},
 	}
 
 	type result struct {

@@ -241,9 +241,9 @@ func TestCodexUnknownActivityIsVisibleFailure(t *testing.T) {
 
 func TestLiveCodexCorpusInventoryRejectsUnknownActivityTypes(t *testing.T) {
 	requireLive(t)
-	root := os.Getenv("MATEV2_CODEX_SESSIONS_DIR")
+	root := os.Getenv("MATE_CODEX_SESSIONS_DIR")
 	if root == "" {
-		t.Skip("set MATEV2_CODEX_SESSIONS_DIR to inventory installed Codex rollout files")
+		t.Skip("set MATE_CODEX_SESSIONS_DIR to inventory installed Codex rollout files")
 	}
 	knownTop := map[string]bool{"session_meta": true, "event_msg": true, "response_item": true, "turn_context": true, "world_state": true, "token_usage_record": true, "compacted": true}
 	knownEvents := map[string]bool{"task_started": true, "task_complete": true, "token_count": true, "item_completed": true, "thread_settings_applied": true, "turn_aborted": true}
@@ -349,9 +349,9 @@ func TestCodexAdoptionDoesNotUseRecencyAsATiebreaker(t *testing.T) {
 // of a context reset.
 func TestLiveCodexRolloutCorpusMeasuresTokenCountCadence(t *testing.T) {
 	requireLive(t)
-	root := os.Getenv("MATEV2_CODEX_SESSIONS_DIR")
+	root := os.Getenv("MATE_CODEX_SESSIONS_DIR")
 	if root == "" {
-		t.Skip("set MATEV2_CODEX_SESSIONS_DIR to measure installed Codex rollout files")
+		t.Skip("set MATE_CODEX_SESSIONS_DIR to measure installed Codex rollout files")
 	}
 	var files, tokenCounts, taskStarts, taskCompletes, compacted, multiSnapshotFiles int
 	var tasks, tasksWithTokenCounts, tasksEqualToAssistantMessages, tasksWithMoreTokenCounts, tasksWithMoreAssistantMessages int

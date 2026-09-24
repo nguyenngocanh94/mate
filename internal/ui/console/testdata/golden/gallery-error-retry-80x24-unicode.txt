@@ -1,10 +1,10 @@
- matev2 console                                              No snapshot loaded 
+ mate console                                                No snapshot loaded 
  (unknown)                                                                      
 ────────────────────────────────────────────────────────────────────────────────
                                                                                 
  Could not read snapshot                                                        
                                                                                 
- runtime_unavailable: open /Users/dev/work/acme/.matev2/workspace.yaml:         
+ runtime_unavailable: open /Users/dev/work/acme/.mate/workspace.yaml:           
  permission denied                                                              
                                                                                 
  No earlier snapshot is loaded, so nothing else is shown.                       

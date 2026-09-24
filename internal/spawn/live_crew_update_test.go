@@ -8,19 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestLiveSpawnCrewCodexSkipsUpdateDialog is the proof for the 2026-09-18
 // production failure: with codex-cli 0.154.0 installed and 0.155.0 published,
 // every Codex crew spawn died on `target_blocked: codex startup screen not
 // recognised`, because codex draws a three-option release-update prompt ahead
-// of the directory-trust dialog and matev2 could not name it.
+// of the directory-trust dialog and mate could not name it.
 //
 // The launch now passes `-c check_for_update_on_startup=false`, so on a
 // healthy machine the prompt is never drawn and UpdateDialog is false. The
@@ -49,8 +49,8 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# shop\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

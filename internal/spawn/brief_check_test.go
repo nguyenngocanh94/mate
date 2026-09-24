@@ -7,15 +7,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief"
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // TestSpawnCrewRefusesAMalformedBriefBeforeCreatingAnything: `crew spawn`
-// runs the same check as `matev2 brief check` and a refusal leaves no
+// runs the same check as `mate brief check` and a refusal leaves no
 // worktree, no branch, no crews/<id>/, no meta and no pane - there is
 // nothing to clean up and nothing reads as a crew that tried to start.
 func TestSpawnCrewRefusesAMalformedBriefBeforeCreatingAnything(t *testing.T) {
@@ -41,8 +41,8 @@ func TestSpawnCrewRefusesAMalformedBriefBeforeCreatingAnything(t *testing.T) {
 			t.Errorf("%s exists after a refused brief (%v)", path, statErr)
 		}
 	}
-	if exists, _ := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3"); exists {
-		t.Error("branch matev2/k3 exists after a refused brief")
+	if exists, _ := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3"); exists {
+		t.Error("branch mate/k3 exists after a refused brief")
 	}
 	if len(rt.Tabs) != 0 {
 		t.Errorf("a pane was opened for a refused brief: %v", rt.Tabs)
