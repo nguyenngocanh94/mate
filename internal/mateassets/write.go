@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/nguyenngocanh94/matev2/assets"
+	"github.com/nguyenngocanh94/matev2/internal/memory"
 )
 
 // Write renders AGENTS.md and CLAUDE.md into dir, replacing whatever is
-// there, and creates memory.md and backlog.md with a one-line header only if
-// they do not already exist. dir must already exist; Write does not create
+// there, and creates memory.md and backlog.md with their headers and empty
+// sections (internal/memory) only if they do not already exist. dir must already exist; Write does not create
 // it. It never touches an existing memory.md or backlog.md.
 func Write(dir string, p Params) error {
 	agentsMD, err := Render(p)
@@ -27,10 +28,10 @@ func Write(dir string, p Params) error {
 	if err := writeAtomic(filepath.Join(dir, "CLAUDE.md"), claudeMD); err != nil {
 		return err
 	}
-	if err := ensureFile(filepath.Join(dir, "memory.md"), "# Memory\n"); err != nil {
+	if err := ensureFile(filepath.Join(dir, "memory.md"), memory.Header); err != nil {
 		return err
 	}
-	if err := ensureFile(filepath.Join(dir, "backlog.md"), "# Backlog\n"); err != nil {
+	if err := ensureFile(filepath.Join(dir, "backlog.md"), memory.BacklogHeader()); err != nil {
 		return err
 	}
 	return writeSkills(dir, p)

@@ -55,6 +55,17 @@ func (g Git) TopLevelEntries(ctx context.Context, dir, rev string) ([]TreeEntry,
 	return entries, nil
 }
 
+// ShortCommit is `git rev-parse --short <rev>^{commit}`: the abbreviated
+// name of the commit rev resolves to, the anchor `matev2 project facts`
+// prints as `head:`.
+func (g Git) ShortCommit(ctx context.Context, dir, rev string) (string, error) {
+	out, err := g.run(ctx, dir, "rev-parse", "--short", rev+"^{commit}")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // TreePaths is `git ls-tree -r -z --name-only --full-tree <rev>`: the path
 // of every file rev's tree holds, recursively.
 func (g Git) TreePaths(ctx context.Context, dir, rev string) ([]string, error) {

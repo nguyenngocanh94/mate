@@ -18,7 +18,7 @@ var (
 // `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
 // `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
 // Code discovers a skill relative to its own working directory.
-var SkillNames = []string{"harness-adapters", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning"}
+var SkillNames = []string{"harness-adapters", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
 // init keeps a malformed skill a build-time failure rather than a Mate that

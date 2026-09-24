@@ -52,6 +52,15 @@ func gitCmd(t *testing.T, dir string, args ...string) {
 	}
 }
 
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return string(out)
+}
+
 func newRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -71,6 +80,7 @@ func TestGatherOnAnEmptyRepository(t *testing.T) {
 	want := []string{
 		"shop: repo " + repo + ", default branch main",
 		"commits: 0 (main has no commit yet)",
+		"head: none",
 		"tree: empty",
 		"note: names and counts from the committed tree of main only; no file was opened, and uncommitted changes in the checkout are not seen",
 	}
@@ -114,8 +124,12 @@ func TestGatherOnAPopulatedRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.Join(f.Lines(), "\n")
+	head := strings.TrimSpace(gitOut(t, repo, "rev-parse", "--short", "main"))
+	if f.Head != head {
+		t.Fatalf("Head = %q, want git's own short name of main %q", f.Head, head)
+	}
 	for _, want := range []string{
-		"commits: 2 on main",
+		"commits: 2 on main\nhead: " + head,
 		"tree: 11 file(s)",
 		`top level: AGENTS.md Makefile README.md go.mod main.go "my notes.txt" vendor/ web/`,
 		"build/test files: Makefile go.mod web/package.json web/vite.config.ts",

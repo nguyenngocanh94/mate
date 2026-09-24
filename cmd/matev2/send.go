@@ -55,12 +55,13 @@ func cmdSend(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// writeSendReport prints the send trace and, when the Mate sent it in auto
-// mode, the line telling it to end its turn (auto_turn.go). A line the
-// captain sends from a shell is not the Mate answering a Crew, so it gets
-// the trace alone.
+// writeSendReport prints the send trace and, when the Mate sent it, the
+// correction nudge (nudge.go) and, in auto mode, the line telling it to end
+// its turn (auto_turn.go), which stays last. A line the captain sends from a
+// shell is not the Mate answering a Crew, so it gets the trace alone.
 func writeSendReport(stdout io.Writer, w *store.Workspace, project, crew, source string, report send.Report) {
 	fmt.Fprintln(stdout, sendSummaryLine(report))
+	printSendCorrectionNudge(stdout, w, project, crew, source)
 	if source == store.SourceMate {
 		printAutoTurnEnd(stdout, w, project, autoSendLine(crew))
 	}

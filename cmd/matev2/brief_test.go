@@ -214,7 +214,7 @@ func TestProjectFactsCLI(t *testing.T) {
 	if code := mainRun([]string{"project", "facts", "shop", "--workspace", ws}, &out, &errw); code != 0 {
 		t.Fatalf("facts shop: %s", errw.String())
 	}
-	if !strings.Contains(out.String(), "commits: 0 (main has no commit yet)\ntree: empty\n") {
+	if !strings.Contains(out.String(), "commits: 0 (main has no commit yet)\nhead: none\ntree: empty\n") {
 		t.Fatalf("empty repo facts:\n%s", out.String())
 	}
 	out.Reset()
@@ -222,7 +222,8 @@ func TestProjectFactsCLI(t *testing.T) {
 		t.Fatalf("facts blog: %s", errw.String())
 	}
 	got := out.String()
-	if !strings.Contains(got, "commits: 2 on main\ntree: 1 file(s)\ntop level: go.mod\nbuild/test files: go.mod\n") {
+	head := strings.TrimSpace(gitOut(t, filepath.Join(ws, "blog"), "rev-parse", "--short", "main"))
+	if !strings.Contains(got, "commits: 2 on main\nhead: "+head+"\ntree: 1 file(s)\ntop level: go.mod\nbuild/test files: go.mod\n") {
 		t.Fatalf("populated repo facts:\n%s", got)
 	}
 	if strings.Contains(got, "secret-module-name") {

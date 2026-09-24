@@ -31,8 +31,13 @@ type Facts struct {
 	// HasCommit is false for a branch with no commit, including the unborn
 	// branch of a repository nobody has committed to.
 	HasCommit bool
-	Commits   int
-	Files     int
+	// Head is the abbreviated commit the branch points at, empty when it
+	// has none. It is the anchor PROJECT.md's repo-state lines carry
+	// (`main@<head>`), so a fact can be told apart from one recorded
+	// before the branch moved.
+	Head    string
+	Commits int
+	Files   int
 	// TopLevel is the names at the root of the tree, directories with a
 	// trailing slash, sorted.
 	TopLevel []string
@@ -88,6 +93,9 @@ func Gather(ctx context.Context, git gitx.Git, project, repo, branch string) (Fa
 		return f, nil
 	}
 	f.HasCommit = true
+	if f.Head, err = git.ShortCommit(ctx, repo, ref); err != nil {
+		return f, err
+	}
 	if f.Commits, err = git.CommitCount(ctx, repo, ref); err != nil {
 		return f, err
 	}
@@ -142,6 +150,10 @@ func isBuildFile(p string) bool {
 	return false
 }
 
+// NoHead is the head line of a branch with no commit, and the anchor a
+// PROJECT.md fact recorded then carries (`main@none`).
+const NoHead = "none"
+
 // maxListed bounds each list line: past it the line ends in `+N more`.
 const maxListed = 30
 
@@ -151,10 +163,11 @@ func (f Facts) Lines() []string {
 	if !f.HasCommit {
 		lines = append(lines,
 			fmt.Sprintf("commits: 0 (%s has no commit yet)", f.DefaultBranch),
+			"head: "+NoHead,
 			"tree: empty",
 		)
 	} else {
-		lines = append(lines, fmt.Sprintf("commits: %d on %s", f.Commits, f.DefaultBranch))
+		lines = append(lines, fmt.Sprintf("commits: %d on %s", f.Commits, f.DefaultBranch), "head: "+f.Head)
 		if f.Files == 0 {
 			lines = append(lines, "tree: empty")
 		} else {

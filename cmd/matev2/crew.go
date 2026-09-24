@@ -209,7 +209,7 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 		// nothing: there is no outcome to report, only the reason.
 		return err
 	}
-	fmt.Fprintln(stdout, crewStopReport(project, crew, res))
+	writeCrewStopReport(stdout, project, crew, res, spawn.CallerFromEnv())
 	return nil
 }
 

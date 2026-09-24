@@ -111,18 +111,21 @@ func TestMateSendEndsWithTheAutoTurnLineOnlyInAutoMode(t *testing.T) {
 		t.Fatalf("sendToCrew: %v", err)
 	}
 	trace := sendSummaryLine(report) + "\n"
+	// k3 has its brief, so the Mate's send also carries the correction
+	// nudge (nudge.go); the auto-mode line stays last.
+	mateTrace := trace + sendCorrectionNudge + "\n"
 
 	setAuto(t, w, false)
 	var manual bytes.Buffer
 	writeSendReport(&manual, w, "shop", "k3", store.SourceMate, report)
-	if got := manual.String(); got != trace {
-		t.Fatalf("manual: send printed %q, want the trace alone %q", got, trace)
+	if got := manual.String(); got != mateTrace {
+		t.Fatalf("manual: send printed %q, want the trace and the nudge %q", got, mateTrace)
 	}
 
 	setAuto(t, w, true)
 	var auto bytes.Buffer
 	writeSendReport(&auto, w, "shop", "k3", store.SourceMate, report)
-	if got, want := auto.String(), trace+wantAutoSendLine+"\n"; got != want {
+	if got, want := auto.String(), mateTrace+wantAutoSendLine+"\n"; got != want {
 		t.Fatalf("auto: send printed %q, want the trace then %q", got, wantAutoSendLine)
 	}
 
