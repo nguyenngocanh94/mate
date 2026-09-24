@@ -1,11 +1,14 @@
 package autopilot
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 )
 
 // MateCrew is the crew field the daemon's own incidents carry. The Mate is
@@ -17,7 +20,7 @@ import (
 // the digest skips only the one combination the daemon itself writes: crew
 // `mate` with kind `wedged`. A crew of that name that actually went stale is
 // still reported.
-const MateCrew = "mate"
+const MateCrew = outbox.MateCrew
 
 // ItemKind is what one digested thing is. The first three spellings are the
 // ones mvp.md section 4b uses on screen, so a Mate reading a digest sees the
@@ -185,6 +188,18 @@ func Advance(cursor map[string]int64, items []Item) map[string]int64 {
 		}
 	}
 	return next
+}
+
+// Key is the outbox dedup key of a digest (store.OutboxItem.Key): the exact
+// set of source lines it reports, so a tick that finds the same items as the
+// digest already queued leaves that digest alone, and a tick that finds a
+// different set refreshes it (outbox.Sender.Offer).
+func Key(items []Item) string {
+	h := sha256.New()
+	for _, item := range items {
+		fmt.Fprintf(h, "%s@%d\n", item.File, item.Offset)
+	}
+	return "digest:" + hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // Line is the one line a digest becomes, without the from-app marker

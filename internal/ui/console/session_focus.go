@@ -368,6 +368,11 @@ func sessionEntryStrip(b boxList, sel, hover, index, x0, row, w int, g glyphSet)
 // is blocked, finished or failed, or is an incident - which is exactly what
 // internal/query already decided when it set Attention - and only while the
 // reader's cursor or pointer is on it.
+//
+// An entry already handed to the Mate (mvp.md task 30) shows no button: a
+// second press would only be told "already assigned", and the row's own
+// words - "assigned, queued" or "assigned HH:MM" - need the columns the
+// strip would take from them at the rail's width.
 func boxEntryHasStrip(e query.BoxEntry, selected, hovered bool) bool {
-	return e.Attention && (selected || hovered)
+	return e.Attention && e.Assigned.State == "" && (selected || hovered)
 }

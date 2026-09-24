@@ -56,6 +56,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
             │   ├── mate.meta             harness= session_id= pane=
             │   ├── .auto                 có mặt = chế độ tự động
             │   ├── .auto-cursor          daemon auto đã digest tới đâu (task 19)
+            │   ├── .outbox               hàng đợi gửi vào Mate: [assign] và digest (task 30)
             │   └── .claude/
             │       ├── settings.json     hook UserPromptSubmit, Stop
             │       └── skills/
@@ -155,6 +156,11 @@ Chế độ `manual` (giám sát, mặc định; nhãn đổi từ `supervised` 
 - Trên một mục trong inbox (quyết định 2026-09-19: box là chỗ để hành động, không phải chỗ để đọc):
   - Enter, hoặc một click vào thân hàng, mở pane của chính crew mà mục đó nêu tên - đúng như Enter trên hàng crew trong cây; mục có crew là `mate` (incident `wedged` của daemon) mở pane Mate. Trong session view thì stream đang mở được đóng trước, rồi mới mở stream của crew, không bao giờ có hai PTY cùng lúc.
   - `a`, hoặc nút `[assign]` trên hàng, gửi vào Mate một dòng `⟦matev2⟧ resolve: <crew> asked: "<status text, một dòng, cắt ở ~200 rune>" — read <đường dẫn tuyệt đối tới status file>, decide, and answer with matev2 send <project> <crew> "<one line>"` (đường dẫn tuyệt đối vì cwd của Mate là thư mục workspace của nó, không phải thư mục project, nên đường dẫn tương đối như `crews/<id>.status` không trỏ tới đâu cả); với incident là `resolve: incident <kind> <crew> — <text>`. Chữ trên nút là `assign` vì đó là việc người dùng làm (giao đi); dòng gửi cho Mate vẫn là `resolve:`, đúng như manual của Mate.
+  - Từ task 30, `[assign]` không bao giờ bị từ chối vì Mate bận: dòng vào hàng đợi `mate/.outbox` dưới khoá `<file status tương đối project>@<offset>` của mục inbox, thử gửi ngay một lần (Mate rảnh thì nhận luôn), rồi trả về `Assigned: sent to <agent>…` hoặc `Assigned: queued for the Mate (<lý do>)…`.
+    Vòng gửi của console thử lại mỗi 2 giây bằng `send.Send` có kiểm chứng cho tới khi composer trống; không bao giờ dùng hàng đợi của harness (`herdr agent prompt`, `QueueWhileBusy`), không gõ đè composer có chữ, không gửi một mục hai lần.
+    Bấm lại trên cùng mục không xếp thêm: `Assigned: already assigned HH:MM, still queued` hoặc `…, sent HH:MM`.
+    Hàng inbox ghi thêm `· assigned, queued` rồi `· assigned HH:MM` và mất nút `[assign]`, nhưng vẫn nằm trong inbox cho tới khi crew thật sự được trả lời.
+    Quá 5 phút chưa gửi được thì mở incident `wedged` trên `mate`, như daemon.
   - `l` đổi giữa hai bộ lọc; `j`/`k` và phím mũi tên di chuyển; `o` mở Actions menu của pane đang xem; `Esc`/`Tab` rời khỏi zone. Không còn `r` (reply) và `p` (peek): muốn nói chuyện với crew thì vào thẳng pane của nó.
 - Header của rail chỉ còn hai nút lọc: `[waiting]` (inbox, mặc định) và `[all]` (toàn bộ log), nút đang bật tô accent, nút kia mờ; dòng đếm ngay dưới nói bằng chữ đang xem cái nào (`N waiting`, hay `all · N entries`), nên terminal đơn sắc vẫn đọc được. Không dùng chữ "unread": console không lưu trạng thái đã đọc, và một mục người dùng đã nhìn nhưng chưa giao vẫn đang chờ ai đó xử lý.
 - `[← project]`, `[manual|auto]`, `[restart mate]`, `[clear composer]` rời khỏi header (quyết định 2026-09-19). `Esc` vẫn rời session (dòng hint ghi `Esc project`); mode vẫn ở ô MODE và phím `m`; restart Mate và clear composer nằm trong Actions menu của hàng Mate (`a` trong cây, `o` trong box zone), giữ nguyên bước xác nhận và request cũ.
@@ -167,7 +173,7 @@ Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở tas
   `wait-mate` không nằm trong inbox (mục 4b) nhưng ở chế độ tự động không có người đọc bảng crew, nên Mate là người phải xem nó.
   Chỉ lấy dòng mới nhất: một `wait-mate` mà crew đã ghi đè lên bằng dòng khác là lịch sử, và luật này chặn luôn trường hợp bật `.auto` trên một project đã chạy cả tuần.
 - Không có gì mới thì không gửi. Daemon không phải heartbeat.
-- Có gì mới thì thành **đúng một dòng**, gửi bằng `send.Send` (kiểm chứng composer, không bao giờ `herdr agent prompt`):
+- Có gì mới thì thành **đúng một dòng**, xếp vào `mate/.outbox` (task 30) rồi gửi bằng `send.Send` (kiểm chứng composer, không bao giờ `herdr agent prompt`); daemon không tự gõ, chung một đường với `[assign]`:
 
   ```text
   ⟦matev2⟧ digest: <k> item(s) — <mục> · <mục> · … — status files under <đường dẫn tuyệt đối tới crews/>; act per AGENTS.md section 10
@@ -198,9 +204,12 @@ Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở tas
 - Con trỏ digest là `mate/.auto-cursor`: một offset byte cho mỗi file nguồn, ghi ở dạng `<đường dẫn tương đối project>=<offset>`.
   Nó là file riêng chứ không nằm trong `.auto` vì `.auto` có ba người xoá (hook của Mate, phím `m`, tay người dùng); con trỏ nằm trong đó sẽ chết theo mỗi lần tắt auto, và lần bật lại sẽ gửi lại toàn bộ câu hỏi cũ.
   Chỉ một lần gửi đã kiểm chứng mới đẩy con trỏ, nên digest bị từ chối được chào lại nguyên vẹn ở vòng sau chứ không mất.
-  `sent.log` ghi trước, con trỏ ghi sau: hỏng ở giữa thì tốn một digest lặp, ngược lại thì mất mục.
-- Hook `UserPromptSubmit` của Mate thấy prompt không có marker thì xoá `.auto`. Daemon đọc lại cờ ở đầu lượt của mỗi project **và** ngay trước khi gõ, nên người dùng giành composer giữa lượt không bị máy trả lời ngay sau đó.
+  Từ task 30 digest đang xếp hàng mang sẵn con trỏ nó sẽ ghi, và outbox ghi con trỏ đó lúc đánh dấu digest `sent`, không phải lúc xếp hàng.
+  Mỗi project có tối đa một digest xếp hàng: vòng sau có mục khác thì viết lại dòng đó tại chỗ (giữ `at`, tức đồng hồ `wedged`), không còn gì để nói thì rút nó (`dropped`).
+  `sent.log` ghi trước, con trỏ ghi sau, mục outbox đánh dấu `sent` sau cùng: hỏng ở giữa thì lần thử sau tìm thấy dòng đó trong `sent.log` và đánh dấu `sent` chứ không gõ lại, ngược lại thì mất mục.
+- Hook `UserPromptSubmit` của Mate thấy prompt không có marker thì xoá `.auto`. Daemon đọc lại cờ ở đầu lượt của mỗi project, và outbox đọc lại **ngay trước khi gõ** một digest (cờ mất thì rút digest thay vì gõ), nên người dùng giành composer giữa chừng không bị máy trả lời ngay sau đó.
 - Gửi không tới được Mate quá 5 phút thì mở incident `wedged` với crew là `mate`; một lần gửi thành công đóng nó. Incident là nửa bền vững: dòng footer chết theo console, inbox thì không.
+  Từ task 30 luật này là của outbox, cho mọi dòng xếp hàng chứ không riêng digest, và đồng hồ là `at` của mục cũ nhất trên đĩa chứ không phải đồng hồ trong tiến trình, nên khởi động lại console không đặt lại nó.
   Đồng hồ 5 phút chạy cho cả hai kiểu hỏng - composer bận/đang có chữ của người dùng, và Mate không chạy - vì auto mode âm thầm không giao gì suốt một tiếng đúng là trạng thái incident này sinh ra để lộ; text của incident luôn nói rõ là nửa nào hỏng.
   Digest bỏ qua chính incident `(mate, wedged)` của mình: báo cáo một lỗi giao hàng qua chính đường giao hàng vừa hỏng là vô nghĩa, và người dùng đã thấy nó trong inbox.
 - Lý do từ chối của lượt gần nhất hiện trên dòng thông báo của console, một lần mỗi lượt chứ không phải mỗi mục, và tự biến mất ở lượt gửi được. Ô `MODE` thêm `auto · sent 14:32:10` khi daemon đã gửi ít nhất một lần.
@@ -349,6 +358,16 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   Hậu quả trước khi sửa: mọi tổng bốn nhóm (`v_task_ledger`, `v_now.tokens_today`, ngân sách, `matev2 usage`) đếm hai lần phần cache của Codex, và giá thành cũng tính tiền phần đó hai lần nếu captain đặt giá cho cả `input_per_m` lẫn `cache_read_per_m`.
   Sửa tại nguồn, trong `internal/timeline/transcript.go`'s `codexTurns`: trừ delta `cache_read` khỏi delta `input` trước khi ghi vào `turn.input_tokens`, để cột đó mang cùng một nghĩa ("tính theo giá input, không phải giá cache") ở cả hai harness; từ đó mọi phép cộng bốn nhóm ở tầng trên không cần biết turn đến từ harness nào.
   `context_tokens_after` của Codex không đổi, vì nó tính thẳng từ `last_token_usage` thô, không đi qua `turn.input_tokens` đã sửa.
+- Claude Code hiện chặn `sleep N` chạy tiền cảnh trong tool Bash.
+  Đo 2026-09-24 (task 30, lần chạy đầu của `TestLiveAssignQueuesWhileTheMateIsBusy`): Mate được bảo chạy `sleep 45` trả lời "The shell blocks a plain `sleep 45` in the foreground, so I started it in the background instead" rồi kết thúc turn sau 8 giây, nên Mate không hề bận như test định dựng.
+  Cùng một lệnh chờ viết thành `python3 -c 'import time; time.sleep(45)'` thì không bị chặn và giữ Mate Busy trọn 45 giây.
+  Hệ quả chưa đo: vòng `sleep 20; matev2 state` của mục 9 manual có thể cũng bị chặn hoặc bị đẩy ra nền; đó là phần của task 31, cần đọc lại cùng mục 7.
+- `[assign]` xếp hàng thay vì bị từ chối đổi hẳn trải nghiệm trên Mate bận.
+  Đo 2026-09-24 (task 30, Claude Code, Herdr 0.8.2): `[assign]` bấm lúc Mate đang ở giây thứ 10 của một tool call 45 giây trả về ngay `queued for the Mate (the Mate is mid-turn)`, outbox thử 22 lần mỗi 2 giây, và dòng `resolve:` vào composer 3 giây sau dòng `Stop` của turn đó (chờ tổng 43 giây), đúng hai bản trong `sent.log` (outbox và hook), không bản thứ ba.
+  Mate đọc status file và trả lời crew trong chưa tới 10 giây sau đó, nên mục rời inbox gần như ngay khi hàng kịp hiện `assigned HH:MM`: hậu tố `assigned HH:MM` sống ngắn trên Mate rảnh, `assigned, queued` mới là chữ người dùng thực sự thấy.
+- Bản ghi `sent.log` của app có thể đứng **sau** bản của hook dù app là bên gõ.
+  Cùng lần đo: dòng của hook `UserPromptSubmit` (11:08:48) nằm trước dòng outbox ghi (11:08:47 theo giờ bắt đầu lượt thử) trong file, vì `send.Send` còn ngủ 400ms chờ đọc lại composer sau Enter trong khi Claude đã đọc prompt và hook đã ghi.
+  Cuộc đua này có từ trước task 30 (đường `[assign]` cũ cũng ghi sau khi `send.Send` trả về); outbox giờ ghi giờ của lúc composer sạch chứ không phải lúc bắt đầu lượt thử, nhưng thứ tự trong file vẫn không bảo đảm, nên luật "bản lặp liền sau là của hook" của timeline chỉ đúng về số lần giao, không đúng về bản nào là của ai.
 
 ## 8. Tái sử dụng từ v1
 
@@ -373,7 +392,8 @@ internal/store/          đọc ghi .matev2/, khoá append, layout, ranh giới 
 internal/box/            gộp status + sent.log + incident thành view
 internal/send/           gửi một dòng vào pane agent qua Herdr, kiểm chứng composer
 internal/watch/          observer và triage
-internal/autopilot/      daemon chế độ tự động: digest 90 giây, gửi có kiểm chứng vào pane Mate
+internal/autopilot/      daemon chế độ tự động: digest 90 giây, xếp vào outbox của Mate
+internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất vào composer Mate, `wedged`
 internal/spawn/          start Mate, spawn Crew
 internal/runtime/        copy v1
 internal/harness/        copy v1
@@ -527,7 +547,7 @@ Nợ M6 (đo 2026-09-21, task 29): `matev2 reindex` đặt lại `event.id` từ
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 30 | `[assign]` khi Mate bận: không từ chối nữa mà xếp hàng. Console giữ một hàng đợi gửi vào Mate (ghi ở `mate/.outbox`, mỗi dòng một mục, để console khởi động lại vẫn gửi tiếp), một vòng gửi thử lại mỗi 2 giây bằng `send.Send` có kiểm chứng cho tới khi composer trống; trùng mục thì bỏ; dòng inbox hiện `assigned · queued` rồi `assigned · sent HH:MM`; quá 5 phút chưa gửi được thì mở incident `wedged` trên `mate` như daemon. Không bao giờ dùng hàng đợi của harness (`herdr agent prompt`). Daemon auto dùng chung hàng đợi này thay vì vòng thử lại riêng. | Unit với pane giả: bận rồi trống thì gửi đúng một lần, khởi động lại vẫn gửi, trùng bị bỏ, quá hạn thì `wedged`. Live: Mate Claude đang trong vòng `sleep 20; matev2 state`, bấm `[assign]` một lần, dòng `resolve:` tới hook của Mate trong vòng một chu kỳ. |
+| 30 | `[assign]` khi Mate bận: không từ chối nữa mà xếp hàng. Console giữ một hàng đợi gửi vào Mate (ghi ở `mate/.outbox`, mỗi dòng một mục, để console khởi động lại vẫn gửi tiếp), một vòng gửi thử lại mỗi 2 giây bằng `send.Send` có kiểm chứng cho tới khi composer trống; trùng mục thì bỏ; dòng inbox hiện `assigned · queued` rồi `assigned · sent HH:MM`; quá 5 phút chưa gửi được thì mở incident `wedged` trên `mate` như daemon. Không bao giờ dùng hàng đợi của harness (`herdr agent prompt`). Daemon auto dùng chung hàng đợi này thay vì vòng thử lại riêng. | Unit với pane giả: bận rồi trống thì gửi đúng một lần, khởi động lại vẫn gửi, trùng bị bỏ, quá hạn thì `wedged`. Live: Mate Claude đang trong vòng `sleep 20; matev2 state`, bấm `[assign]` một lần, dòng `resolve:` tới hook của Mate trong vòng một chu kỳ. Đã xong 2026-09-24: hàng đợi `mate/.outbox` (JSON một dòng một mục, viết lại nguyên tử dưới khoá `.outbox.lock`) và người gửi duy nhất `internal/outbox`; daemon chỉ xếp digest vào đó, con trỏ chỉ tiến khi outbox đánh dấu `sent`; chữ trên hàng inbox là `needs an answer · assigned, queued` rồi `· assigned HH:MM`. Live `TestLiveAssignQueuesWhileTheMateIsBusy` (100s): Mate bận trong một lệnh chờ 45s, `[assign]` trả `queued`, 22 lần thử bị từ chối, dòng `resolve:` vào 3s sau khi turn kết thúc (chờ tổng 43s), đúng hai bản trong `sent.log`; `TestLiveAutoDigestReachesTheMate` vẫn xanh qua outbox (58s). |
 | 31 | Mate ở chế độ auto phải dừng turn sau khi spawn để digest đánh thức nó. Manual đã dặn mà Mate không nghe (đo 2026-09-19, task 24), nên đưa lời nhắc vào chỗ Mate chắc chắn đọc: output của `matev2 crew spawn`, `matev2 state`, `matev2 send` khi project có `.auto` in thêm một dòng cuối "auto mode: end your turn now; the console will wake you with a digest when <crew> speaks". Rà lại mục 7 và 9 của manual cho một câu duy nhất, không mâu thuẫn. | Live: nửa `blog` của `TestLiveAcceptanceTwoProjects` có ít nhất một dòng `app → mate` `digest:` trong `sent.log` và Mate xử lý nó ở một turn riêng; chạy hai lần liên tiếp đều pass. |
 
 Sau M6: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.

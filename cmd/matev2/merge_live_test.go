@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
@@ -299,10 +298,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	t.Logf("crew handed back: %s: %s", done.Verb, done.Text)
 
 	// The digest, exactly as cmdConsole wires it (console_auto.go).
-	pilot := autopilot.New(w, autopilot.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleMateHandle(w, deps),
-	})
+	pilot := consoleAutoPilot(w, deps)
 	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 2*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 wait-mate") {

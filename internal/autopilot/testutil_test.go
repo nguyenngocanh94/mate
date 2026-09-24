@@ -12,6 +12,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/box"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/store"
@@ -107,10 +108,23 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-// deps builds the daemon's collaborators over this fixture. onSleep, when
-// given, runs at the end of every tick of a running daemon.
+// deps builds the daemon's collaborators over this fixture: an outbox sender
+// over the fake Herdr, and the daemon over that. onSleep, when given, runs at
+// the end of every tick of a running daemon.
 func (f *fixture) deps(onSleep func()) autopilot.Deps {
+	return f.depsOver(f.ws, onSleep)
+}
+
+func (f *fixture) depsOver(ws *store.Workspace, onSleep func()) autopilot.Deps {
 	return autopilot.Deps{
+		Outbox:  outbox.New(ws, f.outboxDeps()),
+		Clock:   f.clock,
+		Sleeper: instant{hook: onSleep},
+	}
+}
+
+func (f *fixture) outboxDeps() outbox.Deps {
+	return outbox.Deps{
 		Runtime: f.rt,
 		Handle: func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
 			if f.onHandle != nil {
@@ -122,8 +136,30 @@ func (f *fixture) deps(onSleep func()) autopilot.Deps {
 			return f.handle, harness.KindClaude, nil
 		},
 		Clock:   f.clock,
-		Sleeper: instant{hook: onSleep},
+		Sleeper: instant{},
 	}
+}
+
+// drain is one pass of the console's outbox loop over this workspace.
+func (f *fixture) drain() {
+	f.t.Helper()
+	ws, err := store.Open(f.ws.Root())
+	if err != nil {
+		f.t.Fatalf("store.Open: %v", err)
+	}
+	if err := outbox.New(ws, f.outboxDeps()).Drain(context.Background()); err != nil {
+		f.t.Fatalf("Drain: %v", err)
+	}
+}
+
+// outboxItems is the project's `mate/.outbox`.
+func (f *fixture) outboxItems() []store.OutboxItem {
+	f.t.Helper()
+	items, err := f.ws.ReadOutbox(project)
+	if err != nil {
+		f.t.Fatalf("ReadOutbox: %v", err)
+	}
+	return items
 }
 
 // restart is a second daemon over the same workspace, as a reopened console
@@ -134,7 +170,7 @@ func (f *fixture) restart() *autopilot.Pilot {
 	if err != nil {
 		f.t.Fatalf("store.Open: %v", err)
 	}
-	return autopilot.New(ws, f.deps(nil))
+	return autopilot.New(ws, f.depsOver(ws, nil))
 }
 
 // addProject registers a second project, manual by default.

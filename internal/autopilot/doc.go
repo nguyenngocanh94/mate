@@ -1,13 +1,12 @@
-// Package autopilot is the auto-mode daemon of docs/mvp.md section 5: the
-// one thing in matev2 that may type into the Mate's own composer without a
-// human pressing a key.
+// Package autopilot is the auto-mode daemon of docs/mvp.md section 5: it
+// decides what the Mate is told without a human pressing a key.
 //
 // It lives in the console process, beside the observer (internal/watch), and
 // like the observer it is a plain polling loop over the workspace's files
-// with an injectable clock. It is a separate package from the observer
-// because the two are opposites: the observer only ever reads panes and
-// appends findings, while this one sends - so the narrow Runtime interface
-// here is the one that can type, and the observer's structurally cannot.
+// with an injectable clock. Since task 30 it types nothing itself: every
+// digest goes into the Mate's outbox (internal/outbox, `mate/.outbox`), the
+// one sender into a Mate's composer, which `[assign]` uses too. This package
+// holds no runtime at all.
 //
 // # What one tick does, per project whose `mate/.auto` exists
 //
@@ -19,12 +18,18 @@
 //     in auto mode there is no reader watching that table, so the Mate is
 //     the one who has to review it.
 //  2. Nothing new means nothing is sent. The daemon is not a heartbeat.
-//  3. Everything new becomes one line (see Line), sent with send.Send, which
-//     types only into an empty composer and proves the line was submitted.
-//     A Busy or Pending composer is a refusal, not a retry loop: the captain
-//     shares that composer, and the next tick asks again.
+//  3. Everything new becomes one line (see Line), queued in the outbox under
+//     a key naming exactly those items (Key), and tried once at once so an
+//     idle Mate gets it with no delay. A Busy or Pending composer leaves it
+//     queued; the outbox's own loop retries it every two seconds. At most
+//     one digest is queued per project: a later tick with a different set of
+//     items rewrites the queued line in place, and one with nothing left to
+//     say withdraws it.
 //  4. Only a verified send advances the cursor, so a refused digest is
-//     re-offered whole rather than silently dropped.
+//     re-offered whole rather than silently dropped. The queued digest
+//     carries the cursor it would record, and the outbox writes it when it
+//     marks the digest sent, under the same lock this package gathers
+//     under.
 //
 // # The three ways a project stops being digested
 //
@@ -32,9 +37,9 @@
 // writers: the Mate's own UserPromptSubmit hook deletes it the moment the
 // captain types an unmarked prompt (internal/hook), the console's `m` key
 // toggles it, and a user can remove the file by hand. The daemon re-reads
-// the flag at the top of each project's turn and again immediately before it
-// types, so a captain who takes over mid-tick is not answered by a machine a
-// moment later.
+// the flag at the top of each project's turn, and the outbox reads it again
+// immediately before it types a digest (and withdraws the digest instead), so
+// a captain who takes over is not answered by a machine a moment later.
 //
 // # Idempotence across restarts
 //
@@ -47,18 +52,13 @@
 //
 // # Wedged
 //
-// A digest that does not reach the Mate for longer than WedgedAfter opens a
-// `wedged` incident (mvp.md section 4b) whose crew field is `mate`, and a
-// verified send resolves it. The incident is what makes the failure durable:
-// a footer line dies with the console, while the inbox shows an open incident
-// to whoever opens it next.
-//
-// The clock starts on any tick that had something to say and could not say
-// it - a composer somebody else is typing into, a harness mid-turn, a screen
-// the classifier cannot name, or a Mate that is not running at all. The last
-// of those is a wider reading of the kind's definition ("gửi vào pane không
-// kiểm chứng được quá lâu") than its letter, and it is deliberate: auto mode
-// quietly delivering nothing for an hour because the Mate died is exactly the
-// state the incident exists to surface, and the incident text always names
-// which of the two it was.
+// A digest that does not reach the Mate for longer than DefaultWedgedAfter
+// opens a `wedged` incident (mvp.md section 4b) whose crew field is `mate`,
+// and a verified send resolves it. Since task 30 that rule is the outbox's,
+// for every queued line and not only digests, and its clock is the queued
+// item's own `at` on disk rather than a stopwatch in this process: a console
+// restart neither resets it nor opens a second incident. The incident text
+// always names which half failed - a composer somebody else is typing into,
+// a harness mid-turn, a screen the classifier cannot name, or a Mate that is
+// not running at all.
 package autopilot

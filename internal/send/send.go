@@ -1,8 +1,9 @@
 // Package send types one line into an agent pane and proves it landed.
 //
 // It is the one place in matev2 that puts bytes into a harness composer, for
-// `matev2 send` (task 13), the console's reply key (task 15) and the auto
-// daemon's digest (task 19).
+// `matev2 send` (task 13), the console's reply key (task 15) and the Mate's
+// outbox (internal/outbox, task 30), which delivers `[assign]` and the auto
+// daemon's digest.
 //
 // It never uses `herdr agent prompt` (runtime.PromptAgent) to deliver. v1
 // measured that call reporting success twice while the model received

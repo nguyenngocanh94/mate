@@ -135,10 +135,7 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 	t.Logf("inbox item: %s %s %s", ask.Crew, ask.Verb, ask.Text)
 
 	// 3. One tick of the daemon, wired exactly as cmdConsole wires it.
-	pilot := autopilot.New(w, autopilot.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleMateHandle(w, deps),
-	})
+	pilot := consoleAutoPilot(w, deps)
 	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 3*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 needs-decision") {
@@ -150,6 +147,18 @@ func TestLiveAutoDigestReachesTheMate(t *testing.T) {
 	if status := pilot.Snapshot()["shop"]; status.Sends != 1 || status.Notice != "" {
 		t.Fatalf("daemon status = %+v, want one delivered digest", status)
 	}
+	// Since task 30 the daemon types nothing itself: the digest went through
+	// the Mate's outbox, which is what marked it sent and moved the cursor.
+	outboxItems, err := w.ReadOutbox("shop")
+	if err != nil {
+		t.Fatalf("ReadOutbox: %v", err)
+	}
+	if len(outboxItems) != 1 || outboxItems[0].Source != store.OutboxSourceDigest ||
+		outboxItems[0].State != store.OutboxSent || outboxItems[0].Text != digest {
+		t.Fatalf("outbox = %+v, want the one digest, sent", outboxItems)
+	}
+	t.Logf("outbox: digest sent after %d attempt(s), queued %s, sent %s",
+		outboxItems[0].Attempts, outboxItems[0].At.Format(time.RFC3339), outboxItems[0].SentAt.Format(time.RFC3339))
 
 	// 4. The Mate's own hook recorded it as an app line. Two copies of the
 	//    same text: the daemon's, written when the composer cleared, and the

@@ -39,6 +39,10 @@ var forbiddenImports = []string{
 	// into the snapshot (mvp.md tasks 18 and 19).
 	"github.com/nguyenngocanh94/matev2/internal/watch",
 	"github.com/nguyenngocanh94/matev2/internal/autopilot",
+	// internal/outbox is the one sender into a Mate's composer (task 30).
+	// The Console queues through ActionFunc and draws the queue's state as
+	// query.BoxEntry.Assigned; it never reaches the sender itself.
+	"github.com/nguyenngocanh94/matev2/internal/outbox",
 }
 
 func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {
