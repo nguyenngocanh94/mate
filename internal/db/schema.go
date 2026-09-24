@@ -207,7 +207,7 @@ var schema1 = []string{
 	)`,
 	`CREATE INDEX transition_actor_at ON transition(actor_id, at)`,
 
-	// pricing is filled by task 27 from `.matev2/pricing.yaml`. v_task_ledger
+	// pricing is filled by task 27 from `.mate/pricing.yaml`. v_task_ledger
 	// already joins it, so a ledger gains cost the moment a row lands here
 	// and reports NULL cost - not zero - until then.
 	`CREATE TABLE pricing (
@@ -412,7 +412,7 @@ var schema2 = []string{
 		              ORDER BY x.at DESC, x.id DESC LIMIT 1)`,
 }
 
-// derivedTables are every table `matev2 reindex` empties before rebuilding.
+// derivedTables are every table `mate reindex` empties before rebuilding.
 // `schema_version` is not one of them: the schema is not derived from the
 // files, it is what the files are read into.
 var derivedTables = []string{

@@ -6,7 +6,7 @@
 //
 // Ordering and its one documented limitation: `crews/<id>.status` lines carry
 // no timestamp, because a crew appends them with a bare
-// `echo "state: one line" >> $MATEV2_STATUS`. The only time signal available
+// `echo "state: one line" >> $MATE_STATUS`. The only time signal available
 // is the status file's mtime, which reflects when its last line was written.
 // Every status line currently in a file is therefore stamped with that file's
 // current mtime, and lines from the same file are ordered relative to each

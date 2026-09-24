@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 const (
@@ -44,7 +44,7 @@ func sessionTestClock(h, m int) time.Time {
 // `resolve:` lines through the production builders, so a fixture can never
 // pin a line the console would not actually send.
 func testStatusPath(crew string) string {
-	return "/Users/dev/work/acme/.matev2/projects/payments-api/crews/" + crew + ".status"
+	return "/Users/dev/work/acme/.mate/projects/payments-api/crews/" + crew + ".status"
 }
 
 func testResolveLine(crew, question string) string {
@@ -111,7 +111,7 @@ func sessionTestMateTranscript(g glyphSet) SessionTranscript {
 	entries := []SessionTranscriptEntry{
 		{Kind: SessionTranscriptEntryTurn, Text: `Attempt 1 of "Fix webhook idempotency" failed on 3 tests in internal/webhook. Reading its report before reviewing attempt 2.`},
 		{Kind: SessionTranscriptEntryGap},
-		{Kind: SessionTranscriptEntryTurn, Text: "Read(.matev2/reports/crew-01j9p4p5v9d4.json)"},
+		{Kind: SessionTranscriptEntryTurn, Text: "Read(.mate/reports/crew-01j9p4p5v9d4.json)"},
 		{Kind: SessionTranscriptEntryResult, Text: "Read 84 lines (ctrl+o to expand)"},
 		{Kind: SessionTranscriptEntryGap},
 		{Kind: SessionTranscriptEntryTurn, Text: fmt.Sprintf("Reply(a1 %s Upgrade database adapter)", g.Dot)},
@@ -298,7 +298,7 @@ func TestSessionTranscriptUnknownRendersRawBoundedText(t *testing.T) {
 // split, the composer's fixed 4-line chrome), so a change to any of those
 // layout constants shows up here as a deliberate diff rather than only as a
 // latency regression discovered from a captain's complaint (this figure
-// bounds the ReadAgent request in cmd/matev2/session_bridge.go).
+// bounds the ReadAgent request in cmd/mate/session_bridge.go).
 func TestSessionTranscriptCapacity(t *testing.T) {
 	cases := []struct {
 		name string

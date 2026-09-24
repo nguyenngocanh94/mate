@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 // recorder runs the real git and remembers every argv, so a test can hold

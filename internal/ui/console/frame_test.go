@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // frameSizes are the sizes every frame test sweeps: one per breakpoint,
@@ -308,7 +308,7 @@ func TestFrameIsThreeLinesOfChromeAroundExactlyHMinusSixLines(t *testing.T) {
 		t.Run(size.name, func(t *testing.T) {
 			m := newFixture(t, sampleTree(), size.w, size.h, unicodeGlyphs)
 			lines := strings.Split(renderFrame(t, m), "\n")
-			if !strings.HasPrefix(lines[0], " matev2 console") {
+			if !strings.HasPrefix(lines[0], " mate console") {
 				t.Errorf("line 0 = %q, want the header", lines[0])
 			}
 			if !strings.Contains(lines[1], "ws_acme") {
@@ -765,15 +765,15 @@ func TestNewPicksTheGlyphSetFromTheEnvironment(t *testing.T) {
 	t.Setenv("LC_ALL", "en_US.UTF-8")
 	t.Setenv("LC_CTYPE", "")
 	t.Setenv("LANG", "en_US.UTF-8")
-	t.Setenv("MATEV2_ASCII", "")
+	t.Setenv("MATE_ASCII", "")
 	if got := build().g.Name; got != "unicode" {
 		t.Fatalf("with a UTF-8 locale New picked %s, want unicode", got)
 	}
-	t.Setenv("MATEV2_ASCII", "1")
+	t.Setenv("MATE_ASCII", "1")
 	if got := build().g.Name; got != "ascii" {
-		t.Fatalf("with MATEV2_ASCII=1 New picked %s, want ascii", got)
+		t.Fatalf("with MATE_ASCII=1 New picked %s, want ascii", got)
 	}
-	t.Setenv("MATEV2_ASCII", "")
+	t.Setenv("MATE_ASCII", "")
 	t.Setenv("LC_ALL", "C")
 	t.Setenv("LANG", "C")
 	if got := build().g.Name; got != "ascii" {

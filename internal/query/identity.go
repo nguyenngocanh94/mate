@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
 )
 
 // The lifecycle enums the read model and the Console render. They lived in
-// v1's internal/domain, a package matev2 does not carry across (mvp.md §8),
+// v1's internal/domain, a package mate does not carry across (mvp.md §8),
 // and they are the only part of it these DTOs used, so they are inlined
 // here with the types that give them meaning. The string values are v1's
 // unchanged, which is what keeps the golden fixtures honest.
@@ -25,7 +25,7 @@ var (
 	ErrInvalidValue = errors.New("invalid value")
 )
 
-// HarnessKind is a supported agent harness. matev2 launches the two v1
+// HarnessKind is a supported agent harness. mate launches the two v1
 // probed: Claude Code and Codex CLI. It mirrors harness.Kind's values
 // without this package importing internal/harness, for the same reason
 // WorktreeStatus mirrors the store's own spelling: the Console must stay
@@ -82,7 +82,7 @@ func ModeFor(auto bool) Mode {
 // it, so there is no read that could fail and no reason to carry one.
 //
 // query.Load cannot fill it: the daemon lives in the console process beside
-// the observer, and cmd/matev2 merges its snapshot into the tree the same
+// the observer, and cmd/mate merges its snapshot into the tree the same
 // way it merges the observer's health readings.
 type AutoDaemon struct {
 	// Sends is how many digests this console has delivered for the Project.
@@ -148,7 +148,7 @@ func (s MateStatus) OccupiesActiveSlot() bool {
 //
 // The v1 lifecycle (`reserved`, `preparing`, `running`, `awaiting_review`,
 // `succeeded`, `needs_rebase`, `needs_repair`, `stopped`) is gone: those
-// states had no owner in matev2, nothing wrote them, and a status nobody
+// states had no owner in mate, nothing wrote them, and a status nobody
 // sets is a status the Console can only render as a lie.
 type CrewStatus string
 
@@ -185,14 +185,14 @@ func ParseCrewStatus(s string) (CrewStatus, error) {
 func (s CrewStatus) String() string { return string(s) }
 
 // Closed reports whether the task is over: `finished` or `failed`, the two
-// states `matev2 crew stop` writes. A closed Crew leaves ProjectNode.Crews
+// states `mate crew stop` writes. A closed Crew leaves ProjectNode.Crews
 // and is counted in ProjectNode.ClosedCrews instead. `wait-mate` is not
 // closed - it is the crew reporting, and closing is somebody else's
 // decision (mvp.md section 4b).
 func (s CrewStatus) Closed() bool { return crewstate.State(s).Closed() }
 
 // CrewStateOf resolves one Crew's displayed state in the fixed order of
-// mvp.md section 4b, over the same pure table `matev2 state` uses. Every
+// mvp.md section 4b, over the same pure table `mate state` uses. Every
 // reader of a Crew's state in this codebase goes through here or through
 // crewstate.Declare directly; there is no second ordering anywhere.
 //

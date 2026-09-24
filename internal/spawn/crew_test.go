@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // crewWorkspace is newWorkspace plus the one thing a crew needs that a Mate
@@ -78,8 +78,8 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	if res.Agent != "crew-k3" {
 		t.Fatalf("agent = %q, want crew-k3", res.Agent)
 	}
-	if res.Branch != "matev2/k3" {
-		t.Fatalf("branch = %q, want matev2/k3", res.Branch)
+	if res.Branch != "mate/k3" {
+		t.Fatalf("branch = %q, want mate/k3", res.Branch)
 	}
 	if res.Worktree != w.WorktreeDir("shop", "k3") {
 		t.Fatalf("worktree = %q, want %q", res.Worktree, w.WorktreeDir("shop", "k3"))
@@ -89,8 +89,8 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	}
 
 	// The worktree is a real, isolated checkout of the crew's own branch.
-	if got := strings.TrimSpace(git(t, res.Worktree, "rev-parse", "--abbrev-ref", "HEAD")); got != "matev2/k3" {
-		t.Fatalf("worktree branch = %q, want matev2/k3", got)
+	if got := strings.TrimSpace(git(t, res.Worktree, "rev-parse", "--abbrev-ref", "HEAD")); got != "mate/k3" {
+		t.Fatalf("worktree branch = %q, want mate/k3", got)
 	}
 	top := strings.TrimSpace(git(t, res.Worktree, "rev-parse", "--show-toplevel"))
 	if !gitx.SamePath(top, res.Worktree) || gitx.SamePath(top, w.RepoDir("shop")) {
@@ -106,8 +106,8 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		"Add a healthcheck endpoint.\nKeep it small.",
 		res.Worktree,
 		w.RepoDir("shop"),
-		"matev2/k3",
-		"$MATEV2_STATUS",
+		"mate/k3",
+		"$MATE_STATUS",
 	} {
 		if !strings.Contains(string(brief), want) {
 			t.Errorf("brief.md does not carry %q:\n%s", want, brief)
@@ -141,7 +141,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaWorkspace:  res.Workspace,
 		spawn.MetaSession:    w.Session(),
 		spawn.MetaWorktree:   ".worktrees/shop-k3",
-		spawn.MetaBranch:     "matev2/k3",
+		spawn.MetaBranch:     "mate/k3",
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",
 		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
@@ -187,7 +187,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	}
 }
 
-// The Codex discovery file is matev2's, not the crew's work: a crew that
+// The Codex discovery file is mate's, not the crew's work: a crew that
 // runs `git add -A` must not put it on the branch the Mate reviews.
 func TestSpawnCrewKeepsTheCodexDiscoveryFileOutOfTheBranch(t *testing.T) {
 	w := crewWorkspace(t, "shop")
@@ -267,7 +267,7 @@ func TestSpawnCrewRefusesAnExistingBranchBeforeCreatingAnything(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	git(t, w.RepoDir("shop"), "branch", "matev2/k3")
+	git(t, w.RepoDir("shop"), "branch", "mate/k3")
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
@@ -275,7 +275,7 @@ func TestSpawnCrewRefusesAnExistingBranchBeforeCreatingAnything(t *testing.T) {
 	if err == nil {
 		t.Fatal("an existing branch must be refused")
 	}
-	if !strings.Contains(err.Error(), "matev2/k3 already exists") {
+	if !strings.Contains(err.Error(), "mate/k3 already exists") {
 		t.Fatalf("error = %v, want it to name the branch", err)
 	}
 	if len(rt.Calls) != 0 {
@@ -348,12 +348,12 @@ func TestSpawnCrewCompensatesAfterTheTabExists(t *testing.T) {
 	if _, statErr := os.Stat(w.WorktreeDir("shop", "k3")); !os.IsNotExist(statErr) {
 		t.Fatalf("the worktree survived compensation: %v", statErr)
 	}
-	exists, branchErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	exists, branchErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
 	if branchErr != nil {
 		t.Fatal(branchErr)
 	}
 	if exists {
-		t.Fatal("branch matev2/k3 survived compensation")
+		t.Fatal("branch mate/k3 survived compensation")
 	}
 	if listed := git(t, w.RepoDir("shop"), "worktree", "list"); strings.Contains(listed, "shop-k3") {
 		t.Fatalf("git still lists the crew worktree:\n%s", listed)
@@ -485,7 +485,7 @@ func TestListCrewsReportsTheRecordedCrews(t *testing.T) {
 	if err := w.AppendStatus("shop", "k3", "working: reading the repo"); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.AppendStatus("shop", "k3", "done: ready in branch matev2/k3"); err != nil {
+	if err := w.AppendStatus("shop", "k3", "done: ready in branch mate/k3"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -497,13 +497,13 @@ func TestListCrewsReportsTheRecordedCrews(t *testing.T) {
 		t.Fatalf("crews = %v, want one", crews)
 	}
 	got := crews[0]
-	if got.Crew != "k3" || got.Harness != "codex" || got.Branch != "matev2/k3" || got.Pane != res.Pane {
+	if got.Crew != "k3" || got.Harness != "codex" || got.Branch != "mate/k3" || got.Pane != res.Pane {
 		t.Fatalf("row = %+v", got)
 	}
 	if got.State != "wait-mate" {
 		t.Fatalf("state = %q, want wait-mate: the legacy done: verb reads as wait-mate", got.State)
 	}
-	if got.Note != "ready in branch matev2/k3" {
+	if got.Note != "ready in branch mate/k3" {
 		t.Fatalf("note = %q, want the last status line's text", got.Note)
 	}
 	if got.Closed {
@@ -524,7 +524,7 @@ func TestListCrewsStateReflectsTheMeta(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
-	if err := w.AppendStatus("shop", "k3", "done: ready in branch matev2/k3"); err != nil {
+	if err := w.AppendStatus("shop", "k3", "done: ready in branch mate/k3"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -620,7 +620,7 @@ func TestStopCrewTearsDownCleanlyWhenLanded(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatalf("the worktree survived a clean teardown: %v", statErr)
 	}
-	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
 	if err != nil || exists {
 		t.Fatalf("the branch survived a clean teardown: %v, %v", exists, err)
 	}
@@ -631,7 +631,7 @@ func TestStopCrewTearsDownCleanlyWhenLanded(t *testing.T) {
 	if meta[spawn.MetaAgent] != "" || meta[spawn.MetaPane] != "" {
 		t.Fatalf("a stopped crew must not keep naming a pane: %v", meta)
 	}
-	if meta[spawn.MetaBranch] != "matev2/k3" || meta[spawn.MetaWorktree] != ".worktrees/shop-k3" {
+	if meta[spawn.MetaBranch] != "mate/k3" || meta[spawn.MetaWorktree] != ".worktrees/shop-k3" {
 		t.Fatalf("a torn-down crew must still record which branch and worktree it had: %v", meta)
 	}
 	if meta[spawn.MetaStoppedAt] == "" {
@@ -676,7 +676,7 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); statErr != nil {
 		t.Fatalf("a refused stop must keep the worktree: %v", statErr)
 	}
-	exists, existsErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	exists, existsErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
 	if existsErr != nil || !exists {
 		t.Fatalf("a refused stop must keep the branch: %v, %v", exists, existsErr)
 	}
@@ -718,7 +718,7 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatal("--discard must remove the worktree")
 	}
-	exists, existsErr = gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "matev2/k3")
+	exists, existsErr = gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
 	if existsErr != nil || exists {
 		t.Fatal("--discard must remove the branch")
 	}
@@ -767,7 +767,7 @@ func TestStopCrewRefusesWhenOnlyTheWorktreeIsDirty(t *testing.T) {
 
 // TestStopCrewOnAClosedCrewChangesNothing: `finished` and `failed` are final
 // (mvp.md section 4b). A second stop - the Mate's `crew stop` after its own
-// `matev2 merge`, or a cleanup sweeping every crew with --discard - must not
+// `mate merge`, or a cleanup sweeping every crew with --discard - must not
 // rewrite a merged crew as `failed`. Found 2026-09-24 (task 34): every live
 // acceptance run's merged crew ended its record `state=failed`.
 func TestStopCrewOnAClosedCrewChangesNothing(t *testing.T) {

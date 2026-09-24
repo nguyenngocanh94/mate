@@ -31,7 +31,7 @@ func TestGoldenFramesInspectorPerNodeKind(t *testing.T) {
 		// Mate row.
 		//
 		// TODO(task 21): a Task block sat between the Mate and Crew blocks
-		// in v1. matev2 has no Task.
+		// in v1. mate has no Task.
 		m, _ = send(t, m, key("down"))
 		assertGolden(t, "inspector-crew-"+suffix, renderFrame(t, m))
 	}

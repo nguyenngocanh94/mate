@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 func TestStopMateConfirmsTheAgentIsGone(t *testing.T) {

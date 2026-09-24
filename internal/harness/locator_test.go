@@ -109,9 +109,9 @@ func TestCodexSessionsDirUsesDefaultWhenUnset(t *testing.T) {
 	}
 }
 
-// A live run (MATEV2_LIVE=1) may launch Codex only in a home under the temp
+// A live run (MATE_LIVE=1) may launch Codex only in a home under the temp
 // directory: the operator's ~/.codex is refused before anything starts, and
-// so is an explicit home elsewhere. Without MATEV2_LIVE nothing changes.
+// so is an explicit home elsewhere. Without MATE_LIVE nothing changes.
 func TestLaunchCodexHomeRefusesTheOperatorsHomeInALiveRun(t *testing.T) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -120,13 +120,13 @@ func TestLaunchCodexHomeRefusesTheOperatorsHomeInALiveRun(t *testing.T) {
 	operator := filepath.Join(userHome, ".codex")
 	lab := t.TempDir()
 
-	t.Setenv("MATEV2_LIVE", "")
+	t.Setenv("MATE_LIVE", "")
 	t.Setenv("CODEX_HOME", "")
 	if got, err := LaunchCodexHome(""); err != nil || got != operator {
 		t.Fatalf("outside a live run: LaunchCodexHome() = %q, %v; want the default %q", got, err, operator)
 	}
 
-	t.Setenv("MATEV2_LIVE", "1")
+	t.Setenv("MATE_LIVE", "1")
 	for _, refused := range []struct{ name, explicit, env string }{
 		{"default home", "", ""},
 		{"CODEX_HOME in the environment", "", operator},

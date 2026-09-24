@@ -1,4 +1,4 @@
- matev2 console   workspace acme  /Users/dev/work/acme                                                  live · 14:02:11 
+ mate console   workspace acme  /Users/dev/work/acme                                                    live · 14:02:11 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE              HARNESS STATUS    MODE                 BINDING   │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS            
@@ -12,17 +12,17 @@
                                                                      │ Harness          codex                           
                                                                      │ Agent            crew-payments-api-1             
                                                                      │ Binding          stale                           
-                                                                     │                  recorded stale: matev2 could    
-                                                                     │                  not confirm the agent stopped,  
-                                                                     │                  and attach is refused while     
-                                                                     │                  stale                           
+                                                                     │                  recorded stale: mate could not  
+                                                                     │                  confirm the agent stopped, and  
+                                                                     │                  attach is refused while stale   
                                                                      │ Runtime          herdr · mate-acme · tab crew/   
                                                                      │                  01J9P4P5 · pane p-2b91          
                                                                      │ Bound since      10:02:14                        
                                                                      │                                                  
                                                                      │ Repo             payments-api                    
                                                                      │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │  ↓ 14 more                                       
+                                                                     │ Branch           mate/01J9P4Q5                   
+                                                                     │  ↓ 13 more                                       
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  BOX                                                                                                          1 waiting 
                                                                                                                         

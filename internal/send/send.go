@@ -1,7 +1,7 @@
 // Package send types one line into an agent pane and proves it landed.
 //
-// It is the one place in matev2 that puts bytes into a harness composer, for
-// `matev2 send` (task 13), the console's reply key (task 15) and the Mate's
+// It is the one place in mate that puts bytes into a harness composer, for
+// `mate send` (task 13), the console's reply key (task 15) and the Mate's
 // outbox (internal/outbox, task 30), which delivers `[assign]` and the auto
 // daemon's digest.
 //
@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
-// Marker is the sentinel every line matev2 sends on its own initiative
+// Marker is the sentinel every line mate sends on its own initiative
 // carries, so a Mate can tell an app-generated digest from something its
 // human typed (docs/mvp.md sections 4 and 5).
 //
@@ -45,12 +45,12 @@ import (
 // recorded the line as the user's own typing. Measured 2026-09-17 against
 // Herdr 0.8.2 and Claude Code 2.1.274 (internal/send's
 // TestLiveMarkerSurvivesToTheHook): the 0x1f byte was stripped every time;
-// this bracket sentinel and a plain "[matev2] " ASCII fallback both arrived
+// this bracket sentinel and a plain "[mate] " ASCII fallback both arrived
 // byte for byte. The bracket form was kept because U+27E6/U+27E7 are
 // mathematical bracket glyphs nobody types by hand, while still being
 // ordinary printable UTF-8 that survives typing, tmux and Claude's own
 // input handling.
-const Marker = "⟦matev2⟧ "
+const Marker = "⟦mate⟧ "
 
 // Sentinel reasons a send did not deliver. Each is wrapped in a coded
 // observability.Error, so callers may match with errors.Is and the CLI still

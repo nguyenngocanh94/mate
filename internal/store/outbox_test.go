@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 var outboxNow = time.Date(2026, 9, 24, 9, 0, 0, 0, time.UTC)

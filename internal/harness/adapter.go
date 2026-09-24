@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Adapter validates a harness and builds a LaunchSpec. It never forks the

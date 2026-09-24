@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 const agentGetJSON = `{"id":"cli:agent:get","result":{"agent":{"agent":"claude","agent_status":"idle","cwd":"/w","interactive_ready":true,"name":"mate-shop","pane_id":"w9:p9","tab_id":"w9:t9","terminal_id":"t9","workspace_id":"w9"},"type":"agent_info"}}`

@@ -12,10 +12,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-// sampleDiffText is what `matev2 diff shop k3` prints for a crew two
+// sampleDiffText is what `mate diff shop k3` prints for a crew two
 // commits ahead with one uncommitted file: the dirty line, the commit list,
 // a blank line, then the patch. It is long enough to scroll at 80x24 and at
 // 120x36, which is the point of the fixture.
@@ -61,7 +61,7 @@ const diffTailLine = "return h.receipt(ctx, ev)"
 
 // sampleCrewBranch is the branch sampleTree's running Crew records; the
 // overlay's title has to name it.
-const sampleCrewBranch = "matev2/01J9P6Q6"
+const sampleCrewBranch = "mate/01J9P6Q6"
 
 // toCrewMenu walks to sampleTree's running Crew and opens its Actions menu.
 func toCrewMenu(t *testing.T, m Model) Model {

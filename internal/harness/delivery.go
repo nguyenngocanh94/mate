@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Delivery is an explicit context-delivery strategy.
@@ -32,7 +32,7 @@ const (
 	DeliveryInstructionFile Delivery = "instruction_file"
 	// DeliveryCwdManual is "the harness already loads the manual from the
 	// directory it runs in, so no flag carries it". Claude Code reads
-	// `CLAUDE.md` in its cwd on its own, and matev2's Mate cwd holds a
+	// `CLAUDE.md` in its cwd on its own, and mate's Mate cwd holds a
 	// `CLAUDE.md` that is exactly `@AGENTS.md` (docs/mvp.md section 3), so
 	// also passing that same manual as --append-system-prompt-file put it in
 	// the model's context twice. A spec with this delivery carries no
@@ -49,7 +49,7 @@ const (
 	// (observed 0.151.0 through 0.154.0): the concatenated instruction
 	// chain is silently truncated to this many bytes.
 	CodexFactoryMaxBytes = 32 * 1024
-	// CodexDefaultMaxBytes is the cap every matev2 Codex launch runs under.
+	// CodexDefaultMaxBytes is the cap every mate Codex launch runs under.
 	// The launch raises Codex's own cap to this value with
 	// `-c project_doc_max_bytes=` (CodexProjectDocMaxBytesOverride), and the
 	// meter in this package charges against the same number, so the two

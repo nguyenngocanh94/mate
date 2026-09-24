@@ -402,7 +402,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // onMouse routes a mouse event to the surface it landed on
 // (session_mouse.go). Mouse reporting is enabled Program-wide
-// (tea.WithMouseAllMotion, cmd/matev2/console.go), so an event can reach the
+// (tea.WithMouseAllMotion, cmd/mate/console.go), so an event can reach the
 // Console at any time; every branch below resolves it against the geometry
 // of the frame that is actually drawn, and an event on a frame with nothing
 // clickable on it does nothing at all.
@@ -422,7 +422,7 @@ func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // onBusyQuit is what q/ctrl+c do while an action's ActionFunc is still
 // running (actionBusy): it cancels the context that action is running under
 // - the one signal available, since Bubble Tea leaks the goroutine rather
-// than stopping it - and records what was abandoned so cmd/matev2 can tell the
+// than stopping it - and records what was abandoned so cmd/mate can tell the
 // operator plainly once the terminal is back (see AbandonedAction). The
 // Console has nothing left to draw once tea.Quit takes effect, which is why
 // the message cannot just be m.msg: this is the one thing that survives

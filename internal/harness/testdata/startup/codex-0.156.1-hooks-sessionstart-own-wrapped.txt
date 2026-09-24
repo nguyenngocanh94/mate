@@ -20,9 +20,9 @@
 › [!] Hook 1 · new
 
   Event     SessionStart
-  Source    Project config - /private/tmp/TestLiveCodexMateRecallHook1077437764/001/.matev2
+  Source    Project config - /private/tmp/TestLiveCodexMateRecallHook1077437764/001/.mate
             projects/shop/mate/.codex/hooks.json
-  Command   '/private/tmp/TestLiveCodexMateRecallHook1077437764/002/matev2' hook mate-
+  Command   '/private/tmp/TestLiveCodexMateRecallHook1077437764/002/mate' hook mate-
             session --harness codex
   Mode      Sync
   Timeout   30s

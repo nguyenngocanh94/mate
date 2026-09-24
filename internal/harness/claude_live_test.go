@@ -14,7 +14,7 @@ import (
 
 // TestLiveClaudeProjectSlugResolution measures how a real claude-code CLI names
 // its project directory instead of trusting a rule inferred from a transcript
-// corpus. Opt in with MATEV2_LIVE=1: it runs the CLI twice with a one-word
+// corpus. Opt in with MATE_LIVE=1: it runs the CLI twice with a one-word
 // prompt, which needs an authenticated installation and writes two transcript
 // files into the user's real Claude config directory. Both files, and the
 // project directory if this test created it, are removed again on the way out.
@@ -35,7 +35,7 @@ func TestLiveClaudeProjectSlugResolution(t *testing.T) {
 	requireLive(t)
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
-		t.Fatalf("MATEV2_LIVE=1 but no claude CLI on PATH: %v", err)
+		t.Fatalf("MATE_LIVE=1 but no claude CLI on PATH: %v", err)
 	}
 	projectsDir := claudeProjectsDir(t)
 

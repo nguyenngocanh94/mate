@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The incident half of the merge, read from `incidents.log` (mvp.md section

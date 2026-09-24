@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/watch"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/watch"
 )
 
 // The fixtures every rule test in this package runs on: a real workspace
@@ -67,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock()}
 	f.ws = newWorkspace(t)
 	f.handle = runtime.AgentHandle{
-		Session: runtime.SessionHandle{Name: "matev2-lab"},
+		Session: runtime.SessionHandle{Name: "mate-lab"},
 		Name:    "crew-k3",
 		RawID:   "k3",
 		Kind:    harness.KindCodex,
@@ -90,7 +90,7 @@ func (f *fixture) deps() watch.Deps {
 	}
 }
 
-// handleFunc is the seam cmd/matev2 fills with spawn.CrewHandle: it answers
+// handleFunc is the seam cmd/mate fills with spawn.CrewHandle: it answers
 // for a crew whose meta records an agent, and refuses for one that does not.
 func (f *fixture) handleFunc() watch.HandleFunc {
 	return func(_ context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error) {

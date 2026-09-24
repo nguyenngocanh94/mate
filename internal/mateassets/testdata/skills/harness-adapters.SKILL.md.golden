@@ -1,6 +1,6 @@
 ---
 name: harness-adapters
-description: Per-harness facts the Mate needs to read and steer a Crew pane. Use before interrupting or exiting a Crew, when `matev2 state` says unknown, when `matev2 peek` shows a dialog or a screen you cannot name, or when a send is refused with "showing a screen mate cannot name". Covers Codex and Claude Code, the two harnesses a matev2 Crew runs on.
+description: Per-harness facts the Mate needs to read and steer a Crew pane. Use before interrupting or exiting a Crew, when `mate state` says unknown, when `mate peek` shows a dialog or a screen you cannot name, or when a send is refused with "showing a screen mate cannot name". Covers Codex and Claude Code, the two harnesses a mate Crew runs on.
 ---
 
 # harness-adapters
@@ -8,16 +8,16 @@ description: Per-harness facts the Mate needs to read and steer a Crew pane. Use
 Load this before any harness-specific judgement about a Crew's pane.
 It is a reference, not a procedure: read the rows for the harness the Crew actually runs on and go back to what you were doing.
 
-Which harness a Crew runs on is printed by `/usr/local/bin/matev2 crew list shop` in the HARNESS column, and by `matev2 crew spawn` in its first line.
+Which harness a Crew runs on is printed by `/usr/local/bin/mate crew list shop` in the HARNESS column, and by `mate crew spawn` in its first line.
 Never guess it from what you yourself run on; you run on `claude-code` and a Crew defaults to Codex.
 
 ## What you can and cannot do to a pane
 
 You have exactly three pane operations, and none of them sends a raw key:
 
-- `matev2 peek <project> <crew>` reads the last lines of the pane and changes nothing.
-- `matev2 send <project> <crew> "<one line>"` types one line and presses enter until the composer clears.
-- `matev2 crew stop <project> <crew>` ends the agent and closes the pane.
+- `mate peek <project> <crew>` reads the last lines of the pane and changes nothing.
+- `mate send <project> <crew> "<one line>"` types one line and presses enter until the composer clears.
+- `mate crew stop <project> <crew>` ends the agent and closes the pane.
 
 There is no interrupt key, no escape, no arrow key, and no bare enter.
 So "interrupt the Crew" in practice means one of: send a line the harness will accept mid-turn with `--queue`, or stop the Crew and spawn a fresh one with the same brief plus a note of what was already tried.
@@ -25,7 +25,7 @@ Anything that would need a keystroke is an escalation to the captain, not someth
 
 ## Composer states you will be told about
 
-`matev2 send` and `matev2 state` classify the pane before acting, and report what they saw:
+`mate send` and `mate state` classify the pane before acting, and report what they saw:
 
 | Reading | Screen | Meaning |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Codex is the default Crew harness.
 | Instructions | the brief is delivered as a file in the worktree that Codex reads at startup |
 
 Codex confirms trust for each absolute path separately, and a Crew worktree is always a path it has never seen, so the dialog appears on essentially every spawn.
-`matev2 crew spawn` answers it during launch and prints a `note: answered the codex directory-trust dialog for <worktree>` line on stderr when it did.
+`mate crew spawn` answers it during launch and prints a `note: answered the codex directory-trust dialog for <worktree>` line on stderr when it did.
 If you peek and the dialog is still on screen, the spawn did not complete: report that to the captain rather than sending a line at it, because a line typed into that dialog is not an answer to it.
 
 A first prompt that Codex never picked up leaves the pane idle with the brief line visible in the composer.
@@ -75,5 +75,5 @@ It is not typed text and the classifier ignores it, but it is why a peek of an i
 
 ## Adding a harness
 
-Only Codex and Claude Code are verified for a matev2 Crew.
-If the captain asks for another, say that it is not verified and that a Crew on it would be unsupervisable, because every row above - the busy signature especially - has to be measured before `matev2 state` can tell working from wedged.
+Only Codex and Claude Code are verified for a mate Crew.
+If the captain asks for another, say that it is not verified and that a Crew on it would be unsupervisable, because every row above - the busy signature especially - has to be measured before `mate state` can tell working from wedged.

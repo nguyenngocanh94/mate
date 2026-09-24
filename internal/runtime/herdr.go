@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
 )
 
 // Herdr is the live RuntimeAdapter. It talks to the herdr executable through
@@ -339,7 +339,7 @@ func claimSessionOwner(configHome, session, workspaceID string) error {
 // herdrServerEnv is the environment for a herdr server mate itself
 // cold-starts (EnsureSession's startNamedServer, when no session is already
 // running). ADR 0007 (G4-04) originally allowlisted a small, fixed set of
-// keys "so operator MATEV2_* / secrets are not inherited" and explicitly
+// keys "so operator MATE_* / secrets are not inherited" and explicitly
 // flagged "whether Herdr needs env keys beyond the server allowlist" as
 // unproven.
 //
@@ -362,7 +362,7 @@ func claimSessionOwner(configHome, session, workspaceID string) error {
 // is not viable, so the fix is directional rather than another fixed list:
 // inherit the calling process's own environment (which is already just the
 // operator's login shell environment - mate itself runs under it) and strip
-// only mate's own MATEV2_* namespace, the one thing ADR 0007 named as
+// only mate's own MATE_* namespace, the one thing ADR 0007 named as
 // deliberately not ambient here (it is injected explicitly, per pane, via
 // `--env` at tab/workspace create - runtime.AllowlistedEnv - not via the
 // server's own startup environment).
@@ -380,15 +380,15 @@ func herdrServerEnv() []string {
 }
 
 // refusedServerEnvKey reports whether a caller environment variable must not
-// reach the spawned server. Prefix-matching MATEV2_ rather than listing
+// reach the spawned server. Prefix-matching MATE_ rather than listing
 // config.IdentityEnvKeys is deliberate: a key added later is refused by
 // default, and the failure of a new key leaking is worse than the failure of
-// an unrelated MATEV2_-prefixed one being dropped.
+// an unrelated MATE_-prefixed one being dropped.
 // harness.NestedSessionEnv is refused for the same reason: the server hands
 // its environment to every pane, and an agent that starts the server must not
 // make every Mate and Crew look like its own child session.
 func refusedServerEnvKey(key string) bool {
-	return strings.HasPrefix(key, "MATEV2_") || key == "HERDR_SESSION" || harness.IsNestedSessionEnv(key)
+	return strings.HasPrefix(key, "MATE_") || key == "HERDR_SESSION" || harness.IsNestedSessionEnv(key)
 }
 
 func (h *Herdr) waitRunning(ctx context.Context, session string) error {

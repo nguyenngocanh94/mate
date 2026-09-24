@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// Load reads one Snapshot out of `.matev2/`. It is the only file in this
+// Load reads one Snapshot out of `.mate/`. It is the only file in this
 // package that touches the filesystem, and it is the one implementation of
 // the Console's LoadFunc.
 //
@@ -156,7 +156,7 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 			Status:      status,
 			IsDefault:   true,
 		}),
-		LastEvent: AbsentField[EventValue]("matev2 records no event log yet"),
+		LastEvent: AbsentField[EventValue]("mate records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
 		Tokens:    AbsentField[TokenValue](noTimeline),
 	}
@@ -215,8 +215,8 @@ const notAnErrorState = "the recorded status is not an error state"
 const noObserver = "no observer has looked at this crew yet"
 
 // noTimeline is why a Crew or Mate row carries no token usage: this
-// package reads only `.matev2/`'s flat files, and the ledger lives in the
-// derived `.matev2/matev2.db` (mvp.md M5 task 27). A one-shot CLI read that
+// package reads only `.mate/`'s flat files, and the ledger lives in the
+// derived `.mate/mate.db` (mvp.md M5 task 27). A one-shot CLI read that
 // never opens that database, or a console that has not read it yet, keeps
 // this reason rather than a zero total that would render as "no tokens
 // spent".
@@ -226,7 +226,7 @@ const noTimeline = "no timeline database has been read for this row yet"
 // state through CrewStateOf - the one ordering of mvp.md section 4b.
 //
 // Closed Crews - `state=finished|failed` in the meta, which only
-// `matev2 crew stop` and a failed spawn write - are counted and dropped:
+// `mate crew stop` and a failed spawn write - are counted and dropped:
 // the tree is the list of work in flight, and closing is the decision that
 // ends a task (ProjectNode.Crews). A Crew whose meta could not be read is
 // kept, as a row whose fields say they could not be read, because an
@@ -284,7 +284,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		ProjectID: project,
 		RepoID:    project,
 		Repo:      repoFor(repos, project),
-		LastEvent: AbsentField[EventValue]("matev2 records no event log yet"),
+		LastEvent: AbsentField[EventValue]("mate records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
 		// This package reads files; an observation comes from Herdr. A
 		// snapshot loaded without an observer running therefore carries no

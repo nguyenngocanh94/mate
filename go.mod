@@ -1,4 +1,4 @@
-module github.com/nguyenngocanh94/matev2
+module github.com/nguyenngocanh94/mate
 
 go 1.25.0
 

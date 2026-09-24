@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // ComposerState names what a harness pane is showing, as far as typing one

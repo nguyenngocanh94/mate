@@ -3,7 +3,7 @@ package console
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The box keys (mvp.md section 5, task 15).
@@ -15,7 +15,7 @@ import (
 //	       daemon's `wedged` incident - opens the Mate's own view.
 //	a      assign: hand the selected item to the Mate - one verified line
 //	       into its composer, naming the crew's question, the status file to
-//	       read and the `matev2 send` that answers the crew.
+//	       read and the `mate send` that answers the crew.
 //	l      swap the two filters the header names: `[waiting]`, which is the
 //	       inbox, and `[all]`, the whole merged log. `[all]` is a debugging
 //	       view, off every time the Console starts - what the rail is for is
@@ -285,7 +285,7 @@ func (m Model) boxEntryCrewRow(e query.BoxEntry) (row, string, bool) {
 // openBoxCrew is what Enter and a click on a row body both end in: the same
 // thing Enter on that crew's tree row does (update.go's onEnter) - clear the
 // open-failure chain, take the embedded session view when it is available,
-// and otherwise hand over to `matev2 attach` with its own refusal wording.
+// and otherwise hand over to `mate attach` with its own refusal wording.
 // One implementation, so the box cannot open a pane the tree would refuse.
 func (m Model) openBoxCrew(e query.BoxEntry) (Model, tea.Cmd) {
 	r, crew, ok := m.boxEntryCrewRow(e)

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // FieldState says whether a value that could fail to read is known,

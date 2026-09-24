@@ -7,18 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // Codex's hook review (task 37), driven through StartMate over the screens
 // captured on codex-cli 0.156.1. The captures were taken with a lab Mate
-// directory and a stand-in matev2 path; ownScreen puts this test's own path
+// directory and a stand-in mate path; ownScreen puts this test's own path
 // and command where the capture had those, and nothing else changes.
 
 const (
-	captureCommand  = "'/usr/local/bin/matev2' hook mate-session"
+	captureCommand  = "'/usr/local/bin/mate' hook mate-session"
 	captureOneBlock = "  Source    Project config - /private/tmp/TestLiveZZMeasureCodexHookReview323707510/001/\n            codexlab/.codex/hooks.json"
 	captureTwoBlock = "  Source    Project config - /private/tmp/TestLiveZZMeasureCodexHookReview8854139/001/\n            codexlab/.codex/hooks.json"
 )
@@ -103,7 +103,7 @@ func TestStartMateCodexRefusesAReviewThatListsAForeignHook(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	// The operator's user-config hook is listed first and selected; which
-	// file matev2's own would be in does not matter, it is never reached.
+	// file mate's own would be in does not matter, it is never reached.
 	foreignFirst := screen(t, "codex-0.156.1-hooks-sessionstart-two-foreign-selected.txt")
 	pane := newScriptedPane(t, rt,
 		scriptStep{screen: screen(t, "codex-0.156.1-hooks-review-two.txt"), key: "enter"},
@@ -114,7 +114,7 @@ func TestStartMateCodexRefusesAReviewThatListsAForeignHook(t *testing.T) {
 	if err == nil {
 		t.Fatal("StartMate trusted a review that lists the operator's own hook")
 	}
-	if !strings.Contains(err.Error(), "not matev2's own") || !strings.Contains(err.Error(), "User config") {
+	if !strings.Contains(err.Error(), "not mate's own") || !strings.Contains(err.Error(), "User config") {
 		t.Fatalf("refusal = %v, want it to name the foreign hook", err)
 	}
 	for _, k := range pane.sent() {
@@ -132,7 +132,7 @@ func TestStartMateCodexRefusesAReviewOutsideSessionStart(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	// The table says two hooks need review, but only one is a SessionStart
-	// hook: the other is under an event matev2 never installs for.
+	// hook: the other is under an event mate never installs for.
 	table := strings.Replace(screen(t, "codex-0.156.1-hooks-table-review.txt"),
 		"  ⚠ 1 hook needs review before it can run.", "  ⚠ 2 hooks need review before they can run.", 1)
 	table = strings.Replace(table, "  PreToolUse            0           0           0", "  PreToolUse            1           0           1", 1)

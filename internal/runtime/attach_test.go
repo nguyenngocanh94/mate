@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 // attachProbe is a Herdr adapter whose attach handoff records the argv it

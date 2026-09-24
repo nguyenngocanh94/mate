@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // A fresh file migrates up from nothing, and every view the spec names is
@@ -200,8 +200,8 @@ func TestResetDerivedEmptiesTheDerivedTablesAndTheEventSequence(t *testing.T) {
 	}
 }
 
-// The database lives inside `.matev2/`, and the boundary that protects every
-// other file under it protects this one: a symlink at `matev2.db` pointing
+// The database lives inside `.mate/`, and the boundary that protects every
+// other file under it protects this one: a symlink at `mate.db` pointing
 // out of the workspace is refused, not followed.
 func TestPathRefusesASymlinkOutOfTheWorkspace(t *testing.T) {
 	root := t.TempDir()

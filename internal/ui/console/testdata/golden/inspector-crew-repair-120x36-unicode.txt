@@ -1,4 +1,4 @@
- matev2 console   workspace ws_1                                                                        live · 14:02:11 
+ mate console   workspace ws_1                                                                          live · 14:02:11 
  ws_1 › acme                                                                                           Project · 1 crew 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE              HARNESS STATUS    MODE                 BINDING   │ CREW  crew_01J9P4Q5R6S7T8U9V0W1X2A7CS            

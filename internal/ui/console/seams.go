@@ -6,12 +6,12 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The seams. Five surfaces of the redesign belong to their own tasks; this
 // file is where the frame calls into them, with a foundation implementation
-// behind each one so `matev2 console` builds and runs today. Each is
+// behind each one so `mate console` builds and runs today. Each is
 // deliberately small - replacing one should mean rewriting a function, not
 // unpicking the frame.
 //
@@ -245,7 +245,7 @@ func (m Model) mateFields(valueWidth int) []*line {
 }
 
 // TODO(task 21): the Task inspector block lived here, between the Project
-// and Crew blocks. matev2 has no Task, so a Crew's own one-line job is on
+// and Crew blocks. mate has no Task, so a Crew's own one-line job is on
 // the Crew block instead.
 
 // taskFields: identity (ID, Title), the Task's own recorded status, its

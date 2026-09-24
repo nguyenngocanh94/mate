@@ -10,15 +10,15 @@
      [0m[38;2;255;107;128m# Memory[0m
      [0m[38;2;153;153;153m… +3 lines (ctrl+o to expand)[0m
 
-[0m[38;2;78;186;101m⏺ [0m[1mBash[0m(/private/tmp/TestLiveAcceptanceTwoProjects1057770993/002/matev2 backlog blog)
+[0m[38;2;78;186;101m⏺ [0m[1mBash[0m(/private/tmp/TestLiveAcceptanceTwoProjects1057770993/002/mate backlog blog)
 [0m[38;2;153;153;153m  ⎿  [0mno crews for blog
 
 [0m[38;2;78;186;101m⏺[0m [0m[1mBash[0m(mkdir -p briefs && cat > briefs/rm1.md <<'EOF'
-      Append the line "Published with matev2" as the final line of README.md at the repository
+      Append the line "Published with mate" as the final line of README.md at the repository
       root.…)
 [0m[38;2;153;153;153m  ⎿  [0mnote: answered the codex directory-trust dialog for /private/tmp/TestLiveAcceptanceT
      woProjects1057770993/001/.worktrees/blog-rm1
-     spawned blog/rm1: agent crew-rm1 in pane w2:p2 (harness codex, branch matev2/rm1, wo
+     spawned blog/rm1: agent crew-rm1 in pane w2:p2 (harness codex, branch mate/rm1, wo
      [0m[2m… +7 lines (ctrl+o to expand)[0m
 [0m[38;2;153;153;153m  ⎿  (timeout 10m)[0m
 
@@ -27,8 +27,8 @@
 [0m[38;2;153;153;153m  ⎿  [0m• Working (2s • esc to interrupt)
      [0m[2m… +4 lines (ctrl+o to expand)[0m
 
-[0m[38;2;255;255;255m⏺ [0mI've started the work to add "Published with matev2" to the end of the blog README, on
-  branch [0m[38;2;177;185;249mmatev2/rm1[0m. Once I've reviewed the change, I'll merge it and let you know.
+[0m[38;2;255;255;255m⏺ [0mI've started the work to add "Published with mate" to the end of the blog README, on
+  branch [0m[38;2;177;185;249mmate/rm1[0m. Once I've reviewed the change, I'll merge it and let you know.
 
 [0m[38;2;153;153;153m✻[0m [0m[38;2;153;153;153mSautéed for 26s · done 11:20 AM[0m
 

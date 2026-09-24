@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestLiveSpawnMateResumeRemembers is the task 10 proof: a stopped Mate
@@ -41,8 +41,8 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	liveGit(t, repo, "commit", "--allow-empty", "-m", "init")
 	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatalf("AddProject: %v", err)

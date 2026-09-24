@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 func streamRef() runtime.AgentSessionRef {

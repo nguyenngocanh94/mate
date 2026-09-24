@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // TestStoreAppendStatusRefusesSymlinkEscape is the boundary test of
-// docs/mvp.md section 3: a symlink planted under `.matev2/` must not let a
+// docs/mvp.md section 3: a symlink planted under `.mate/` must not let a
 // write land outside the workspace.
 func TestStoreAppendStatusRefusesSymlinkEscape(t *testing.T) {
 	w := newProjectWorkspace(t)
@@ -45,32 +45,32 @@ func TestStoreWritesRefuseSymlinkEscape(t *testing.T) {
 	}{
 		{
 			name:  "sent.log through a symlinked project dir",
-			link:  ".matev2/projects/shop",
+			link:  ".mate/projects/shop",
 			write: func(w *store.Workspace) error { return w.AppendSent("shop", store.SentEntry{Text: "x"}) },
 		},
 		{
 			name:  "crew meta through a symlinked crews dir",
-			link:  ".matev2/projects/shop/crews",
+			link:  ".mate/projects/shop/crews",
 			write: func(w *store.Workspace) error { return w.WriteCrewMeta("shop", "k3", map[string]string{"task": "x"}) },
 		},
 		{
 			name:  "mate meta through a symlinked mate dir",
-			link:  ".matev2/projects/shop/mate",
+			link:  ".mate/projects/shop/mate",
 			write: func(w *store.Workspace) error { return w.WriteMateMeta("shop", map[string]string{"harness": "claude"}) },
 		},
 		{
 			name:  "auto flag through a symlinked mate dir",
-			link:  ".matev2/projects/shop/mate",
+			link:  ".mate/projects/shop/mate",
 			write: func(w *store.Workspace) error { return w.SetAuto("shop", true) },
 		},
 		{
 			name:  "project.yaml through a symlinked project dir",
-			link:  ".matev2/projects/shop",
+			link:  ".mate/projects/shop",
 			write: func(w *store.Workspace) error { return w.SaveProject("shop", store.ProjectConfig{Repo: "shop"}) },
 		},
 		{
 			name:  "workspace.yaml through a symlinked state dir",
-			link:  ".matev2",
+			link:  ".mate",
 			write: func(w *store.Workspace) error { return w.SaveConfig() },
 		},
 	}

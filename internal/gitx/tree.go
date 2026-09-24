@@ -9,7 +9,7 @@ import (
 // The calls in this file read git's metadata about a committed tree - entry
 // names and types, and commit counts - and never a blob. `ls-tree` lists a
 // tree object's entries without opening the files they name, which is what
-// lets `matev2 project facts` tell the Mate what a repository holds without
+// lets `mate project facts` tell the Mate what a repository holds without
 // the Mate, or the app on its behalf, reading any of it (docs/mvp.md
 // decision 1 and M7).
 
@@ -56,7 +56,7 @@ func (g Git) TopLevelEntries(ctx context.Context, dir, rev string) ([]TreeEntry,
 }
 
 // ShortCommit is `git rev-parse --short <rev>^{commit}`: the abbreviated
-// name of the commit rev resolves to, the anchor `matev2 project facts`
+// name of the commit rev resolves to, the anchor `mate project facts`
 // prints as `head:`.
 func (g Git) ShortCommit(ctx context.Context, dir, rev string) (string, error) {
 	out, err := g.run(ctx, dir, "rev-parse", "--short", rev+"^{commit}")

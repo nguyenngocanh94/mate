@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // TerminalSize is the terminal geometry requested for an interactive agent

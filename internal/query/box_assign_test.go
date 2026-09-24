@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // An inbox entry's assign state is the Mate's outbox read for that entry's

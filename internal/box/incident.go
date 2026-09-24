@@ -3,7 +3,7 @@ package box
 import (
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // IncidentKind is the kind of trouble the observer (task 18) detected.

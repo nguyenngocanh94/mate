@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // Task 35's Codex measurements (docs/mvp.md section 7): whether codex-cli's
@@ -251,7 +251,7 @@ func codexLabAgent(t *testing.T, ctx context.Context, lab liveLab, home, cwd, re
 
 // settleCodexLab answers the lab's startup dialogs one key at a time, with a
 // re-read between presses: the directory-trust dialog through the product's
-// own answer, and the hook-trust review (which matev2 does not answer, and
+// own answer, and the hook-trust review (which mate does not answer, and
 // the test does only because the hooks are its own) with "2. Trust all and
 // continue", which writes trust into the lab CODEX_HOME only.
 func settleCodexLab(t *testing.T, ctx context.Context, lab liveLab, h runtime.AgentHandle) {

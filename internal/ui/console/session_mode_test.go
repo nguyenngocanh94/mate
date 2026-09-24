@@ -10,8 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // recordingSessionController is a minimal, mutex-protected SessionReader/
@@ -242,7 +242,7 @@ func TestEntryReadFailureFallsBackToClassicHandoffAndSaysWhy(t *testing.T) {
 		t.Fatalf("session mode became active despite the entry read failing")
 	}
 	if !m.attachHoldsTerminal() {
-		t.Fatalf("an entry-read failure must fall back to the classic matev2 attach hand-off")
+		t.Fatalf("an entry-read failure must fall back to the classic mate attach hand-off")
 	}
 	if !containsSubstring(m.msg.text, "runtime_unavailable") {
 		t.Fatalf("fallback message %q does not name the real taxonomy code", m.msg.text)
@@ -256,7 +256,7 @@ func TestEntryReadFailureFallsBackToClassicHandoffAndSaysWhy(t *testing.T) {
 	if !containsSubstring(m.msg.text, "Snapshot view failed") {
 		t.Fatalf("fallback message %q does not say which step failed", m.msg.text)
 	}
-	if !containsSubstring(m.msg.text, "matev2 attach") {
+	if !containsSubstring(m.msg.text, "mate attach") {
 		t.Fatalf("fallback message %q does not say what the Console fell back to", m.msg.text)
 	}
 	if cmd == nil {

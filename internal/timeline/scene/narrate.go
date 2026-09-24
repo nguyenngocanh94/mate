@@ -7,7 +7,7 @@ import (
 )
 
 // Row is a transition with the names a reader would say out loud instead of
-// the ids a join needs. It is what `matev2 events --scene` prints and what
+// the ids a join needs. It is what `mate events --scene` prints and what
 // the narrator reads.
 type Row struct {
 	Transition
@@ -127,9 +127,9 @@ func (r Row) Sentence() string {
 		return "the captain calls " + actor
 	case ReceivingDigest:
 		if r.Detail == DetailAssign {
-			return fmt.Sprintf("matev2 walks the captain's note into %s's office", actor)
+			return fmt.Sprintf("mate walks the captain's note into %s's office", actor)
 		}
-		return fmt.Sprintf("matev2 walks a digest into %s's office", actor)
+		return fmt.Sprintf("mate walks a digest into %s's office", actor)
 	case Reading:
 		if r.TargetName == "" {
 			return actor + " reads the note"
@@ -179,9 +179,9 @@ func clause(state State, detail, target string) string {
 		return "on the phone with the captain"
 	case ReceivingDigest:
 		if detail == DetailAssign {
-			return "taking the captain's note from matev2"
+			return "taking the captain's note from mate"
 		}
-		return "taking a digest from matev2"
+		return "taking a digest from mate"
 	case Reading:
 		if target == "" {
 			return "reading the note"
@@ -211,7 +211,7 @@ func who(actorKind, name string) string {
 	case ActorUser:
 		return "the captain"
 	case ActorApp:
-		return "matev2"
+		return "the app"
 	default:
 		if name == "" {
 			return "somebody"

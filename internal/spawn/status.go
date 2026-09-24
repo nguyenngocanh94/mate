@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // State is what MateStatus concluded about a project's Mate.
@@ -43,7 +43,7 @@ type Status struct {
 	Detail string
 }
 
-// Line is the single line `matev2 mate status` prints.
+// Line is the single line `mate mate status` prints.
 func (s Status) Line() string {
 	session := s.SessionID
 	if session == "" {

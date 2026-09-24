@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // StopResult is what a stop established.
@@ -139,7 +139,7 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 	out.AlreadyGone = !live
 	if kind == harness.KindCodex {
 		// Read before the agent is gone: Herdr forgets agent_session with
-		// the agent, and a Codex session id exists nowhere matev2 writes.
+		// the agent, and a Codex session id exists nowhere mate writes.
 		if id := codexSessionAtStop(deps, w.MateDir(project), meta, observed.SessionRef); id != "" {
 			meta[MetaSessionID] = id
 			out.SessionID = id

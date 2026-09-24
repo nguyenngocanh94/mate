@@ -1,7 +1,7 @@
 // Package hook implements the Mate side of Claude Code's own hooks
 // (docs/mvp.md task 08): UserPromptSubmit and Stop. Both handlers are pure
 // functions of an already-open *store.Workspace, a project name, and the
-// hook's raw JSON stdin payload, so the CLI glue in cmd/matev2 - which
+// hook's raw JSON stdin payload, so the CLI glue in cmd/mate - which
 // resolves the workspace and project and never blocks a prompt on a
 // failure here - is the only part that touches the process environment.
 package hook
@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // PromptMarker is the sentinel the app prefixes onto every line it types
@@ -28,7 +28,7 @@ import (
 // (send.Marker's doc comment has the measurement). legacyPromptMarker is
 // still recognised for one release so an in-flight digest sent with the old
 // byte, from a Mate started before this change, is still read as the app's.
-const PromptMarker = "⟦matev2⟧ "
+const PromptMarker = "⟦mate⟧ "
 
 // legacyPromptMarker is the abandoned 0x1f byte, tolerated as a leading
 // marker for one release (see PromptMarker's doc comment). Remove this once
@@ -59,7 +59,7 @@ type stopPayload struct {
 	LastAssistantMessage string `json:"last_assistant_message"`
 }
 
-// HandlePrompt implements `matev2 hook mate-prompt`. It appends one
+// HandlePrompt implements `mate hook mate-prompt`. It appends one
 // sent.log line for the prompt and, when a plain user prompt (no marker)
 // finds auto mode on, clears `.auto` and appends a second app line
 // recording that.
@@ -102,7 +102,7 @@ func HandlePrompt(w *store.Workspace, project string, raw []byte) error {
 	return nil
 }
 
-// HandleStop implements `matev2 hook mate-stop`. It appends one sent.log
+// HandleStop implements `mate hook mate-stop`. It appends one sent.log
 // line for Claude's last answer and updates `mate.meta` with the session id
 // and transcript path the payload carries, keeping every other key as-is.
 func HandleStop(w *store.Workspace, project string, raw []byte) error {
@@ -165,7 +165,7 @@ type SessionStart struct {
 // outbox. Every other source lost the digest from context, or never had it.
 func (s SessionStart) LiveOnly() bool { return s.Source == SourceResume }
 
-// HandleSessionStart implements the record half of `matev2 hook
+// HandleSessionStart implements the record half of `mate hook
 // mate-session`: it parses the payload and, when `mate.meta` records a
 // Mate, writes the payload's session id and transcript into it, keeping
 // every other key.

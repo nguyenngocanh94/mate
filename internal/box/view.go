@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Cursor is a set of per-file read offsets: one for sent.log, one for
@@ -39,7 +39,7 @@ type View struct {
 	Attention []Entry
 	// Closed is the set of crews whose meta declares a terminal state
 	// (`state=finished|failed`, or a pre-4b `stopped_at` with no state):
-	// the Mate or the captain closed them with `matev2 crew stop`, or their
+	// the Mate or the captain closed them with `mate crew stop`, or their
 	// spawn failed. Their lines stay in Entries as history; Inbox skips
 	// them, because nobody can answer a crew that is gone.
 	Closed map[string]bool

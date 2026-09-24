@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // projectFrame loads a tree and drills into its first Project, leaving the

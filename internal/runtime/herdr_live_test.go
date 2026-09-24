@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/harness/codexlab"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 // recordingRunner wraps a ProcessRunner and records argv so the live test
@@ -46,14 +46,14 @@ func (r *recordingRunner) snapshot() [][]string {
 
 // TestLiveHerdrSessionWorkspaceTabStart talks to a provisioned fm-lab-*
 // session. `go test ./...` skips it. The worker runs it with
-// MATEV2_HERDR_LIVE_SESSION set after helper provision; it refuses default
+// MATE_HERDR_LIVE_SESSION set after helper provision; it refuses default
 // and firstmate. Production argv ( --session before -- ) is used; the lab
 // helper's trailing --session is not the adapter's isolation mechanism.
 func liveLabSession(t *testing.T) (session, home string) {
 	t.Helper()
-	session = strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
+	session = strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
 	if session == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
+		t.Skip("set MATE_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
 	}
 	if session == "default" || session == "firstmate" {
 		t.Fatal("refusing to run the live adapter against the default or firstmate session")
@@ -151,7 +151,7 @@ func TestLiveHerdrSessionWorkspaceTabStart(t *testing.T) {
 		Label:   label,
 		Cwd:     cwd,
 		Env: []runtime.EnvVar{
-			{Key: "MATEV2_AGENT_ID", Value: "mate_g4s3"},
+			{Key: "MATE_AGENT_ID", Value: "mate_g4s3"},
 			{Key: "CLAUDE_CONFIG_DIR", Value: filepath.Join(filepath.Dir(home), ".claude")},
 		},
 	})
@@ -410,7 +410,7 @@ func TestLiveHerdrFocusedCrewDoesNotDuplicateWorkspace(t *testing.T) {
 }
 
 // TestLiveHerdrIdentityEnvReachesStartedAgentProcess is the G4-05 proof:
-// MATEV2_* is read from the started agent's process table (ps eww), not from
+// MATE_* is read from the started agent's process table (ps eww), not from
 // the argv mate constructed. Mate env is workspace create --env; Crew env
 // is tab create --env. agent start has no --env flag.
 func TestLiveHerdrIdentityEnvReachesStartedAgentProcess(t *testing.T) {
@@ -630,13 +630,13 @@ func processTableLine(t *testing.T, unique string) string {
 	if err != nil {
 		t.Fatalf("ps eww: %v", err)
 	}
-	needle := []byte("MATEV2_AGENT_ID=" + unique)
+	needle := []byte("MATE_AGENT_ID=" + unique)
 	for _, line := range bytes.Split(out, []byte{'\n'}) {
 		if bytes.Contains(line, needle) {
 			return string(line)
 		}
 	}
-	t.Fatalf("no started-agent process in ps eww carried MATEV2_AGENT_ID=%s (env did not reach the process)", unique)
+	t.Fatalf("no started-agent process in ps eww carried MATE_AGENT_ID=%s (env did not reach the process)", unique)
 	return ""
 }
 

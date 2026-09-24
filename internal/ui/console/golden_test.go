@@ -45,7 +45,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite the golden fixtures under testdata/golden")
@@ -370,7 +370,7 @@ func sampleTree() query.Snapshot {
 						}),
 						Worktree: query.KnownField(query.WorktreeValue{
 							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-							Branch: "matev2/01J9P4Q5",
+							Branch: "mate/01J9P4Q5",
 							Status: query.WorktreeRecordedCreated,
 						}),
 						AgentName: query.KnownField("crew-payments-api-1"),
@@ -378,7 +378,7 @@ func sampleTree() query.Snapshot {
 							Status: query.BindingStale, AgentName: "crew-payments-api-1",
 							Runtime: "herdr", Session: "mate-acme", Tab: "crew/01J9P4P5", Pane: "p-2b91",
 							BoundSince: time.Date(2026, 9, 10, 10, 2, 14, 0, time.UTC), BoundSinceKind: query.BoundSinceActivated,
-						}, "recorded stale: matev2 could not confirm the agent stopped, and attach is refused while stale"),
+						}, "recorded stale: mate could not confirm the agent stopped, and attach is refused while stale"),
 						LastEvent: query.KnownField(query.EventValue{
 							EventType: "crew.failed", OccurredAt: time.Date(2026, 9, 10, 13, 21, 37, 0, time.UTC),
 						}),
@@ -400,7 +400,7 @@ func sampleTree() query.Snapshot {
 						}),
 						Worktree: query.KnownField(query.WorktreeValue{
 							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P6Q6W0E5V8XK2M4B8DT",
-							Branch: "matev2/01J9P6Q6",
+							Branch: "mate/01J9P6Q6",
 							Status: query.WorktreeRecordedCreated,
 						}),
 						AgentName: query.KnownField("crew-payments-api-2"),

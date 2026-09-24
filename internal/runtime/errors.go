@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Herdr error codes observed on 0.8.2. agent_not_found and

@@ -11,8 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ErrNotWorkspace is returned by Open for a directory with no `.matev2/`.
-var ErrNotWorkspace = errors.New("store: not a matev2 workspace")
+// ErrNotWorkspace is returned by Open for a directory with no `.mate/`.
+var ErrNotWorkspace = errors.New("store: not a mate workspace")
 
 // Defaults are the harnesses a project uses when it does not say otherwise.
 type Defaults struct {
@@ -42,7 +42,7 @@ type ProjectRef struct {
 	Repo string `yaml:"repo"`
 }
 
-// WorkspaceConfig is `.matev2/workspace.yaml`.
+// WorkspaceConfig is `.mate/workspace.yaml`.
 type WorkspaceConfig struct {
 	Version int `yaml:"version"`
 	// Session is the Herdr session name of this workspace. It is derived from
@@ -60,7 +60,7 @@ type Workspace struct {
 	cfg  WorkspaceConfig
 }
 
-// Init creates `.matev2/` under workspaceDir and writes a default
+// Init creates `.mate/` under workspaceDir and writes a default
 // workspace.yaml. It is idempotent for a directory that already has one: the
 // existing workspace is opened instead, so the stored session name survives.
 func Init(workspaceDir string) (*Workspace, error) {
@@ -97,7 +97,7 @@ func Init(workspaceDir string) (*Workspace, error) {
 		return nil, err
 	}
 	// The token price table (mvp.md M5 task 27). Seeded once, at zero, with
-	// a comment telling the captain it is theirs to fill in: matev2 records
+	// a comment telling the captain it is theirs to fill in: mate records
 	// tokens whether or not anyone has priced them, and an init that left
 	// this file missing would make every ledger's cost column silently
 	// unreadable rather than honestly "?".
@@ -122,7 +122,7 @@ Rules here apply to every Mate in this workspace, on top of each project's PROJE
 Nothing is written here yet.
 `
 
-// Open resolves workspaceDir, which must contain `.matev2/workspace.yaml`, and
+// Open resolves workspaceDir, which must contain `.mate/workspace.yaml`, and
 // loads the configuration.
 func Open(workspaceDir string) (*Workspace, error) {
 	root, err := resolveRoot(workspaceDir)
@@ -162,12 +162,12 @@ func resolveRoot(dir string) (string, error) {
 	return resolved, nil
 }
 
-// SessionName is the Herdr session name for a workspace path: `matev2-` plus a
+// SessionName is the Herdr session name for a workspace path: `mate-` plus a
 // short stable hash of the absolute path. Init stores the result so it never
 // changes for a workspace that already exists.
 func SessionName(absPath string) string {
 	sum := sha256.Sum256([]byte(absPath))
-	return "matev2-" + hex.EncodeToString(sum[:4])
+	return "mate-" + hex.EncodeToString(sum[:4])
 }
 
 // Config is the loaded workspace.yaml. The copy is the caller's; changes reach

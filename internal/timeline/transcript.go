@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // ingestTranscripts reads every agent's transcript into turns, tool calls,
@@ -189,7 +189,7 @@ func (p *pass) claudeTurns(loc Located, sessionRow string, tb harness.Transcript
 // Subtracting the cache-read delta here before it is stored makes
 // `turn.input_tokens` mean the same thing for both harnesses - "billed at
 // the input rate, not a cache rate" - so every sum across the four buckets
-// (`v_task_ledger`, `v_now.tokens_today`, the budget check, `matev2 usage`)
+// (`v_task_ledger`, `v_now.tokens_today`, the budget check, `mate usage`)
 // is correct without asking which harness a turn came from. Cache-write is
 // left alone: Codex's own `context_tokens_after` derivation
 // (`marks.lastTokenUsage`, below) already treats it as additional rather
@@ -471,7 +471,7 @@ var gitCommitEcho = regexp.MustCompile(`\[[^\]\s]+ (?:\(root-commit\) )?([0-9a-f
 // commitSha is the commit a shell action made, when its command ran
 // `git commit` and git echoed a sha back.
 //
-// This exists because a crew's branch is short-lived. `matev2 merge` deletes
+// This exists because a crew's branch is short-lived. `mate merge` deletes
 // it on its way out, so a crew that commits a few seconds before somebody
 // merges leaves no window in which a five-second poll could read
 // `git log <default>..<branch>` - measured 2026-09-20, six seconds between the

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 func TestWithSessionPutsFlagBeforeTerminator(t *testing.T) {
@@ -831,7 +831,7 @@ func TestHerdrEnsureProjectWorkspaceReuseRefusesEnv(t *testing.T) {
 		Session: runtime.SessionHandle{Name: "s", ConfigHome: "/tmp/cfg"},
 		Label:   "Duplicate",
 		Cwd:     wantCwd,
-		Env:     []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env:     []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	})
 	if err == nil {
 		t.Fatal("reuse with env would not inject it; refuse rather than drop")
@@ -897,7 +897,7 @@ func TestHerdrCreateAgentTabPassesAllowlistedEnv(t *testing.T) {
 		if !hasSessionBeforeTerminator(args) {
 			t.Fatalf("session placement %#v", args)
 		}
-		if !argvHas(args, "--env", "MATEV2_AGENT_ID=mate_001") {
+		if !argvHas(args, "--env", "MATE_AGENT_ID=mate_001") {
 			t.Fatalf("missing allowlisted env: %#v", args)
 		}
 		for i, a := range args {
@@ -912,7 +912,7 @@ func TestHerdrCreateAgentTabPassesAllowlistedEnv(t *testing.T) {
 		Workspace: runtime.WorkspaceHandle{Session: runtime.SessionHandle{Name: "s"}, WorkspaceID: "w1"},
 		Label:     "Mate",
 		Cwd:       cwd,
-		Env:       []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env:       []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -920,7 +920,7 @@ func TestHerdrCreateAgentTabPassesAllowlistedEnv(t *testing.T) {
 	if tab.TabID != "w1:t2" || tab.PaneID != "w1:p2" {
 		t.Fatalf("tab = %+v", tab)
 	}
-	if len(tab.Env) != 1 || tab.Env[0].Key != "MATEV2_AGENT_ID" {
+	if len(tab.Env) != 1 || tab.Env[0].Key != "MATE_AGENT_ID" {
 		t.Fatalf("tab env = %#v", tab.Env)
 	}
 }
@@ -1006,7 +1006,7 @@ func TestHerdrStartExportsTheLaunchEnvIntoThePane(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "it's a home")
 	launch, err := harness.Codex{}.BuildLaunchSpec(ctx, harness.AgentSpec{
 		Kind: harness.KindCodex, Cwd: cwd,
-		Env:    []harness.EnvVar{{Key: "MATEV2_AGENT_ROLE", Value: "mate"}},
+		Env:    []harness.EnvVar{{Key: "MATE_AGENT_ROLE", Value: "mate"}},
 		Config: harness.Config{CodexHome: home},
 	})
 	if err != nil {
@@ -1033,7 +1033,7 @@ func TestHerdrStartExportsTheLaunchEnvIntoThePane(t *testing.T) {
 		!argvHas(calls[1], "pane", "run", tab.PaneID, "export") || !argvHas(calls[2], "agent", "start") {
 		t.Fatalf("calls = %#v, want unset, then export, then agent start, on pane %s", calls, tab.PaneID)
 	}
-	want := []string{"MATEV2_AGENT_ROLE='mate'", "CODEX_HOME='" + strings.ReplaceAll(home, "'", `'\''`) + "'"}
+	want := []string{"MATE_AGENT_ROLE='mate'", "CODEX_HOME='" + strings.ReplaceAll(home, "'", `'\''`) + "'"}
 	if !argvHas(calls[1], append([]string{"export"}, want...)...) {
 		t.Fatalf("export argv = %#v, want %q", calls[1], want)
 	}
@@ -1300,7 +1300,7 @@ func TestHerdrEnsureProjectWorkspaceRefusesUnknownEnv(t *testing.T) {
 		Session: runtime.SessionHandle{Name: "s", ConfigHome: "/tmp/cfg"},
 		Label:   "Project A",
 		Cwd:     t.TempDir(),
-		Env:     []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}, {Key: "SECRET", Value: "nope"}},
+		Env:     []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}, {Key: "SECRET", Value: "nope"}},
 	})
 	if err == nil {
 		t.Fatal("unknown env must be refused")
@@ -1319,7 +1319,7 @@ func TestHerdrEnsureProjectWorkspacePassesAllowlistedEnv(t *testing.T) {
 		case argvHas(args, "workspace", "list"):
 			return process.Result{Stdout: readRuntimeTestdata(t, "workspace-list-empty.json")}, nil
 		case argvHas(args, "workspace", "create"):
-			if !argvHas(args, "--env", "MATEV2_AGENT_ID=mate_001") || !argvHas(args, "--env", "MATEV2_AGENT_ROLE=mate") {
+			if !argvHas(args, "--env", "MATE_AGENT_ID=mate_001") || !argvHas(args, "--env", "MATE_AGENT_ROLE=mate") {
 				t.Fatalf("workspace create missing identity env: %#v", args)
 			}
 			for i, a := range args {
@@ -1339,8 +1339,8 @@ func TestHerdrEnsureProjectWorkspacePassesAllowlistedEnv(t *testing.T) {
 		Label:   "Project A",
 		Cwd:     t.TempDir(),
 		Env: []runtime.EnvVar{
-			{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
-			{Key: "MATEV2_AGENT_ROLE", Value: "mate"},
+			{Key: "MATE_AGENT_ID", Value: "mate_001"},
+			{Key: "MATE_AGENT_ROLE", Value: "mate"},
 		},
 	})
 	if err != nil {
@@ -1398,7 +1398,7 @@ func TestHerdrCreateAgentTabWithEnvCreatesNewTabInsteadOfRenamingRoot(t *testing
 	}
 	tab, err := rt.CreateAgentTab(ctx, runtime.TabSpec{
 		Workspace: ws, Label: "crew_001", Cwd: crewCwd,
-		Env: []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "crew_001"}, {Key: "MATEV2_AGENT_ROLE", Value: "crew"}, {Key: "MATEV2_CREW_ID", Value: "crew_001"}},
+		Env: []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "crew_001"}, {Key: "MATE_AGENT_ROLE", Value: "crew"}, {Key: "MATE_CREW_ID", Value: "crew_001"}},
 	})
 	if err != nil {
 		t.Fatalf("crew tab create: %v", err)
@@ -1450,7 +1450,7 @@ func TestHerdrCreateAgentTabRenameRefusesEnv(t *testing.T) {
 	}
 	_, err = rt.CreateAgentTab(ctx, runtime.TabSpec{
 		Workspace: ws, Label: "Mate", Cwd: cwd,
-		Env: []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env: []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	})
 	if err == nil {
 		t.Fatal("Mate env on tab rename would not reach the pane process")
@@ -1463,7 +1463,7 @@ func TestHerdrCreateAgentTabRefusesUnknownEnv(t *testing.T) {
 		Workspace: runtime.WorkspaceHandle{Session: runtime.SessionHandle{Name: "s"}, WorkspaceID: "w1"},
 		Label:     "Crew",
 		Cwd:       t.TempDir(),
-		Env:       []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "crew_001"}, {Key: "SECRET", Value: "nope"}},
+		Env:       []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "crew_001"}, {Key: "SECRET", Value: "nope"}},
 	})
 	if err == nil {
 		t.Fatal("unknown env must be refused")

@@ -3,7 +3,7 @@ package console
 import (
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // Selection, focus and status are three separate signals and never share a

@@ -18,24 +18,24 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"github.com/creack/pty"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/process"
 	"golang.org/x/sys/unix"
 )
 
-const sessionStreamHelperEnv = "MATEV2_SESSION_STREAM_HELPER"
+const sessionStreamHelperEnv = "MATE_SESSION_STREAM_HELPER"
 
 // TestLiveHerdrSessionStreamSignalIsolation is the in-process proof that a
 // signal delivered to the local attach client does not stop the server-owned
-// agent. The lab driver provisions MATEV2_HERDR_LIVE_SESSION and names the
-// already-running agent with MATEV2_HERDR_LIVE_AGENT; no lifecycle mutation is
+// agent. The lab driver provisions MATE_HERDR_LIVE_SESSION and names the
+// already-running agent with MATE_HERDR_LIVE_AGENT; no lifecycle mutation is
 // performed by this test.
 func TestLiveHerdrSessionStreamSignalIsolation(t *testing.T) {
 	requireLive(t)
-	session := strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
-	agent := strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_AGENT"))
+	session := strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
+	agent := strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_AGENT"))
 	if session == "" || agent == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION and MATEV2_HERDR_LIVE_AGENT to a provisioned lab agent")
+		t.Skip("set MATE_HERDR_LIVE_SESSION and MATE_HERDR_LIVE_AGENT to a provisioned lab agent")
 	}
 	if session == "default" || session == "firstmate" {
 		t.Fatal("refusing to run the live stream test against a shared Herdr session")
@@ -64,10 +64,10 @@ func TestLiveHerdrSessionStreamSignalIsolation(t *testing.T) {
 
 func TestLiveHerdrSessionStreamRawOutputAndResize(t *testing.T) {
 	requireLive(t)
-	session := strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
-	agent := strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_AGENT"))
+	session := strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
+	agent := strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_AGENT"))
 	if session == "" || agent == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION and MATEV2_HERDR_LIVE_AGENT to a provisioned lab agent")
+		t.Skip("set MATE_HERDR_LIVE_SESSION and MATE_HERDR_LIVE_AGENT to a provisioned lab agent")
 	}
 	if session == "default" || session == "firstmate" {
 		t.Fatal("refusing to run the live stream test against a shared Herdr session")
@@ -107,9 +107,9 @@ func TestLiveHerdrSessionStreamRawOutputAndResize(t *testing.T) {
 func TestLiveHerdrSessionStreamAgentDisappearance(t *testing.T) {
 	requireLive(t)
 	session, agent, helper := liveSessionStreamConfig(t)
-	pane := strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_PANE"))
+	pane := strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_PANE"))
 	if pane == "" {
-		t.Fatal("set MATEV2_HERDR_LIVE_PANE to the live agent pane")
+		t.Fatal("set MATE_HERDR_LIVE_PANE to the live agent pane")
 	}
 	h := NewHerdr(process.ExecRunner{})
 	channel, err := h.Open(context.Background(), AgentSessionRef{HerdrSession: session, AgentName: agent}, TerminalSize{Cols: 80, Rows: 24})
@@ -211,11 +211,11 @@ const liveDrainFloorBytes = 2048
 
 func liveSessionStreamConfig(t *testing.T) (session, agent, helper string) {
 	t.Helper()
-	session = strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
-	agent = strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_AGENT"))
+	session = strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
+	agent = strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_AGENT"))
 	helper = strings.TrimSpace(os.Getenv("HERDR_LAB_HELPER"))
 	if session == "" || agent == "" || helper == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION, MATEV2_HERDR_LIVE_AGENT and HERDR_LAB_HELPER")
+		t.Skip("set MATE_HERDR_LIVE_SESSION, MATE_HERDR_LIVE_AGENT and HERDR_LAB_HELPER")
 	}
 	if session == "default" || session == "firstmate" || !strings.HasPrefix(session, "fm-lab-") {
 		t.Fatal("refusing to run the live stream test outside an fm-lab-* session")
@@ -681,10 +681,10 @@ func newTestSessionHerdr(t *testing.T) *Herdr {
 	runner := &process.FakeRunner{Default: process.Result{Stdout: []byte(agentGetEnvelope())}}
 	h := NewHerdr(runner)
 	script := filepath.Join(t.TempDir(), "herdr-fixture")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec \"$MATEV2_SESSION_STREAM_TEST_BINARY\" --session-stream-helper\n"), 0755); err != nil {
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec \"$MATE_SESSION_STREAM_TEST_BINARY\" --session-stream-helper\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("MATEV2_SESSION_STREAM_TEST_BINARY", os.Args[0])
+	t.Setenv("MATE_SESSION_STREAM_TEST_BINARY", os.Args[0])
 	h.Binary = script
 	return h
 }

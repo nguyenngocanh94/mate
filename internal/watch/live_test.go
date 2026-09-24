@@ -11,32 +11,32 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/harness/codexlab"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/watch"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/watch"
 )
 
 // requireLive gates this package's live proof the way every other package
 // does: a provisioned Herdr lab session and the harness binaries are machine
-// facts, so MATEV2_LIVE=1 is the single opt-in.
+// facts, so MATE_LIVE=1 is the single opt-in.
 func requireLive(t *testing.T) {
 	t.Helper()
-	if os.Getenv("MATEV2_LIVE") != "1" {
-		t.Skip("set MATEV2_LIVE=1 to run live Herdr proofs")
+	if os.Getenv("MATE_LIVE") != "1" {
+		t.Skip("set MATE_LIVE=1 to run live Herdr proofs")
 	}
 }
 
 func liveLabSession(t *testing.T) (session, configHome string) {
 	t.Helper()
-	session = strings.TrimSpace(os.Getenv("MATEV2_HERDR_LIVE_SESSION"))
+	session = strings.TrimSpace(os.Getenv("MATE_HERDR_LIVE_SESSION"))
 	if session == "" {
-		t.Skip("set MATEV2_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
+		t.Skip("set MATE_HERDR_LIVE_SESSION to a provisioned fm-lab-* Herdr session")
 	}
 	if session == "default" || session == "firstmate" {
 		t.Fatal("refusing to run a live observer against the default or firstmate session")
@@ -63,8 +63,8 @@ func liveLabSession(t *testing.T) (session, configHome string) {
 //  1. a real Codex crew whose brief ends its turn without a status line goes
 //     `stale` once the (shortened) threshold passes;
 //  2. a line typed into its pane through internal/send - the same path
-//     `matev2 send` takes - resolves it;
-//  3. stopping the agent behind matev2's back opens `runtime_lost`.
+//     `mate send` takes - resolves it;
+//  3. stopping the agent behind mate's back opens `runtime_lost`.
 //
 // Measured 2026-09-18, codex-cli 0.154.0, Herdr 0.8.2 (the numbers this test
 // was written against):
@@ -144,7 +144,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 	}
 	waitForIncident(t, ctx, watcher, w, "k3", "stale", store.IncidentResolved, 2*time.Minute)
 
-	// 3. The agent is stopped behind matev2's back - a crash, or a human
+	// 3. The agent is stopped behind mate's back - a crash, or a human
 	// closing the pane. The meta still records it, so the observer asks
 	// Herdr and is told the agent is gone.
 	if err := rt.StopAgent(ctx, handle, runtime.StopForce); err != nil {
@@ -274,8 +274,8 @@ func liveWorkspace(t *testing.T, session string) *store.Workspace {
 		t.Fatal(err)
 	}
 	liveGit(t, repo, "init", "-b", "main")
-	liveGit(t, repo, "config", "user.email", "matev2-test@example.com")
-	liveGit(t, repo, "config", "user.name", "matev2 test")
+	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
+	liveGit(t, repo, "config", "user.name", "mate test")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# shop\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -340,14 +340,14 @@ func useLabSession(t *testing.T, w *store.Workspace, session string) {
 	}
 }
 
-// binaryPath builds the matev2 binary the crew's brief points at.
+// binaryPath builds the mate binary the crew's brief points at.
 func binaryPath(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "matev2")
-	cmd := exec.Command("go", "build", "-o", bin, "github.com/nguyenngocanh94/matev2/cmd/matev2")
+	bin := filepath.Join(dir, "mate")
+	cmd := exec.Command("go", "build", "-o", bin, "github.com/nguyenngocanh94/mate/cmd/mate")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go build matev2: %v\n%s", err, out)
+		t.Fatalf("go build mate: %v\n%s", err, out)
 	}
 	return bin
 }

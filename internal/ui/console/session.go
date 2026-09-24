@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // TerminalSize is the display-cell geometry of the embedded terminal pane.
 // It deliberately mirrors the runtime port without importing that package;
-// cmd/matev2 adapts the two at the process boundary.
+// cmd/mate adapts the two at the process boundary.
 type TerminalSize struct {
 	Cols int
 	Rows int
@@ -48,7 +48,7 @@ const (
 
 // SessionTarget identifies the Mate or Crew a session view is attached to.
 // It mirrors application.AttachResolution's identity fields but stays
-// inside the Console boundary: the caller (cmd/matev2's bridge, step 4) builds
+// inside the Console boundary: the caller (cmd/mate's bridge, step 4) builds
 // it from an already-resolved query.Snapshot node - this package never
 // resolves a target itself, and a raw Herdr pane/tab id is never a valid ID
 // here (ADR 0010's attach-target rule applies to session targets too).
@@ -230,7 +230,7 @@ type SessionSnapshot struct {
 	// Box is the Project's message box (mvp.md task 15): crew status lines,
 	// sent.log and observer incidents merged in time order by internal/box
 	// and flattened into DTOs by internal/query. It is the Mate session
-	// view's left rail. It replaces v1's interaction inbox outright: matev2
+	// view's left rail. It replaces v1's interaction inbox outright: mate
 	// has no interaction lifecycle at all (mvp.md section 4 - "Câu hỏi của
 	// crew không có vòng đời"), so there is nothing here that awaits a
 	// reply as a tracked object; there are only lines, some of which carry
@@ -244,7 +244,7 @@ type SessionSnapshot struct {
 // SessionReader is the snapshot controller port. It is called on a
 // fixed-interval ticker (ADR 0025 default 300-500ms) and replaces the whole
 // SessionSnapshot each time. Stream mode uses it only after a stream failure.
-// The bridge in cmd/matev2/console.go is the only place this closure is built
+// The bridge in cmd/mate/console.go is the only place this closure is built
 // from internal/query, internal/application and runtime.Adapter.
 type SessionReader func(context.Context, SessionTarget) (SessionSnapshot, error)
 

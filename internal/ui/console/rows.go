@@ -1,7 +1,7 @@
 package console
 
 import (
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // rowKind names what a rendered line refers to, so Enter and the cursor can

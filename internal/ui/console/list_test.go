@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // ---------- golden fixtures: the Project level (Mate row + Crews) ----------
@@ -34,7 +34,7 @@ func TestGoldenProjectLevelAtEveryBreakpoint(t *testing.T) {
 
 // TestTokensColumnRendersHumanisedTotals (mvp.md M5 task 27): the Mate row
 // and a Crew row both show the TOKENS column once query.TokenValue is
-// Known, humanised the way `matev2 usage` renders the same numbers - a
+// Known, humanised the way `mate usage` renders the same numbers - a
 // total alone when the model has no price, a total plus cost once it does.
 func TestTokensColumnRendersHumanisedTotals(t *testing.T) {
 	tree := sampleTree()

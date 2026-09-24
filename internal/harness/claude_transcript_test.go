@@ -867,12 +867,12 @@ func TestClaudeTranscriptPath(t *testing.T) {
 // TestLiveClaudeProjectSlugMatchesRealTranscriptCorpus re-verifies the slug rule
 // against a real ~/.claude/projects tree rather than synthetic fixtures. It is
 // opt-in because CI has no Claude installation; the evidence driver runs it
-// when MATEV2_CLAUDE_PROJECTS_DIR points at one.
+// when MATE_CLAUDE_PROJECTS_DIR points at one.
 func TestLiveClaudeProjectSlugMatchesRealTranscriptCorpus(t *testing.T) {
 	requireLive(t)
-	root := os.Getenv("MATEV2_CLAUDE_PROJECTS_DIR")
+	root := os.Getenv("MATE_CLAUDE_PROJECTS_DIR")
 	if root == "" {
-		t.Skip("set MATEV2_CLAUDE_PROJECTS_DIR to <home>/.claude/projects to re-verify the slug rule against real sessions")
+		t.Skip("set MATE_CLAUDE_PROJECTS_DIR to <home>/.claude/projects to re-verify the slug rule against real sessions")
 	}
 	projectDirs, err := os.ReadDir(root)
 	if err != nil {
@@ -1042,13 +1042,13 @@ func TestLiveClaudeTranscriptCorpusIncrementalSyncEmitsEveryMessageOnce(t *testi
 }
 
 // walkTranscriptCorpus hands fn the bytes of every session transcript under
-// MATEV2_CLAUDE_PROJECTS_DIR, skipping the test when it is unset.
+// MATE_CLAUDE_PROJECTS_DIR, skipping the test when it is unset.
 func walkTranscriptCorpus(t *testing.T, fn func(path string, data []byte)) {
 	t.Helper()
 	requireLive(t)
-	root := os.Getenv("MATEV2_CLAUDE_PROJECTS_DIR")
+	root := os.Getenv("MATE_CLAUDE_PROJECTS_DIR")
 	if root == "" {
-		t.Skip("set MATEV2_CLAUDE_PROJECTS_DIR to <home>/.claude/projects to re-verify against real sessions")
+		t.Skip("set MATE_CLAUDE_PROJECTS_DIR to <home>/.claude/projects to re-verify against real sessions")
 	}
 	projectDirs, err := os.ReadDir(root)
 	if err != nil {

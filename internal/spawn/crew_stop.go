@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // MetaTeardown records what a stop did with the worktree and the branch:
@@ -106,7 +106,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	}
 
 	// 0. A closed task stays closed. `finished` and `failed` are final
-	// (mvp.md section 4b), so a second stop - after `matev2 merge` closed
+	// (mvp.md section 4b), so a second stop - after `mate merge` closed
 	// the crew, or a --discard sweep over every crew - reports the outcome
 	// already recorded and changes nothing; it never turns a merged crew
 	// into a failed one.
@@ -297,7 +297,7 @@ func writeCrewTeardownMeta(w *store.Workspace, project, crew string, meta map[st
 	return w.WriteCrewMeta(project, crew, next)
 }
 
-// CrewSummary is one row of `matev2 crew list`: the crew's declared state,
+// CrewSummary is one row of `mate crew list`: the crew's declared state,
 // and beside it the crew's own last word. They are two different things and
 // the table shows both - the state is who the crew is to the app, the note
 // is what it said about its work.
@@ -324,7 +324,7 @@ type CrewSummary struct {
 // ListCrews reads every `crews/<id>.meta` of a project, the last line of
 // each crew's status file, and the observer's open incidents from the
 // project's box. It asks Herdr nothing: a list is a view of what was
-// recorded, and `matev2 state <crew>` (task 13) is where a live answer -
+// recorded, and `mate state <crew>` (task 13) is where a live answer -
 // the health column - comes from.
 func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 	if w == nil {

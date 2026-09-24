@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/outbox"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/outbox"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // DefaultInterval is the digest window of docs/mvp.md section 5: the daemon
@@ -101,7 +101,7 @@ func (s Status) Sent() bool { return s.Sends > 0 }
 //
 // The workspace handle is this package's own for the reason the observer's
 // is (store.Workspace caches workspace.yaml and re-reads it on LoadConfig
-// while the console reloads on its own goroutine); cmd/matev2 does the
+// while the console reloads on its own goroutine); cmd/mate does the
 // opening, and gives the Outbox sender the same handle.
 type Pilot struct {
 	ws   *store.Workspace

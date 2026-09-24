@@ -3,7 +3,7 @@ package timeline
 import (
 	"context"
 
-	"github.com/nguyenngocanh94/matev2/internal/timeline/scene"
+	"github.com/nguyenngocanh94/mate/internal/timeline/scene"
 )
 
 // projectScene runs the scene projection of task 26 over the project this

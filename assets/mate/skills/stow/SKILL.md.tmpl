@@ -1,7 +1,7 @@
 {{- /*
 Reduced from firstmate's .agents/skills/stow/SKILL.md and skills/stow/SKILL.md
 at 9284978f (docs/research/firstmate-memory-2026-09-24.md B4). Deviations,
-each forced by a matev2 constraint:
+each forced by a mate constraint:
 - One memory file with two sections (memory.md ## Captain, ## Lessons)
   replaces captain.md, captain-shared.md and learnings.md: one Mate per
   project, no homes, no inheritance.
@@ -10,7 +10,7 @@ each forced by a matev2 constraint:
   pass horizon and no <!--g--> migration (no legacy memory exists), so no
   <!--P--> and no proposed-offload verb.
 - The budget is a fixed 4,000 estimated tokens over memory.md, PROJECT.md
-  and WORKSPACE.md, measured by `matev2 memory check`, not a captain-set
+  and WORKSPACE.md, measured by `mate memory check`, not a captain-set
   file; the over-budget decision offers what the captain can actually do.
 - The Mate writes only memory.md, backlog.md, the two archives and
   PROJECT.md. A rule for every Crew or every Mate is the captain's file, so
@@ -21,7 +21,7 @@ each forced by a matev2 constraint:
 */ -}}
 ---
 name: stow
-description: Sweep this conversation for durable knowledge and open work that exist only in chat, file each to its one owner, curate memory.md's tiered, decaying entries, and end with an honest receipt. Load it when the captain says stow or "ghi nhớ lại", when a `⟦matev2⟧ stow:` line arrives, when `matev2 memory check` reports over budget or stale entries, and after a `crew stop` whose task produced a correction.
+description: Sweep this conversation for durable knowledge and open work that exist only in chat, file each to its one owner, curate memory.md's tiered, decaying entries, and end with an honest receipt. Load it when the captain says stow or "ghi nhớ lại", when a `⟦mate⟧ stow:` line arrives, when `mate memory check` reports over budget or stale entries, and after a `crew stop` whose task produced a correction.
 ---
 
 # stow
@@ -38,11 +38,11 @@ Every command below is run with the binary's absolute path, `{{.MatevBin}}`, fro
 - The app sends you this line, which it does just before it restarts you:
 
   ```text
-  ⟦matev2⟧ stow: you are about to be restarted; record anything that exists only in this conversation (skill stow), then end your turn
+  ⟦mate⟧ stow: you are about to be restarted; record anything that exists only in this conversation (skill stow), then end your turn
   ```
 
   Run the whole pass, write the receipt, and end your turn; the restart follows, and whatever you did not write is gone.
-- `matev2 memory check {{.ProjectName}}` reports over budget or a stale entry: the whole pass.
+- `mate memory check {{.ProjectName}}` reports over budget or a stale entry: the whole pass.
 - `crew stop` printed its `record:` line and the task produced a correction you sent the Crew after its brief: the sweep and routing below for that task only, then `memory check`.
 
 ## Memory tiers and entry markers
@@ -77,7 +77,7 @@ Marking rules:
 - A `pinned` entry carries no marker at all; every `aging` and `perishable` entry always carries its dated marker, whose letter names the tier.
 - Every entry is one line: the fact, a perishable entry's `(expires: <condition>)`, then its source in parentheses, then the marker.
   The source is the captain and a date, or a path relative to the project directory (`crews/k1/report.md §Durable facts`, `sent.log to k3 2026-09-24`), never an absolute or temporary path.
-- `matev2 remember` writes a new entry in exactly that shape; when you rewrite one by hand, keep the shape, and `matev2 memory check` tells you if you did not.
+- `mate remember` writes a new entry in exactly that shape; when you rewrite one by hand, keep the shape, and `mate memory check` tells you if you did not.
 - Marker bytes count toward the budget: the pass's own bookkeeping is costed content, never free.
 - The file's header carries one pointer, `<!-- memory tiers: see the stow skill -->`; this skill is the single owner of tier semantics, marker spellings and clocks, and no memory file restates them.
 
@@ -153,9 +153,9 @@ The sweep above preserves knowledge; this one preserves the state of work.
 A reset destroys whatever exists only in this session, and that includes what you have learned about work already under way, not just facts worth remembering.
 So before the reset, make sure the important open work you are holding in context is durably recorded: file what was never filed, and correct what you now know is stale.
 
-- `## In flight` names every Crew you are running, as `matev2 backlog {{.ProjectName}}` lists it.
+- `## In flight` names every Crew you are running, as `mate backlog {{.ProjectName}}` lists it.
 - `## Held for the captain` holds every question you sent the captain and every promise you made: the task, the date, the question exactly as you sent it - pasted from your message inside double quotes, never paraphrased (manual section 13) - and what it waits on.
-  When the captain answers, put their words verbatim into the task (`matev2 brief append` for a Crew in flight, `{{.ProjectDoc}}`'s `## Captain's decisions` for a product decision), and only then remove the line.
+  When the captain answers, put their words verbatim into the task (`mate brief append` for a Crew in flight, `{{.ProjectDoc}}`'s `## Captain's decisions` for a product decision), and only then remove the line.
 - `## Queued` holds each undone next step with its `blocked-by:`.
 
 Judge for yourself what is important and which record each thing belongs to, and write it through the owner that already governs that record.

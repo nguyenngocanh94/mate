@@ -45,7 +45,7 @@ Do not pick an option, even the obvious one.
 `## Deliverable` names the questions your report must answer.
 
 # Setup
-You are in a disposable git worktree of `/ws/shop`, on branch `matev2/k3`, branched from `main`.
+You are in a disposable git worktree of `/ws/shop`, on branch `mate/k3`, branched from `main`.
 
 Verify isolation before anything else.
 Run `pwd -P` and `git rev-parse --show-toplevel`; both must resolve to `/ws/.worktrees/shop-k3`, not the project's primary checkout at `/ws/shop`.
@@ -53,9 +53,9 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 
 # Rules
 1. Never push to any remote and never open a pull request.
-2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `/ws/.matev2/projects/shop/crews/k3/report.md`.
+2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `/ws/.mate/projects/shop/crews/k3/report.md`.
 3. Report status by appending one line:
-   `echo "{state}: {one short line}" >> $MATEV2_STATUS`
+   `echo "{state}: {one short line}" >> $MATE_STATUS`
    You have exactly three states, and no others: `working`, `needs-decision`, `wait-mate`.
    - `working: {phase}` - you are making progress.
    - `needs-decision: {summary of the options}` - you cannot decide this yourself. Stop your turn; somebody will type an answer into this pane and you carry on.
@@ -67,12 +67,12 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 5. If a decision belongs to a human - a product choice, a destructive action, anything under `## Open decisions`, or anything else the task left open that the repository does not settle for you - append `needs-decision: {summary of the options}` and stop. The Mate will reply with the decision.
    Do not settle it by taking whichever option looks most natural and mentioning it afterwards. Once you have shipped a guess it is indistinguishable from an instruction you were given, and the only moment anyone could have corrected it has passed.
 6. If you genuinely cannot finish the task, that is not a failure you declare: append `wait-mate: could not do X because Y` and stop. The Mate decides what happens next.
-7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.matev2/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
+7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.mate/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
 
 # Definition of done
 This project ships local-only: no remote, no pull request, no pipeline.
 This task asks for knowledge - an investigation, a plan, a reproduction, an audit - and there is nothing to commit.
-Write your findings to `/ws/.matev2/projects/shop/crews/k3/report.md`.
+Write your findings to `/ws/.mate/projects/shop/crews/k3/report.md`.
 It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 Answer every question under `## Deliverable`, each under its own heading, and say plainly which ones you could not answer and why.
@@ -80,6 +80,6 @@ The Mate never reads this repository, so the report is its only view of it: name
 End the report with a `## Durable facts` section: what almost any future task in this repository would need to know - its stack, its layout, how to build, test and run it, its current state - or `none` if this investigation found nothing of that kind.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report and propose the acceptance lines for it: one observable result per line, each with `verify:` and the command that proves it.
 A summary in the status line is not the deliverable.
-When the report is written, append `wait-mate: report ready at /ws/.matev2/projects/shop/crews/k3/report.md` to the status file and stop.
+When the report is written, append `wait-mate: report ready at /ws/.mate/projects/shop/crews/k3/report.md` to the status file and stop.
 
 Do NOT push. Do NOT open a pull request. Do NOT merge.

@@ -77,7 +77,7 @@ func narratePhrase(e StoryEvent) string {
 		return fmt.Sprintf("%s answers %s: %s (it waited %s)",
 			answerer, e.Field("crew"), quote(e.Field("text"), quotedRunes), durationPhrase(e.Field("waited_ms")))
 	case KindDigestSent:
-		return fmt.Sprintf("matev2 walks a digest into the Mate's office: %s", quote(e.Field("text"), quotedRunes))
+		return fmt.Sprintf("mate walks a digest into the Mate's office: %s", quote(e.Field("text"), quotedRunes))
 	case KindAssignClicked:
 		return fmt.Sprintf("the captain hands the Mate a question to resolve: %s", quote(e.Field("text"), quotedRunes))
 	case KindIncidentOpen:
@@ -97,7 +97,7 @@ func narratePhrase(e StoryEvent) string {
 	case KindHealthChanged:
 		return fmt.Sprintf("%s's composer goes %s", who, e.Field("to"))
 	case KindIngestUnresolved:
-		return fmt.Sprintf("matev2 cannot find %s's transcript (%s)", who, e.Field("reason"))
+		return fmt.Sprintf("mate cannot find %s's transcript (%s)", who, e.Field("reason"))
 	default:
 		return fmt.Sprintf("%s: %s", who, e.Kind)
 	}
@@ -113,7 +113,7 @@ func actorPhrase(name, kind string) string {
 	case ActorUser:
 		return "the captain"
 	case ActorApp:
-		return "matev2"
+		return "the app"
 	case ActorObserver:
 		return "the observer"
 	default:
@@ -161,11 +161,11 @@ func messagePhrase(e StoryEvent) string {
 	text := quote(e.Field("text"), quotedRunes)
 	switch {
 	case e.Field("confirms") == "true":
-		// The Mate's own hook, recording that the line matev2 typed reached
+		// The Mate's own hook, recording that the line mate typed reached
 		// the model. It is the second half of one handover, not a second one.
 		return "the Mate reads it"
 	case e.Field("channel") == ChannelHook:
-		return fmt.Sprintf("matev2 notes: %s", e.Field("text"))
+		return fmt.Sprintf("mate notes: %s", e.Field("text"))
 	case e.ActorKind == ActorUser && e.Field("to") == "mate":
 		return fmt.Sprintf("the captain tells the Mate: %s", text)
 	case e.ActorKind == ActorMate && e.Field("to") == "user":
@@ -175,7 +175,7 @@ func messagePhrase(e StoryEvent) string {
 	case e.ActorKind == ActorUser:
 		return fmt.Sprintf("the captain sends %s: %s", e.Field("crew"), text)
 	default:
-		return fmt.Sprintf("matev2 sends %s: %s", e.Field("to"), text)
+		return fmt.Sprintf("mate sends %s: %s", e.Field("to"), text)
 	}
 }
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // bodyLines is the frame's main region on its own, with the six lines of
@@ -77,7 +77,7 @@ func TestUnknownFieldsHintAtRefresh(t *testing.T) {
 }
 
 // TODO(task 21): TestRetryOfRendersFirstAttemptAndLinkedAttempt lived
-// here. matev2 has no retry: a Crew runs once.
+// here. mate has no retry: a Crew runs once.
 
 // TestErrorReasonKnownButEmptySaysSoRatherThanBlank is query.ErrorReason's
 // own Known-but-empty case: the status is an error state, the event read

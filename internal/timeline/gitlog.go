@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 // Commit is one commit of a crew's branch that the default branch does not
@@ -31,13 +31,13 @@ const (
 // ingestGit records what a crew actually produced.
 //
 // `git log <default>..<branch>` - two dots, the list of commits that belong
-// to this branch alone, which is the same spelling `matev2 diff` uses for its
+// to this branch alone, which is the same spelling `mate diff` uses for its
 // commit list and for the same reason (docs/mvp.md section 7: three dots
 // there is the diff, two dots here is the list).
 //
 // `merge.done` is the other half: a crew is merged when it has been closed
 // `finished` and its branch tip is now an ancestor of the default branch.
-// There is no file that records a merge - `matev2 merge` types into no pane,
+// There is no file that records a merge - `mate merge` types into no pane,
 // so `sent.log` is silent about it (docs/mvp.md section 7) - so this is
 // derived from git itself, which is also what makes it survive a rebuild.
 func (p *pass) ingestGit(ctx context.Context) error {
@@ -104,7 +104,7 @@ func (p *pass) commitEvent(crew crewRecord, commit Commit, branch, repo string) 
 // mergeEvent decides whether a crew's branch has landed.
 //
 // The evidence is git's, not a log's: the crew is closed `finished` and its
-// last commit is reachable from the default branch. A branch `matev2 merge`
+// last commit is reachable from the default branch. A branch `mate merge`
 // deleted on its way out is handled by the same rule from the other side -
 // the branch is gone and the commits it carried are in `default`, so the last
 // commit this ingest recorded for the crew is the one to test.
@@ -146,7 +146,7 @@ func (p *pass) mergeEvent(ctx context.Context, git gitx.Git, crew crewRecord,
 		at = p.now
 	}
 	// The merge closes the crew, so the person who ran it is the person who
-	// closed it: `matev2 merge` runs `crew stop` itself on success
+	// closed it: `mate merge` runs `crew stop` itself on success
 	// (docs/mvp.md M4). linkCauses names which turn or gesture it was.
 	mergeDedup := dedup(KindMergeDone, crew.ActorID)
 	p.b.event(pendingEvent{

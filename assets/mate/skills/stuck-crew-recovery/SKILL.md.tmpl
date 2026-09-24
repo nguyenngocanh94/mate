@@ -17,7 +17,7 @@ Load `harness-adapters` before you judge what is on a pane.
 ## Step 0 - establish the facts, cheaply
 
 ```text
-matev2 state {{.ProjectName}} <id>
+mate state {{.ProjectName}} <id>
 ```
 
 One line, and it usually ends the investigation.
@@ -37,7 +37,7 @@ The state is a record: after you answer a question and the Crew resumes, it stil
 ## Step 1 - look
 
 ```text
-matev2 peek {{.ProjectName}} <id>
+mate peek {{.ProjectName}} <id>
 ```
 
 Read the last 40 lines and name what you see, in one of four ways:
@@ -52,14 +52,14 @@ If the pane will not read at all, or reads `agent absent`, the Crew's process is
 ## Step 2 - answer it, in one line
 
 ```text
-matev2 send {{.ProjectName}} <id> "<one line>"
+mate send {{.ProjectName}} <id> "<one line>"
 ```
 
 If its question is already answered by its own brief, say so and point at the answer rather than re-deriving it: `The brief covers this: append the line at the end of the file, not the top.`
 If it is a decision only the captain can make, escalate instead of inventing one.
 If the answer needs more than a line, write a file inside your own directory and send one line naming that file's absolute path.
 
-Then re-run `matev2 state` after a beat.
+Then re-run `mate state` after a beat.
 A successful send prints a trace ending in `working`; if it ends any other way, read section 4 of your manual for what that refusal means before you try again.
 
 Send one steering line, not three.
@@ -71,8 +71,8 @@ There is no interrupt key available to you, so a looping or unresponsive Crew is
 
 1. Read the branch it has so far: `git -C <worktree> log --oneline {{.DefaultBranch}}..<branch>`. Committed work is not lost.
 2. Copy the `# Task` part of `{{.CrewsDir}}/<id>/brief.md` - the app's copy, which also holds any captain's words appended since spawn - to `briefs/<new-id>.md`, and add `- Already tried (crew <id>): ...` lines to its `## What we already know`, above the `Unknown:` line: what it attempted, where it got stuck, and what not to repeat.
-   Run `matev2 brief check` on it.
-3. Stop the old Crew. Use `matev2 crew stop {{.ProjectName}} <id>` first; if it refuses because the branch is unlanded, keep it - do not reach for `--discard` to make a refusal go away.
+   Run `mate brief check` on it.
+3. Stop the old Crew. Use `mate crew stop {{.ProjectName}} <id>` first; if it refuses because the branch is unlanded, keep it - do not reach for `--discard` to make a refusal go away.
 4. Spawn the replacement with the new brief, with `--scout` again if the old Crew was a scout.
 5. Update `{{.BacklogFile}}`: the old id closed with what happened, the new id under In flight.
 

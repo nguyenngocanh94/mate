@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // StartupScreen classifies a bounded terminal snapshot of a harness pane taken
@@ -175,7 +175,7 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 		return startupProfile{
 			// The hook review (codex_hooks.go) is recognised here but
 			// answered only by the settle's own walk through it, and only
-			// for hooks matev2 names as its own.
+			// for hooks mate names as its own.
 			dialogs: append([]dialogProfile{
 				{
 					screen:   StartupScreenTrustDialog,

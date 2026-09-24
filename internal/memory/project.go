@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/facts"
+	"github.com/nguyenngocanh94/mate/internal/facts"
 )
 
 // PROJECT.md's sections (docs/research/firstmate-memory-2026-09-24.md
@@ -24,7 +24,7 @@ var ProjectSections = []string{ProjectWhatSection, ProjectLayoutSection, Project
 // RepoStateSections are the PROJECT.md sections whose lines state what the
 // repository holds or how it runs. Those facts go stale by commit, not by
 // calendar, so every line there carries a `<branch>@<sha>` anchor from
-// `matev2 project facts` (B8).
+// `mate project facts` (B8).
 var RepoStateSections = []string{ProjectLayoutSection, ProjectHowSection}
 
 // ProjectFileName is how problems name PROJECT.md.
@@ -62,7 +62,7 @@ func CheckProject(text, branch string) ([]Anchor, []Problem) {
 		m := re.FindStringSubmatch(line)
 		if m == nil {
 			problems = append(problems, Problem{File: ProjectFileName, Line: i + 1, Msg: fmt.Sprintf(
-				"`## %s` line has no %s@<sha> anchor: add the head `matev2 project facts` printed when the fact was recorded, e.g. (crews/k1/report.md §Durable facts, %s@3f2a91c, 2026-09-24)", section, branch, branch)})
+				"`## %s` line has no %s@<sha> anchor: add the head `mate project facts` printed when the fact was recorded, e.g. (crews/k1/report.md §Durable facts, %s@3f2a91c, 2026-09-24)", section, branch, branch)})
 			continue
 		}
 		anchors = append(anchors, Anchor{Line: i + 1, SHA: m[1]})

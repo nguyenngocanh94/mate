@@ -16,7 +16,7 @@
 // transcript, a status line dated by the shell command that wrote it - and an
 // incremental machine fed that event out of order would be wrong for ever.
 // Recomputing costs one ordered read of the project's events, which is the
-// same read `matev2 events` does, and it makes two reindexes byte-identical
+// same read `mate events` does, and it makes two reindexes byte-identical
 // by construction.
 package scene
 
@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
 // State is one place an actor can be in the office. The vocabulary is the one
@@ -190,7 +190,7 @@ type projector struct {
 // transition, oldest first.
 //
 // The events are applied in (at, rank, id) order. The rank exists for one
-// case the timeline genuinely records at the same instant: `matev2 merge`
+// case the timeline genuinely records at the same instant: `mate merge`
 // closes the crew it merged, so `merge.done` and `crew.finished` share a
 // timestamp, and a crew that left merged must not be recorded as having left
 // merely closed.

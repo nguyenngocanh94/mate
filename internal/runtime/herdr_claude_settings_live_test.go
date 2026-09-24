@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 // TestLiveHerdrClaudeStopHookFiresWithRealPayload starts a real Claude child
@@ -291,7 +291,7 @@ func waitForAssistantAnswer(ctx context.Context, rt *runtime.Herdr, agent runtim
 // this test's self-injected staleness (see the header comment): without it the
 // test could lose its own setup and pass for the wrong reason.
 func paneEnvValue(ctx context.Context, session, paneID, key string) (string, error) {
-	const marker = "MATEV2_G512_PANE_ENV"
+	const marker = "MATE_G512_PANE_ENV"
 	runner := process.ExecRunner{}
 	run := func(args []string) (process.Result, error) {
 		return runner.Run(ctx, process.Spec{Name: "herdr", Args: runtime.WithSession(session, args)})

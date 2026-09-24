@@ -9,6 +9,6 @@
 //
 // Copied from v1 (github.com/nguyenngocanh94/mate), where the identity types
 // lived in internal/domain and the runtime binding in internal/application.
-// matev2 has neither: the few identity pieces the adapter needs are in
+// mate has neither: the few identity pieces the adapter needs are in
 // identity.go, and binding state is the caller's business.
 package runtime

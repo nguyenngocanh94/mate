@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/autopilot"
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/send"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/autopilot"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Manual mode sends nothing, ever - mvp.md section 5's first line, and

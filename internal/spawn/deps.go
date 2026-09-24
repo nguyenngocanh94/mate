@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/process"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Meta keys written to `mate/mate.meta`. They are spelled once, here, so the
@@ -77,7 +77,7 @@ type Deps struct {
 	// Empty means the environment's (HERDR_CONFIG_PATH, XDG_CONFIG_HOME,
 	// then $HOME/.config).
 	ConfigHome string
-	// Binary is the absolute path of the matev2 binary the Mate invokes.
+	// Binary is the absolute path of the mate binary the Mate invokes.
 	// Empty means os.Executable.
 	Binary string
 	// ReadinessTimeout bounds the wait for Herdr to report the agent ready.

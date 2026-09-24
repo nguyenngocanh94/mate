@@ -2,5 +2,5 @@
 // by every other package: a stable Code taxonomy, the *Error carrying it,
 // the process exit mapping, and the JSON envelope the agent-facing commands
 // print. It is deliberately small - v1's event catalog, logging and
-// redaction helpers are not part of matev2 and are not copied here.
+// redaction helpers are not part of mate and are not copied here.
 package observability

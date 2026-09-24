@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Adapter is the only owner of Herdr integration. It does not update domain
@@ -109,7 +109,7 @@ type WorkspaceSpec struct {
 	Session SessionHandle
 	Label   string
 	Cwd     string
-	// Env is allowlisted MATEV2_* for the workspace-create root pane (the Mate
+	// Env is allowlisted MATE_* for the workspace-create root pane (the Mate
 	// tab). Crew env still goes through TabSpec on tab create.
 	Env []EnvVar
 }
@@ -125,7 +125,7 @@ type WorkspaceHandle struct {
 	RootTab     TabHandle
 }
 
-// TabSpec creates a Mate or Crew tab. Env is allowlisted MATEV2_* keys only.
+// TabSpec creates a Mate or Crew tab. Env is allowlisted MATE_* keys only.
 type TabSpec struct {
 	Workspace WorkspaceHandle
 	Label     string
@@ -150,7 +150,7 @@ type TabHandle struct {
 	TerminalID  string
 	Cwd         string
 	Label       string
-	Env         []EnvVar // allowlisted MATEV2_* only
+	Env         []EnvVar // allowlisted MATE_* only
 }
 
 // AgentStartSpec is a validated plan to start a harness process *through

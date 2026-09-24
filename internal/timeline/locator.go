@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // Located is one agent's transcript: where it is, which harness wrote it, and
@@ -101,7 +101,7 @@ func (p *pass) locateMate() (Located, string) {
 // locateCrew finds one crew's transcript.
 //
 // A Codex crew is the interesting case and the one docs/mvp.md M5 names: its
-// rollout id is not in any file matev2 writes, so it comes from the runtime -
+// rollout id is not in any file mate writes, so it comes from the runtime -
 // Herdr's `agent_session.value` - with harness.AdoptCodexRollout over cwd and
 // launch time as the fallback for a crew whose agent is gone.
 func (p *pass) locateCrew(ctx context.Context, crew crewRecord) (Located, string) {

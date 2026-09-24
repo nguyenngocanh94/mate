@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Fake routes BuildLaunchSpec to the real Claude/Codex constructors (the

@@ -76,11 +76,11 @@ func mateActions(m MateNode) []ActionAvailability {
 	return out
 }
 
-// crewActions publishes the per-Crew actions matev2 can offer today.
+// crewActions publishes the per-Crew actions mate can offer today.
 //
 // retry and discard are not here: mvp.md has no retry at all (a Crew runs
 // once), so offering one would publish a capability nothing implements.
-// TODO(task 22): add merge once `matev2 merge <crew>` exists.
+// TODO(task 22): add merge once `mate merge <crew>` exists.
 func crewActions(c CrewNode) []ActionAvailability {
 	stop := c.Binding.State == Known && c.Binding.Value.Status == BindingActive
 	stopReason := "no active binding to stop"

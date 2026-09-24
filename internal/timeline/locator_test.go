@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/store"
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 // The locator rules of docs/timeline.md, each proved on its own. They are not
@@ -228,7 +228,7 @@ func TestIncidentsBecomeOpenAndResolvedEvents(t *testing.T) {
 }
 
 // A crew's commits and the merge that landed them come from git, because no
-// file records either: `matev2 merge` types into no pane, so `sent.log` is
+// file records either: `mate merge` types into no pane, so `sent.log` is
 // silent about it (docs/mvp.md section 7).
 func TestCommitsAndTheMergeComeFromGit(t *testing.T) {
 	f := newFixture(t)
@@ -259,7 +259,7 @@ func TestCommitsAndTheMergeComeFromGit(t *testing.T) {
 	}
 
 	// The captain merges from the Console and closes the crew, exactly as
-	// `matev2 merge` does.
+	// `mate merge` does.
 	gitRun(t, repo, "merge", "--ff-only", fixtureBranch)
 	meta, err := f.ws.ReadCrewMeta(fixtureProject, fixtureCrew)
 	if err != nil {

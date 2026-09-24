@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The message box as the Console reads it (mvp.md task 15, section 4).
@@ -243,7 +243,7 @@ func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 // BoxAssignKey is the outbox key of the entry whose line lives at file and
 // offset: the file relative to the project directory, slash-separated, then
 // `@` and the byte offset. It is spelled once, here, because the inbox row
-// looks the key up in the outbox that cmd/matev2 wrote it into.
+// looks the key up in the outbox that cmd/mate wrote it into.
 func BoxAssignKey(projectDir, file string, offset int64) string {
 	rel, err := filepath.Rel(projectDir, file)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
@@ -300,7 +300,7 @@ func withAssign(e BoxEntry, assigned map[string]BoxAssign) BoxEntry {
 // cwd is its own workspace directory, not the project's, so a path relative
 // to the project never resolves there.
 func BoxResolveLine(project, crew, question, statusPath string) string {
-	return fmt.Sprintf("resolve: %s asked: %q — read %s, decide, and answer with matev2 send %s %s \"<one line>\"",
+	return fmt.Sprintf("resolve: %s asked: %q — read %s, decide, and answer with mate send %s %s \"<one line>\"",
 		crew, oneLine(question, resolveQuestionRunes), statusPath, project, crew)
 }
 

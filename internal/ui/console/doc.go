@@ -1,19 +1,19 @@
 // Package console is the G6 Console: a Bubble Tea model that renders the
 // Workspace -> Project -> {Mate, Task -> Crew} navigation tree and opens the
 // Agent View by default for resolvable live sessions. Stream mode is the
-// primary path; the snapshot reader and then `matev2 attach` remain fallbacks.
+// primary path; the snapshot reader and then `mate attach` remain fallbacks.
 //
 // This package must never import internal/persistence or internal/runtime,
 // and must never call Herdr. It only knows internal/query's read types and
 // caller-supplied seams: LoadFunc (how to re-read the tree),
-// AttachCmdFunc (how to build the `matev2 attach <target>` subprocess),
+// AttachCmdFunc (how to build the `mate attach <target>` subprocess),
 // ActionFunc (how to invoke application services for start/stop/resume/retry/
 // repair/discard/onboard), and the three session-mode ports from ADR 0025
 // (session.go) - SessionReader (snapshot fallback), SessionPrompt (send
 // composer input), SessionClose (release the snapshot controller),
 // SessionStreamFactory (open the primary PTY stream), and
 // SessionMetadataReader (refresh status/runtime/inbox side channels). The
-// CLI layer in cmd/matev2 is the only place those
+// CLI layer in cmd/mate is the only place those
 // seams are built, which is where the persistence/runtime access actually
 // happens (G6 gate, see
 // docs/phase1/roadmap.md's G6 section and internal/query/types.go).
@@ -41,7 +41,7 @@
 // The rest of the foundation:
 //
 //	glyphs.go   the Unicode and ASCII drawing alphabets, chosen by locale or
-//	            MATEV2_ASCII - the only place this package reads the environment
+//	            MATE_ASCII - the only place this package reads the environment
 //	palette.go  the ten design tokens as ANSI-indexed lipgloss styles
 //	signals.go  selection, focus and status as three separate primitives that
 //	            never share a drawing method, and each of which reads
@@ -68,11 +68,11 @@
 // Its two facts never render alike:
 //
 //	Attach refused: <what the snapshot says> - nothing started
-//	Attach failed:  <taxonomy>, matev2 attach exit <n>
+//	Attach failed:  <taxonomy>, mate attach exit <n>
 //
 // A refusal is decided from the snapshot alone - a Mate's binding read
 // exactly like a Crew's - so nothing is started for an attach that cannot
-// happen. A failure means `matev2 attach` ran (or could not be started) and
+// happen. A failure means `mate attach` ran (or could not be started) and
 // says what its exit establishes: the child's coded envelope when the
 // hand-over's private result channel is available, or the code/class where
 // only the exit remains (usage, runtime_unavailable, target_blocked,
@@ -82,7 +82,7 @@
 // The hand-over is announced, then handed over, then taken back:
 //
 //	Enter -> announce -> AttachHandedOverMsg ->
-//	tea.Exec(handoverNotice{`matev2 attach <target>`}) -> AttachFinishedMsg ->
+//	tea.Exec(handoverNotice{`mate attach <target>`}) -> AttachFinishedMsg ->
 //	exactly one re-read -> the same task, the same row, re-found by id
 //
 // The announcement the reader is guaranteed to see is not a frame. In the

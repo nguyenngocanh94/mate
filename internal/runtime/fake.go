@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Fake is a deterministic RuntimeAdapter for later gates. It simulates
@@ -215,7 +215,7 @@ func (f *Fake) EnsureProjectWorkspace(_ context.Context, spec WorkspaceSpec) (Wo
 		if len(env) > 0 {
 			return WorkspaceHandle{}, observability.NewError(
 				observability.CodeUsage,
-				"MATEV2_* env is injected only when the workspace pane is created (workspace create --env); this workspace already exists",
+				"MATE_* env is injected only when the workspace pane is created (workspace create --env); this workspace already exists",
 			)
 		}
 		return existing, nil
@@ -282,7 +282,7 @@ func (f *Fake) CreateAgentTab(_ context.Context, spec TabSpec) (TabHandle, error
 			if len(env) > 0 {
 				return TabHandle{}, observability.NewError(
 					observability.CodeUsage,
-					"MATEV2_* env is injected only when the pane is created (tab create --env); this tab already exists",
+					"MATE_* env is injected only when the pane is created (tab create --env); this tab already exists",
 				)
 			}
 			return existing, nil

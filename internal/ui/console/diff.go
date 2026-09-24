@@ -6,11 +6,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// The diff overlay (mvp.md task 21): what `matev2 diff <project> <crew>`
+// The diff overlay (mvp.md task 21): what `mate diff <project> <crew>`
 // prints, on the project frame, scrollable.
 //
 // It reaches this package the way every other action's outcome does - as
-// the string an ActionFunc returned (cmd/matev2/console_actions.go calls
+// the string an ActionFunc returned (cmd/mate/console_actions.go calls
 // the same function the command does) - so the Console still runs no git of
 // its own and still imports nothing new. What is different is only where
 // the result is put: a diff is a screenful, and one line of it on the
@@ -215,7 +215,7 @@ func (m Model) scrollDiff(delta int, l frameLayout) Model {
 // cells wide and h lines tall, scrolled to the top and with colour stripped
 // the way a golden fixture renders.
 //
-// It is exported for one caller, the live proof in cmd/matev2, for the same
+// It is exported for one caller, the live proof in cmd/mate, for the same
 // reason RenderInboxRail is (box.go): whether a real crew's commit is
 // legible on this surface is a claim only the renderer can settle, and a
 // live test that asserted on the ActionFunc's string alone would pass while

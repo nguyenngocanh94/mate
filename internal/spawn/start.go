@@ -10,16 +10,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/mateassets"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/mateassets"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // ClaudeSettingsDir and ClaudeSettingsFile are the Claude settings the Mate
-// launches with: ClaudeSettings wires its three hooks to the matev2 binary and
+// launches with: ClaudeSettings wires its three hooks to the mate binary and
 // turns Claude Code's auto-memory off. Start creates the file, and on one
 // that already exists - the user's own, or one a previous start wrote - it
 // only ever adds a missing autoMemoryEnabled key and a missing SessionStart
@@ -35,7 +35,7 @@ var ErrMateRunning = errors.New("mate is already running")
 
 func errUsage(msg string) error { return observability.NewError(observability.CodeUsage, msg) }
 
-// StartRequest is one `matev2 mate start`.
+// StartRequest is one `mate mate start`.
 type StartRequest struct {
 	// Project is the registered project whose Mate is started.
 	Project string
@@ -49,7 +49,7 @@ type StartRequest struct {
 	// start is launching.
 	Resume bool
 	// Fresh forces a brand new harness session even when `mate.meta`
-	// carries one to resume: `matev2 mate start --fresh`.
+	// carries one to resume: `mate mate start --fresh`.
 	Fresh bool
 }
 
@@ -620,10 +620,10 @@ func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.Sess
 // mateEnv is the Mate pane's environment: its identity, and the CODEX_HOME
 // every Codex agent of this project runs in.
 //
-// MATEV2_CALLER is how `matev2 merge` knows a Mate typed it and applies the
-// project's `yolo` rule (docs/mvp.md M4 decisions), and MATEV2_AGENT_ROLE is
-// how `matev2 send` records a line as the Mate's. CODEX_HOME is pinned for
-// either harness because the Mate's own `matev2 crew spawn` launches Codex
+// MATE_CALLER is how `mate merge` knows a Mate typed it and applies the
+// project's `yolo` rule (docs/mvp.md M4 decisions), and MATE_AGENT_ROLE is
+// how `mate send` records a line as the Mate's. CODEX_HOME is pinned for
+// either harness because the Mate's own `mate crew spawn` launches Codex
 // Crews and finds their rollouts from it: a Claude Mate that inherited
 // whatever the Herdr server was started with would put its Crews' trust
 // and rollouts somewhere this process never looks. harness.LaunchCodexHome

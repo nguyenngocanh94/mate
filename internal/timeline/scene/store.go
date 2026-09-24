@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
 // Querier is the part of *sql.DB and *sql.Tx this package uses, so the

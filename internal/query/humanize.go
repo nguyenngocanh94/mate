@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// HumanizeTokens renders a token count the way `matev2 usage` and the
+// HumanizeTokens renders a token count the way `mate usage` and the
 // console's TOKENS column do: exact under 1000, one decimal place with a
 // k/M/B suffix above it - "523", "96.3k", "1.2M". A trailing ".0" is
 // dropped ("90k", not "90.0k"), which is also why the observer's budget

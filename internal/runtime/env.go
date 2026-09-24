@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // AllowlistedEnv is the live allowlist: identity keys plus explicitly pinned
@@ -31,7 +31,7 @@ func AllowlistedEnv(vars []EnvVar) ([]EnvVar, error) {
 		if _, ok := allow[key]; !ok {
 			return nil, observability.NewError(
 				observability.CodeUsage,
-				fmt.Sprintf("env key %q is not allowlisted; unknown keys are refused rather than dropped (allowlist is the MATEV2_* identity keys; HERDR_* is injected by Herdr)", key),
+				fmt.Sprintf("env key %q is not allowlisted; unknown keys are refused rather than dropped (allowlist is the MATE_* identity keys; HERDR_* is injected by Herdr)", key),
 			)
 		}
 		if v.Value == "" {

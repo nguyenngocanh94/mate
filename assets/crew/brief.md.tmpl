@@ -34,7 +34,7 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 1. Never push to any remote and never open a pull request.
 2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `{{if .Scout}}{{.ReportPath}}{{else}}{{.HandbackPath}}{{end}}`.
 3. Report status by appending one line:
-   `echo "{state}: {one short line}" >> $MATEV2_STATUS`
+   `echo "{state}: {one short line}" >> $MATE_STATUS`
    You have exactly three states, and no others: `working`, `needs-decision`, `wait-mate`.
    - `working: {phase}` - you are making progress.
    - `needs-decision: {summary of the options}` - you cannot decide this yourself. Stop your turn; somebody will type an answer into this pane and you carry on.

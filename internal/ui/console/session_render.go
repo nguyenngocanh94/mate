@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // ADR 0025 step 3: the embedded snapshot-session renderer. It draws one
@@ -255,7 +255,7 @@ func sessionRailWidth(kind SessionTargetKind, cols int) int {
 // The rail is the project's message box (mvp.md task 15, section 4): every
 // box entry, newest at the bottom, one line each, with the selected one
 // marked and attention entries flagged. It replaces v1's interaction inbox,
-// which had a lifecycle - queued, awaiting reply, answered - that matev2
+// which had a lifecycle - queued, awaiting reply, answered - that mate
 // deliberately does not have ("Câu hỏi của crew không có vòng đời").
 // box.go owns how one entry is drawn; this file owns the pane around it.
 

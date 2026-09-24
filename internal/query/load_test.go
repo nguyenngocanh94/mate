@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
@@ -96,7 +96,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 	}
 	if err := ws.WriteCrewMeta("shop", "k3", map[string]string{
 		"task": "wire the webhook", "harness": "codex",
-		"worktree": "/w/shop-k3", "branch": "matev2/k3",
+		"worktree": "/w/shop-k3", "branch": "mate/k3",
 	}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 	if got := c.Status; got != CrewStatus("needs-decision") {
 		t.Fatalf("crew status = %q, want the last status line's state word", got)
 	}
-	if c.Worktree.State != Known || c.Worktree.Value.Branch != "matev2/k3" {
+	if c.Worktree.State != Known || c.Worktree.Value.Branch != "mate/k3" {
 		t.Fatalf("worktree = %+v, want the recorded worktree and branch", c.Worktree)
 	}
 }
@@ -178,8 +178,8 @@ func TestLoadResolvesEachCrewStateInTheOrderOfSection4b(t *testing.T) {
 	// A crew's own last verb, including the legacy spellings.
 	write("k1", map[string]string{"state": "spawned"}, "working: reading the ticket")
 	write("k2", map[string]string{"state": "spawned"}, "working: a", "needs-decision: A or B?")
-	write("k3", map[string]string{"state": "spawned"}, "wait-mate: ready in branch matev2/k3")
-	write("k4", map[string]string{"state": "spawned"}, "done: ready in branch matev2/k4")
+	write("k3", map[string]string{"state": "spawned"}, "wait-mate: ready in branch mate/k3")
+	write("k4", map[string]string{"state": "spawned"}, "done: ready in branch mate/k4")
 	// Nothing written at all.
 	write("k5", map[string]string{"state": "spawned"})
 	// The meta's terminal state outranks whatever the crew last said.
@@ -277,8 +277,8 @@ func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 	}
 }
 
-// Load reads only `.matev2/`'s flat files; token usage lives in the derived
-// `.matev2/matev2.db` (mvp.md M5 task 27), so both the Mate and a Crew must
+// Load reads only `.mate/`'s flat files; token usage lives in the derived
+// `.mate/mate.db` (mvp.md M5 task 27), so both the Mate and a Crew must
 // come back with Tokens Absent, exactly the way Health does - the Console's
 // wiring fills it in afterwards, never this package.
 func TestLoadLeavesTokensAbsent(t *testing.T) {
@@ -378,7 +378,7 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 }
 
 // TestLoadHidesClosedCrewsAndCountsThem: closing is the decision that ends
-// a task and it is `matev2 crew stop`'s `state=finished|failed`, not the
+// a task and it is `mate crew stop`'s `state=finished|failed`, not the
 // crew's own report (2026-09-18). A crew that said `wait-mate` is still a
 // row; a closed one is not, and ClosedCrews says how many were dropped.
 func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
@@ -387,7 +387,7 @@ func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 		"task": "ship", "agent": "crew-k1", "pane": "w1:p2", "state": "spawned"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	if err := ws.AppendStatus("shop", "k1", "wait-mate: ready in branch matev2/k1"); err != nil {
+	if err := ws.AppendStatus("shop", "k1", "wait-mate: ready in branch mate/k1"); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{

@@ -18,10 +18,10 @@ func TestGlyphsForPicksTheSetFromMateAsciiAndTheLocale(t *testing.T) {
 		{name: "c locale", env: map[string]string{"LANG": "C"}, want: "ascii"},
 		{name: "posix locale", env: map[string]string{"LANG": "POSIX"}, want: "ascii"},
 		{name: "no locale at all", env: map[string]string{}, want: "ascii"},
-		{name: "MATEV2_ASCII forces ascii", env: map[string]string{"MATEV2_ASCII": "1", "LANG": "en_US.UTF-8"}, want: "ascii"},
-		{name: "MATEV2_ASCII true", env: map[string]string{"MATEV2_ASCII": "TRUE", "LANG": "en_US.UTF-8"}, want: "ascii"},
-		{name: "MATEV2_ASCII=0 forces unicode", env: map[string]string{"MATEV2_ASCII": "0", "LANG": "C"}, want: "unicode"},
-		{name: "MATEV2_ASCII empty defers to locale", env: map[string]string{"MATEV2_ASCII": "", "LANG": "en_US.UTF-8"}, want: "unicode"},
+		{name: "MATE_ASCII forces ascii", env: map[string]string{"MATE_ASCII": "1", "LANG": "en_US.UTF-8"}, want: "ascii"},
+		{name: "MATE_ASCII true", env: map[string]string{"MATE_ASCII": "TRUE", "LANG": "en_US.UTF-8"}, want: "ascii"},
+		{name: "MATE_ASCII=0 forces unicode", env: map[string]string{"MATE_ASCII": "0", "LANG": "C"}, want: "unicode"},
+		{name: "MATE_ASCII empty defers to locale", env: map[string]string{"MATE_ASCII": "", "LANG": "en_US.UTF-8"}, want: "unicode"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // The startup-prompt settle is driven through StartMate itself, over the
@@ -152,7 +152,7 @@ func TestStartMateRefusesAnUnrecognisedScreen(t *testing.T) {
 		t.Fatalf("error = %v, want the screen tail in the message", err)
 	}
 	if len(rt.SentKeys) != 0 {
-		t.Fatalf("keys %v were pressed into a screen matev2 cannot name", rt.SentKeys)
+		t.Fatalf("keys %v were pressed into a screen mate cannot name", rt.SentKeys)
 	}
 	if len(rt.Tabs) != 0 {
 		t.Fatalf("tabs left behind: %v", rt.Tabs)
@@ -163,7 +163,7 @@ func TestStartMateRefusesAnUnrecognisedScreen(t *testing.T) {
 // 0.154.0 installed and 0.155.0 published, the release-update prompt comes
 // first and the directory-trust dialog only after it is answered. The settle
 // answers each with the same discipline - one key per call, a re-read
-// between presses, Enter only once the highlight is where matev2 means it.
+// between presses, Enter only once the highlight is where mate means it.
 
 // scriptedPane drives the fake runtime through a measured screen sequence:
 // each (screen, key) step says what the pane shows and which single key
@@ -308,7 +308,7 @@ func TestStartMateRefusesToConfirmAnUnmovedUpdateHighlight(t *testing.T) {
 		t.Fatal("the start must be refused when the highlight did not move")
 	}
 	if !strings.Contains(err.Error(), "3. Skip until next version") {
-		t.Fatalf("error = %v, want it to name the option matev2 meant to take", err)
+		t.Fatalf("error = %v, want it to name the option mate meant to take", err)
 	}
 	var keys []string
 	for _, sent := range rt.SentKeys {
@@ -338,11 +338,11 @@ func TestStartMateRefusesAnUnrecognisedScreenCarryingUpdateWords(t *testing.T) {
 		t.Fatalf("error = %v, want it to say the screen was not recognised", err)
 	}
 	if len(rt.SentKeys) != 0 {
-		t.Fatalf("keys %v were pressed into a screen matev2 cannot name", rt.SentKeys)
+		t.Fatalf("keys %v were pressed into a screen mate cannot name", rt.SentKeys)
 	}
 }
 
-// A harness that redraws a dialog matev2 has already confirmed is refused
+// A harness that redraws a dialog mate has already confirmed is refused
 // rather than answered again: the cap exists so a redraw loop can never
 // become an unbounded stream of keypresses.
 func TestStartMateRefusesAnUpdateDialogItAlreadyAnswered(t *testing.T) {
@@ -361,7 +361,7 @@ func TestStartMateRefusesAnUpdateDialogItAlreadyAnswered(t *testing.T) {
 
 	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
 	if err == nil {
-		t.Fatal("a dialog still on screen after matev2 confirmed it must fail the start")
+		t.Fatal("a dialog still on screen after mate confirmed it must fail the start")
 	}
 	if !strings.Contains(err.Error(), "still on screen") {
 		t.Fatalf("error = %v, want it to say the dialog was still on screen", err)

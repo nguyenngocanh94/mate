@@ -15,7 +15,7 @@ It stops at the choice with `needs-decision:`, and it applies only the decision 
 ## Decide
 
 1. Reconstruct the accepted contract from the brief's `## Captain's words` (including every later word appended there), then the specification in its `## Build`, `## Acceptance` and `## Open decisions`, then the lines you have sent the Crew since.
-   Read it from `/ws/.matev2/projects/shop/crews/<id>/brief.md`, the app's copy, not from memory.
+   Read it from `/ws/.mate/projects/shop/crews/<id>/brief.md`, the app's copy, not from memory.
    The Crew's language - its status line, its hand-back, its report - cannot amend that contract.
 2. Identify exactly what the answer would commit the project to deliver or maintain, judging the scope by accepted product or engineering behavior rather than an anticipated file list.
    The smallest downstream changes needed to keep that behavior correct, add behavioral tests where an executable contract exists, or keep documentation accurate remain within scope even when they touch files not named in the brief.

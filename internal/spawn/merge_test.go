@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The merge of docs/mvp.md task 22, on real temporary repositories. Every
@@ -297,7 +297,7 @@ func TestMergeCrewRefusesADirtyPrimaryRepo(t *testing.T) {
 }
 
 func TestCallerFromEnvDefaultsToTheCaptain(t *testing.T) {
-	// The default matters: a missing MATEV2_CALLER is somebody's own shell,
+	// The default matters: a missing MATE_CALLER is somebody's own shell,
 	// and the yolo rule must never be skipped because a Mate's pane lost a
 	// variable. A Mate's pane always has it, because spawn injects it.
 	for _, tc := range []struct{ raw, want string }{
@@ -312,11 +312,11 @@ func TestCallerFromEnvDefaultsToTheCaptain(t *testing.T) {
 			t.Errorf("NormaliseCaller(%q) = %q, want %q", tc.raw, got, tc.want)
 		}
 	}
-	t.Setenv("MATEV2_CALLER", "mate")
+	t.Setenv("MATE_CALLER", "mate")
 	if got := spawn.CallerFromEnv(); got != spawn.CallerMate {
 		t.Fatalf("CallerFromEnv = %q, want mate", got)
 	}
-	t.Setenv("MATEV2_CALLER", "")
+	t.Setenv("MATE_CALLER", "")
 	if got := spawn.CallerFromEnv(); got != spawn.CallerUser {
 		t.Fatalf("CallerFromEnv with no value = %q, want user", got)
 	}

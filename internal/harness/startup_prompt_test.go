@@ -42,7 +42,7 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		{KindCodex, "codex-0.154.0-resume-ready.txt", StartupScreenReady},
 		// Codex's hook-trust review (task 37): recognised in both measured
 		// layouts, and answered only by the settle's walk through the
-		// review, for matev2's own hook. The screens behind it are not
+		// review, for mate's own hook. The screens behind it are not
 		// startup screens of their own.
 		{KindCodex, "codex-0.154.0-hooks-review.txt", StartupScreenHooksReview},
 		{KindCodex, "codex-0.156.1-hooks-review.txt", StartupScreenHooksReview},

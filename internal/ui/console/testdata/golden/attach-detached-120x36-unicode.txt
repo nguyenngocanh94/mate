@@ -1,4 +1,4 @@
- matev2 console   workspace acme  /Users/dev/work/acme                                                  live · 14:05:12 
+ mate console   workspace acme  /Users/dev/work/acme                                                    live · 14:05:12 
  ws_acme › payments-api                                                                               Project · 2 crews 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   MATE              HARNESS STATUS    MODE                 BINDING   │ CREW  crew_01J9P6Q6W0E5V8XK2M4B8DT               
@@ -18,7 +18,7 @@
                                                                      │                                                  
                                                                      │ Repo             payments-api                    
                                                                      │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
-                                                                     │ Branch           matev2/01J9P6Q6                 
+                                                                     │ Branch           mate/01J9P6Q6                   
                                                                      │ Worktree         /Users/dev/work/acme/           
                                                                      │                  .worktrees/                     
                                                                      │                  payments-api-crew_01J9P6Q6W0E5V 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
 // linkCauses fills `event.cause_event_id` for the kinds docs/timeline.md
@@ -148,7 +148,7 @@ func (p *pass) causeMateTurnStarted(ctx context.Context) error {
 }
 
 // causeQuestionAnswered: the Mate's answer is caused by the turn that sent
-// it - the turn holding the `matev2 send <project> <crew>` the answer came
+// it - the turn holding the `mate send <project> <crew>` the answer came
 // out of. An answer the captain typed has no such turn and keeps a NULL
 // cause, which is the honest record: nothing in any file says what the
 // captain was doing first.
@@ -189,7 +189,7 @@ func (p *pass) causeQuestionAnswered(ctx context.Context) error {
 		}
 		crew := crewFromActorID(a.crew)
 		cause, ok, err := p.turnThatRan(ctx, p.mate.ActorID, a.at,
-			[]string{"matev2 send", crew}, 10*time.Minute)
+			[]string{"mate send", crew}, 10*time.Minute)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (p *pass) causeCrewTurnAfterAnswer(ctx context.Context) error {
 	return err
 }
 
-// causeCrewSpawned: the Mate turn that ran `matev2 crew spawn`.
+// causeCrewSpawned: the Mate turn that ran `mate crew spawn`.
 func (p *pass) causeCrewSpawned(ctx context.Context) error {
 	rows, err := p.tx.QueryContext(ctx,
 		`SELECT id, at, subject_actor_id FROM event
@@ -274,11 +274,11 @@ func (p *pass) causeCrewSpawned(ctx context.Context) error {
 // causeMergeDone has two rules, tried in order, and the payload records which
 // one fired.
 //
-//  1. The Mate turn that ran `matev2 merge <project> <crew>`. Exact, and the
+//  1. The Mate turn that ran `mate merge <project> <crew>`. Exact, and the
 //     one that fires when the Mate landed the branch itself under `yolo`.
 //  2. The crew's handback - its last `wait-mate` status line before the
 //     merge. This is the captain's merge, and it is a weaker rule on purpose:
-//     `matev2 merge` types into no pane, so a merge run from the Console
+//     `mate merge` types into no pane, so a merge run from the Console
 //     leaves nothing at all in `sent.log` (docs/mvp.md section 7) and no
 //     event exists to point at. The handback is what the captain acted on,
 //     which is the most the files can say about why the merge happened.
@@ -315,7 +315,7 @@ func (p *pass) causeMergeDone(ctx context.Context) error {
 	for _, m := range merges {
 		crew := crewFromActorID(m.crewActor)
 		cause, ok, err := p.turnThatRan(ctx, p.mate.ActorID, m.at.Add(2*time.Minute),
-			[]string{"matev2 merge", crew}, 30*time.Minute)
+			[]string{"mate merge", crew}, 30*time.Minute)
 		if err != nil {
 			return err
 		}

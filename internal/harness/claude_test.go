@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/config"
 )
 
 func TestClaudeDefaultUsesFileFlag(t *testing.T) {
@@ -282,13 +282,13 @@ func TestClaudeLaunchEnvIsAllowlisted(t *testing.T) {
 		Cwd: cwd, ContextPath: path,
 		Config: Config{ClaudeConfigDir: configDir},
 		Env: []EnvVar{
-			{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
+			{Key: "MATE_AGENT_ID", Value: "mate_001"},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(spec.Env()) != 2 || spec.Env()[0].Key != "MATEV2_AGENT_ID" || spec.Env()[1].Key != "CLAUDE_CONFIG_DIR" || spec.Env()[1].Value != configDir || spec.ClaudeConfigDir() != configDir {
+	if len(spec.Env()) != 2 || spec.Env()[0].Key != "MATE_AGENT_ID" || spec.Env()[1].Key != "CLAUDE_CONFIG_DIR" || spec.Env()[1].Value != configDir || spec.ClaudeConfigDir() != configDir {
 		t.Fatalf("env = %#v", spec.Env())
 	}
 	if got := spec.UnsetEnv(); slices.Contains(got, config.EnvClaudeConfigDir) || !slices.Equal(got, NestedSessionEnv) {
@@ -303,7 +303,7 @@ func TestClaudeLaunchSpecRefusesUnknownEnv(t *testing.T) {
 	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
 		Cwd: cwd, ContextPath: path,
 		Env: []EnvVar{
-			{Key: "MATEV2_AGENT_ID", Value: "mate_001"},
+			{Key: "MATE_AGENT_ID", Value: "mate_001"},
 			{Key: "SECRET", Value: "nope"},
 			{Key: "HERDR_PANE_ID", Value: "w1:p1"},
 		},

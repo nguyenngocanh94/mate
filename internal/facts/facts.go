@@ -1,4 +1,4 @@
-// Package facts answers `matev2 project facts`: what a project's repository
+// Package facts answers `mate project facts`: what a project's repository
 // holds, from git's metadata alone - whether the default branch has a
 // commit, how many files its tree has, the names at its top level, and which
 // build and test files it has, recognised by name.
@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 // Facts is what Gather found about one branch of one repository.

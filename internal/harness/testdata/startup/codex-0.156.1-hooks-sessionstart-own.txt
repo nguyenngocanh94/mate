@@ -22,7 +22,7 @@
   Event     SessionStart
   Source    Project config - /private/tmp/TestLiveZZMeasureCodexHookReview323707510/001/
             codexlab/.codex/hooks.json
-  Command   '/usr/local/bin/matev2' hook mate-session
+  Command   '/usr/local/bin/mate' hook mate-session
   Mode      Sync
   Timeout   10s
   Trust     New hook - review required

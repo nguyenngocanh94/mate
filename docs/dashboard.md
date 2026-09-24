@@ -1,14 +1,14 @@
 # Dashboard
 
-This is the contract of `matev2 dashboard` and of `internal/dashboard` (docs/mvp.md M6, tasks 28 and 29).
+This is the contract of `mate dashboard` and of `internal/dashboard` (docs/mvp.md M6, tasks 28 and 29).
 Task 28 owns the server and this document; task 29 builds the three-tier UI against it.
 
 The dashboard is read-only and local.
-It opens `.matev2/matev2.db` with `db.OpenRead`, which takes no lock, so it runs beside an open console rather than instead of it.
+It opens `.mate/mate.db` with `db.OpenRead`, which takes no lock, so it runs beside an open console rather than instead of it.
 There is no endpoint that writes: every action stays in the console TUI, which is where a reader who can act already is.
 
 ```
-matev2 dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open] [--allow-remote]
+mate dashboard [<workspace>] [--addr 127.0.0.1:7777] [--open] [--allow-remote]
 ```
 
 `--addr` must be a loopback address unless `--allow-remote` is passed.
@@ -35,7 +35,7 @@ A timestamp is the database's own string: RFC3339 with nanoseconds, in UTC (`db.
 It is passed through and never reformatted, so a value on the page and a row in the database compare byte for byte.
 
 A nullable number is `null`, never `0`.
-A cost with no `pricing` row and a context percentage with no known context window are unknown, and docs/timeline.md's "a missing price is not a price of zero" is the same rule `matev2 usage` prints as `?`.
+A cost with no `pricing` row and a context percentage with no known context window are unknown, and docs/timeline.md's "a missing price is not a price of zero" is the same rule `mate usage` prints as `?`.
 
 Token buckets are always this object.
 
@@ -43,7 +43,7 @@ Token buckets are always this object.
 {"input": 32, "cache_read": 57690, "cache_write": 739, "output": 911, "thinking": 73, "total": 59372}
 ```
 
-`total` is `input + cache_read + cache_write + output` and excludes `thinking`, which is exactly what `matev2 usage`'s TOTAL column and `v_now.tokens_today` sum.
+`total` is `input + cache_read + cache_write + output` and excludes `thinking`, which is exactly what `mate usage`'s TOTAL column and `v_now.tokens_today` sum.
 
 A `ref` is a transcript locator - the file a fact was read out of and the byte offset inside it - and it is what makes every number on the page traceable back to the harness's own record.
 
@@ -103,7 +103,7 @@ Tier 2: the Mate above, the task table below, the inbox beside it.
 
 `mate` is the card's block plus what the Mate has spent and what it last did.
 There is no `task` row for a Mate - its turns belong to the project and not to any one task (docs/timeline.md) - so `turns`, `tokens` and `cost` are computed from `turn` directly, with the same all-zeroes-is-not-a-price guard `v_task_ledger` uses.
-This is the same SQL `cmd/matev2/usage.go`'s `mateLedgerRow` runs, and the unit tests compare the two number for number.
+This is the same SQL `cmd/mate/usage.go`'s `mateLedgerRow` runs, and the unit tests compare the two number for number.
 `last_turn` is `null` for a Mate that has taken no turn yet, and otherwise the full turn object of section 4.
 
 `tasks` is every crew the project has ever recorded, open and closed, oldest spawn first: one row of `v_task_ledger` each, with the crew's current `v_now` state, target and detail hung on it, plus two things no view carries.
@@ -138,7 +138,7 @@ A failed box read leaves `inbox` empty and puts the reason in `inbox_error` rath
     {
       "crew": "buybtn",
       "text": "Add a Buy button to README.md linking to the checkout page",
-      "branch": "matev2/buybtn",
+      "branch": "mate/buybtn",
       "state": "waiting_review",
       "since": "2026-09-19T10:46:12.000000000Z",
       "target": "mate",
@@ -248,7 +248,7 @@ A branch that is gone is not an error: the crew was torn down and its work lande
       "waited_ms": 48000
     }
   ],
-  "branch": {"name": "matev2/buybtn", "exists": true}
+  "branch": {"name": "mate/buybtn", "exists": true}
 }
 ```
 
@@ -262,7 +262,7 @@ One turn opened: the turn itself, its tool calls, and the story rows recorded in
 `actions` can be longer than the turn's `tool_count`: the count is the calls the harness made, while `action` also holds the synthesised `thinking` rows the ingest writes for a busy stretch no call explains (docs/timeline.md section 4).
 A UI that draws them should say which is which by the tool name.
 
-`events` is `v_story` filtered to `turn_id`, in exactly the shape and field order `matev2 events` prints as JSON lines: `id`, `at`, `project`, `kind`, `actor`, `actor_kind`, `subject`, `task`, `turn`, `cause`, `cause_kind`, `payload`, `ref`, `ref_offset`.
+`events` is `v_story` filtered to `turn_id`, in exactly the shape and field order `mate events` prints as JSON lines: `id`, `at`, `project`, `kind`, `actor`, `actor_kind`, `subject`, `task`, `turn`, `cause`, `cause_kind`, `payload`, `ref`, `ref_offset`.
 It is produced by `timeline.Story`, the same function the CLI calls, so the two cannot drift.
 
 A turn id belonging to another crew is a `404`: a link built from one page must not render under another page's heading.
@@ -311,7 +311,7 @@ An unescaped `#` makes the browser send only the part before it and treat the re
 
 ## 6. `GET /api/projects/{project}/tasks/{crew}/diff`
 
-The bottom of the task page: `matev2 diff <project> <crew>`, verbatim.
+The bottom of the task page: `mate diff <project> <crew>`, verbatim.
 
 The CLI's own `crewDiffText` produces it, so the page and the terminal can never disagree about what a branch contains.
 A branch git no longer has returns `200` with an empty `text` and a `reason`, not an error, for the same reason the CLI says it plainly: a crew whose branch was deleted is a crew whose work landed or was discarded.
@@ -323,7 +323,7 @@ A diff that fails for any other reason answers the same way - the rest of the ta
   "last_event_id": 412,
   "project": "shop",
   "crew": "buybtn",
-  "branch": "matev2/buybtn",
+  "branch": "mate/buybtn",
   "exists": true,
   "text": "0d2d20d docs: add Buy link\n\ndiff --git a/README.md b/README.md\n…"
 }
@@ -339,7 +339,7 @@ Otherwise it waits up to `wait` seconds, polling the database once a second, and
 `since` defaults to 0, which returns the whole story.
 `project` is optional; without it the story of every project is returned, merged and sorted by `(at, id)`.
 
-`events` are `v_story` rows through `timeline.Story`, the same shape and field order `matev2 events` prints.
+`events` are `v_story` rows through `timeline.Story`, the same shape and field order `mate events` prints.
 
 `now` are the `v_now` rows of the actors that moved, so one call refreshes both the story and the scene.
 `v_now` has no "changed since" of its own, so which actors moved is read off `transition` - the table the view's scene columns already come from - as the distinct actors with a transition whose `event_id > since`.
@@ -386,7 +386,7 @@ Each is named here because a later change to a view should absorb them rather th
 4. `turn`, `action`, `question` and `message` themselves, for the turn timeline: the views summarise a task, they do not enumerate what happened inside it.
 5. `transition`, for which actors moved since an event id, because `v_now` is a snapshot with no history in it.
 
-`v_now`'s `context_pct` is read from the view directly rather than through `scene.Now`, which selects only the eight columns `matev2 events --scene` prints.
+`v_now`'s `context_pct` is read from the view directly rather than through `scene.Now`, which selects only the eight columns `mate events --scene` prints.
 
 ## 10. The UI
 
@@ -415,7 +415,7 @@ Because the API is cached per `last_event_id` and the page always polls from the
 The header carries the state as words: `live · HH:MM:SS` after every answered poll, `stale · <reason>` when one fails, where the reason is the API's own `reason` or, for a transport failure, "the dashboard is not answering".
 A failed poll retries every 3 seconds rather than spinning.
 
-One thing the `since` contract does not cover: `matev2 reindex` deletes and re-inserts every event, so `MAX(event.id)` can go *backwards*.
+One thing the `since` contract does not cover: `mate reindex` deletes and re-inserts every event, so `MAX(event.id)` can go *backwards*.
 A page holding a cursor from before a rebuild would poll a dead id for ever while reporting `live`, so the page treats a `last_event_id` lower than its own cursor as a rebuild, takes the server's number and re-fetches.
 
 ### Numbers
@@ -424,7 +424,7 @@ A page holding a cursor from before a rebuild would poll a dead id for ever whil
 `TestUIHumanizeMatchesGo` builds a table of ~900 cases from the Go functions, sweeping every boundary plus a deterministic spread, and replays it through the page's own file in node when the machine has one.
 Durations (`840ms`, `6.2s`, `1m7s`, `2h04m`, `3d 4h`) are the page's own: the console's `shortDuration` answers a different question and rounds a minute and seven seconds down to `1m`.
 
-A `null` cost or context percentage renders `?`, never `0` - the same answer `matev2 usage` prints.
+A `null` cost or context percentage renders `?`, never `0` - the same answer `mate usage` prints.
 A timestamp is shown as a local clock time with the database's own RFC3339 string on hover, so a value on the page and a row in the database stay comparable.
 Every turn, action, status line and event carries its `ref` as a `path:offset` tooltip.
 

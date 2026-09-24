@@ -2,11 +2,11 @@ package runtime_test
 
 import (
 	"context"
-	"github.com/nguyenngocanh94/matev2/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/process"
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 func TestHerdrReadAgentUsesRecentUnwrappedTextAndNamedSession(t *testing.T) {

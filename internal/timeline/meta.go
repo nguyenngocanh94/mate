@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // Meta keys read here. internal/spawn writes them under exactly these names;
@@ -106,7 +106,7 @@ func (p *pass) ingestMeta(ctx context.Context) error {
 	// because every message has two ends and an end that is not recorded is
 	// a join that silently drops the row.
 	p.b.actor(pendingActor{ID: UserActorID(project), Project: project, Kind: ActorUser, Name: "captain"})
-	p.b.actor(pendingActor{ID: AppActorID(project), Project: project, Kind: ActorApp, Name: "matev2"})
+	p.b.actor(pendingActor{ID: AppActorID(project), Project: project, Kind: ActorApp, Name: "app"})
 	p.b.actor(pendingActor{ID: ObserverActorID(project), Project: project, Kind: ActorObserver, Name: "observer"})
 
 	mateMeta, err := ws.ReadMateMeta(project)

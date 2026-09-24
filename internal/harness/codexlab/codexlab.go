@@ -4,15 +4,15 @@
 //
 // Measured 2026-09-24: 115 of the 138 `[projects."…"]` trust entries in an
 // operator's ~/.codex/config.toml pointed at deleted temp directories of
-// matev2 live tests, and task 37 had added a `hooks.state` entry there. Each
+// mate live tests, and task 37 had added a `hooks.state` entry there. Each
 // one was a Codex agent trusting its cwd in the only home it could see.
 //
 // How the lab home reaches every launch: Home sets CODEX_HOME in the test
 // process; harness.LaunchCodexHome resolves every Codex launch and every Mate
 // pane's CODEX_HOME from it; the runtime exports a launch's environment into
 // the pane before each agent start; and a Mate pane carries CODEX_HOME to the
-// `matev2 crew spawn` it runs. The guard is harness.LaunchCodexHome itself:
-// with MATEV2_LIVE=1, a launch whose home is outside the temp directory is
+// `mate crew spawn` it runs. The guard is harness.LaunchCodexHome itself:
+// with MATE_LIVE=1, a launch whose home is outside the temp directory is
 // refused before anything starts. Home's cleanup is the second check, after
 // the fact: the operator's config.toml must not have gained a line naming a
 // temp path.
@@ -26,8 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // AuthFile is the one file copied from the operator's home. codex-cli 0.156.1
@@ -43,7 +43,7 @@ const Config = "[features]\nhooks = true\n"
 
 // Marker is the file that says a home is a lab home, so a second Home in one
 // test is refused instead of copying a lab's auth into another lab.
-const Marker = "matev2-codexlab"
+const Marker = "mate-codexlab"
 
 // Home creates a lab CODEX_HOME under the temp directory for t, copies the
 // operator's auth file into it (a copy, never a link, so Codex writing to it
@@ -85,7 +85,7 @@ func Home(t testing.TB) string {
 	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(Config), 0o644); err != nil {
 		t.Fatalf("codexlab: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(home, Marker), []byte("a matev2 live test's lab CODEX_HOME\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(home, Marker), []byte("a mate live test's lab CODEX_HOME\n"), 0o644); err != nil {
 		t.Fatalf("codexlab: %v", err)
 	}
 	t.Setenv(config.EnvCodexHome, home)

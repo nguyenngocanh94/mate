@@ -86,7 +86,7 @@ func CrewActorID(project, crew string) string { return ActorCrew + ":" + project
 // UserActorID is the captain, as seen from one project.
 func UserActorID(project string) string { return ActorUser + ":" + project }
 
-// AppActorID is matev2 itself: the daemon's digests and the console's
+// AppActorID is mate itself: the daemon's digests and the console's
 // `[assign]` lines are its, not the captain's.
 func AppActorID(project string) string { return ActorApp + ":" + project }
 

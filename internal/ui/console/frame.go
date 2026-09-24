@@ -64,7 +64,7 @@ func (m Model) hasInspectorColumn(l frameLayout) bool {
 // ---------- line 0: header ----------
 
 func (m Model) headerLine(l frameLayout) *line {
-	left := newLine().add(" matev2 console", m.p.Bold)
+	left := newLine().add(" mate console", m.p.Bold)
 	if m.phase == phaseReady {
 		// TODO(task 18): the open-incident badge and the "? monitoring
 		// error" marker lived here. Both read the health observer, which
@@ -458,6 +458,6 @@ func filterHints(hints []keyHint, keep func(keyHint) bool) []keyHint {
 // terminal back returns to exactly the previous screen.
 func (m Model) pushTooSmall(s *screen, l frameLayout) {
 	s.push(newLine().add(fmt.Sprintf(" Terminal too small: %dx%d", l.Cols, l.Rows), m.p.Amber))
-	s.push(newLine().add(fmt.Sprintf(" matev2 console needs at least %dx%d.", minCols, minRows), m.p.Fg))
+	s.push(newLine().add(fmt.Sprintf(" mate console needs at least %dx%d.", minCols, minRows), m.p.Fg))
 	s.push(newLine().add(" Resize the window, or press q to quit.", m.p.Dim))
 }

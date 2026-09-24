@@ -3,7 +3,7 @@ package watch
 import (
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/send"
+	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
 // Health is one observation of a crew: what Herdr answered about the agent,

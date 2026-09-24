@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// The three callers a `matev2` command can have, as the pane environment
+// The three callers a `mate` command can have, as the pane environment
 // spells them. A Mate's pane carries CallerMate and a Crew's pane carries
 // CallerCrew because spawn injects them when the pane is made; the captain's
 // own shell carries nothing, which is CallerUser.
 //
-// The default is deliberately the captain: an environment matev2 did not
+// The default is deliberately the captain: an environment mate did not
 // create is somebody typing, and the rule the variable exists for - a Mate
 // may not merge while `yolo` is off - must never be skipped because a
 // variable was missing. Missing means "not a Mate", and a Mate always has
@@ -29,7 +29,7 @@ const (
 	CallerCrew = "crew"
 )
 
-// CallerFromEnv reads MATEV2_CALLER out of the process environment and
+// CallerFromEnv reads MATE_CALLER out of the process environment and
 // normalises it. An unset, empty or unrecognised value is CallerUser: see
 // the constants above for why that is the safe default rather than a
 // refusal.
@@ -37,7 +37,7 @@ func CallerFromEnv() string {
 	return NormaliseCaller(os.Getenv(config.EnvCaller))
 }
 
-// NormaliseCaller maps one raw MATEV2_CALLER value onto the three callers.
+// NormaliseCaller maps one raw MATE_CALLER value onto the three callers.
 func NormaliseCaller(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case CallerMate:
@@ -49,7 +49,7 @@ func NormaliseCaller(raw string) string {
 	}
 }
 
-// MergeResult is one successful `matev2 merge`: what was landed, and the
+// MergeResult is one successful `mate merge`: what was landed, and the
 // teardown that closed the crew behind it.
 type MergeResult struct {
 	Project string
@@ -277,7 +277,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	out.Stop = stop
 	if err != nil {
 		return out, observability.WrapError(observability.CodeStateConflict,
-			fmt.Sprintf("%s/%s: merged %d commit(s) into %s (%s..%s), but the crew was not torn down and is still open; rerun `matev2 crew stop %s %s` - the merge is done and must not be repeated",
+			fmt.Sprintf("%s/%s: merged %d commit(s) into %s (%s..%s), but the crew was not torn down and is still open; rerun `mate crew stop %s %s` - the merge is done and must not be repeated",
 				project, crew, out.Commits, cfg.DefaultBranch, shortCommit(out.Before), shortCommit(out.After), project, crew), err)
 	}
 	return out, nil

@@ -15,7 +15,7 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"github.com/creack/pty"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"golang.org/x/sys/unix"
 )
 

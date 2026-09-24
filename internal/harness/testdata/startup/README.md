@@ -47,7 +47,7 @@ published, in Herdr 0.8.2 lab panes under the scratchpad:
 - `codex-0.154.0-resume-update-dialog.txt` - `codex resume <id>` launched **without**
   `-c check_for_update_on_startup=false`, in a directory codex already trusted, with
   the session's history above it. It is the same release-update prompt a fresh
-  launch draws; with the flag, which every matev2 resume carries, it is not drawn.
+  launch draws; with the flag, which every mate resume carries, it is not drawn.
 - `codex-0.154.0-resume-ready.txt` - the same pane after `down`, `enter` (**2. Skip**,
   so the lab wrote nothing to the operator's `version.json`) and one more question.
   The replayed conversation puts `›` prompt lines above the composer, so this is the
@@ -58,7 +58,7 @@ published, in Herdr 0.8.2 lab panes under the scratchpad:
   hook of its own, and this layout is recognised with the 0.156.1 one below.
 
 The installed codex moved from 0.154.0 to 0.156.1 during the same session (not by
-matev2: every lab update prompt was answered **2. Skip**), and the first live Codex
+mate: every lab update prompt was answered **2. Skip**), and the first live Codex
 Mate start after it died on a trust dialog of a new shape. Captured the same way, in
 a scratchpad directory codex had never seen:
 
@@ -74,7 +74,7 @@ a scratchpad directory codex had never seen:
 Captured 2026-09-24 (task 37) the same way, against codex-cli 0.156.1 in Herdr 0.8.2 lab
 panes, with a lab `CODEX_HOME` (the operator's auth copied, `features.hooks = true`)
 and a lab Mate directory whose `.codex/hooks.json` holds one SessionStart hook,
-`'/usr/local/bin/matev2' hook mate-session` (a stand-in path; the tests put the real
+`'/usr/local/bin/mate' hook mate-session` (a stand-in path; the tests put the real
 path and command in its place). Each file is one read, 1.5 s after the key named:
 
 - `codex-0.156.1-hooks-review.txt` - the dialog after the directory-trust dialog:
@@ -98,7 +98,7 @@ review lists two:
 - `codex-0.156.1-hooks-table-review-two.txt` - the table: SessionStart `2 0 2`.
 - `codex-0.156.1-hooks-sessionstart-two-foreign-selected.txt` - the list with the
   operator-side hook (`User config - <CODEX_HOME>/hooks.json`) first and selected.
-- `codex-0.156.1-hooks-sessionstart-two-own-selected.txt` - after `down`: matev2's.
+- `codex-0.156.1-hooks-sessionstart-two-own-selected.txt` - after `down`: mate's.
 - `codex-0.156.1-hooks-sessionstart-two-own-trusted.txt` - after `t`: `[x] Hook 2`,
   `Trust Trusted`, footer `space/enter toggle · esc back`; `t` trusts the selected
   hook only.
@@ -110,9 +110,15 @@ review lists two:
 - `codex-0.156.1-hooks-sessionstart-own-wrapped.txt` - assembled from the screen tail
   a live `TestLiveCodexMateRecallHook` refusal quoted (the Event to Trust block and
   the footer are verbatim; the banner above is the list capture's): the Source path
-  wrapped at `/` with the `/` not drawn (`…/.matev2` then `projects/…`), the Command
+  wrapped at `/` with the `/` not drawn (`…/.mate` then `projects/…`), the Command
   wrapped after `mate-`, and a `Context   limit: 32000 approximate tokens` row the
   lab captures without `additionalContextLimit` do not have.
+- `codex-0.156.1-hooks-sessionstart-own-truncated.txt` - the whole screen of a live
+  `TestLiveSpawnMateResumeRemembersCodex` refusal (2026-09-24, TMPDIR a long Claude
+  scratchpad path): Codex cut the 194-character command at a word boundary and drew
+  `…` in place of ` --harness codex`. The cut fell at the same word with a 179- and a
+  178-character prefix, so it is a word boundary near 180 characters, not a fixed
+  count.
 
 Trusting writes `[hooks.state."<hooks.json>:session_start:0:0"] trusted_hash` into
 `$CODEX_HOME/config.toml`; the next launch with the same hook bytes draws no review.

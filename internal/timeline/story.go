@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/db"
 )
 
 // StoryEvent is one row of `v_story`: an event with the names a reader would
 // say out loud instead of the ids a join needs.
 //
 // The field order is the JSON field order, and it is part of the contract:
-// `matev2 events` prints one of these per line, and a consumer diffing two
+// `mate events` prints one of these per line, and a consumer diffing two
 // runs compares bytes. A field is added at the end, never in the middle.
 type StoryEvent struct {
 	ID        int64           `json:"id"`
@@ -137,7 +137,7 @@ func Story(ctx context.Context, sqlDB *sql.DB, q StoryQuery) ([]StoryEvent, erro
 	return out, rows.Err()
 }
 
-// JSONLine renders one event as the line `matev2 events` prints. It is
+// JSONLine renders one event as the line `mate events` prints. It is
 // deliberately not indented: one event per line is what makes `--follow`
 // streamable and what lets a reader `grep` the story.
 func (e StoryEvent) JSONLine() (string, error) {

@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 func narrowMateStreamFixture(t *testing.T, metadata SessionMetadataReader) (Model, *blockingChannel, int) {

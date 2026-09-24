@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/crewstate"
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // HealthReading is one observation of one agent's pane. It is the only input
@@ -19,7 +19,7 @@ import (
 // hole M5 exists to close.
 //
 // The composer word is crewstate.Composer, the spelling the console and
-// `matev2 state` already share, so this package needs neither internal/send
+// `mate state` already share, so this package needs neither internal/send
 // nor the Herdr adapter it pulls in.
 type HealthReading struct {
 	Project      string
@@ -149,7 +149,7 @@ func (i *Ingester) ingestAll(ctx context.Context, shared *sql.Tx) error {
 }
 
 // Reindex drops every derived table and rebuilds the whole timeline from the
-// files and the transcripts. It is `matev2 reindex`, and it is the executable
+// files and the transcripts. It is `mate reindex`, and it is the executable
 // statement of decision 6: nothing here is a record, so throwing all of it
 // away and reading the files again has to produce the same story.
 func (i *Ingester) Reindex(ctx context.Context) error {
@@ -255,7 +255,7 @@ type pass struct {
 	// keyed by actor, with the command text as written in the transcript.
 	statusClock map[string][]datedCommand
 	// commitSightings are the commits an actor's transcript shows it making,
-	// keyed by actor. They matter because a branch is short-lived: `matev2
+	// keyed by actor. They matter because a branch is short-lived: `mate
 	// merge` deletes it, and a crew that commits seconds before the merge can
 	// leave no window in which any poll could have read `git log`.
 	commitSightings map[string][]commitSighting

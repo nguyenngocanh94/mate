@@ -9,24 +9,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/db"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// DefaultAddr is what `matev2 dashboard` binds when nobody says otherwise.
+// DefaultAddr is what `mate dashboard` binds when nobody says otherwise.
 // Loopback, and a port nothing else in this toolchain uses.
 const DefaultAddr = "127.0.0.1:7777"
 
 // Deps are the two answers the database cannot give, handed in rather than
-// imported: the text of `matev2 diff` for a crew, and whether a crew's
+// imported: the text of `mate diff` for a crew, and whether a crew's
 // branch still exists. Both live in the CLI and in `internal/gitx`, and one
-// seam keeps the dashboard's own package free of git and of `cmd/matev2`.
+// seam keeps the dashboard's own package free of git and of `cmd/mate`.
 //
 // A nil Deps field is not an error: the endpoint that needs it says so in
 // its `reason` rather than failing, which is the same answer a reader gets
 // for a branch that was deleted.
 type Deps struct {
-	// Diff is `matev2 diff <project> <crew>`, verbatim - cmd/matev2 wires
+	// Diff is `mate diff <project> <crew>`, verbatim - cmd/mate wires
 	// its own crewDiffText here so the page and the terminal can never
 	// disagree about what a branch contains.
 	Diff func(ctx context.Context, project, crew string) (string, error)
@@ -162,7 +162,7 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	return err
 }
 
-// URL is the address a reader opens, for the line `matev2 dashboard` prints.
+// URL is the address a reader opens, for the line `mate dashboard` prints.
 func URL(ln net.Listener) string {
 	addr, ok := ln.Addr().(*net.TCPAddr)
 	if !ok {

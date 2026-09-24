@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/nguyenngocanh94/matev2/assets"
+	"github.com/nguyenngocanh94/mate/assets"
 )
 
 var (
@@ -61,7 +61,7 @@ type Params struct {
 	MemoryFile string
 	// BacklogFile is the absolute path of the Mate's backlog.md.
 	BacklogFile string
-	// MatevBin is the absolute path of the matev2 binary the Mate invokes.
+	// MatevBin is the absolute path of the mate binary the Mate invokes.
 	MatevBin string
 	// MateDir is the absolute path of the Mate's own working directory, the
 	// one place it may write: its briefs, memory and backlog live there.

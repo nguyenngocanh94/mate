@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/config"
 )
 
 // recorder runs Home's cleanups on demand and keeps what they report, so the

@@ -40,7 +40,7 @@ const (
 // mate attach child. The child still writes its normal envelope to the
 // terminal for scripting and human callers, and mirrors it here so the
 // Console can recover the error code after the child releases the TTY.
-const EnvAttachResultFile = "MATEV2_ATTACH_RESULT_FILE"
+const EnvAttachResultFile = "MATE_ATTACH_RESULT_FILE"
 
 // Error is a coded error with optional details. CodeInteractionTimeout and
 // CodeInteractionExpired both map to exit 31 and are distinguished by

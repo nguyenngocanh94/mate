@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The foundation's own golden frames: one per breakpoint, both glyph sets,
@@ -34,7 +34,7 @@ func TestGoldenFramesLoadingAndFailed(t *testing.T) {
 	m.hasLoaded = false
 	assertGolden(t, "loading-120x36-unicode", renderFrame(t, m))
 
-	failed := newFailedFixture(t, errFake("open /Users/dev/work/acme/.matev2/matev2.db: permission denied"), 120, 36, unicodeGlyphs)
+	failed := newFailedFixture(t, errFake("open /Users/dev/work/acme/.mate/mate.db: permission denied"), 120, 36, unicodeGlyphs)
 	assertGolden(t, "failed-120x36-unicode", renderFrame(t, failed))
 
 	// A refresh that fails is a different screen: the snapshot already on
@@ -45,7 +45,7 @@ func TestGoldenFramesLoadingAndFailed(t *testing.T) {
 }
 
 // TestGoldenFramesDrilledIntoAProject is the Project frame with a Crew
-// selected, the deepest level matev2 has.
+// selected, the deepest level mate has.
 //
 // TODO(task 21): v1 drilled one level further, into a Task's Crew
 // attempts; those attempts-*.txt fixtures went with the Task level.

@@ -1,4 +1,4 @@
-// humanize.js - the number vocabulary of `matev2 usage` and the console's
+// humanize.js - the number vocabulary of `mate usage` and the console's
 // TOKENS column, re-implemented for the page.
 //
 // It is a classic script, not a module: it declares three functions on the

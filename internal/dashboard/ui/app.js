@@ -85,7 +85,7 @@
   function fmtTokens(n) { return humanizeTokens(n || 0); }
 
   // A null cost is unknown, not zero: docs/timeline.md's "a missing price is
-  // not a price of zero", which `matev2 usage` prints as `?`.
+  // not a price of zero", which `mate usage` prints as `?`.
   function fmtCost(v) { return v == null ? "?" : humanizeCost(v); }
 
   function fmtPct(v) { return v == null ? "?" : goFixed(v, 1) + "%"; }
@@ -959,7 +959,7 @@
       if (token !== pollToken) return;
       var serverID = body.last_event_id || 0;
       if (serverID < lastEventID) {
-        // The whole timeline was rebuilt under us. `matev2 reindex` deletes
+        // The whole timeline was rebuilt under us. `mate reindex` deletes
         // and re-inserts every row, so `MAX(event.id)` goes backwards and a
         // cursor from before the rebuild names an id that will never come
         // round again. Taking the server's number is the only way back:

@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 )
 
 // The merge half of the package (docs/mvp.md task 22). Like the rest of this
-// file's neighbours these run the real git: what `matev2 merge` depends on is
+// file's neighbours these run the real git: what `mate merge` depends on is
 // that `--ff-only` really refuses a diverged branch, which no fake can show.
 // The one fake-runner test at the bottom pins the argv and the order of the
 // two commands, which is the part a real repository cannot observe.
@@ -68,13 +68,13 @@ func TestMergeFFOnlyAdvancesTheCheckedOutBranchToTheCrewBranch(t *testing.T) {
 	repo := newRepo(t)
 	g := gitx.New()
 	ctx := context.Background()
-	branchWithCommit(t, repo, "matev2/k3", "feature.txt", "feature\n")
+	branchWithCommit(t, repo, "mate/k3", "feature.txt", "feature\n")
 
 	before, err := g.HeadCommit(ctx, repo, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	tip, err := g.HeadCommit(ctx, repo, "matev2/k3")
+	tip, err := g.HeadCommit(ctx, repo, "mate/k3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestMergeFFOnlyAdvancesTheCheckedOutBranchToTheCrewBranch(t *testing.T) {
 		t.Fatal("the branch must be ahead before the merge, or this test proves nothing")
 	}
 
-	if err := g.MergeFFOnly(ctx, repo, "matev2/k3"); err != nil {
+	if err := g.MergeFFOnly(ctx, repo, "mate/k3"); err != nil {
 		t.Fatalf("MergeFFOnly: %v", err)
 	}
 
@@ -104,7 +104,7 @@ func TestMergeFFOnlyRefusesABranchThatIsNotADescendant(t *testing.T) {
 	repo := newRepo(t)
 	g := gitx.New()
 	ctx := context.Background()
-	branchWithCommit(t, repo, "matev2/k3", "feature.txt", "feature\n")
+	branchWithCommit(t, repo, "mate/k3", "feature.txt", "feature\n")
 
 	// main moves on: the crew branch is no longer a fast-forward. This is
 	// the `needs-rebase` situation, and git must refuse it rather than
@@ -117,7 +117,7 @@ func TestMergeFFOnlyRefusesABranchThatIsNotADescendant(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := g.MergeFFOnly(ctx, repo, "matev2/k3"); err == nil {
+	if err := g.MergeFFOnly(ctx, repo, "mate/k3"); err == nil {
 		t.Fatal("MergeFFOnly must refuse a diverged branch")
 	}
 	after, err := g.HeadCommit(ctx, repo, "main")
@@ -133,16 +133,16 @@ func TestMergeFFOnlyRefusesADetachedHeadAndTheBranchItself(t *testing.T) {
 	repo := newRepo(t)
 	g := gitx.New()
 	ctx := context.Background()
-	branchWithCommit(t, repo, "matev2/k3", "feature.txt", "feature\n")
+	branchWithCommit(t, repo, "mate/k3", "feature.txt", "feature\n")
 
 	run(t, repo, "checkout", "--detach", "HEAD")
-	err := g.MergeFFOnly(ctx, repo, "matev2/k3")
+	err := g.MergeFFOnly(ctx, repo, "mate/k3")
 	if err == nil || !strings.Contains(err.Error(), "detached HEAD") {
 		t.Fatalf("MergeFFOnly on a detached HEAD = %v, want a refusal naming the detached HEAD", err)
 	}
 
 	run(t, repo, "checkout", "main")
-	// The primary repo cannot check out matev2/k3 (the linked worktree
+	// The primary repo cannot check out mate/k3 (the linked worktree
 	// holds it), so the same-branch guard is exercised by asking to merge
 	// main into main.
 	err = g.MergeFFOnly(ctx, repo, "main")
@@ -163,7 +163,7 @@ func TestMergeFFOnlyReadsHEADBeforeItRunsAnyMerge(t *testing.T) {
 	}
 	g := gitx.Git{Runner: f}
 
-	if err := g.MergeFFOnly(context.Background(), "/ws/shop", "matev2/k3"); err != nil {
+	if err := g.MergeFFOnly(context.Background(), "/ws/shop", "mate/k3"); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.calls) != 2 {
@@ -171,7 +171,7 @@ func TestMergeFFOnlyReadsHEADBeforeItRunsAnyMerge(t *testing.T) {
 	}
 	want := [][]string{
 		{"rev-parse", "--abbrev-ref", "HEAD"},
-		{"merge", "--ff-only", "matev2/k3"},
+		{"merge", "--ff-only", "mate/k3"},
 	}
 	for i, w := range want {
 		if strings.Join(f.calls[i].Args, "\x00") != strings.Join(w, "\x00") {
@@ -191,7 +191,7 @@ func TestMergeFFOnlyDoesNotRunMergeWhenHEADIsDetached(t *testing.T) {
 	}
 	g := gitx.Git{Runner: f}
 
-	if err := g.MergeFFOnly(context.Background(), "/ws/shop", "matev2/k3"); err == nil {
+	if err := g.MergeFFOnly(context.Background(), "/ws/shop", "mate/k3"); err == nil {
 		t.Fatal("a detached HEAD must be refused")
 	}
 	if len(f.calls) != 1 {

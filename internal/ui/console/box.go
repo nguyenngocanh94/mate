@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The message box (mvp.md task 15, section 4): the project's crew status
@@ -457,7 +457,7 @@ func (m Model) listLayout() frameLayout {
 // (-1 for the newest). Colour is stripped, the way a golden fixture renders,
 // so what comes back is the words a reader sees and nothing else.
 //
-// It is exported for one caller: the live proof in cmd/matev2, which has to
+// It is exported for one caller: the live proof in cmd/mate, which has to
 // assert that a crew's actual question is legible in the rail. That is a
 // claim only the renderer can settle - boxRail and the palette are Console
 // state - and a live test that asserted on the DTO instead would pass while

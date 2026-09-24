@@ -4,12 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // The inbox rule table. Each case builds a real workspace through store -
-// the same appends a crew and `matev2 send` make - and asserts exactly which
+// the same appends a crew and `mate send` make - and asserts exactly which
 // items survive box.Inbox. The two rules under test are the ones inbox.go
 // documents: a later status line from the same crew (exact), and a sent.log
 // line addressed to that crew after the question's time (approximate, and
@@ -127,7 +127,7 @@ func TestInboxLegacyBlockedFromACrewIsAQuestion(t *testing.T) {
 // for the same reason.
 func TestInboxWaitMateIsNotAQuestion(t *testing.T) {
 	assertInbox(t, runInbox(t, nil,
-		step{crew: "k3", status: "wait-mate: ready in branch matev2/k3"},
+		step{crew: "k3", status: "wait-mate: ready in branch mate/k3"},
 		step{crew: "k9", status: "done: PR ready"},
 		step{crew: "z1", status: "failed: the build never went green"},
 	))
@@ -143,7 +143,7 @@ func TestInboxResolvedByUserReply(t *testing.T) {
 }
 
 // TestInboxResolvedByMateReply is rule 2 with the Mate as the replier - the
-// whole point of `resolve:`. `matev2 send` records Source: mate when it runs
+// whole point of `resolve:`. `mate send` records Source: mate when it runs
 // in the Mate's own pane, and that is what closes the item.
 func TestInboxResolvedByMateReply(t *testing.T) {
 	assertInbox(t, runInbox(t, nil,

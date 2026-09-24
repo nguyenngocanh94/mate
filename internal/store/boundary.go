@@ -9,7 +9,7 @@ import (
 
 // BoundaryError is the refusal for a path that resolves outside the workspace
 // root. It is returned by every write in this package, so a symlink planted
-// under `.matev2/` cannot make the store touch a file elsewhere on disk.
+// under `.mate/` cannot make the store touch a file elsewhere on disk.
 type BoundaryError struct {
 	// Path is the path as the layout helpers built it, before resolution.
 	Path string

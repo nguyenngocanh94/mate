@@ -145,7 +145,7 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 }
 
 // normaliseProject fills the defaults and checks the fields: the repository
-// must be inside the workspace and outside `.matev2/`, and the mode must be
+// must be inside the workspace and outside `.mate/`, and the mode must be
 // the one the MVP supports.
 func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
 	if cfg.DefaultBranch == "" {
@@ -169,7 +169,7 @@ func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
 // root - into the path stored in the configuration: relative to the root,
 // slash separated, and proven to be inside the workspace. The repository need
 // not be a direct child of the root, but it must not be the root itself and
-// must not live under `.matev2/`.
+// must not live under `.mate/`.
 func (w *Workspace) RelRepo(repo string) (string, error) {
 	if repo == "" {
 		return "", fmt.Errorf("store: repo path is empty")

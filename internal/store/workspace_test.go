@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // newWorkspace initialises a workspace in a temp dir with a repo directory
@@ -32,8 +32,8 @@ func TestStoreInitThenOpenRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	if created.Session() == "" || !strings.HasPrefix(created.Session(), "matev2-") {
-		t.Fatalf("session name %q does not look like matev2-<id>", created.Session())
+	if created.Session() == "" || !strings.HasPrefix(created.Session(), "mate-") {
+		t.Fatalf("session name %q does not look like mate-<id>", created.Session())
 	}
 	if got := created.Defaults(); got.MateHarness != store.DefaultMateHarness || got.CrewHarness != store.DefaultCrewHarness {
 		t.Fatalf("defaults = %+v, want claude/codex", got)
@@ -70,7 +70,7 @@ func TestStoreOpenWithoutStateDirFails(t *testing.T) {
 		t.Fatalf("Open on a bare dir: err = %v, want ErrNotWorkspace", err)
 	}
 
-	// A .matev2 directory without workspace.yaml is not a workspace either.
+	// A .mate directory without workspace.yaml is not a workspace either.
 	if err := os.MkdirAll(filepath.Join(dir, store.StateDirName), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestStoreSessionNameIsStableAndPathSpecific(t *testing.T) {
 	if a == c {
 		t.Fatalf("two workspaces share session name %q", a)
 	}
-	if !strings.HasPrefix(a, "matev2-") || len(a) != len("matev2-")+8 {
+	if !strings.HasPrefix(a, "mate-") || len(a) != len("mate-")+8 {
 		t.Fatalf("unexpected session name %q", a)
 	}
 }
@@ -131,18 +131,18 @@ func TestStoreLayoutPathsAreInsideWorkspace(t *testing.T) {
 	}
 
 	want := map[string]string{
-		w.CrewMeta("shop", "k3"):    filepath.Join(root, ".matev2/projects/shop/crews/k3.meta"),
-		w.CrewStatus("shop", "k3"):  filepath.Join(root, ".matev2/projects/shop/crews/k3.status"),
-		w.CrewBrief("shop", "k3"):   filepath.Join(root, ".matev2/projects/shop/crews/k3/brief.md"),
+		w.CrewMeta("shop", "k3"):    filepath.Join(root, ".mate/projects/shop/crews/k3.meta"),
+		w.CrewStatus("shop", "k3"):  filepath.Join(root, ".mate/projects/shop/crews/k3.status"),
+		w.CrewBrief("shop", "k3"):   filepath.Join(root, ".mate/projects/shop/crews/k3/brief.md"),
 		w.WorktreeDir("shop", "k3"): filepath.Join(root, ".worktrees/shop-k3"),
-		w.AutoFlag("shop"):          filepath.Join(root, ".matev2/projects/shop/mate/.auto"),
-		w.SentLog("shop"):           filepath.Join(root, ".matev2/projects/shop/sent.log"),
-		w.MemoryFile("shop"):        filepath.Join(root, ".matev2/projects/shop/mate/memory.md"),
-		w.BacklogFile("shop"):       filepath.Join(root, ".matev2/projects/shop/mate/backlog.md"),
-		w.ProjectDoc("shop"):        filepath.Join(root, ".matev2/projects/shop/PROJECT.md"),
-		w.CrewReport("shop", "k3"):  filepath.Join(root, ".matev2/projects/shop/crews/k3/report.md"),
-		w.MateMeta("shop"):          filepath.Join(root, ".matev2/projects/shop/mate/mate.meta"),
-		w.WorkspaceDoc():            filepath.Join(root, ".matev2/WORKSPACE.md"),
+		w.AutoFlag("shop"):          filepath.Join(root, ".mate/projects/shop/mate/.auto"),
+		w.SentLog("shop"):           filepath.Join(root, ".mate/projects/shop/sent.log"),
+		w.MemoryFile("shop"):        filepath.Join(root, ".mate/projects/shop/mate/memory.md"),
+		w.BacklogFile("shop"):       filepath.Join(root, ".mate/projects/shop/mate/backlog.md"),
+		w.ProjectDoc("shop"):        filepath.Join(root, ".mate/projects/shop/PROJECT.md"),
+		w.CrewReport("shop", "k3"):  filepath.Join(root, ".mate/projects/shop/crews/k3/report.md"),
+		w.MateMeta("shop"):          filepath.Join(root, ".mate/projects/shop/mate/mate.meta"),
+		w.WorkspaceDoc():            filepath.Join(root, ".mate/WORKSPACE.md"),
 	}
 	for got, expect := range want {
 		if got != expect {

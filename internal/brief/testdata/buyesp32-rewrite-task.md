@@ -9,7 +9,7 @@ tôi muốn bạn tìm hiểu cho tôi mạch esp32 sau đó báo cáo lại, ta
 ## What we already know
 - The Mate has not read this repository and has no record of its contents: PROJECT.md is empty and no earlier task changed code here.
 - No earlier task built an ESP32 landing page; the backlog holds only research tasks. Whether one exists in the repo is unknown.
-- A research report with a landing-page content outline exists: /Users/erics/work-matev2/.matev2/projects/shop/crews/esp32research/bao-cao-esp32-devkit.md, section "4) Khung nội dung sẵn cho landing page". Read it only if Open decision 1 is answered "build it".
+- A research report with a landing-page content outline exists: /Users/erics/work-mate/.mate/projects/shop/crews/esp32research/bao-cao-esp32-devkit.md, section "4) Khung nội dung sẵn cho landing page". Read it only if Open decision 1 is answered "build it".
 - No payment provider, checkout URL or payment account has ever been mentioned by the captain.
 - Unknown: the stack, the build and test commands, and whether a checkout page exists.
 

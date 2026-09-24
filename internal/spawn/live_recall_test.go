@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/memory"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // Task 37's live proofs of the SessionStart digest (docs/mvp.md M8): the
-// hook matev2 installs prints `matev2 recall`, and after a compaction the
+// hook mate installs prints `mate recall`, and after a compaction the
 // Mate answers from the digest the hook printed again, not from what it
 // remembered of the one before.
 
-const canaryQuestion = "Without running any tool or reading any file: what is the deploy canary word in the memory.md of the most recent matev2 recall digest in your context? Answer with that word only, or NONE."
+const canaryQuestion = "Without running any tool or reading any file: what is the deploy canary word in the memory.md of the most recent mate recall digest in your context? Answer with that word only, or NONE."
 
 // seedCanary writes a memory.md whose one lesson names word.
 func seedCanary(t *testing.T, path, word string) {
@@ -88,11 +88,11 @@ func TestLiveMateRecallOnCompact(t *testing.T) {
 	if transcript == "" {
 		t.Fatal("the Stop hook recorded no transcript")
 	}
-	transcriptLineWith(t, transcript, time.Second, `"hookName":"SessionStart:startup"`, "# matev2 recall shop", "PELICAN-SOUTH")
+	transcriptLineWith(t, transcript, time.Second, `"hookName":"SessionStart:startup"`, "# mate recall shop", "PELICAN-SOUTH")
 
 	seedCanary(t, memoryFile, "OSPREY-NORTH")
 	sendSlash(t, ctx, lab, h, "/compact")
-	line := transcriptLineWith(t, transcript, 5*time.Minute, `"hookName":"SessionStart:compact"`, "# matev2 recall shop")
+	line := transcriptLineWith(t, transcript, 5*time.Minute, `"hookName":"SessionStart:compact"`, "# mate recall shop")
 	if !strings.Contains(line, "OSPREY-NORTH") || !strings.Contains(line, "session start: compact") {
 		t.Fatalf("the compact hook's output lacks the new canary: %.600s", line)
 	}
@@ -153,14 +153,14 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	}
 	answer := waitCodexAnswer(t, rollout, 0, 3*time.Minute)
 	requireCanary(t, answer, "HERON-EAST")
-	if !strings.Contains(transcriptLineWith(t, rollout, time.Second, "# matev2 recall shop", "session start: startup"), "HERON-EAST") {
+	if !strings.Contains(transcriptLineWith(t, rollout, time.Second, "# mate recall shop", "session start: startup"), "HERON-EAST") {
 		t.Fatal("the startup digest in the rollout lacks the canary")
 	}
-	if strings.Contains(transcriptLineWith(t, rollout, time.Second, "# matev2 recall shop"), "truncated output") {
+	if strings.Contains(transcriptLineWith(t, rollout, time.Second, "# mate recall shop"), "truncated output") {
 		t.Fatal("Codex truncated the digest despite additionalContextLimit")
 	}
 
-	// Codex recorded the trust matev2 gave its hook in the lab CODEX_HOME,
+	// Codex recorded the trust mate gave its hook in the lab CODEX_HOME,
 	// under the Mate's own hooks file, so the next launch draws no review.
 	// The /compact below keeps this to one launch; a relaunch would now run
 	// in the same lab home, because every start exports CODEX_HOME.
@@ -190,5 +190,5 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	}
 	answer = waitCodexAnswer(t, rollout, seen, 4*time.Minute)
 	requireCanary(t, answer, "HERON-WEST")
-	transcriptLineWith(t, rollout, time.Second, "# matev2 recall shop", "session start: compact", "HERON-WEST")
+	transcriptLineWith(t, rollout, time.Second, "# mate recall shop", "session start: compact", "HERON-WEST")
 }

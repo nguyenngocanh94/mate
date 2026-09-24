@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
 func TestFakeStartPaneNotFoundDistinctFromAgentNotFound(t *testing.T) {
@@ -111,13 +111,13 @@ func TestFakeEnsureProjectWorkspaceReuseRefusesEnv(t *testing.T) {
 	cwd := t.TempDir()
 	if _, err := rt.EnsureProjectWorkspace(context.Background(), runtime.WorkspaceSpec{
 		Session: session, Label: "P", Cwd: cwd,
-		Env: []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env: []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = rt.EnsureProjectWorkspace(context.Background(), runtime.WorkspaceSpec{
 		Session: session, Label: "P", Cwd: cwd,
-		Env: []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env: []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	})
 	if err == nil {
 		t.Fatal("reuse with env would not inject it; refuse rather than drop")
@@ -421,7 +421,7 @@ func boot(t *testing.T) (*runtime.Fake, harness.LaunchSpec, runtime.SessionHandl
 	cwd := t.TempDir()
 	ws, err := rt.EnsureProjectWorkspace(ctx, runtime.WorkspaceSpec{
 		Session: session, Label: "P", Cwd: cwd,
-		Env: []runtime.EnvVar{{Key: "MATEV2_AGENT_ID", Value: "mate_001"}},
+		Env: []runtime.EnvVar{{Key: "MATE_AGENT_ID", Value: "mate_001"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -432,7 +432,7 @@ func boot(t *testing.T) (*runtime.Fake, harness.LaunchSpec, runtime.SessionHandl
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tab.Env) != 1 || tab.Env[0].Key != "MATEV2_AGENT_ID" {
+	if len(tab.Env) != 1 || tab.Env[0].Key != "MATE_AGENT_ID" {
 		t.Fatalf("tab env = %#v", tab.Env)
 	}
 	path := filepath.Join(cwd, "context.md")

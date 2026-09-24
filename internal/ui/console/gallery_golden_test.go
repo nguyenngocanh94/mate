@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/query"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 // The states gallery's own two groups, wired to fixtures: "Empty, loading,
@@ -115,7 +115,7 @@ func TestGalleryEmptyLoadingAndError(t *testing.T) {
 		// show the breadcrumb falsely claiming "0 projects". The only fact a
 		// failed first load establishes is that the read failed, not how many
 		// Projects the workspace has.
-		err := errFake("runtime_unavailable: open " + galleryWorkspaceRoot + "/.matev2/workspace.yaml: permission denied")
+		err := errFake("runtime_unavailable: open " + galleryWorkspaceRoot + "/.mate/workspace.yaml: permission denied")
 		failed := newFailedFixture(t, err, 80, 24, unicodeGlyphs)
 		frame := renderFrame(t, failed)
 		if !strings.Contains(frame, "r retries the read; q quits.") {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // The Codex 0.151.0 metering contract in internal/harness/codex.go rests on
@@ -205,16 +205,16 @@ func TestCodexModelReproducesCommittedProbeCaptures(t *testing.T) {
 
 // Opt-in live re-probe: reruns every scenario against the installed codex
 // CLI and diffs the extracted instruction text against the committed
-// captures. Run with MATEV2_LIVE=1 (testdata/codexprobe/probe.py
+// captures. Run with MATE_LIVE=1 (testdata/codexprobe/probe.py
 // does the same standalone). A mismatch means a Codex release changed the
 // chain behavior: re-verify the metering contract in codex.go before
 // re-baselining with probe.py --write.
 func TestLiveCodexProbeMatchesCommittedCaptures(t *testing.T) {
-	if os.Getenv("MATEV2_LIVE") != "1" {
-		t.Skip("set MATEV2_LIVE=1 to run live harness proofs")
+	if os.Getenv("MATE_LIVE") != "1" {
+		t.Skip("set MATE_LIVE=1 to run live harness proofs")
 	}
 	if _, err := exec.LookPath("codex"); err != nil {
-		t.Fatalf("MATEV2_LIVE=1 but no codex CLI is in PATH: %v", err)
+		t.Fatalf("MATE_LIVE=1 but no codex CLI is in PATH: %v", err)
 	}
 	for _, sc := range loadProbeScenarios(t) {
 		sc := sc

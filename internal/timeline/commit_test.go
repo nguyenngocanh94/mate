@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/timeline"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
-// A crew's branch is short-lived: `matev2 merge` deletes it on its way out,
+// A crew's branch is short-lived: `mate merge` deletes it on its way out,
 // so a crew that commits a few seconds before somebody merges can leave no
 // window in which a five-second poll could read `git log <default>..<branch>`.
 // Measured 2026-09-20 in a live run: six seconds between the commit and the
 // merge, no poll inside it, and the merge could not be proved at all.
 //
 // The crew's own transcript keeps the sha for ever, because git echoes it
-// back: `[matev2/buybtn 6b8ee07] docs: add …`. This is that rule, end to end:
+// back: `[mate/buybtn 6b8ee07] docs: add …`. This is that rule, end to end:
 // the branch is already gone before the first ingest, and the commit and the
 // merge are still recorded.
 func TestACommitIsFoundInTheTranscriptWhenTheBranchIsAlreadyGone(t *testing.T) {
@@ -28,7 +28,7 @@ func TestACommitIsFoundInTheTranscriptWhenTheBranchIsAlreadyGone(t *testing.T) {
 	repo := filepath.Join(f.root, fixtureProject)
 
 	// The crew's work, already merged and its branch already deleted - the
-	// state `matev2 merge` leaves behind.
+	// state `mate merge` leaves behind.
 	gitRun(t, repo, "checkout", "-b", fixtureBranch)
 	if err := os.WriteFile(filepath.Join(repo, "README.md"),
 		[]byte("# shop\n\n[Buy](pages/checkout-express.html)\n"), 0o644); err != nil {

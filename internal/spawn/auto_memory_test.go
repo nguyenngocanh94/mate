@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
 // settingsKeys decodes a settings file into its top-level keys.
@@ -26,7 +26,7 @@ func settingsKeys(t *testing.T, data []byte) map[string]json.RawMessage {
 // mate/memory.md, so Claude Code's own auto-memory must be off in the file
 // every Mate launches with.
 func TestMateSettingsTurnAutoMemoryOff(t *testing.T) {
-	data, err := spawn.ClaudeSettings("/usr/local/bin/matev2")
+	data, err := spawn.ClaudeSettings("/usr/local/bin/mate")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, spawn.ClaudeSettingsFile)
-	old := `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"'/old/matev2' hook mate-stop"}]}]}}`
+	old := `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"'/old/mate' hook mate-stop"}]}]}}`
 	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 	if string(keys[spawn.AutoMemoryKey]) != "false" {
 		t.Fatalf("auto-memory not turned off: %s", data)
 	}
-	if !json.Valid(keys["hooks"]) || !strings.Contains(string(keys["hooks"]), "/old/matev2") {
+	if !json.Valid(keys["hooks"]) || !strings.Contains(string(keys["hooks"]), "/old/mate") {
 		t.Fatalf("the existing hooks were not kept: %s", data)
 	}
 	// Task 37: the same start adds the SessionStart hook the old file lacks.
@@ -132,8 +132,8 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 // directory made before it: the SessionStart hook is added beside whatever
 // the file already runs, the captain's own SessionStart entries included.
 func TestEnsureSessionHookAddsItAndKeepsTheRest(t *testing.T) {
-	in := []byte(`{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"'/old/matev2' hook mate-stop"}]}],"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"echo captain"}]}]}}`)
-	out, changed, err := spawn.EnsureSessionHook(in, "/usr/local/bin/matev2")
+	in := []byte(`{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"'/old/mate' hook mate-stop"}]}],"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"echo captain"}]}]}}`)
+	out, changed, err := spawn.EnsureSessionHook(in, "/usr/local/bin/mate")
 	if err != nil || !changed {
 		t.Fatalf("EnsureSessionHook = changed %v, %v", changed, err)
 	}
@@ -149,18 +149,18 @@ func TestEnsureSessionHookAddsItAndKeepsTheRest(t *testing.T) {
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if got.Theme != "dark" || len(got.Hooks["Stop"]) != 1 || got.Hooks["Stop"][0].Hooks[0].Command != "'/old/matev2' hook mate-stop" {
+	if got.Theme != "dark" || len(got.Hooks["Stop"]) != 1 || got.Hooks["Stop"][0].Hooks[0].Command != "'/old/mate' hook mate-stop" {
 		t.Fatalf("the file's other keys were not kept: %s", out)
 	}
 	starts := got.Hooks["SessionStart"]
 	if len(starts) != 2 || starts[0].Matcher != "startup" || starts[0].Hooks[0].Command != "echo captain" {
 		t.Fatalf("the captain's SessionStart entry was not kept first: %s", out)
 	}
-	if starts[1].Matcher != "" || starts[1].Hooks[0].Command != "'/usr/local/bin/matev2' hook mate-session" {
-		t.Fatalf("matev2's entry = %+v, want an unmatched hook mate-session", starts[1])
+	if starts[1].Matcher != "" || starts[1].Hooks[0].Command != "'/usr/local/bin/mate' hook mate-session" {
+		t.Fatalf("mate's entry = %+v, want an unmatched hook mate-session", starts[1])
 	}
 
-	again, changed, err := spawn.EnsureSessionHook(out, "/somewhere/else/matev2")
+	again, changed, err := spawn.EnsureSessionHook(out, "/somewhere/else/mate")
 	if err != nil || changed || string(again) != string(out) {
 		t.Fatalf("a file that already runs hook mate-session was changed (%v, %v)", changed, err)
 	}

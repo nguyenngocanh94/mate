@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/matev2/internal/config"
-	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
 // Codex is the HarnessAdapter for Codex CLI 0.151.0. Generated context is
@@ -150,7 +150,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		notes: []string{
 			"the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code",
 			"the captain first chose the narrower --ask-for-approval never --sandbox workspace-write pair, then reversed that ruling the same day: a linked Crew worktree's .git is a pointer file into the primary repo's git dir, outside workspace-write's writable root, so a Codex Crew under the narrow pair could do work but could never git commit it (measured both directions) - and mate never commits on a Crew's behalf, it only fast-forwards the Crew branch, so uncommitted work can never be delivered",
-			"this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.matev2/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit",
+			"this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.mate/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit",
 			"this puts gomate in the same posture firstmate's own tooling already runs Codex in",
 			"this does not clear Codex's per-absolute-path directory-trust confirmation; that dialog is a separate wall no flag removes, measured 2026-09-14",
 			"the launch also carries -c check_for_update_on_startup=false: codex-cli draws a three-option release-update prompt ahead of everything else while a newer version is published, which blocks the composer (measured 2026-09-18 with 0.154.0 installed and 0.155.0 out); the key is documented and the override is per-launch, so the operator's own config.toml is never written",
