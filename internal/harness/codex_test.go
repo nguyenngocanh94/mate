@@ -23,19 +23,49 @@ func TestCodexRefusesMissingOverride(t *testing.T) {
 	}
 }
 
-func TestCodexRefusesResumeRequest(t *testing.T) {
+// TestCodexResumeLaunchesTheSubcommandWithTheID is task 35's B11: codex-cli
+// 0.154.0 resumes a given session with `codex resume [OPTIONS] <id>` and only
+// opens its picker when no id is given, so a resume is the fresh launch's
+// flags under the subcommand, with the id last.
+func TestCodexResumeLaunchesTheSubcommandWithTheID(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	const id = "01a0d260-cd47-77d2-bee7-46d98aa0461a"
+	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
 		Kind:            KindCodex,
 		Cwd:             cwd,
-		ResumeSessionID: "some-thread-id",
+		ResumeSessionID: id,
 	})
-	if !errors.Is(err, ErrResumeUnsupported) {
-		t.Fatalf("err = %v, want ErrResumeUnsupported", err)
+	if err != nil {
+		t.Fatalf("BuildLaunchSpec resume: %v", err)
+	}
+	want := []string{"resume", "--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride, id}
+	if !slices.Equal(spec.Args(), want) {
+		t.Fatalf("resume args = %#v, want %#v", spec.Args(), want)
+	}
+}
+
+// TestCodexRefusesAResumeIDThatIsNotAUUID keeps whatever mate.meta carries
+// from reaching the argv as something Codex could read as a flag or as a
+// session name: only a session UUID is ever resumed.
+func TestCodexRefusesAResumeIDThatIsNotAUUID(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"--last", "some-thread-id", "01a0d260-cd47"} {
+		_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+			Kind:            KindCodex,
+			Cwd:             cwd,
+			ResumeSessionID: id,
+		})
+		if !errors.Is(err, ErrContextRequired) {
+			t.Fatalf("resume id %q: err = %v, want a refusal", id, err)
+		}
 	}
 }
 

@@ -727,9 +727,10 @@ func prepareCrewHarnessFiles(ctx context.Context, w *store.Workspace, deps Deps,
 		// A Claude launch can only carry a session id together with a
 		// settings file, and decision 9 wants session_id= recorded from the
 		// first day, so the crew gets a settings file of its own. It wires
-		// no hooks: the Mate's hooks are the Mate's.
+		// no hooks (the Mate's hooks are the Mate's) and turns auto-memory
+		// off (CrewClaudeSettings).
 		settingsPath = filepath.Join(w.CrewDir(plan.project, plan.crew), ClaudeSettingsFile)
-		if err := writeInside(w, settingsPath, []byte("{}\n"), 0o644); err != nil {
+		if err := writeInside(w, settingsPath, CrewClaudeSettings(), 0o644); err != nil {
 			return "", "", err
 		}
 		return newSessionID(deps.NewSessionID), settingsPath, nil

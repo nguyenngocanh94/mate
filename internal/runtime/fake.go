@@ -116,6 +116,10 @@ type fakeAgent struct {
 	Status        AgentStatus
 	LaunchPending bool
 	Interactive   bool
+	// SessionRef is what Herdr would report as agent_session.value; a test
+	// sets it on the live entry to model a Codex agent past its first
+	// prompt.
+	SessionRef string
 }
 
 // NewFake returns an empty fake runtime.
@@ -389,6 +393,7 @@ func (f *Fake) ListAgents(_ context.Context, session SessionHandle) ([]ObservedA
 		}
 		out = append(out, ObservedAgent{
 			Handle:        ag.Handle,
+			SessionRef:    ag.SessionRef,
 			Status:        ag.Status,
 			LaunchPending: ag.LaunchPending,
 			Interactive:   ag.Interactive,
@@ -422,6 +427,7 @@ func (f *Fake) InspectAgent(_ context.Context, handle AgentHandle) (ObservedAgen
 	}
 	return ObservedAgent{
 		Handle:        ag.Handle,
+		SessionRef:    ag.SessionRef,
 		Status:        ag.Status,
 		LaunchPending: ag.LaunchPending,
 		Interactive:   ag.Interactive,

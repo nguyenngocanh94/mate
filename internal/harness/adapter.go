@@ -57,9 +57,8 @@ type AgentSpec struct {
 	// exclusive with ClaudeSessionID: a fresh id names the session a start
 	// creates, a resume id names one that already exists. Claude resumes
 	// with `--resume <id>` (still paired with --settings so the Stop hook
-	// wires up the same as a fresh start); Codex has no proven
-	// non-interactive resume path, so BuildLaunchSpec refuses with
-	// ErrResumeUnsupported.
+	// wires up the same as a fresh start); Codex with `codex resume <flags>
+	// <id>`, which must be a UUID (task 35, measured on codex-cli 0.154.0).
 	ResumeSessionID string
 	// ManualInCwd says the agent's cwd already loads the operating manual on
 	// its own, so the launch must not carry a context flag as well. Claude

@@ -19,9 +19,10 @@ import (
 )
 
 // ClaudeSettingsDir and ClaudeSettingsFile are the Claude settings the Mate
-// launches with: ClaudeSettings wires its two hooks to the matev2 binary.
-// Start only ever creates the file; it never overwrites one that already
-// exists, whether that is the user's own or one a previous start wrote.
+// launches with: ClaudeSettings wires its two hooks to the matev2 binary and
+// turns Claude Code's auto-memory off. Start creates the file, and on one
+// that already exists - the user's own, or one a previous start wrote - it
+// only ever adds a missing autoMemoryEnabled key.
 const (
 	ClaudeSettingsDir  = ".claude"
 	ClaudeSettingsFile = "settings.json"
@@ -77,8 +78,9 @@ type StartResult struct {
 	// ResumedFrom is the session id resumed from. Empty unless Resumed.
 	ResumedFrom string
 	// ResumeNote explains why a resume that was requested did not happen
-	// (harness mismatch, or the harness has no non-interactive resume),
-	// so this start went fresh instead. Empty when nothing needed saying.
+	// (harness mismatch, a Codex session with no rollout on disk, or a
+	// resumed launch that did not come up), so this start went fresh
+	// instead. Empty when nothing needed saying.
 	ResumeNote string
 }
 
@@ -133,7 +135,16 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	if err != nil {
 		return StartResult{}, err
 	}
+	if staleMeta && priorMeta[MetaHarness] == string(harness.KindCodex) && strings.TrimSpace(priorMeta[MetaSessionID]) == "" {
+		// A Codex Mate that died without `mate stop` never had its session
+		// recorded (StopMate is where Herdr is asked); its rollout can
+		// still say which one it was.
+		if id := codexSessionAtStop(deps, w.MateDir(project), priorMeta, ""); id != "" {
+			priorMeta[MetaSessionID] = id
+		}
+	}
 	decision := decideResume(priorMeta, kind, req)
+	decision = checkCodexResume(deps, kind, decision)
 
 	// 2. The Mate's directory: the manual, rendered again on every start,
 	// and the settings file Claude launches with.
@@ -152,15 +163,7 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	if err != nil {
 		return StartResult{}, err
 	}
-	wsHandle, err := ensureProjectWorkspace(ctx, deps, session, project, mateDir)
-	if err != nil {
-		return StartResult{}, err
-	}
-	tab, err := deps.Runtime.CreateAgentTab(ctx, runtime.TabSpec{
-		Workspace: wsHandle,
-		Label:     MateTabLabel,
-		Cwd:       mateDir,
-	})
+	tab, err := openMateTab(ctx, deps, session, project, mateDir)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -169,10 +172,68 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	result, err := startInTab(ctx, w, deps, project, kind, mateDir, decision, session, tab)
 	if err != nil {
 		compensate(ctx, deps, w, project, session, tab)
-		return StartResult{}, err
+		if !decision.Resume || ctx.Err() != nil {
+			return StartResult{}, err
+		}
+		// A resume that did not come up is not a reason to leave the
+		// project without a Mate: the conversation is a convenience, the
+		// files are the memory (docs/mvp.md M8). One fresh attempt, in a
+		// tab of its own, and the result says why it went fresh.
+		fresh := resumeDecision{Note: fmt.Sprintf(
+			"resuming the %s session %s failed (%v); started a fresh session instead",
+			kind, decision.SessionID, oneLineErr(err))}
+		tab, err = openMateTab(ctx, deps, session, project, mateDir)
+		if err != nil {
+			return StartResult{}, err
+		}
+		result, err = startInTab(ctx, w, deps, project, kind, mateDir, fresh, session, tab)
+		if err != nil {
+			compensate(ctx, deps, w, project, session, tab)
+			return StartResult{}, err
+		}
 	}
 	result.StaleMeta = staleMeta
 	return result, nil
+}
+
+// openMateTab adopts or creates the project's Herdr workspace and opens the
+// Mate tab in it, cwd = the Mate directory.
+func openMateTab(ctx context.Context, deps Deps, session runtime.SessionHandle, project, mateDir string) (runtime.TabHandle, error) {
+	wsHandle, err := ensureProjectWorkspace(ctx, deps, session, project, mateDir)
+	if err != nil {
+		return runtime.TabHandle{}, err
+	}
+	return deps.Runtime.CreateAgentTab(ctx, runtime.TabSpec{
+		Workspace: wsHandle,
+		Label:     MateTabLabel,
+		Cwd:       mateDir,
+	})
+}
+
+// oneLineErr flattens an error for a one-line note: startup refusals carry
+// the pane's screen tail on the lines after the message.
+func oneLineErr(err error) string {
+	msg, _, _ := strings.Cut(err.Error(), "\n")
+	return strings.TrimSpace(msg)
+}
+
+// checkCodexResume refuses, before anything is launched, to resume a Codex
+// session whose rollout is not on disk. codex-cli 0.154.0 answers `codex
+// resume <unknown id>` with "No saved session found with ID ..." and drops to
+// the shell, which Herdr reports only as an agent-start timeout a minute
+// later (measured 2026-09-24, task 35); the file name says it at once.
+func checkCodexResume(deps Deps, kind harness.Kind, decision resumeDecision) resumeDecision {
+	if kind != harness.KindCodex || !decision.Resume {
+		return decision
+	}
+	dir, err := deps.codexSessionsDir()
+	if err != nil {
+		return resumeDecision{Note: fmt.Sprintf("cannot look for the Codex session %s to resume (%v); starting a fresh session instead", decision.SessionID, err)}
+	}
+	if _, ok := harness.CodexRolloutPath(dir, decision.SessionID); !ok {
+		return resumeDecision{Note: fmt.Sprintf("mate.meta recorded the Codex session %s but %s has no rollout for it; starting a fresh session instead", decision.SessionID, dir)}
+	}
+	return decision
 }
 
 // resumeDecision is what task 10's resume logic concluded before a single
@@ -207,8 +268,10 @@ func decideResume(meta map[string]string, kind harness.Kind, req StartRequest) r
 	return resumeDecision{Resume: true, SessionID: priorID}
 }
 
-// freshSessionID mints the Claude session uuid a non-resuming start needs;
-// every other harness has no launch-time session identity (start_test.go's
+// freshSessionID mints the Claude session uuid a non-resuming start needs.
+// Codex has no launch-time session identity: its id exists only once the
+// first prompt opens the rollout, so StopMate records it (task 35) and a
+// fresh Codex start writes session_id= empty (start_test.go's
 // TestStartMateCodexWritesTheDiscoveryFile).
 func freshSessionID(deps Deps, kind harness.Kind) string {
 	if kind != harness.KindClaude {
@@ -230,19 +293,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	resumeNote := decision.Note
 	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume)
 	if err != nil {
-		if resume && errors.Is(err, harness.ErrResumeUnsupported) {
-			// Documented in docs/mvp.md task 10: a harness with no proven
-			// non-interactive resume path (Codex's `resume` opens an
-			// interactive picker) falls back to a fresh session rather
-			// than failing the start outright.
-			resumeNote = fmt.Sprintf("resume not supported for %s: %v; started a fresh session instead", kind, err)
-			resume = false
-			sessionID = freshSessionID(deps, kind)
-			launch, err = buildLaunchSpec(ctx, project, kind, mateDir, sessionID, false)
-		}
-		if err != nil {
-			return StartResult{}, err
-		}
+		return StartResult{}, err
 	}
 	reservation, err := runtime.AllocateAgentName(deps.Names, session.Name, AgentNamePrefix, project, runtime.FailOnCollision)
 	if err != nil {
@@ -394,15 +445,25 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 // ensureClaudeSettings creates `<mate>/.claude/settings.json` if it is not
 // there, wired to binary's `hook mate-prompt`/`hook mate-stop` (ClaudeSettings).
 // An existing file - the user's own, or one a previous start already wrote -
-// is never touched.
+// keeps every key it has; the one thing a start adds to it is
+// `autoMemoryEnabled: false` when the file does not say (EnsureAutoMemoryOff),
+// so a Mate directory made before task 35 starts with auto-memory off too.
 func ensureClaudeSettings(mateDir, binary string) error {
 	dir := filepath.Join(mateDir, ClaudeSettingsDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	path := filepath.Join(dir, ClaudeSettingsFile)
-	if _, err := os.Stat(path); err == nil {
-		return nil
+	existing, err := os.ReadFile(path)
+	if err == nil {
+		updated, changed, err := EnsureAutoMemoryOff(existing)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		if !changed {
+			return nil
+		}
+		return os.WriteFile(path, updated, 0o644)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
