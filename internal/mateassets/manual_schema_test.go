@@ -7,6 +7,7 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/brief"
 	"github.com/nguyenngocanh94/matev2/internal/facts"
+	"github.com/nguyenngocanh94/matev2/internal/memory"
 )
 
 // The brief schema has one source of truth, internal/brief. These tests
@@ -92,8 +93,17 @@ func TestManualFactsExampleIsTheRealOutput(t *testing.T) {
 var headingMention = regexp.MustCompile("`## ([^`]+)`")
 
 // templateHeadings are the `##` headings the crew template itself asks a
-// Crew to write, in a hand-back or a report; they are not brief sections.
-var templateHeadings = map[string]bool{"Deviations from Build": true, "Still open": true, "Durable facts": true}
+// Crew to write, in a hand-back or a report, and the sections of the Mate's
+// own files (internal/memory); they are not brief sections.
+var templateHeadings = func() map[string]bool {
+	m := map[string]bool{"Deviations from Build": true, "Still open": true, "Durable facts": true}
+	for _, set := range [][]string{memory.Sections, memory.ProjectSections, memory.BacklogSections} {
+		for _, s := range set {
+			m[s] = true
+		}
+	}
+	return m
+}()
 
 // TestEveryBriefHeadingMentionIsKnown: wherever the manual, a skill or the
 // crew template names a `## ` heading, it is one the check enforces or one

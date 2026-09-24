@@ -12,6 +12,7 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/facts"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
+	"github.com/nguyenngocanh94/matev2/internal/memory"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
@@ -300,7 +301,7 @@ func ensureProjectDoc(w *store.Workspace, name string) error {
 }
 
 func projectDocTemplate(name string) string {
-	return fmt.Sprintf("# %s\n\n## What this project is\n\n## How to work here\n", name)
+	return memory.ProjectTemplate(name)
 }
 
 // cmdProjectFacts implements `matev2 project facts <project>`: what the
