@@ -88,9 +88,12 @@ Times are UTC.
 | 5 | + `claudeBusy` fix | FAIL 451.12s, in the `shop` half | Reported and ended the spawn turn 25s after the request. Digest at 04:34:07. The test failed earlier, in `shop`. |
 | 6 | + a `resolve:` sentence in section 10 | PASS 239.25s | Reported and ended the spawn turn 26s after the request. Digest at 04:42:28, then a separate turn merged. |
 | 7 | + main merged (M7, tasks 32-33); `resolve:` sentence reverted | FAIL 393.55s, in the `shop` half | Reported and ended the spawn turn 28s after the request. Digest at 04:47:55, merged 16s later. |
+| 8 | + `shop` half waits for the escalation and types the captain's answer | FAIL 118.68s, in the `shop` half | Not reached. The `shop` Mate escalated, then relayed the answer through the brief rather than in the line. |
+| 9 | + the relay may go through the brief | **PASS 254.52s** | Reported and ended the spawn turn 25s after the request. Digest at 05:01:08, then a separate turn merged. |
+| 10 | same tree as 9 | **PASS 284.46s** | Reported and ended the spawn turn 27s after the request. Digest at 05:05:34, then a separate turn merged. |
 
-The `blog` Mate ended its spawning turn in all seven runs.
-None of the seven ran the supervision loop.
+The `blog` Mate ended its spawning turn in every run where it was reached.
+None of those runs ran the supervision loop.
 The tool-output wording was never changed, because it never needed to be.
 
 ### Attempts 2 and 4: an idle Mate read as busy
@@ -144,54 +147,79 @@ In attempt 7 the Mate wrote the checkout choice into the brief as `decides: capt
 ```
 
 The test waits for the Mate to answer the Crew, so under M7's policy the `shop` half now fails every time at that step.
-Whether `[assign]` hands the Mate a `decides: captain` question is an open product decision.
-`docs/mvp.md` section 5 says `[assign]` is the captain handing the question to the Mate.
-The M7 skill says otherwise.
-It is not decided here.
+Decided 2026-09-24: `[assign]` hands the question to the Mate to handle, not to decide, and `decision-authority` stays.
+`docs/mvp.md` section 5's sentence about `[assign]` now says so.
+The test changed, not the policy.
+After `[assign]` is delivered, the `shop` half waits for the Mate's escalation to the captain naming both pages.
+It asserts the Mate sent the Crew no checkout choice.
+Then it types the captain's answer into the Mate's pane unmarked; `shop` is in manual mode, so there is no `.auto` to clear.
+Finally it waits for the Mate's `Source: mate` line to the Crew.
+Attempt 8 failed on the relay: the Mate did not send the choice itself.
+It ran `matev2 brief append` and sent the Crew a pointer: "The captain added to your task: read the words marked (added …) at the end of ## Captain's words in …/brief.md, then carry on with them."
+That is the M7 way, so the test accepts the choice either in the relayed line or in the Crew's `brief.md`.
+It also asserts that `main`'s README links `checkout-express.html`.
 
-## The two runs with the digest, in full
-
-Attempt 3, `blog` `sent.log`:
-
-```text
-04:13:53 | user → mate | Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.
-04:14:18 | mate → user | I've started the README change: "Published with matev2" is being added as the last line of the README. When it's done I'll check the change and merge it into main myself, since you've allowed me to merge on this project.
-04:15:05 | app  → mate | digest: 1 item(s) — r1 wait-mate: "ready in branch matev2/r1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
-04:15:05 | app  → mate | digest: 1 item(s) — r1 wait-mate: "ready in branch matev2/r1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
-04:15:16 | mate → user | "Published with matev2" is now the last line of the README and is merged into main. It was one commit, `1b65c65`, and nothing else changed. I checked it before merging.
-04:17:22 | user → mate | Thanks - that is all for today.
-04:17:22 | app  → mate | auto mode off: user prompt
-```
-
-Attempt 3, the Mate's turn boundaries:
+Attempt 9, `shop` `sent.log` from the question on:
 
 ```text
-#0 883cc3a7-…  04:13:56.459 .. 04:14:18.120  4 model calls  trigger user:blog: Add the line "Published with matev2" …
-#1 7e375ffc-…  04:15:08.251 .. 04:15:14.144  3 model calls  trigger app:blog: digest: 1 item(s) — r1 wait-mate: …
+05:01:03 | mate → user      | I need you to pick which checkout page the Buy button links to.  The repository has two checkout pages, `pages/checkout-express.html` and `pages/checkout-classic.html` […]
+05:01:04 | app  → mate      | resolve: buy1 asked: "checkout target is ambiguous: pages/checkout-express.html or pages/checkout-classic.html" — read …/crews/buy1.status, decide, and answer with matev2 send shop buy1 "<one line>"
+05:01:05 | app  → mate      | (the hook's copy of the same line)
+05:01:12 | mate → user      | I'm not answering this one, because it's yours to decide and I have nothing to base a choice on. […]
+05:01:12 | user → mate      | Use the express checkout page, pages/checkout-express.html.
+05:01:17 | mate → crew:buy1 | The captain added to your task: read the words marked (added 2026-09-24 12:01 +07) at the end of ## Captain's words in …/crews/buy1/brief.md, then carry on with them.
+05:02:25 | mate → user      | The Buy button is in and ready for you to merge, in branch `matev2/buy1`.  README.md now ends with `[Buy](pages/checkout-express.html)`. […]
 ```
 
-Attempt 6, `blog` `sent.log`:
+Then the console merge: `shop/buy1: merged 1 commit(s) into main (b72ae0c..8dd2d0c); crew finished, worktree and branch removed`.
+Attempt 10 took the same path (`05:05:40` escalation, `05:05:41` the captain's line, `05:05:45` the relay, merge `ec6d712..7c06288`).
+
+## The two final runs, in full
+
+Attempts 9 and 10 ran back to back on the same tree, each on its own lab session.
+
+Attempt 9, `blog` `sent.log`:
 
 ```text
-04:41:16 | user → mate | Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.
-04:41:42 | mate → user | I've started the README change: "Published with matev2" is being added as the last line of README.md. When it's done I'll review it and merge it, since this project is set to merge without […]
-04:42:28 | app  → mate | digest: 1 item(s) — rd1 wait-mate: "ready in branch matev2/rd1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
-04:42:28 | app  → mate | digest: 1 item(s) — rd1 wait-mate: "ready in branch matev2/rd1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
-04:42:35 | mate → user | "Published with matev2" is now the last line of README.md, and the change is merged into `main`. It's a single added line, and nothing else in the file changed.
-04:44:54 | user → mate | Thanks - that is all for today.
-04:44:54 | app  → mate | auto mode off: user prompt
+04:59:56 | user → mate | Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.
+05:00:24 | mate → user | I've started the work to add "Published with matev2" as the last line of README.md, and it's under way now. I'll review it when it's done, and because merging is delegated on this project […]
+05:01:08 | app  → mate | digest: 1 item(s) — rd1 wait-mate: "ready in branch matev2/rd1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
+05:01:09 | app  → mate | digest: 1 item(s) — rd1 wait-mate: "ready in branch matev2/rd1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
+05:01:26 | mate → user | The line is added and merged into main. README.md now ends with "Published with matev2", and nothing else in the file changed. […]
+05:03:50 | user → mate | Thanks - that is all for today.
+05:03:50 | app  → mate | auto mode off: user prompt
 ```
 
-Attempt 6, the Mate's turn boundaries:
+Attempt 9, the `blog` Mate's turn boundaries:
 
 ```text
-#0 0ad0b9b7-…  04:41:19.180 .. 04:41:42.144  4 model calls  trigger user:blog: Add the line "Published with matev2" …
-#1 feb5e02a-…  04:42:30.861 .. 04:42:34.289  2 model calls  trigger app:blog: digest: 1 item(s) — rd1 wait-mate: …
+#0 6896ca76-…  04:59:59.351 .. 05:00:24.503  4 model calls  trigger user:blog: Add the line "Published with matev2" …   (ran crew spawn blog rd1)
+#1 ca0a1c4b-…  05:01:11.751 .. 05:01:24.228  5 model calls  trigger app:blog: digest: 1 item(s) — rd1 wait-mate: …     (ran matev2 merge blog rd1)
 ```
 
-Attempt 1 is the same shape: spawn turn 03:56:44-03:57:07, digest 03:57:52, merge turn 03:57:55-03:58:00.
-Each digest appears twice, once from the outbox or daemon and once from the Mate's own `UserPromptSubmit` hook (section 7 of `docs/mvp.md`), so it reached the model.
-Every Crew finished through the Mate's `matev2 merge`, and `blog`'s `sent.log` holds exactly one captain line before the last one.
+Attempt 10, `blog` `sent.log`:
+
+```text
+05:04:22 | user → mate | Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.
+05:04:52 | mate → user | I've started adding "Published with matev2" to the end of README.md, and it will go on branch `matev2/rm1`. Merging is delegated to me on this project, so I'll land it on main […]
+05:05:34 | app  → mate | digest: 1 item(s) — rm1 wait-mate: "ready in branch matev2/rm1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
+05:05:34 | app  → mate | digest: 1 item(s) — rm1 wait-mate: "ready in branch matev2/rm1" — status files under <workspace>/.matev2/projects/blog/crews; act per AGENTS.md section 10
+05:05:46 | mate → user | README.md now ends with the line "Published with matev2", and the change is merged into main as one commit. I checked it before merging: that line is the only thing that changed.
+05:08:46 | user → mate | Thanks - that is all for today.
+05:08:46 | app  → mate | auto mode off: user prompt
+```
+
+Attempt 10, the `blog` Mate's turn boundaries:
+
+```text
+#0 60df9db9-…  05:04:25.533 .. 05:04:52.284  4 model calls  trigger user:blog: Add the line "Published with matev2" …   (ran crew spawn blog rm1)
+#1 b31391d9-…  05:05:37.110 .. 05:05:44.339  3 model calls  trigger app:blog: digest: 1 item(s) — rm1 wait-mate: …     (ran matev2 merge blog rm1)
+```
+
+Each digest appears twice: once from the outbox, once from the Mate's own `UserPromptSubmit` hook, so it reached the model.
+Both Crews finished through the Mate's `matev2 merge`.
+`blog`'s `sent.log` holds exactly one captain line before the last one.
+Earlier passing attempts 1, 3 and 6 had the same shape (spawn turn, digest, separate merge turn).
 
 ## Section 9's loop and Claude Code's `sleep` block
 
@@ -201,10 +229,7 @@ In attempts 1-3 the `shop` Mate supervised in manual mode with `sleep 20; matev2
 Every one of those ran in the foreground and returned its `state:` line after the wait.
 The loop stays as written, with the one sentence added to section 9.
 
-## Not established
+## Result
 
-- Two consecutive full passes on the final tree.
-  The `blog` half is correct in every run since the `claudeBusy` fix (attempts 5, 6, 7).
-  The `shop` half fails under M7's `decision-authority` policy until the `[assign]` question above is decided.
-
-`make check` exits 0 on the final tree.
+Two consecutive full passes on the final tree: attempts 9 (254.52s) and 10 (284.46s).
+`make check` exits 0 on the same tree.
