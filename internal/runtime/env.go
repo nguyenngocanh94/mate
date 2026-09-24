@@ -49,16 +49,33 @@ func AllowlistedEnv(vars []EnvVar) ([]EnvVar, error) {
 	return out, nil
 }
 
-// PaneEnv copies LaunchSpec.Env onto the runtime env that workspace/tab
-// create injects. This is the live use of LaunchSpec.Env(): agent start
-// has no --env flag (Herdr 0.8.2) and must not grow one.
+// PaneEnv copies LaunchSpec.Env onto the runtime env shape that workspace
+// and tab create inject. Agent start has no --env flag (Herdr 0.8.2), so
+// Herdr.StartAgent exports the same allowlisted variables into the pane's
+// shell before every start.
 func PaneEnv(launch harness.LaunchSpec) ([]EnvVar, error) {
-	src := launch.Env()
+	return AllowlistedEnv(runtimeEnv(launch.Env()))
+}
+
+func runtimeEnv(src []harness.EnvVar) []EnvVar {
 	vars := make([]EnvVar, 0, len(src))
 	for _, v := range src {
 		vars = append(vars, EnvVar{Key: v.Key, Value: v.Value})
 	}
-	return AllowlistedEnv(vars)
+	return vars
+}
+
+// exportAssignments renders vars as the words of one POSIX `export` typed
+// into a pane's shell: KEY='value', with a single quote in the value closed,
+// escaped and reopened, so a path with spaces or quotes arrives whole.
+// AllowlistedEnv has already refused keys and values that could not be one
+// assignment.
+func exportAssignments(vars []EnvVar) []string {
+	out := make([]string, 0, len(vars))
+	for _, v := range vars {
+		out = append(out, v.Key+"='"+strings.ReplaceAll(v.Value, "'", `'\''`)+"'")
+	}
+	return out
 }
 
 func envFlags(vars []EnvVar) []string {

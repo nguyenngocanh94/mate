@@ -295,7 +295,11 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		sessionID = freshSessionID(deps, kind)
 	}
 	resumeNote := decision.Note
-	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume)
+	env, err := mateEnv(project, session)
+	if err != nil {
+		return StartResult{}, err
+	}
+	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume, env)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -551,7 +555,7 @@ func writeCodexOverride(mateDir string) error {
 // directory, which is also where the manual is: the adapters require a
 // context path, so the path they are given is that same manual, never a
 // separate generated file.
-func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool) (harness.LaunchSpec, error) {
+func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar) (harness.LaunchSpec, error) {
 	adapter, err := harness.AdapterFor(kind)
 	if err != nil {
 		return harness.LaunchSpec{}, err
@@ -561,9 +565,12 @@ func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mat
 		Role: harness.RoleMate,
 		Kind: kind,
 		Cwd:  mateDir,
-		// No launch env here: Herdr 0.8.2 applies `--env` when a pane is
-		// created, not at `agent start`, so the Mate's identity variables
-		// are injected by the workspace create in ensureProjectWorkspace.
+		// The Mate's environment rides on the launch as well as on the
+		// workspace create: the runtime exports it into the pane before
+		// every start, which is the only way a Mate restarted into a fresh
+		// `tab create` (a Crew still holds the workspace) keeps its
+		// identity. The Codex adapter pins CODEX_HOME itself.
+		Env:    launchEnv(env, kind),
 		Config: harness.Config{Kind: kind},
 	}
 	switch kind {
@@ -602,19 +609,51 @@ func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.Sess
 	} else if found {
 		return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
 	}
-	spec.Env = []runtime.EnvVar{
+	env, err := mateEnv(project, session)
+	if err != nil {
+		return runtime.WorkspaceHandle{}, err
+	}
+	spec.Env = env
+	return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
+}
+
+// mateEnv is the Mate pane's environment: its identity, and the CODEX_HOME
+// every Codex agent of this project runs in.
+//
+// MATEV2_CALLER is how `matev2 merge` knows a Mate typed it and applies the
+// project's `yolo` rule (docs/mvp.md M4 decisions), and MATEV2_AGENT_ROLE is
+// how `matev2 send` records a line as the Mate's. CODEX_HOME is pinned for
+// either harness because the Mate's own `matev2 crew spawn` launches Codex
+// Crews and finds their rollouts from it: a Claude Mate that inherited
+// whatever the Herdr server was started with would put its Crews' trust
+// and rollouts somewhere this process never looks. harness.LaunchCodexHome
+// is also what refuses the operator's home during a live test run.
+func mateEnv(project string, session runtime.SessionHandle) ([]runtime.EnvVar, error) {
+	codexHome, err := harness.LaunchCodexHome("")
+	if err != nil {
+		return nil, observability.WrapError(observability.CodeUsage, "codex home", err)
+	}
+	return []runtime.EnvVar{
 		{Key: config.EnvProjectID, Value: project},
 		{Key: config.EnvAgentID, Value: AgentNamePrefix + "-" + project},
 		{Key: config.EnvAgentRole, Value: string(harness.RoleMate)},
 		{Key: config.EnvRuntimeSessionID, Value: session.Name},
-		// MATEV2_CALLER is how `matev2 merge` knows a Mate typed it and
-		// applies the project's `yolo` rule (docs/mvp.md M4 decisions). It
-		// goes on the workspace create, not on the Mate's tab create,
-		// because the Mate's tab is the workspace's renamed root pane and
-		// Herdr can only apply `--env` when a pane is made.
 		{Key: config.EnvCaller, Value: CallerMate},
+		{Key: config.EnvCodexHome, Value: codexHome},
+	}, nil
+}
+
+// launchEnv is env as a launch carries it. A Codex launch pins CODEX_HOME
+// itself (harness.Codex.BuildLaunchSpec) and refuses a second assignment.
+func launchEnv(env []runtime.EnvVar, kind harness.Kind) []harness.EnvVar {
+	out := make([]harness.EnvVar, 0, len(env))
+	for _, v := range env {
+		if kind == harness.KindCodex && v.Key == config.EnvCodexHome {
+			continue
+		}
+		out = append(out, harness.EnvVar{Key: v.Key, Value: v.Value})
 	}
-	return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
+	return out
 }
 
 // compensate undoes a start that failed after the tab existed: the agent is

@@ -10,10 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/memory"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 )
 
@@ -115,49 +113,16 @@ func TestLiveMateRecallOnCompact(t *testing.T) {
 // that reason (see the note before /compact).
 func TestLiveCodexMateRecallHook(t *testing.T) {
 	lab := newLiveLab(t)
-	home, err := os.MkdirTemp(os.Getenv("TMPDIR"), "codexhome-")
+	// liveLabSession gave this test a lab CODEX_HOME (codexlab.Home), and
+	// StartMate pins it into the Mate's pane on every launch.
+	home, err := harness.LaunchCodexHome("")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("no lab CODEX_HOME: %v", err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(home) })
-	userHome, err := harness.EffectiveCodexHome("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	auth, err := os.ReadFile(filepath.Join(userHome, "auth.json"))
-	if err != nil {
-		t.Fatalf("no Codex auth to copy into a lab CODEX_HOME: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(home, "auth.json"), auth, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[features]\nhooks = true\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("CODEX_HOME", home)
 	lab.deps.CodexSessionsDir = filepath.Join(home, "sessions")
-
-	// The Mate's pane takes its environment from the workspace create
-	// (docs/mvp.md section 7, task 22), so the lab creates the project's
-	// workspace first, with CODEX_HOME and the identity StartMate would
-	// have given it, and StartMate adopts it.
 	mateDir := lab.w.MateDir("shop")
-	if err := os.MkdirAll(mateDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
-	session := runtime.SessionHandle{Name: lab.session, ConfigHome: lab.configHome}
-	if _, err := lab.rt.EnsureProjectWorkspace(ctx, runtime.WorkspaceSpec{
-		Session: session, Label: "shop", Cwd: mateDir,
-		Env: []runtime.EnvVar{
-			{Key: "CODEX_HOME", Value: home},
-			{Key: config.EnvProjectID, Value: "shop"},
-			{Key: config.EnvCaller, Value: spawn.CallerMate},
-		},
-	}); err != nil {
-		t.Fatalf("EnsureProjectWorkspace: %v", err)
-	}
 
 	seedCanary(t, lab.w.MemoryFile("shop"), "HERON-EAST")
 	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
@@ -197,9 +162,8 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 
 	// Codex recorded the trust matev2 gave its hook in the lab CODEX_HOME,
 	// under the Mate's own hooks file, so the next launch draws no review.
-	// There is deliberately no second launch here: a pane's environment
-	// comes only from its workspace's create, and StopMate closes that
-	// workspace, so a relaunch would run in the operator's own CODEX_HOME.
+	// The /compact below keeps this to one launch; a relaunch would now run
+	// in the same lab home, because every start exports CODEX_HOME.
 	cfg, err := os.ReadFile(filepath.Join(home, "config.toml"))
 	if err != nil {
 		t.Fatal(err)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/matev2/internal/harness/codexlab"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -47,6 +48,9 @@ func consoleLiveLab(t *testing.T) (session, configHome string) {
 	if home == "" {
 		t.Fatal("HOME is required to resolve the Herdr socket")
 	}
+	// Every live test that reaches a lab session runs Codex in a lab
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	codexlab.Home(t)
 	return session, filepath.Join(home, ".config")
 }
 

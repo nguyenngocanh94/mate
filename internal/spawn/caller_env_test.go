@@ -70,3 +70,61 @@ func TestSpawnCrewInjectsTheCrewCallerIntoItsPane(t *testing.T) {
 		t.Fatalf("the crew's pane lost %s: %v", config.EnvStatusFile, env)
 	}
 }
+
+// The Mate's identity and CODEX_HOME ride on its launch, which the runtime
+// exports into the pane before every start: a Mate restarted while a Crew
+// holds the project's workspace is a new `tab create` that inherits nothing
+// from the workspace create, and it must still record its sends as the
+// Mate's, merge under the Mate's rules and launch Crews in the same
+// CODEX_HOME. Both harnesses: a Claude Mate's `crew spawn` launches Codex
+// Crews too.
+func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
+	for _, kind := range []harness.Kind{harness.KindClaude, harness.KindCodex} {
+		t.Run(string(kind), func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv(config.EnvCodexHome, home)
+			w := newWorkspace(t, "shop")
+			rt := runtime.NewFake()
+			deps := fakeDeps(t, rt)
+			res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: kind})
+			if err != nil {
+				t.Fatalf("StartMate: %v", err)
+			}
+			env := map[string]string{}
+			for _, v := range rt.StartEnv[res.Pane] {
+				env[v.Key] = v.Value
+			}
+			for key, want := range map[string]string{
+				config.EnvCaller:    spawn.CallerMate,
+				config.EnvAgentRole: string(harness.RoleMate),
+				config.EnvProjectID: "shop",
+				config.EnvCodexHome: home,
+			} {
+				if env[key] != want {
+					t.Fatalf("the %s Mate's launch exports %s=%q, want %q (all: %v)", kind, key, env[key], want, env)
+				}
+			}
+			if got := paneEnv(t, rt, res.Pane)[config.EnvCodexHome]; got != home {
+				t.Fatalf("the workspace create gave the Mate pane CODEX_HOME=%q, want %q", got, home)
+			}
+		})
+	}
+}
+
+// In a live test run the Mate is refused before anything is created when
+// CODEX_HOME is the operator's own: its pane would hand that home to every
+// Crew the Mate spawns.
+func TestStartMateRefusesTheOperatorsCodexHomeInALiveRun(t *testing.T) {
+	t.Setenv(config.EnvLive, "1")
+	t.Setenv(config.EnvCodexHome, "")
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	if err == nil {
+		t.Fatal("a live run started a Mate whose pane carries the operator's CODEX_HOME")
+	}
+	if len(rt.StartArgv) != 0 || len(rt.Tabs) != 0 {
+		t.Fatalf("the refusal came after the launch: starts %v, tabs %v", rt.StartArgv, rt.Tabs)
+	}
+}

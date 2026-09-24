@@ -990,6 +990,55 @@ func TestHerdrStartClearsDefaultClaudeConfigInPaneBeforeAgentStart(t *testing.T)
 	}
 }
 
+// A launch's own environment reaches the agent's pane at every start, not
+// only at pane create: a Mate restarted while a Crew holds its workspace is
+// a fresh `tab create` that inherits nothing, and a Codex agent must run in
+// the CODEX_HOME its launch pinned, whatever the Herdr server was started
+// with. The export comes after the unset and before agent start, targets
+// the agent's own pane, and quotes each value for the pane's shell.
+func TestHerdrStartExportsTheLaunchEnvIntoThePane(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	cwd := t.TempDir()
+	if err := os.WriteFile(harness.CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(t.TempDir(), "it's a home")
+	launch, err := harness.Codex{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+		Kind: harness.KindCodex, Cwd: cwd,
+		Env:    []harness.EnvVar{{Key: "MATEV2_AGENT_ROLE", Value: "mate"}},
+		Config: harness.Config{CodexHome: home},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calls [][]string
+	rt, _, session, tab := bootHerdrWithOptions(t, true, func(_ context.Context, spec process.Spec) (process.Result, error) {
+		calls = append(calls, append([]string(nil), spec.Args...))
+		if argvHas(spec.Args, "pane", "run") {
+			return process.Result{}, nil
+		}
+		if argvHas(spec.Args, "agent", "start") {
+			return process.Result{Stdout: readRuntimeTestdata(t, "agent-get.json")}, nil
+		}
+		t.Fatalf("unexpected argv %#v", spec.Args)
+		return process.Result{}, nil
+	})
+	tab.Cwd = cwd
+	res := reserveOn(t, rt.Names, session, "mate_001")
+	if _, err := rt.StartAgent(ctx, mustStartSpec(t, tab, res, launch)); err != nil {
+		t.Fatalf("StartAgent: %v", err)
+	}
+	if len(calls) != 3 || !argvHas(calls[0], "pane", "run", tab.PaneID, "unset") ||
+		!argvHas(calls[1], "pane", "run", tab.PaneID, "export") || !argvHas(calls[2], "agent", "start") {
+		t.Fatalf("calls = %#v, want unset, then export, then agent start, on pane %s", calls, tab.PaneID)
+	}
+	want := []string{"MATEV2_AGENT_ROLE='mate'", "CODEX_HOME='" + strings.ReplaceAll(home, "'", `'\''`) + "'"}
+	if !argvHas(calls[1], append([]string{"export"}, want...)...) {
+		t.Fatalf("export argv = %#v, want %q", calls[1], want)
+	}
+}
+
 // TestHerdrStartPaneBusyExhaustedIsActionable pins the honest-error
 // requirement: when Herdr never answers anything but agent_pane_busy for the
 // whole retry budget, the caller-facing message must name what mate was
