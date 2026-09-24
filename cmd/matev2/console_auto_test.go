@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/autopilot"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
@@ -40,8 +41,11 @@ func TestConsolePilotDigestsToAStartedMate(t *testing.T) {
 	}
 
 	pilot := autopilot.New(w, autopilot.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleMateHandle(w, deps),
+		Outbox: outbox.New(w, outbox.Deps{
+			Runtime: deps.Runtime,
+			Handle:  consoleMateHandle(w, deps),
+			Sleeper: noSleep{},
+		}),
 		Sleeper: noSleep{},
 	})
 	if err := pilot.Tick(context.Background()); err != nil {

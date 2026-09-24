@@ -1046,5 +1046,11 @@ func boxOutcome(msg actionDoneMsg, g glyphSet) footerMsg {
 	if text == "" {
 		text = strings.ToLower(verb) + " delivered"
 	}
+	if msg.choice.action == ActionResolve {
+		// An assign that went through is already done from the reader's
+		// side, whether the line is in the composer or queued for it
+		// (mvp.md task 30): the past tense says so, and the text says which.
+		verb = "Assigned"
+	}
 	return okMsg(verb + ": " + text)
 }

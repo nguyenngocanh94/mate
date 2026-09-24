@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -138,10 +137,7 @@ func TestLiveAutoPolicyMateAnswersADigest(t *testing.T) {
 
 	// 3. One tick of the daemon, wired exactly as cmdConsole wires it
 	// (consolePilot / consoleMateHandle in console_auto.go).
-	pilot := autopilot.New(w, autopilot.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleMateHandle(w, deps),
-	})
+	pilot := consoleAutoPilot(w, deps)
 	digest := tickUntilDigest(t, ctx, pilot, w, "shop", 2*time.Minute)
 	t.Logf("digest: %s", digest)
 	if !strings.Contains(digest, "k3 needs-decision") {

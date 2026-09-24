@@ -8,63 +8,41 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/box"
-	"github.com/nguyenngocanh94/matev2/internal/harness"
-	"github.com/nguyenngocanh94/matev2/internal/runtime"
-	"github.com/nguyenngocanh94/matev2/internal/send"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
-// Defaults of docs/mvp.md section 5.
-const (
-	// DefaultInterval is the digest window: the daemon looks once every 90
-	// seconds and says at most one thing.
-	DefaultInterval = 90 * time.Second
-	// DefaultWedgedAfter is how long a digest may fail to reach the Mate
-	// before a `wedged` incident opens.
-	DefaultWedgedAfter = 5 * time.Minute
-)
+// DefaultInterval is the digest window of docs/mvp.md section 5: the daemon
+// looks once every 90 seconds and says at most one thing.
+const DefaultInterval = 90 * time.Second
 
-// Runtime is the slice of runtime.Adapter the daemon needs, which is exactly
-// send.Runtime's: read a pane, type, press keys, wait. It structurally cannot
-// start, stop or `herdr agent prompt` anything.
-type Runtime interface {
-	send.Runtime
-}
-
-var _ Runtime = runtime.Adapter(nil)
-
-// HandleFunc resolves the Herdr handle and harness kind of one project's
-// Mate. It is a seam rather than a direct call to internal/spawn so this
-// package imports nothing that can start or stop an agent; cmd/matev2 wires
-// spawn.MateHandle into it.
-//
-// An error means the digest has nowhere to go - the Mate is not running, or
-// the Herdr session is not up.
-type HandleFunc func(ctx context.Context, project string) (runtime.AgentHandle, harness.Kind, error)
+// DefaultWedgedAfter is how long a digest may wait before `wedged`. It is
+// the outbox's rule (outbox.DefaultWedgedAfter), which is the one
+// implementation of it since task 30; the name stays here because the
+// section 5 contract is the daemon's.
+const DefaultWedgedAfter = outbox.DefaultWedgedAfter
 
 // Clock is where the daemon reads the time; tests pass a fake one.
 type Clock interface {
 	Now() time.Time
 }
 
-// Sleeper is the pause between ticks and inside a send, interruptible by the
-// context. Tests pass one that returns immediately.
+// Sleeper is the pause between ticks, interruptible by the context. Tests
+// pass one that returns immediately.
 type Sleeper interface {
 	Sleep(ctx context.Context, d time.Duration) error
 }
 
-// Deps are the daemon's collaborators. Runtime and Handle are required;
-// everything else has a default.
+// Deps are the daemon's collaborators. Outbox is required.
 type Deps struct {
-	Runtime Runtime
-	Handle  HandleFunc
+	// Outbox is where a digest is queued, and the sender that makes the
+	// one immediate attempt right after (task 30). The daemon types
+	// nothing itself.
+	Outbox  *outbox.Sender
 	Clock   Clock
 	Sleeper Sleeper
 	// Interval is the digest window; zero means DefaultInterval.
 	Interval time.Duration
-	// WedgedAfter is how long undelivered digests open a `wedged` incident
-	// after; zero means DefaultWedgedAfter.
-	WedgedAfter time.Duration
 }
 
 func (d Deps) now() time.Time {
@@ -95,30 +73,24 @@ func (d Deps) interval() time.Duration {
 	return DefaultInterval
 }
 
-func (d Deps) wedgedAfter() time.Duration {
-	if d.WedgedAfter > 0 {
-		return d.WedgedAfter
-	}
-	return DefaultWedgedAfter
-}
-
-// Status is what the daemon has done for one project, for the console header
-// and footer. It is an in-process observation, not a record: nothing on disk
-// says "the daemon has sent 14 digests", and a console that restarts starts
-// this count again.
+// Status is what the daemon's digests have done for one project, for the
+// console header and footer. It is read out of the project's outbox, so it
+// counts the digests the outbox still remembers (store.OutboxRetention),
+// not only the ones this console delivered.
 type Status struct {
-	// Sends is how many digests this console has delivered.
+	// Sends is how many digests the outbox holds as delivered.
 	Sends int
 	// LastSentAt is when the last one was delivered, zero before the first.
 	LastSentAt time.Time
-	// Notice is why the last tick did not deliver, empty when it did or
-	// when there was nothing to deliver. It is one line per tick, not one
-	// per item: a tick sends one digest, so it has one outcome.
+	// Notice is why the queued digest has not been delivered yet, empty
+	// when none is waiting or when it has not been tried. It is one line
+	// per project, not one per item: a project has at most one digest
+	// queued, so it has one outcome.
 	Notice   string
 	NoticeAt time.Time
 }
 
-// Sent reports whether this console has delivered anything for the project.
+// Sent reports whether a digest has been delivered for the project.
 func (s Status) Sent() bool { return s.Sends > 0 }
 
 // Pilot is the auto-mode daemon over one workspace.
@@ -130,32 +102,21 @@ func (s Status) Sent() bool { return s.Sends > 0 }
 // The workspace handle is this package's own for the reason the observer's
 // is (store.Workspace caches workspace.yaml and re-reads it on LoadConfig
 // while the console reloads on its own goroutine); cmd/matev2 does the
-// opening.
+// opening, and gives the Outbox sender the same handle.
 type Pilot struct {
 	ws   *store.Workspace
 	deps Deps
 
-	// failing is the first tick at which each project had something to say
-	// and could not say it. Only the ticking goroutine touches it. It is
-	// in-process on purpose: it is a stopwatch, not a record, and the record
-	// it produces - the `wedged` incident - is the durable half.
-	failing map[string]time.Time
-
 	mu     sync.Mutex
-	status map[string]Status
+	seen   map[string]bool
 	cancel context.CancelFunc
 	done   chan struct{}
 }
 
-// New builds a daemon over a workspace. It sends nothing until Start or Tick
-// is called.
+// New builds a daemon over a workspace. It queues nothing until Start or
+// Tick is called.
 func New(ws *store.Workspace, deps Deps) *Pilot {
-	return &Pilot{
-		ws:      ws,
-		deps:    deps,
-		failing: make(map[string]time.Time),
-		status:  make(map[string]Status),
-	}
+	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool)}
 }
 
 // Start begins ticking in its own goroutine until Stop or a cancelled
@@ -202,13 +163,38 @@ func (p *Pilot) run(ctx context.Context) {
 	}
 }
 
-// Snapshot is the daemon's per-project state, copied for a reader on another
-// goroutine.
+// Snapshot is the daemon's per-project state, read out of the outbox of each
+// project the daemon has ticked, for a reader on another goroutine.
 func (p *Pilot) Snapshot() map[string]Status {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	out := make(map[string]Status, len(p.status))
-	for project, status := range p.status {
+	projects := make([]string, 0, len(p.seen))
+	for project := range p.seen {
+		projects = append(projects, project)
+	}
+	p.mu.Unlock()
+
+	out := make(map[string]Status, len(projects))
+	for _, project := range projects {
+		items, err := p.ws.ReadOutbox(project)
+		if err != nil {
+			continue
+		}
+		var status Status
+		for _, item := range items {
+			if item.Source != store.OutboxSourceDigest {
+				continue
+			}
+			switch {
+			case item.State == store.OutboxSent:
+				status.Sends++
+				if item.SentAt.After(status.LastSentAt) {
+					status.LastSentAt = item.SentAt
+				}
+			case item.Queued() && item.LastRefusal != "" && p.ws.Auto(project):
+				status.Notice = fmt.Sprintf("auto digest for %s not delivered: %s", project, item.LastRefusal)
+				status.NoticeAt = item.TriedAt
+			}
+		}
 		out[project] = status
 	}
 	return out
@@ -217,11 +203,14 @@ func (p *Pilot) Snapshot() map[string]Status {
 // Tick runs one digest window over every project of the workspace.
 //
 // The error it returns is the joined per-project failures of the tick; the
-// tick itself always finishes. Nothing is ever sent for a project whose
+// tick itself always finishes. Nothing is ever queued for a project whose
 // `.auto` flag is absent, which is the whole of manual mode.
 func (p *Pilot) Tick(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if p.deps.Outbox == nil {
+		return errors.New("autopilot: no outbox is wired")
 	}
 	// Re-read workspace.yaml every tick, for the reason the observer does: a
 	// project registered beside this console must come under the daemon
@@ -243,181 +232,50 @@ func (p *Pilot) Tick(ctx context.Context) error {
 }
 
 func (p *Pilot) tickProject(ctx context.Context, project string) error {
+	p.mu.Lock()
+	p.seen[project] = true
+	p.mu.Unlock()
 	if !p.ws.Auto(project) {
-		// Manual. Nothing is sent, and the stopwatch is dropped: there
-		// is no pending digest any more, so nothing is failing to arrive.
-		// The cursor stays on disk, which is what makes turning auto back on
-		// resume rather than replay.
-		delete(p.failing, project)
-		p.clearNotice(project)
+		// Manual. Nothing is queued. A digest still waiting from before
+		// the flag went off is the outbox's to withdraw: it re-reads the
+		// flag before it types, so the captain who took over is not
+		// answered by a machine. The cursor stays on disk, which is what
+		// makes turning auto back on resume rather than replay.
 		return nil
 	}
 
-	view, err := box.Load(p.ws, project)
-	if err != nil {
-		return err
-	}
-	cursor, err := p.ws.ReadAutoCursor(project)
-	if err != nil {
-		return err
-	}
+	// The gather runs under the outbox's lock (Offer), because the cursor
+	// it reads is moved by the sender when a digest is marked sent, under
+	// that same lock. Reading it outside could see a digest's items as new
+	// a moment after the sender delivered them.
 	now := p.deps.now()
-	items := Gather(view, cursor, now)
-	if len(items) == 0 {
-		// Nothing new. The daemon is not a heartbeat, and a tick with
-		// nothing to say cannot be failing to say it.
-		delete(p.failing, project)
-		p.clearNotice(project)
-		return nil
-	}
-
-	line := Line(items, p.ws.CrewsDir(project))
-	report, err := p.deliver(ctx, project, line)
-	if err != nil {
-		return p.undelivered(project, view, now, err)
-	}
-
-	// sent.log is written before the cursor moves. Recording a line the Mate
-	// did receive and then failing to record how far we got costs one
-	// repeated digest; moving the cursor first and then failing would lose
-	// the items entirely, and the two are not the same mistake.
-	if err := p.ws.AppendSent(project, store.SentEntry{
-		Source: store.SourceApp,
-		Target: store.TargetMate,
-		Text:   line,
-	}); err != nil {
-		return err
-	}
-	if err := p.ws.WriteAutoCursor(project, Advance(cursor, items)); err != nil {
-		return err
-	}
-
-	delete(p.failing, project)
-	if err := p.resolveWedged(project, view, now, report.Agent); err != nil {
-		return err
-	}
-	p.delivered(project, now)
-	return nil
-}
-
-// deliver resolves the Mate's pane and types the digest into it, verified.
-func (p *Pilot) deliver(ctx context.Context, project, line string) (send.Report, error) {
-	if p.deps.Handle == nil {
-		return send.Report{}, errors.New("autopilot: no handle resolver is wired")
-	}
-	handle, kind, err := p.deps.Handle(ctx, project)
-	if err != nil {
-		return send.Report{}, err
-	}
-	// The flag is read again here, as late as it can be read. box.Load and
-	// the handle lookup both touch the filesystem and Herdr, and a captain
-	// who typed into the Mate during that window has already had `.auto`
-	// deleted by the Mate's own hook; answering them a moment later would be
-	// exactly the takeover auto mode promises not to fight.
-	if !p.ws.Auto(project) {
-		return send.Report{}, errAutoOff
-	}
-	deps := send.Deps{Runtime: p.deps.Runtime}
-	if p.deps.Sleeper != nil {
-		deps.Sleep = p.deps.sleep
-	}
-	return send.Send(ctx, deps, handle, kind, line, send.Options{Marker: true})
-}
-
-// errAutoOff is the one "failure" that is not one: the captain took over
-// between the tick starting and the line being typed. Nothing was sent,
-// nothing is wedged, and the next tick will find the project in manual mode.
-var errAutoOff = errors.New("auto mode was turned off during the tick")
-
-// undelivered records a tick that had something to say and could not say it:
-// one footer notice, and a `wedged` incident once the failure has lasted.
-func (p *Pilot) undelivered(project string, view box.View, now time.Time, cause error) error {
-	if errors.Is(cause, errAutoOff) {
-		delete(p.failing, project)
-		p.clearNotice(project)
-		return nil
-	}
-
-	since, ok := p.failing[project]
-	if !ok {
-		since = now
-		p.failing[project] = since
-	}
-	p.note(project, fmt.Sprintf("auto digest for %s not delivered: %v", project, cause), now)
-
-	if now.Sub(since) < p.deps.wedgedAfter() {
-		return nil
-	}
-	return p.openWedged(project, view, now, fmt.Sprintf(
-		"no digest has reached the Mate for %s: %v", now.Sub(since).Round(time.Second), cause))
-}
-
-// openWedged appends the `open` line, unless one is already open. The file is
-// the state (mvp.md section 4b), so a console that restarted opens nothing
-// its predecessor already opened.
-func (p *Pilot) openWedged(project string, view box.View, now time.Time, text string) error {
-	if wedgedOpen(view) {
-		return nil
-	}
-	return p.ws.AppendIncident(project, store.IncidentEntry{
-		Time:  now,
-		Crew:  MateCrew,
-		Kind:  string(box.IncidentWedged),
-		State: store.IncidentOpen,
-		Text:  text,
-	})
-}
-
-func (p *Pilot) resolveWedged(project string, view box.View, now time.Time, agent string) error {
-	if !wedgedOpen(view) {
-		return nil
-	}
-	return p.ws.AppendIncident(project, store.IncidentEntry{
-		Time:  now,
-		Crew:  MateCrew,
-		Kind:  string(box.IncidentWedged),
-		State: store.IncidentResolved,
-		Text:  fmt.Sprintf("a digest was verified into %s's composer", agent),
-	})
-}
-
-// wedgedOpen reads the daemon's own incident out of the merged view it
-// already loaded, rather than re-reading incidents.log: the daemon is the
-// only writer of a (mate, wedged) pair, so the view cannot be stale about it.
-func wedgedOpen(view box.View) bool {
-	for _, inc := range box.OpenIncidents(view, MateCrew) {
-		if inc.Kind == box.IncidentWedged {
-			return true
+	crewsDir := p.ws.CrewsDir(project)
+	_, queued, err := p.deps.Outbox.Offer(project, store.OutboxSourceDigest, func() (outbox.Request, bool, error) {
+		view, err := box.Load(p.ws, project)
+		if err != nil {
+			return outbox.Request{}, false, err
 		}
+		cursor, err := p.ws.ReadAutoCursor(project)
+		if err != nil {
+			return outbox.Request{}, false, err
+		}
+		items := Gather(view, cursor, now)
+		if len(items) == 0 {
+			// Nothing new. The daemon is not a heartbeat.
+			return outbox.Request{}, false, nil
+		}
+		return outbox.Request{
+			Key:    Key(items),
+			Text:   Line(items, crewsDir),
+			Cursor: Advance(cursor, items),
+		}, true, nil
+	})
+	if err != nil || !queued {
+		return err
 	}
-	return false
-}
-
-func (p *Pilot) delivered(project string, now time.Time) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	status := p.status[project]
-	status.Sends++
-	status.LastSentAt = now
-	status.Notice, status.NoticeAt = "", time.Time{}
-	p.status[project] = status
-}
-
-func (p *Pilot) note(project, text string, now time.Time) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	status := p.status[project]
-	status.Notice, status.NoticeAt = text, now
-	p.status[project] = status
-}
-
-func (p *Pilot) clearNotice(project string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	status, ok := p.status[project]
-	if !ok || status.Notice == "" {
-		return
-	}
-	status.Notice, status.NoticeAt = "", time.Time{}
-	p.status[project] = status
+	// One immediate attempt, so an idle Mate gets the digest now rather than
+	// at the sender loop's next pass. A refusal is not an error here: the
+	// digest stays queued and the loop retries it.
+	_, err = p.deps.Outbox.Attempt(ctx, project)
+	return err
 }

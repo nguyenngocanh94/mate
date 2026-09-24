@@ -254,7 +254,7 @@ func boxAssignChoice(project string, e query.BoxEntry) actionChoice {
 		desc: "Ask the Mate to resolve " + e.Crew + "'s " + e.Verb,
 		req: ActionRequest{
 			Action: ActionResolve, Target: project, TargetKind: "project",
-			Crew: e.Crew, Input: e.Resolve,
+			Crew: e.Crew, Input: e.Resolve, Key: e.AssignKey,
 		},
 	}
 }

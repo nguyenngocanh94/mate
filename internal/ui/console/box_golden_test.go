@@ -3,6 +3,7 @@ package console
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/query"
 )
@@ -236,7 +237,7 @@ func TestBoxInboxIsTheDefaultAndAllShowsTheLog(t *testing.T) {
 		t.Fatalf("wraps() = inbox %v, all %v; no surface lays text under a row any more", inbox.wraps(), all.wraps())
 	}
 	for _, e := range inbox.rows() {
-		line := boxEntryText(e, false)
+		line := boxEntryText(e, false, unicodeGlyphs)
 		if !strings.Contains(line, "needs an answer") {
 			t.Fatalf("inbox line %q does not say what the crew needs", line)
 		}
@@ -251,7 +252,7 @@ func TestBoxInboxIsTheDefaultAndAllShowsTheLog(t *testing.T) {
 		if e.Text == "" {
 			continue
 		}
-		if line := boxEntryText(e, true); !strings.Contains(line, e.Verb) || !strings.Contains(line, sanitizeText(e.Text)) {
+		if line := boxEntryText(e, true, unicodeGlyphs); !strings.Contains(line, e.Verb) || !strings.Contains(line, sanitizeText(e.Text)) {
 			t.Fatalf("[all] line %q lost the verb or the text of %+v", line, e)
 		}
 	}
@@ -278,6 +279,52 @@ func TestBoxEmptyInboxSaysNothingWaiting(t *testing.T) {
 	two := boxCountLine(boxList{field: sessionTestBox()}, unicodeGlyphs, plainPalette()).render(44)
 	if !containsLine(two, "2 waiting") {
 		t.Fatalf("header = %q, want \"2 waiting\"", two)
+	}
+}
+
+// TestBoxInboxRowSaysWhetherItWasAssigned is mvp.md task 30's row: an item
+// handed to the Mate stays in the inbox (the crew is not answered yet), and
+// says so after its need - "assigned, queued" while the line waits for the
+// Mate's composer, "assigned HH:MM" once it got there - whole, at the rail's
+// own width, with the [assign] button gone because pressing it again would do
+// nothing.
+func TestBoxInboxRowSaysWhetherItWasAssigned(t *testing.T) {
+	at := time.Date(2026, 9, 24, 14, 32, 0, 0, time.UTC)
+	base := query.BoxEntry{Seq: 1, At: at, Kind: query.BoxStatus, Crew: "buybtn", Verb: "needs-decision",
+		Text: "pick A or B", Attention: true, Resolve: "resolve: buybtn asked", AssignKey: "crews/buybtn.status@0"}
+	queued := base
+	queued.Assigned = query.BoxAssign{State: query.BoxAssignQueued, At: at}
+	sent := base
+	sent.Assigned = query.BoxAssign{State: query.BoxAssignSent, At: at, SentAt: at.Add(3 * time.Minute)}
+
+	for _, tc := range []struct {
+		name string
+		e    query.BoxEntry
+		want string
+	}{
+		{"not assigned", base, "14:32  buybtn  needs an answer"},
+		{"queued", queued, "14:32  buybtn  needs an answer · assigned, queued"},
+		{"sent", sent, "14:32  buybtn  needs an answer · assigned 14:35"},
+	} {
+		view := query.KnownField(query.BoxView{Entries: []query.BoxEntry{tc.e}, Inbox: []query.BoxEntry{tc.e}})
+		rail := strings.Join(RenderInboxRail(view, 0, 54, 8), "\n")
+		if !strings.Contains(rail, tc.want) {
+			t.Errorf("%s: rail does not carry %q whole:\n%s", tc.name, tc.want, rail)
+		}
+		if tc.e.Assigned.State == "" {
+			if !strings.Contains(rail, "[assign]") {
+				t.Errorf("%s: the selected unassigned row shows no [assign]:\n%s", tc.name, rail)
+			}
+			if strings.Contains(rail, "assigned") && !strings.Contains(rail, "[assign]") {
+				t.Errorf("%s: an unassigned row says assigned:\n%s", tc.name, rail)
+			}
+		} else if strings.Contains(rail, "[assign]") {
+			t.Errorf("%s: an assigned row still offers [assign]:\n%s", tc.name, rail)
+		}
+	}
+	// The ASCII glyph set spells the separator in ASCII too.
+	if got := boxEntryText(queued, false, asciiGlyphs); got != "14:32  buybtn  needs an answer . assigned, queued" {
+		t.Errorf("ascii row = %q", got)
 	}
 }
 

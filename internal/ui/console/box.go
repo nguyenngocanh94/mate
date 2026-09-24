@@ -97,7 +97,7 @@ func boxEntryLine(e query.BoxEntry, selected, hovered, focused, all bool, g glyp
 	if strip {
 		textW = max0(w - boxEntryLead - boxStripWidth(g))
 	}
-	text := truncateEnd(boxEntryText(e, all), textW, g)
+	text := truncateEnd(boxEntryText(e, all, g), textW, g)
 	l.add(text, boxEntryStyle(e, p))
 	if strip {
 		l.add(strings.Repeat(" ", max0(textW-cells(text))+1), p.Dim)
@@ -113,12 +113,17 @@ func boxEntryLine(e query.BoxEntry, selected, hovered, focused, all bool, g glyp
 
 // boxEntryText is the entry's own words, without any selection or attention
 // decoration. In the inbox: time, the crew, and what it needs in plain
-// words (boxNeedPhrase). In `[all]` mode: time, who, the raw verb, and the
+// words (boxNeedPhrase), then whether it has been handed to the Mate
+// (boxAssignSuffix). In `[all]` mode: time, who, the raw verb, and the
 // payload, because a log is read for its record.
-func boxEntryText(e query.BoxEntry, all bool) string {
+func boxEntryText(e query.BoxEntry, all bool, g glyphSet) string {
 	parts := []string{e.At.UTC().Format("15:04"), boxEntryWho(e)}
 	if !all {
-		if need := boxNeedPhrase(e); need != "" {
+		need := boxNeedPhrase(e)
+		if suffix := boxAssignSuffix(e); suffix != "" {
+			need += " " + g.Dot + " " + suffix
+		}
+		if need != "" {
 			parts = append(parts, need)
 		}
 		return strings.Join(parts, "  ")
@@ -163,6 +168,22 @@ func boxNeedPhrase(e query.BoxEntry) string {
 		}
 	}
 	return e.Verb
+}
+
+// boxAssignSuffix is what `[assign]` has done for an inbox item (mvp.md
+// task 30): "assigned, queued" while the line waits for the Mate's composer,
+// "assigned HH:MM" once it reached it. The item stays in the inbox either
+// way - handing a question to the Mate is not answering the crew (section
+// 5) - so the suffix is what keeps a reader from pressing `[assign]` again
+// on a row that already has.
+func boxAssignSuffix(e query.BoxEntry) string {
+	switch e.Assigned.State {
+	case query.BoxAssignQueued:
+		return "assigned, queued"
+	case query.BoxAssignSent:
+		return "assigned " + e.Assigned.SentAt.UTC().Format("15:04")
+	}
+	return ""
 }
 
 // boxEntryWho names the entry's subject: the crew for a status line or an

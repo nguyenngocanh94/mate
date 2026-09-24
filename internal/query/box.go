@@ -2,6 +2,8 @@ package query
 
 import (
 	"fmt"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,7 +69,33 @@ type BoxEntry struct {
 	// about - a message never has one, because the Mate either sent it or
 	// was sent it, so handing it back says nothing new.
 	Resolve string
+	// AssignKey names this entry in the Mate's outbox (task 30): the file
+	// and byte offset of the line the entry came from, relative to the
+	// project (`crews/k3.status@120`). `[assign]` queues the Resolve line
+	// under this key, so pressing it twice on one question queues it once,
+	// while the same words asked again later are a new entry with a new key.
+	// Empty whenever Resolve is.
+	AssignKey string
+	// Assigned is what the Mate's outbox says about that key: nothing, a
+	// line still waiting for the Mate's composer, or one delivered.
+	Assigned BoxAssign
 }
+
+// BoxAssign is an entry's `[assign]` as the Mate's outbox records it.
+type BoxAssign struct {
+	// State is "", BoxAssignQueued or BoxAssignSent.
+	State string
+	// At is when the line was queued, SentAt when it reached the composer.
+	At     time.Time
+	SentAt time.Time
+}
+
+// The states an entry's assign can be in. A dropped outbox item is not an
+// assign that happened, so it reads as none.
+const (
+	BoxAssignQueued = "queued"
+	BoxAssignSent   = "sent"
+)
 
 // Resolvable reports whether [resolve] may hand this entry to the Mate.
 func (e BoxEntry) Resolvable() bool { return e.Resolve != "" }
@@ -151,6 +179,7 @@ func loadBox(ws *store.Workspace, project string) (box.View, bool, Field[BoxView
 
 func boxView(ws *store.Workspace, project string, v box.View) BoxView {
 	sum := box.Summarize(v)
+	assigned := assignedByKey(ws, project)
 	out := BoxView{
 		Entries:  make([]BoxEntry, 0, len(v.Entries)),
 		Crews:    sum.Crews,
@@ -158,14 +187,14 @@ func boxView(ws *store.Workspace, project string, v box.View) BoxView {
 		LastAt:   sum.LastAt,
 	}
 	for _, e := range v.Entries {
-		out.Entries = append(out.Entries, boxEntry(ws, project, e))
+		out.Entries = append(out.Entries, withAssign(boxEntry(ws, project, e), assigned))
 	}
 	// The inbox is built from the same Entry values, through the same
 	// flattener, so an item and its line in the full log are the same row
 	// with the same Seq - a reader who toggles [all] sees the entry they
 	// were looking at, not a second copy of it built by other code.
 	for _, item := range box.Inbox(v) {
-		out.Inbox = append(out.Inbox, boxEntry(ws, project, item.Entry))
+		out.Inbox = append(out.Inbox, withAssign(boxEntry(ws, project, item.Entry), assigned))
 	}
 	return out
 }
@@ -195,6 +224,7 @@ func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 		// so `crews/<id>.status` resolves to nothing there.
 		if e.Crew != "" {
 			out.Resolve = BoxResolveLine(project, e.Crew, st.Text, ws.CrewStatus(project, e.Crew))
+			out.AssignKey = BoxAssignKey(ws.ProjectDir(project), e.Ref.File, e.Ref.Offset)
 		}
 	case box.KindIncident:
 		kind, text := box.ParseIncidentText(e.Text)
@@ -203,10 +233,56 @@ func boxEntry(ws *store.Workspace, project string, e box.Entry) BoxEntry {
 		out.Text = text
 		out.Attention = true
 		out.Resolve = BoxIncidentResolveLine(string(kind), e.Crew, text)
+		out.AssignKey = BoxAssignKey(ws.ProjectDir(project), e.Ref.File, e.Ref.Offset)
 	default:
 		out.Kind = BoxMessage
 	}
 	return out
+}
+
+// BoxAssignKey is the outbox key of the entry whose line lives at file and
+// offset: the file relative to the project directory, slash-separated, then
+// `@` and the byte offset. It is spelled once, here, because the inbox row
+// looks the key up in the outbox that cmd/matev2 wrote it into.
+func BoxAssignKey(projectDir, file string, offset int64) string {
+	rel, err := filepath.Rel(projectDir, file)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		rel = file
+	}
+	return filepath.ToSlash(rel) + "@" + strconv.FormatInt(offset, 10)
+}
+
+// assignedByKey reads the Mate's outbox. That is a file read like sent.log
+// is, so it lives here with the rest of the box rather than being merged in
+// by the console wiring: every surface that loads a box - the project frame
+// and the session rail's own refresh - then shows the same suffix. An
+// unreadable outbox shows no suffix, which says less than it could but
+// nothing false.
+func assignedByKey(ws *store.Workspace, project string) map[string]BoxAssign {
+	items, err := ws.ReadOutbox(project)
+	if err != nil {
+		return nil
+	}
+	out := make(map[string]BoxAssign)
+	for _, item := range items {
+		if item.Source != store.OutboxSourceAssign {
+			continue
+		}
+		switch item.State {
+		case store.OutboxQueued:
+			out[item.Key] = BoxAssign{State: BoxAssignQueued, At: item.At}
+		case store.OutboxSent:
+			out[item.Key] = BoxAssign{State: BoxAssignSent, At: item.At, SentAt: item.SentAt}
+		}
+	}
+	return out
+}
+
+func withAssign(e BoxEntry, assigned map[string]BoxAssign) BoxEntry {
+	if e.AssignKey != "" {
+		e.Assigned = assigned[e.AssignKey]
+	}
+	return e
 }
 
 // BoxResolveLine and BoxIncidentResolveLine are the two lines `[resolve]`

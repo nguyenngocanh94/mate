@@ -113,7 +113,7 @@ func (f boxFixture) resolveRequest(t *testing.T) console.ActionRequest {
 	}
 	return console.ActionRequest{
 		Action: console.ActionResolve, Target: "shop", TargetKind: "project",
-		Crew: e.Crew, Input: e.Resolve,
+		Crew: e.Crew, Input: e.Resolve, Key: e.AssignKey,
 	}
 }
 
@@ -152,8 +152,8 @@ func TestConsoleBoxResolveTypesTheResolveLineAndRecordsIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if !strings.Contains(out, "asked to decide") {
-		t.Errorf("outcome = %q, want it to say the Mate was asked to decide", out)
+	if !strings.HasPrefix(out, "sent to "+f.mate.Name) {
+		t.Errorf("outcome = %q, want it to say the line was sent to the idle Mate at once", out)
 	}
 
 	var typed []string
@@ -214,37 +214,149 @@ func TestConsoleBoxResolveEmptiesTheInbox(t *testing.T) {
 	}
 }
 
-// TestConsoleBoxResolveRefusedOnAPendingComposerRecordsNothing is the rule
-// mvp.md section 4 puts on the Mate's pane specifically: the human owns that
-// composer too, so a line already sitting in it is never typed over - and a
-// send that did not happen must leave no trace in sent.log, or the box would
-// show the Mate a message no agent ever received.
-func TestConsoleBoxResolveRefusedOnAPendingComposerRecordsNothing(t *testing.T) {
+// TestConsoleBoxResolveQueuesBehindAPendingComposer is the rule mvp.md
+// section 4 puts on the Mate's pane - the human owns that composer too, so a
+// line already sitting in it is never typed over - under task 30's queue:
+// the assign is not refused any more, it waits in the Mate's outbox, leaves
+// no trace in sent.log (the box must never show the Mate a message no agent
+// received), and the inbox row says it is queued. Once the composer is empty
+// the console's sender loop types it exactly once, and the row says when.
+func TestConsoleBoxResolveQueuesBehindAPendingComposer(t *testing.T) {
 	f := newBoxFixture(t)
 	f.rt.SetReadOutput(f.mate, claudePendingScreen)
+	req := f.resolveRequest(t)
 
-	out, err := f.action(context.Background(), f.resolveRequest(t))
-	if err == nil {
-		t.Fatalf("resolve into a pending composer returned %q and no error", out)
+	out, err := f.action(context.Background(), req)
+	if err != nil {
+		t.Fatalf("resolve into a pending composer: %v", err)
 	}
-	if !errors.Is(err, send.ErrComposerPending) {
-		t.Fatalf("forward error = %v, want send.ErrComposerPending", err)
+	if !strings.HasPrefix(out, "queued for the Mate") || !strings.Contains(out, "unsubmitted text") {
+		t.Errorf("outcome = %q, want it queued and why", out)
 	}
-	if !boxSendRefusal(err) {
-		t.Errorf("boxSendRefusal(%v) = false, want a refusal the console reports on its outcome line", err)
-	}
-	if !strings.Contains(err.Error(), "half typed") {
-		t.Errorf("refusal %q does not quote the pending text it refused to overwrite", err)
-	}
-
-	for _, s := range f.rt.SentText {
-		if s.Handle.Name == f.mate.Name {
-			t.Errorf("a refused resolve typed %q into the Mate", s.Text)
-		}
+	if typed := f.mateTyped(); len(typed) != 0 {
+		t.Fatalf("a queued resolve typed %q into the Mate over the captain's text", typed)
 	}
 	if sent := sentLines(t, f.ws); len(sent) != 0 {
-		t.Fatalf("a refused resolve wrote %+v to sent.log, want nothing", sent)
+		t.Fatalf("a queued resolve wrote %+v to sent.log, want nothing", sent)
 	}
+	items, err := f.ws.ReadOutbox("shop")
+	if err != nil {
+		t.Fatalf("ReadOutbox: %v", err)
+	}
+	if len(items) != 1 || !items[0].Queued() || items[0].Key != req.Key || items[0].Text != req.Input ||
+		!strings.Contains(items[0].LastRefusal, "half typed") {
+		t.Fatalf("outbox = %+v, want the resolve line queued under its entry's key with the refusal", items)
+	}
+	row := f.inboxRow(t)
+	if row.Assigned.State != query.BoxAssignQueued {
+		t.Fatalf("inbox row = %+v, want it marked assigned, queued", row)
+	}
+
+	// The captain submits their own line and the Mate's turn ends: the
+	// console's loop, not another keystroke, delivers the assign.
+	f.rt.SetReadOutput(f.mate, claudeEmptyScreen)
+	loop := consoleOutbox(f.ws, f.deps)
+	for i := 0; i < 3; i++ {
+		if err := loop.Drain(context.Background()); err != nil {
+			t.Fatalf("Drain: %v", err)
+		}
+	}
+	typed := f.mateTyped()
+	if len(typed) != 1 || typed[0] != send.Marker+req.Input {
+		t.Fatalf("typed %q into the Mate, want the marked resolve line exactly once", typed)
+	}
+	sent := sentLines(t, f.ws)
+	if len(sent) != 1 || sent[0].Source != store.SourceApp || sent[0].Target != store.TargetMate || sent[0].Text != req.Input {
+		t.Fatalf("sent.log = %+v, want the one app -> mate line", sent)
+	}
+	row = f.inboxRow(t)
+	if row.Assigned.State != query.BoxAssignSent || row.Assigned.SentAt.IsZero() {
+		t.Fatalf("inbox row = %+v, want it marked assigned with a time - and still in the inbox", row)
+	}
+}
+
+// TestConsoleBoxResolveQueuesBehindABusyMate is the case task 24 measured
+// four or five times in a row: the Mate mid-turn. The assign returns at once,
+// queued, instead of refusing.
+func TestConsoleBoxResolveQueuesBehindABusyMate(t *testing.T) {
+	f := newBoxFixture(t)
+	f.rt.SetReadOutput(f.mate, "✶ Pollinating…\n"+claudeEmptyScreen)
+
+	out, err := f.action(context.Background(), f.resolveRequest(t))
+	if err != nil {
+		t.Fatalf("resolve into a busy Mate: %v", err)
+	}
+	if !strings.Contains(out, "queued for the Mate (the Mate is mid-turn)") {
+		t.Errorf("outcome = %q, want it queued behind the turn", out)
+	}
+	if typed := f.mateTyped(); len(typed) != 0 {
+		t.Fatalf("typed %q into a Mate mid-turn", typed)
+	}
+	for _, call := range f.rt.Calls {
+		if call == "PromptAgent" {
+			t.Fatalf("the assign was handed to herdr agent prompt; calls = %v", f.rt.Calls)
+		}
+	}
+}
+
+// TestConsoleBoxResolveTwiceQueuesOnce is the dedup: the same inbox entry
+// assigned again, while queued or after it was sent, is not queued a second
+// time, and the outcome says when it was.
+func TestConsoleBoxResolveTwiceQueuesOnce(t *testing.T) {
+	f := newBoxFixture(t)
+	f.rt.SetReadOutput(f.mate, claudePendingScreen)
+	req := f.resolveRequest(t)
+	if _, err := f.action(context.Background(), req); err != nil {
+		t.Fatalf("first resolve: %v", err)
+	}
+	out, err := f.action(context.Background(), req)
+	if err != nil {
+		t.Fatalf("second resolve: %v", err)
+	}
+	if !strings.HasPrefix(out, "already assigned ") || !strings.Contains(out, "still queued") {
+		t.Errorf("outcome = %q, want \"already assigned HH:MM\" and that it is still queued", out)
+	}
+
+	f.rt.SetReadOutput(f.mate, claudeEmptyScreen)
+	out, err = f.action(context.Background(), req)
+	if err != nil {
+		t.Fatalf("third resolve: %v", err)
+	}
+	if !strings.HasPrefix(out, "already assigned ") || !strings.Contains(out, ", sent ") {
+		t.Errorf("outcome = %q, want \"already assigned HH:MM\" and when it was sent", out)
+	}
+	if _, err := f.action(context.Background(), req); err != nil {
+		t.Fatalf("fourth resolve: %v", err)
+	}
+	if typed := f.mateTyped(); len(typed) != 1 {
+		t.Fatalf("typed %q into the Mate across four presses, want one line", typed)
+	}
+	items, err := f.ws.ReadOutbox("shop")
+	if err != nil {
+		t.Fatalf("ReadOutbox: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("outbox = %+v, want one item", items)
+	}
+}
+
+func (f boxFixture) mateTyped() []string {
+	var typed []string
+	for _, s := range f.rt.SentText {
+		if s.Handle.Name == f.mate.Name {
+			typed = append(typed, s.Text)
+		}
+	}
+	return typed
+}
+
+func (f boxFixture) inboxRow(t *testing.T) query.BoxEntry {
+	t.Helper()
+	box := query.LoadBox(f.ws, "shop")
+	if !box.IsKnown() || len(box.Value.Inbox) != 1 {
+		t.Fatalf("inbox = %+v (%s), want the one item still waiting", box.Value.Inbox, box.Reason)
+	}
+	return box.Value.Inbox[0]
 }
 
 // TestConsoleBoxReplyTypesIntoTheCrewAndRecordsTheUser is `r`: the line goes
