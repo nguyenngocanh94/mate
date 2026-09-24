@@ -346,6 +346,7 @@ Check it about every twenty seconds with one command:
 sleep 20; /usr/local/bin/matev2 state shop <id>
 ```
 
+Run it in the foreground, as the one command it is: a bare `sleep` on its own is refused by some harnesses, and a wait moved to the background is not waiting.
 Repeat that while the state says `working` or `spawned`.
 Real work takes minutes, so expect to run it many times over; each run costs one line of output, and that is the whole cost of supervising.
 Stop repeating when the state says something else, and act on it: `needs-decision` means answer it, `wait-mate` means review it, `blocked` means the watcher says the Crew cannot speak - peek it and go to section 12.

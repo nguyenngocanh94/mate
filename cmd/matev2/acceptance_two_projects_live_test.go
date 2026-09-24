@@ -266,11 +266,13 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("the shop inbox holds %+v, want the ship crew's question", inbox)
 	}
 
-	// `[assign]`: the captain hands the question to the Mate.
-	resolveOut := assignUntilDelivered(t, ctx, action, "shop", inbox, 6*time.Minute, shopPane)
+	// `[assign]`: the captain hands the question to the Mate, once. A busy
+	// Mate no longer refuses it: the console queues it in `mate/.outbox`
+	// and the sender loop consolePilot started delivers it when the
+	// composer clears (task 30).
+	resolveOut := assignAndAwaitDelivery(t, ctx, w, action, "shop", inbox, 6*time.Minute, shopPane)
 	t.Logf("shop [assign]: %s", resolveOut)
 	t.Logf("shop resolve line: %s", inbox.Resolve)
-	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, inbox.Resolve)
 
 	// The Mate answers the Crew itself: `Source: mate` is written only by a
 	// `matev2 send` run from inside the Mate's own pane.
@@ -688,52 +690,24 @@ func typeCaptainLine(t *testing.T, ctx context.Context, deps spawn.Deps, action 
 		project, within, last, evidence())
 }
 
-// assignUntilDelivered presses `[assign]` until the line reaches the Mate's
-// composer, and returns the Console's own outcome line.
-//
-// The retry is the captain's, not a weakening of the claim. Measured
-// 2026-09-19: a Mate in manual mode supervising a Crew it dispatched is
-// inside a tool call for most of every twenty-second cycle (section 9's
-// poll loop), so `[assign]` meets `target_blocked: agent is mid-turn` far
-// more often than it meets an idle composer. The console reports that
-// refusal on its outcome line and the reader presses again; this is that
-// reader. A composer holding text is answered with the Console's own
-// `[clear composer]`, for the reason typeCaptainLine gives. Every other
-// failure is fatal, because a refusal that is not one of those two is not
-// something pressing again would fix.
-func assignUntilDelivered(t *testing.T, ctx context.Context, action console.ActionFunc, project string,
-	item query.BoxEntry, within time.Duration, evidence func() string) string {
+// assignAndAwaitDelivery presses `[assign]` once and waits for the line to
+// reach the Mate. Since task 30 a busy Mate does not refuse it: the console
+// answers "queued for the Mate" and its outbox sender delivers the line when
+// the composer clears, so the proof of delivery is the `app → mate` line in
+// `sent.log`, not the action's own answer.
+func assignAndAwaitDelivery(t *testing.T, ctx context.Context, w *store.Workspace, action console.ActionFunc,
+	project string, item query.BoxEntry, within time.Duration, evidence func() string) string {
 	t.Helper()
-	deadline := time.Now().Add(within)
-	var last error
-	for time.Now().Before(deadline) {
-		out, err := action(ctx, console.ActionRequest{
-			Action: console.ActionResolve, Target: project, TargetKind: "project",
-			Crew: item.Crew, Input: item.Resolve})
-		if err == nil {
-			return out
-		}
-		if !boxSendRefusal(err) {
-			t.Fatalf("[assign] on the %s inbox item: %v\nmate pane:\n%s", project, err, evidence())
-		}
-		last = err
-		t.Logf("[assign] refused (%v); pressing again", err)
-		if errors.Is(err, send.ErrComposerPending) {
-			clearOut, clearErr := action(ctx, console.ActionRequest{
-				Action: console.ActionClearComposer, Target: project, TargetKind: "mate"})
-			if clearErr != nil {
-				t.Fatalf("[clear composer] on %s: %v", project, clearErr)
-			}
-			t.Logf("%s [clear composer]: %s", project, clearOut)
-		}
-		select {
-		case <-ctx.Done():
-			t.Fatalf("context ended pressing [assign]: %v\nmate pane:\n%s", last, evidence())
-		case <-time.After(10 * time.Second):
-		}
+	out, err := action(ctx, console.ActionRequest{
+		Action: console.ActionResolve, Target: project, TargetKind: "project",
+		Crew: item.Crew, Input: item.Resolve, Key: item.AssignKey})
+	if err != nil {
+		t.Fatalf("[assign] on the %s inbox item: %v\nmate pane:\n%s", project, err, evidence())
 	}
-	t.Fatalf("[assign] never reached the %s Mate within %s: %v\nmate pane:\n%s", project, within, last, evidence())
-	return ""
+	waitForSent(t, ctx, w, project, within, func(e store.SentEntry) bool {
+		return e.Source == store.SourceApp && e.Target == store.TargetMate && e.Text == item.Resolve
+	})
+	return out
 }
 
 // logComposerReading classifies a Mate's composer from the styled screen,
