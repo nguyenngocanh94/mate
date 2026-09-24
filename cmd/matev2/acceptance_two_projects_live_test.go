@@ -197,6 +197,14 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	t.Cleanup(func() {
 		t.Logf("final shop Mate pane:\n%s", shopPane())
 		t.Logf("final blog Mate pane:\n%s", blogPane())
+		// What the daemon last saw of the blog Mate's composer, and why it
+		// last did not deliver: a digest that never arrives is otherwise
+		// indistinguishable from one that was never due.
+		logComposerReading(t, rt, blogMate, blogKind, "blog")
+		for project, status := range pilot.Snapshot() {
+			t.Logf("daemon %s: auto=%v sends=%d last=%s notice=%q at %s", project, w.Auto(project),
+				status.Sends, status.LastSentAt.UTC().Format("15:04:05"), status.Notice, status.NoticeAt.UTC().Format("15:04:05"))
+		}
 		dumpProject(t, w, "shop")
 		dumpProject(t, w, "blog")
 	})
@@ -728,6 +736,30 @@ func assignUntilDelivered(t *testing.T, ctx context.Context, action console.Acti
 	return ""
 }
 
+// logComposerReading classifies a Mate's composer from the styled screen,
+// the reading internal/send takes before every verified send.
+func logComposerReading(t *testing.T, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, project string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	screen, err := rt.ReadAgentStyled(ctx, handle, send.DefaultLines)
+	if err != nil {
+		t.Logf("%s Mate composer: not readable: %v", project, err)
+		return
+	}
+	cls, err := send.ClassifyComposer(kind, screen)
+	t.Logf("%s Mate composer: state=%s evidence=%q err=%v\nstyled tail:\n%q", project, cls.State, cls.Evidence, err,
+		lastLines(screen, 8))
+}
+
+func lastLines(s string, n int) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n")
+}
+
 // writeRepo creates a git repository with the given files, committed on
 // `main`. The files are what makes each acceptance task real: a ship task
 // needs something ambiguous to ask about, a scout task needs something to
@@ -853,6 +885,9 @@ func dumpProject(t *testing.T, w *store.Workspace, project string) {
 	}
 	for _, e := range entries {
 		fmt.Fprintf(&b, "%s | %-5s → %-8s | %s\n", e.Time.UTC().Format("15:04:05"), e.Source, e.Target, e.Text)
+	}
+	if incidents, err := os.ReadFile(w.IncidentsLog(project)); err == nil {
+		fmt.Fprintf(&b, "==== %s incidents.log ====\n%s", project, incidents)
 	}
 	crews, err := spawn.ListCrews(w, project)
 	if err != nil {
