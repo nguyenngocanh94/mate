@@ -181,3 +181,57 @@ func TestHookEventTwoHooksOneForeign(t *testing.T) {
 		t.Fatalf("all trusted = %+v (ok %v)", all, ok)
 	}
 }
+
+// TestHookEventMatchesACommandCodexCut is the whole screen of a live refusal
+// (TestLiveSpawnMateResumeRemembersCodex, 2026-09-24): with a long TMPDIR the
+// command ran past what Codex draws, and Codex cut it at a space and drew `…`.
+func TestHookEventMatchesACommandCodexCut(t *testing.T) {
+	const (
+		root    = "/private/tmp/claude-501/-Volumes-Work-Workspace-matev2/913de3e1-6e57-4ff7-8872-9d4eac0dda49/scratchpad/TestLiveSpawnMateResumeRemembersCodex897977192"
+		source  = root + "/001/.mate/projects/shop/mate/.codex/hooks.json"
+		command = "'" + root + "/002/mate' hook mate-session --harness codex"
+	)
+	e, ok := ParseCodexHookEvent(startupFixture(t, "codex-0.156.1-hooks-sessionstart-own-truncated.txt"))
+	if !ok {
+		t.Fatal("the hook list did not parse")
+	}
+	own := OwnHook{Event: "SessionStart", Source: source, Command: command}
+	if !own.Matches(e.Detail) {
+		t.Fatalf("mate's own hook did not match its cut drawing: %+v", e.Detail)
+	}
+	// The cut forgives only what is not drawn: the drawn part must be the
+	// command up to a space, and the source must still match whole.
+	for _, other := range []OwnHook{
+		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/mate' hook mate-sessionX --harness codex"},
+		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/mate' hook mate-session"},
+		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/matey' hook mate-session --harness codex"},
+		{Event: "SessionStart", Source: root + "/001/.mate/projects/shop/mate/.codex/hooks.json.bak", Command: command},
+		{Event: "Stop", Source: source, Command: command},
+	} {
+		if other.Matches(e.Detail) {
+			t.Errorf("%+v matched the drawing", other)
+		}
+	}
+}
+
+func TestCommandMatch(t *testing.T) {
+	const want = "'/bin/mate' hook mate-session --harness codex"
+	for _, tc := range []struct {
+		lines []string
+		ok    bool
+	}{
+		{[]string{want}, true},
+		{[]string{"'/bin/mate' hook mate-session…"}, true},
+		{[]string{"'/bin/mate' hook mate-", "session…"}, true},
+		{[]string{"'/bin/mate' hook…"}, true},
+		{[]string{"'/bin/mate' hook mate-sess…"}, false},
+		{[]string{"'/bin/mate' hook mate-session"}, false},
+		{[]string{"'/bin/mate' hook mate-session --harness codex…"}, false},
+		{[]string{"…"}, false},
+		{nil, false},
+	} {
+		if got := commandMatch(tc.lines, want); got != tc.ok {
+			t.Errorf("commandMatch(%q) = %v, want %v", tc.lines, got, tc.ok)
+		}
+	}
+}

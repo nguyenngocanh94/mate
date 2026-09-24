@@ -113,6 +113,12 @@ review lists two:
   wrapped at `/` with the `/` not drawn (`…/.mate` then `projects/…`), the Command
   wrapped after `mate-`, and a `Context   limit: 32000 approximate tokens` row the
   lab captures without `additionalContextLimit` do not have.
+- `codex-0.156.1-hooks-sessionstart-own-truncated.txt` - the whole screen of a live
+  `TestLiveSpawnMateResumeRemembersCodex` refusal (2026-09-24, TMPDIR a long Claude
+  scratchpad path): Codex cut the 194-character command at a word boundary and drew
+  `…` in place of ` --harness codex`. The cut fell at the same word with a 179- and a
+  178-character prefix, so it is a word boundary near 180 characters, not a fixed
+  count.
 
 Trusting writes `[hooks.state."<hooks.json>:session_start:0:0"] trusted_hash` into
 `$CODEX_HOME/config.toml`; the next launch with the same hook bytes draws no review.

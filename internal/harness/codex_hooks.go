@@ -104,10 +104,47 @@ type OwnHook struct {
 // kept it and `mate-` + `session` broke after a hyphen. So a value is
 // matched line by line, and at each line break exactly one space or `/` may
 // be missing; nothing else is forgiven.
+//
+// A long command is also cut: measured 2026-09-24 (codex-cli 0.156.1), a
+// 194-character command drew its first 178 or 179 characters and `…`, the
+// cut at the space before ` --harness codex` both times. So a command whose
+// drawing ends in `…` matches when what is drawn is the command up to a
+// space; the Source, which says which file holds the hook, is never cut and
+// must match whole.
 func (o OwnHook) Matches(h CodexReviewHook) bool {
 	return h.Event == o.Event &&
 		wrapMatch(h.SourceLines, codexHookProjectSource+o.Source) &&
-		wrapMatch(h.CommandLines, o.Command)
+		commandMatch(h.CommandLines, o.Command)
+}
+
+// codexEllipsis is what Codex draws where it cut a long value.
+const codexEllipsis = "…"
+
+// commandMatch is wrapMatch for a command, which Codex may cut at a word
+// boundary and end with codexEllipsis.
+func commandMatch(lines []string, want string) bool {
+	if wrapMatch(lines, want) {
+		return true
+	}
+	if len(lines) == 0 {
+		return false
+	}
+	last := lines[len(lines)-1]
+	if !strings.HasSuffix(last, codexEllipsis) {
+		return false
+	}
+	drawn := append(append([]string(nil), lines[:len(lines)-1]...), strings.TrimSuffix(last, codexEllipsis))
+	for cut := strings.IndexByte(want, ' '); cut > 0; {
+		if wrapMatch(drawn, want[:cut]) {
+			return true
+		}
+		next := strings.IndexByte(want[cut+1:], ' ')
+		if next < 0 {
+			break
+		}
+		cut += 1 + next
+	}
+	return false
 }
 
 // wrapMatch reports whether lines, as drawn, are want wrapped: each line a
