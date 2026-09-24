@@ -175,6 +175,54 @@ func CaptainsFirstLine(text string) string {
 	return ""
 }
 
+// SectionText is the body of one `##` section of a brief, verbatim, with
+// surrounding blank lines trimmed, and whether the section is there. text is
+// either the Mate's own file or a brief the app rendered (only its `# Task`
+// is read). A duplicated section answers with its first copy, the one Check
+// judges.
+func SectionText(text, name string) (string, bool) {
+	s, ok := findSection(text, name)
+	if !ok {
+		return "", false
+	}
+	raw := make([]string, 0, len(s.body))
+	for _, l := range s.body {
+		raw = append(raw, l.text)
+	}
+	return strings.Trim(strings.Join(raw, "\n"), "\n"), true
+}
+
+// SectionItems is one section's entries as Check counts them - one per
+// top-level line, indented and fenced lines joined onto the entry above -
+// with the list marker stripped, and whether the section is there.
+func SectionItems(text, name string) ([]string, bool) {
+	s, ok := findSection(text, name)
+	if !ok {
+		return nil, false
+	}
+	var out []string
+	for _, it := range items(s.body) {
+		out = append(out, stripMarker(it.text))
+	}
+	return out, true
+}
+
+func findSection(text, name string) (section, bool) {
+	if IsRendered(text) {
+		task, ok := ExtractTask(text)
+		if !ok {
+			return section{}, false
+		}
+		text = task
+	}
+	for _, s := range parse(text).sections {
+		if s.first && norm(s.name) == norm(name) {
+			return s, true
+		}
+	}
+	return section{}, false
+}
+
 // ExtractTask returns the body of the `# Task` section of a rendered brief:
 // everything after the heading up to the next level-one heading.
 func ExtractTask(rendered string) (string, bool) {
