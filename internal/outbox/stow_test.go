@@ -2,6 +2,9 @@ package outbox_test
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -114,6 +117,76 @@ func TestStowEndsOnACodexComposerBackToEmpty(t *testing.T) {
 	}
 	if sleeper.n < 5 {
 		t.Fatalf("the stow ended after %d sleeps, before the composer had been empty twice", sleeper.n)
+	}
+}
+
+// TestStowWaitsForTheCodexRolloutToFinishTheTurn: a Codex composer reads
+// empty between tool calls, so once mate.meta names the Mate's rollout the
+// stow ends only on a task_complete stamped after the stow line - measured
+// 2026-09-24 (task 38): an empty-composer stow was cut off mid-turn by the
+// restart it said was safe.
+func TestStowWaitsForTheCodexRolloutToFinishTheTurn(t *testing.T) {
+	f := newFixture(t)
+	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	const codexBusy = "• Working (3s • esc to interrupt)\n\n› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	rollout := filepath.Join(t.TempDir(), "rollout.jsonl")
+	old := fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"task_complete","turn_id":"t0","last_agent_message":"earlier"}}`+"\n",
+		f.clock.Now().Add(-time.Minute).Format(time.RFC3339Nano))
+	if err := os.WriteFile(rollout, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ws.WriteMateMeta(project, map[string]string{"harness": "codex", "transcript": rollout}); err != nil {
+		t.Fatal(err)
+	}
+	f.rt.SetReadOutput(f.handle, codexEmpty)
+	f.rt.OnSendText = func(h runtime.AgentHandle, _ string) { f.rt.SetReadOutput(h, codexBusy) }
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(n int) {
+		switch {
+		case n == 2:
+			// Between two tool calls: empty, and it stays empty.
+			f.rt.SetReadOutput(f.handle, codexEmpty)
+		case n == 12:
+			line := fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"task_complete","turn_id":"t1","last_agent_message":"stow receipt"}}`+"\n",
+				f.clock.Now().Format(time.RFC3339Nano))
+			fh, err := os.OpenFile(rollout, os.O_APPEND|os.O_WRONLY, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fh.WriteString(line)
+			fh.Close()
+		}
+	}}
+	res, err := f.stowSender(harness.KindCodex, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Stowed {
+		t.Fatalf("result = %+v", res)
+	}
+	if sleeper.n < 12 {
+		t.Fatalf("the stow ended after %d sleeps, on the empty composer, before the rollout recorded the turn's end", sleeper.n)
+	}
+}
+
+func TestCodexTurnCompletedAfter(t *testing.T) {
+	at := time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC)
+	rec := func(kind string, ts time.Time) string {
+		return fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":%q,"turn_id":"t"}}`, ts.Format(time.RFC3339Nano), kind)
+	}
+	for _, c := range []struct {
+		name    string
+		rollout string
+		want    bool
+	}{
+		{"finished after", rec("task_complete", at.Add(time.Second)), true},
+		{"finished before", rec("task_complete", at.Add(-time.Second)), false},
+		{"aborted after", rec("turn_aborted", at.Add(time.Second)), false},
+		{"started only", rec("task_started", at.Add(time.Second)), false},
+		{"garbage then finished", "not json\n" + rec("task_complete", at.Add(time.Millisecond)), true},
+	} {
+		if got := harness.CodexTurnCompletedAfter([]byte(c.rollout), at); got != c.want {
+			t.Errorf("%s: CodexTurnCompletedAfter = %v, want %v", c.name, got, c.want)
+		}
 	}
 }
 

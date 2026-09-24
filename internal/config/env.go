@@ -33,6 +33,13 @@ const (
 	EnvCaller          = "MATEV2_CALLER"
 	EnvClaudeConfigDir = "CLAUDE_CONFIG_DIR"
 	EnvCodexHome       = "CODEX_HOME"
+	// EnvLive is the single opt-in that lets `TestLive*` proofs claim a real
+	// Herdr lab and real harnesses (AGENTS.md). The product reads it in one
+	// place only: a process that carries it may not launch Codex, or hand a
+	// pane a CODEX_HOME, outside the temp directory (harness.LaunchCodexHome),
+	// so a live run never writes trust or rollouts into the operator's own
+	// ~/.codex.
+	EnvLive = "MATEV2_LIVE"
 )
 
 // ParseLogLevel maps debug/info/warn/error to slog levels. Empty or unknown

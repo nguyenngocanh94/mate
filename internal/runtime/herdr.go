@@ -941,6 +941,23 @@ func (h *Herdr) StartAgent(ctx context.Context, spec AgentStartSpec) (AgentHandl
 			return AgentHandle{}, err
 		}
 	}
+	// The launch's own environment (identity keys, the pinned CODEX_HOME, an
+	// explicit CLAUDE_CONFIG_DIR) is exported into this pane's shell before
+	// every start, the same way the unset above removes what it must not
+	// carry. Pane creation is not enough: Herdr applies `--env` only when a
+	// pane is made (docs/mvp.md section 7, task 22), and a Mate restarted
+	// while a Crew holds its workspace gets a fresh `tab create` that
+	// inherits nothing from the workspace (measured 2026-09-24, Herdr 0.8.2:
+	// a tab created without --env in a workspace made with --env FOO=ws
+	// echoes FOO empty).
+	if env, err := AllowlistedEnv(runtimeEnv(spec.Launch().Env())); err != nil {
+		return AgentHandle{}, err
+	} else if len(env) > 0 {
+		argv := append([]string{"pane", "run", spec.Tab().PaneID, "export"}, exportAssignments(env)...)
+		if _, err := h.run(ctx, session.Name, argv); err != nil {
+			return AgentHandle{}, err
+		}
+	}
 	handle := AgentHandle{
 		Session: session,
 		Name:    spec.Name(),

@@ -50,6 +50,9 @@ The tier names say what the pass does with an entry:
 Marking rules:
 
 - Tier defaults are section-scoped: entries under `## Captain` are `pinned` because preferences and authority boundaries do not age, and entries under `## Lessons` are `aging` because operational facts must re-prove themselves.
+- The section is decided by what the entry is about, never by the tier you want for it: `## Captain` is how the captain wants you to work, and it never reaches a brief; a rule for how Crews work is a `## Lessons` entry, because the manual copies `## Lessons` into every brief it applies to.
+  A Crew rule proposed for a `CREW.md` stays an `aging` lesson until the captain has added it; never move it to `## Captain` to stop its clock.
+- A clock running out never makes a fact lapse: a stale entry is re-checked in step 7, and an entry whose truth still holds is refreshed, not lost.
 - A `pinned` entry carries no marker at all; every `aging` and `perishable` entry always carries its dated marker, whose letter names the tier.
 - Every entry is one line: the fact, a perishable entry's `(expires: <condition>)`, then its source in parentheses, then the marker.
   The source is the captain and a date, or a path relative to the project directory (`crews/k1/report.md §Durable facts`, `sent.log to k3 2026-09-24`), never an absolute or temporary path.
@@ -130,7 +133,7 @@ A reset destroys whatever exists only in this session, and that includes what yo
 So before the reset, make sure the important open work you are holding in context is durably recorded: file what was never filed, and correct what you now know is stale.
 
 - `## In flight` names every Crew you are running, as `matev2 backlog shop` lists it.
-- `## Held for the captain` holds every question you sent the captain and every promise you made: the task, the date, the question exactly as you sent it, and what it waits on.
+- `## Held for the captain` holds every question you sent the captain and every promise you made: the task, the date, the question exactly as you sent it - pasted from your message inside double quotes, never paraphrased (manual section 13) - and what it waits on.
   When the captain answers, put their words verbatim into the task (`matev2 brief append` for a Crew in flight, `/ws/.matev2/projects/shop/PROJECT.md`'s `## Captain's decisions` for a product decision), and only then remove the line.
 - `## Queued` holds each undone next step with its `blocked-by:`.
 

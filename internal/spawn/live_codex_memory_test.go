@@ -75,8 +75,10 @@ func waitCodexAnswer(t *testing.T, path string, seen int, timeout time.Duration)
 
 // TestLiveSpawnMateResumeRemembersCodex is B11: a Codex Mate stopped with
 // StopMate and started again resumes the same Codex session through `codex
-// resume <id>` and remembers a word from before the restart. The session id
-// is the one Herdr's agent_session reports, recorded by the stop.
+// resume <id>` and remembers a word from before the restart. It runs in a
+// lab CODEX_HOME, which has no Herdr Codex integration, so the session id is
+// the one the Mate's own SessionStart hook records in mate.meta at the first
+// prompt (task 37), and the stop keeps it.
 func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 	lab := newLiveLab(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
@@ -94,19 +96,15 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 		t.Fatalf("PromptAgent (plant): %v", err)
 	}
 
-	// Herdr learns the session from the SessionStart hook of its Codex
-	// integration, which Codex runs at the first prompt, not at launch.
+	// The Mate's SessionStart hook runs at the first prompt, not at
+	// launch, and records the rollout id in mate.meta.
 	var ref string
 	deadline := time.Now().Add(2 * time.Minute)
 	for ref == "" {
-		obs, err := lab.rt.InspectAgent(ctx, h)
-		if err != nil {
-			t.Fatalf("InspectAgent: %v", err)
-		}
-		ref = obs.SessionRef
+		ref = readMeta(t, lab.w, "shop")[spawn.MetaSessionID]
 		if ref == "" {
 			if time.Now().After(deadline) {
-				t.Fatal("Herdr never reported agent_session for the Codex Mate; is the Herdr Codex integration installed in ~/.codex/hooks.json?")
+				t.Fatal("the Mate's SessionStart hook never recorded the Codex session id in mate.meta")
 			}
 			time.Sleep(time.Second)
 		}
@@ -125,7 +123,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	t.Logf("first start: agent %s, Herdr agent_session %s, rollout %s", started.Agent, ref, rollout)
+	t.Logf("first start: agent %s, session %s, rollout %s", started.Agent, ref, rollout)
 	waitCodexAnswer(t, rollout, 0, 4*time.Minute)
 
 	stopped, err := spawn.StopMate(ctx, lab.w, lab.deps, "shop")
@@ -133,7 +131,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 		t.Fatalf("StopMate: %v", err)
 	}
 	if stopped.SessionID != ref || readMeta(t, lab.w, "shop")[spawn.MetaSessionID] != ref {
-		t.Fatalf("stop recorded session %q (meta %q), want Herdr's %q", stopped.SessionID, readMeta(t, lab.w, "shop")[spawn.MetaSessionID], ref)
+		t.Fatalf("stop recorded session %q (meta %q), want the hook's %q", stopped.SessionID, readMeta(t, lab.w, "shop")[spawn.MetaSessionID], ref)
 	}
 
 	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex, Resume: true})
@@ -162,8 +160,8 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 	if !strings.Contains(strings.ToUpper(recall), "ZEBRA") {
 		t.Fatalf("the resumed Codex Mate answered %q, want ZEBRA", recall)
 	}
-	if obs, err := lab.rt.InspectAgent(ctx, rh); err != nil || obs.SessionRef != ref {
-		t.Fatalf("after the resumed turn Herdr reports session %q (%v), want the same %q", obs.SessionRef, err, ref)
+	if got := readMeta(t, lab.w, "shop")[spawn.MetaSessionID]; got != ref {
+		t.Fatalf("after the resumed turn mate.meta records session %q, want the same %q", got, ref)
 	}
 
 	final, err := spawn.StopMate(ctx, lab.w, lab.deps, "shop")
@@ -175,25 +173,14 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 	}
 }
 
-// codexLabHome is a CODEX_HOME of the test's own: the operator's auth, hooks
-// on, and a global SessionStart canary hook. Nothing is written to the
-// operator's ~/.codex.
+// codexLabHome is the test's lab CODEX_HOME (codexlab.Home, which
+// liveLabSession installed) with a global SessionStart canary hook added.
+// Nothing is written to the operator's ~/.codex.
 func codexLabHome(t *testing.T) (home, globalLog string) {
 	t.Helper()
-	userHome, err := harness.EffectiveCodexHome("")
+	home, err := harness.LaunchCodexHome("")
 	if err != nil {
-		t.Fatal(err)
-	}
-	auth, err := os.ReadFile(filepath.Join(userHome, "auth.json"))
-	if err != nil {
-		t.Fatalf("no Codex auth to copy into a lab CODEX_HOME: %v", err)
-	}
-	home = t.TempDir()
-	if err := os.WriteFile(filepath.Join(home, "auth.json"), auth, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte("[features]\nhooks = true\n"), 0o644); err != nil {
-		t.Fatal(err)
+		t.Fatalf("no lab CODEX_HOME: %v", err)
 	}
 	hookDir := t.TempDir()
 	globalLog = filepath.Join(hookDir, "session-start.log")

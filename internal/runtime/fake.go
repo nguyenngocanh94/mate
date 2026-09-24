@@ -52,6 +52,10 @@ type Fake struct {
 	StyledOutputs map[string]string
 	ReadCalls     []string
 	StartArgv     [][]string
+	// StartEnv is, per pane, the environment the latest start in it would
+	// have exported into the pane's shell (Herdr.StartAgent's `export`),
+	// through the same allowlist.
+	StartEnv map[string][]EnvVar
 	// PromptGate, if set, is called after PromptAgent is recorded and with
 	// the Fake lock released, so a test can interleave another command with
 	// an in-flight delivery (claim committed, outcome not yet recorded).
@@ -352,7 +356,15 @@ func (f *Fake) StartAgent(_ context.Context, spec AgentStartSpec) (AgentHandle, 
 	if err := f.Names.Reserve(session.Name, spec.Name(), spec.RawID()); err != nil {
 		return AgentHandle{}, err
 	}
+	env, err := AllowlistedEnv(runtimeEnv(spec.Launch().Env()))
+	if err != nil {
+		return AgentHandle{}, err
+	}
 	f.StartArgv = append(f.StartArgv, argv)
+	if f.StartEnv == nil {
+		f.StartEnv = map[string][]EnvVar{}
+	}
+	f.StartEnv[spec.Tab().PaneID] = env
 	h := AgentHandle{Session: session, Name: spec.Name(), RawID: spec.RawID(), Kind: spec.Kind(), Tab: spec.Tab()}
 	f.Agents[session.Name+"/"+spec.Name()] = &fakeAgent{
 		Handle:      h,

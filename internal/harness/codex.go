@@ -104,7 +104,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		)
 	}
 	max := c.maxBytes(spec.Config)
-	codexHome, err := EffectiveCodexHome(spec.Config.CodexHome)
+	codexHome, err := LaunchCodexHome(spec.Config.CodexHome)
 	if err != nil {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "codex home", err)
 	}

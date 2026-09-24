@@ -3,6 +3,8 @@ package outbox
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
@@ -169,11 +171,33 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 
 	// 2. The turn on it. Claude's Stop hook writes the Mate's answer to
 	// sent.log (docs/mvp.md task 08), which says the turn ended; Codex has
-	// no such hook, and Claude's does not fire every turn (section 7), so
-	// the composer itself is the rule for both: busy after the line, then
-	// empty on two looks in a row.
+	// no such hook, but its rollout records `task_complete` when a turn
+	// ends, and mate.meta names the rollout once the Mate's SessionStart
+	// hook has run. A Codex composer reads empty between tool calls
+	// (task 38: a stow judged over by the composer was cut off mid-turn),
+	// so while the rollout is known it is the only rule. Claude's hook does
+	// not fire every turn (section 7), and a Codex rollout can be unknown,
+	// so the composer remains the fallback: busy after the line, then empty
+	// on two looks in a row.
 	sawBusy, empties, since := false, 0, 0
 	for ; ; since++ {
+		if kind == harness.KindCodex {
+			if rollout := s.codexRollout(project); rollout != "" {
+				if data, err := os.ReadFile(rollout); err == nil && harness.CodexTurnCompletedAfter(data, item.SentAt) {
+					if c, err := s.composer(ctx, handle, kind); err == nil && c.State != send.StateBusy {
+						return done(StowResult{Stowed: true})
+					}
+				}
+				if expired() {
+					return done(StowResult{Reason: fmt.Sprintf("the Mate had not finished its stow turn after %s", Span(ceiling))})
+				}
+				if err := s.deps.sleep(ctx, poll); err != nil {
+					return out, err
+				}
+				polls++
+				continue
+			}
+		}
 		if kind == harness.KindClaude {
 			ended, err := s.answeredAfter(project, item)
 			if err != nil {
@@ -250,6 +274,20 @@ func (s *Sender) answeredAfter(project string, item store.OutboxItem) (bool, err
 		}
 	}
 	return false, nil
+}
+
+// MateMetaTranscript is mate.meta's transcript key, spawn.MetaTranscript,
+// named here because importing spawn from this package is a cycle;
+// internal/spawn's tests hold the two equal.
+const MateMetaTranscript = "transcript"
+
+// codexRollout is the rollout mate.meta records for a Codex Mate, or "".
+func (s *Sender) codexRollout(project string) string {
+	meta, err := s.ws.ReadMateMeta(project)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(meta[MateMetaTranscript])
 }
 
 // item reads one item back by id.

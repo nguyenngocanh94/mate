@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/send"
@@ -220,12 +221,19 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 		}
 		stow.Reason = "the composer held unsent text; restarted on your confirmation"
 	}
+	// A restart keeps the harness the Mate was running: StartMate otherwise
+	// launches the workspace default, and a Codex Mate restarted from the
+	// console came back as a fresh Claude Mate (found 2026-09-24, task 38).
+	kind, err := restartHarness(ws, req.Target)
+	if err != nil {
+		return "", err
+	}
 	stopped, err := spawn.StopMate(ctx, ws, deps, req.Target)
 	gone := mateNotRecorded(err)
 	if err != nil && !gone {
 		return "", err
 	}
-	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Resume: true})
+	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Resume: true, Harness: kind})
 	if err != nil {
 		return "", err
 	}
@@ -234,6 +242,20 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 		was = "the previous Mate was already gone"
 	}
 	return fmt.Sprintf("%s; %s; Mate %s is running on %s in pane %s", stow.Outcome(), was, res.Agent, res.Harness, res.Pane), nil
+}
+
+// restartHarness is the harness mate.meta records for the project's Mate,
+// or "" (the workspace default) when there is no record of one.
+func restartHarness(ws *store.Workspace, project string) (harness.Kind, error) {
+	meta, err := ws.ReadMateMeta(project)
+	if err != nil {
+		return "", err
+	}
+	recorded := strings.TrimSpace(meta[spawn.MetaHarness])
+	if recorded == "" {
+		return "", nil
+	}
+	return harness.ParseKind(recorded)
 }
 
 // restartConfirmWindow is how long a held restart waits for the captain's

@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/matev2/internal/harness/codexlab"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -64,6 +65,9 @@ func liveLabSession(t *testing.T) (session, home string) {
 	if userHome == "" {
 		t.Fatal("HOME is required to resolve the Herdr socket; do not use XDG_CONFIG_HOME for lab isolation")
 	}
+	// Every live test that reaches a lab session runs Codex in a lab
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	codexlab.Home(t)
 	home = filepath.Join(userHome, ".config")
 	return session, home
 }

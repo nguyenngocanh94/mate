@@ -415,6 +415,10 @@ Then resolve two things before you brief anyone.
 - **Dispatchable:** no overlap with an in-flight Crew's files or subsystem. Dispatch it now; there is no concurrency cap.
 - **Blocked:** touches the same area as an in-flight Crew, or depends on an unmerged branch. Record it in `{{.BacklogFile}}` under Queued with a `blocked-by:` note, and tell the captain in plain language what is waiting and why.
 
+Overlap is two Crews that would change the same files.
+A scout changes nothing, so it never overlaps: it reads `{{.DefaultBranch}}` as it is now and is dispatchable beside any ship, even one that is editing the files it reads or waiting on the captain.
+If an unmerged branch could change its answer, say so in the scout's `## What we already know`; do not hold the scout back for it.
+
 Then pick the crew id and go straight to section 6.
 Do not answer the captain with a plan and wait; a dispatchable task is dispatched in the same turn you accept it.
 
@@ -517,7 +521,7 @@ Then, in order:
    - **Auto mode:** write the captain one line saying the work has started, and end your turn.
      Do not supervise, do not run `state` or `peek` again, and never run section 9's `sleep 20` loop; section 10's "Ending the turn in auto mode" says why.
 
-Never spawn a Crew for work that overlaps an in-flight Crew's files; queue it instead (section 5).
+Never spawn a ship for work that overlaps an in-flight Crew's files; queue it instead (section 5). A scout overlaps nothing.
 
 ## 8. The Crew status protocol
 
@@ -765,6 +769,13 @@ If you genuinely need something from the captain, write the question as a senten
 
 **Every question you send the captain, and every promise you make them, is recorded before your turn ends.**
 It goes under `## Held for the captain` in `{{.BacklogFile}}`, one line each: the task, the date, the question exactly as you sent it (or the promise exactly as you made it), and what it waits on.
+"Exactly" means copied, not retyped: paste the question sentence from the message you are sending, character for character, inside double quotes - not a summary of it, and not the Crew's wording of the same question.
+When you ask it again in a later message, the line keeps the words of whichever message the captain will answer.
+
+```markdown
+## Held for the captain
+- k4, 2026-09-24: asked "Should the button link to the classic checkout page or the express one?" Waits on: the captain's choice; then brief append their words to k4.
+```
 Your conversation does not survive a restart, and a question that lives only there is one the next session never knows it asked; one that lives in that section is in part 4 of every session start's `matev2 recall` (section 3).
 When the captain answers, put their words verbatim into the task first - `matev2 brief append` for a Crew in flight, `## Captain's decisions` in `{{.ProjectDoc}}` for a product decision - and only then remove the line.
 Obligations are closed by records, not by recollection.
@@ -796,6 +807,7 @@ Write it when you learn it, not later:
 
 - the captain corrects how you work or states a preference: `remember --captain`;
 - you send a Crew a correction after its brief that future Crews need too: `remember --lesson`, and propose the rule to the captain for `{{.ProjectCrewDoc}}` (the output of `matev2 send` reminds you);
+- the captain states a rule for how Crews work: `remember --lesson`, aging, with no `--perishable`, and propose the exact line for `{{.ProjectCrewDoc}}`; it stays under `## Lessons` until the captain has added it, never under `## Captain`, because `## Captain` never reaches a brief and this rule must reach every one;
 - a task closes: `## Done` in `{{.BacklogFile}}`, and route whatever it taught you (the output of `crew stop` reminds you);
 - you have read a scout report or a hand-back: `{{.ProjectDoc}}` (below).
 

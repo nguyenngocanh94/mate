@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/memory"
+	"github.com/nguyenngocanh94/matev2/internal/query"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
@@ -98,6 +99,42 @@ func TestConsoleRestartMateStartsAMateThatWasAlreadyGone(t *testing.T) {
 	}
 	if status.State != spawn.StateRunning {
 		t.Fatalf("state after the restart = %q, want a running Mate", status.Line())
+	}
+}
+
+// TestConsoleRestartMateKeepsItsHarness: a restart brings back the Mate
+// the project had, on the same harness. StartMate alone launches the
+// workspace default, and a Codex Mate restarted from the console came back
+// as a fresh Claude Mate, with neither its conversation nor its harness
+// (found 2026-09-24 writing task 38's acceptance).
+func TestConsoleRestartMateKeepsItsHarness(t *testing.T) {
+	ws, deps := consoleFixture(t, "shop")
+	action := consoleAction(ws, deps)
+	if _, err := action(context.Background(), console.ActionRequest{
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessCodex,
+	}); err != nil {
+		t.Fatalf("start a Codex Mate: %v", err)
+	}
+	if _, err := action(context.Background(), console.ActionRequest{
+		Action: console.ActionStop, Target: "shop", TargetKind: "mate",
+	}); err != nil {
+		t.Fatalf("stop it: %v", err)
+	}
+	out, err := action(context.Background(), console.ActionRequest{
+		Action: console.ActionRestartMate, Target: "shop", TargetKind: "project",
+	})
+	if err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if !strings.Contains(out, "is running on codex") {
+		t.Fatalf("restart line = %q, want the Mate back on codex", out)
+	}
+	meta, err := ws.ReadMateMeta("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta[spawn.MetaHarness] != "codex" {
+		t.Fatalf("mate.meta harness after the restart = %q, want codex", meta[spawn.MetaHarness])
 	}
 }
 
