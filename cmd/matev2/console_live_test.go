@@ -78,7 +78,8 @@ func liveWorkspaceRoot(t *testing.T) string {
 	if abs, _ := filepath.Abs(keep); abs != resolved {
 		t.Fatalf("MATEV2_LIVE_KEEP=%s goes through a symlink (resolves to %s); Herdr reports resolved cwds", keep, resolved)
 	}
-	root, err := os.MkdirTemp(resolved, t.Name()+"-")
+	// A subtest's name holds a "/", which MkdirTemp refuses in a pattern.
+	root, err := os.MkdirTemp(resolved, strings.ReplaceAll(t.Name(), "/", "-")+"-")
 	if err != nil {
 		t.Fatalf("MATEV2_LIVE_KEEP: %v", err)
 	}
