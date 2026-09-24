@@ -126,6 +126,96 @@ func HandleStop(w *store.Workspace, project string, raw []byte) error {
 	return nil
 }
 
+// sessionPayload is the subset of a SessionStart payload this hook reads.
+// Claude Code 2.1.281 and codex-cli 0.154/0.156.1 both send `source` and
+// `session_id` (docs/mvp.md section 7, task 35, A2 and A3), and both a
+// `transcript_path`: Claude's session transcript, Codex's rollout.
+type sessionPayload struct {
+	Source         string `json:"source"`
+	SessionID      string `json:"session_id"`
+	TranscriptPath string `json:"transcript_path"`
+}
+
+// The SessionStart sources the hook treats by name. Anything else, or no
+// source at all, is read as a fresh start (docs/research/firstmate-memory-
+// 2026-09-24.md B2, after firstmate's sessionstart-nudge.md): printing the
+// whole digest redundantly is cheap, missing it is the bug the hook exists
+// to prevent.
+const (
+	SourceStartup = "startup"
+	SourceResume  = "resume"
+	SourceClear   = "clear"
+	SourceCompact = "compact"
+)
+
+// SessionStart is what one SessionStart payload said.
+type SessionStart struct {
+	// Source is the payload's own word, or "" when it named none.
+	Source string
+	// SessionID and TranscriptPath are the session the hook fired in.
+	SessionID      string
+	TranscriptPath string
+	// Recorded is true when mate.meta was updated with SessionID.
+	Recorded bool
+}
+
+// LiveOnly reports whether the digest for this start is part 1 only. A
+// resumed conversation still holds everything the files said; what may
+// have moved while the Mate was stopped is the crews, the inbox and the
+// outbox. Every other source lost the digest from context, or never had it.
+func (s SessionStart) LiveOnly() bool { return s.Source == SourceResume }
+
+// HandleSessionStart implements the record half of `matev2 hook
+// mate-session`: it parses the payload and, when `mate.meta` records a
+// Mate, writes the payload's session id and transcript into it, keeping
+// every other key.
+//
+// This closes the gap task 35 measured: `/clear` mints a new Claude session
+// id, and until now only the Stop hook of the first turn after it recorded
+// the id, so a restart in between resumed the conversation from before the
+// clear. A Codex Mate's id is its rollout's uuid, which exists only once the
+// first prompt opens the rollout - exactly when Codex runs this hook.
+//
+// A meta with no `harness=` is not a Mate's record (a first start has not
+// written one yet, and StartMate writes the same id itself), so it is left
+// alone. A payload that does not parse is still a session start: the caller
+// prints the full digest.
+func HandleSessionStart(w *store.Workspace, project string, raw []byte) (SessionStart, error) {
+	var payload sessionPayload
+	if len(strings.TrimSpace(string(raw))) > 0 {
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			return SessionStart{}, fmt.Errorf("hook: malformed SessionStart payload: %w", err)
+		}
+	}
+	out := SessionStart{
+		Source:         strings.TrimSpace(payload.Source),
+		SessionID:      strings.TrimSpace(payload.SessionID),
+		TranscriptPath: strings.TrimSpace(payload.TranscriptPath),
+	}
+	if out.SessionID == "" {
+		return out, nil
+	}
+	meta, err := w.ReadMateMeta(project)
+	if err != nil {
+		return out, fmt.Errorf("hook: read mate.meta: %w", err)
+	}
+	if strings.TrimSpace(meta[spawn.MetaHarness]) == "" {
+		return out, nil
+	}
+	if meta[spawn.MetaSessionID] == out.SessionID && (out.TranscriptPath == "" || meta[spawn.MetaTranscript] == out.TranscriptPath) {
+		return out, nil
+	}
+	meta[spawn.MetaSessionID] = out.SessionID
+	if out.TranscriptPath != "" {
+		meta[spawn.MetaTranscript] = out.TranscriptPath
+	}
+	if err := w.WriteMateMeta(project, meta); err != nil {
+		return out, fmt.Errorf("hook: write mate.meta: %w", err)
+	}
+	out.Recorded = true
+	return out, nil
+}
+
 // oneLine flattens text the way store.AppendSent will anyway (log.go's
 // unexported oneLine), so a rune-count truncation below counts the line
 // sent.log will actually hold rather than one a stray newline could shift.

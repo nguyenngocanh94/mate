@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 	"github.com/nguyenngocanh94/matev2/internal/outbox"
@@ -177,20 +180,45 @@ func boxPeekAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, re
 	return screen, nil
 }
 
-// restartMateAction is the Actions menu's restart_mate entry on the Mate row: stop
-// the Mate, then start it again, through the same spawn seams the action
-// menu's own Stop and Start use. It is one action rather than two keystrokes
-// because the state it exists for - a Mate that no longer answers - is one a
-// reader wants out of in one gesture, and a stop that is not followed by a
-// start leaves the project with no Mate at all.
+// restartMateAction is the Actions menu's restart_mate entry on the Mate row:
+// stow, stop the Mate, then start it again, through the same spawn seams the
+// action menu's own Stop and Start use. It is one action rather than two
+// keystrokes because the state it exists for - a Mate that no longer answers
+// - is one a reader wants out of in one gesture, and a stop that is not
+// followed by a start leaves the project with no Mate at all.
+//
+// Since task 37 (B7) the restart first asks the Mate to file what exists
+// only in its conversation: the `⟦matev2⟧ stow:` line goes through the
+// outbox like every other line the app types into a Mate, and the restart
+// waits for that turn to end, up to outbox.DefaultStowCeiling, then goes
+// ahead either way. The captain's own unsent text in the composer is never
+// typed over: the first press is held with a question on the outcome line,
+// and a second press within restartConfirmWindow restarts without stowing.
+// The outcome line opens with "stowed" or "not stowed: <reason>".
 //
 // A Mate that was already gone is not an error: StopMate reports it and the
 // start proceeds, which is exactly the case a reader reaching for a restart
-// is most often in. The returned line names both halves, so the outcome line
+// is most often in. The returned line names every step, so the outcome line
 // says what actually happened rather than only that something did.
-func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest, holds *restartHolds) (string, error) {
 	if req.Target == "" {
 		return "", observability.NewError(observability.CodeUsage, "no Project was named for the restart")
+	}
+	if err := store.ValidateProjectName(req.Target); err != nil {
+		return "", err
+	}
+	confirmed := holds.take(req.Target, time.Now())
+	stow, err := consoleOutbox(ws, deps).Stow(ctx, req.Target, outbox.StowOptions{})
+	if err != nil {
+		return "", err
+	}
+	if stow.Held {
+		if !confirmed {
+			holds.put(req.Target, time.Now())
+			return fmt.Sprintf("held: the Mate's composer holds unsent text (%s), so matev2 typed nothing and restarted nothing; choose Restart again within %s to restart without stowing, which discards that text",
+				strconv.Quote(recallClip(stow.Pending, 80)), outbox.Span(restartConfirmWindow)), nil
+		}
+		stow.Reason = "the composer held unsent text; restarted on your confirmation"
 	}
 	stopped, err := spawn.StopMate(ctx, ws, deps, req.Target)
 	gone := mateNotRecorded(err)
@@ -205,7 +233,38 @@ func restartMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps
 	if gone || stopped.AlreadyGone {
 		was = "the previous Mate was already gone"
 	}
-	return fmt.Sprintf("%s; Mate %s is running on %s in pane %s", was, res.Agent, res.Harness, res.Pane), nil
+	return fmt.Sprintf("%s; %s; Mate %s is running on %s in pane %s", stow.Outcome(), was, res.Agent, res.Harness, res.Pane), nil
+}
+
+// restartConfirmWindow is how long a held restart waits for the captain's
+// second press.
+const restartConfirmWindow = 2 * time.Minute
+
+// restartHolds remembers, per project, a restart held because the Mate's
+// composer had unsent text in it, so the next press within
+// restartConfirmWindow is the captain's confirmation. It lives in the
+// console process: a console restarted in between asks again, which is the
+// safe side.
+type restartHolds struct {
+	mu sync.Mutex
+	at map[string]time.Time
+}
+
+func newRestartHolds() *restartHolds { return &restartHolds{at: map[string]time.Time{}} }
+
+func (h *restartHolds) put(project string, now time.Time) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.at[project] = now
+}
+
+// take reports whether a hold for project is still open, and clears it.
+func (h *restartHolds) take(project string, now time.Time) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	at, ok := h.at[project]
+	delete(h.at, project)
+	return ok && now.Sub(at) <= restartConfirmWindow
 }
 
 // clearComposerAction is the Actions menu's clear_composer entry: one Ctrl+U into

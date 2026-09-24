@@ -228,6 +228,48 @@ func TestHandleStopMissingFieldsAreEmptyNotAnError(t *testing.T) {
 	}
 }
 
+func TestHandleSessionStartRecordsTheIDOfARecordedMate(t *testing.T) {
+	w := newWorkspace(t)
+	if err := w.WriteMateMeta("shop", map[string]string{spawn.MetaHarness: "codex", spawn.MetaAgent: "mate-shop", spawn.MetaSessionID: ""}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := hook.HandleSessionStart(w, "shop", []byte(`{"source":"startup","session_id":"019a-rollout","transcript_path":"/codex/rollout.jsonl","cwd":"/m"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != hook.SourceStartup || got.SessionID != "019a-rollout" || !got.Recorded || got.LiveOnly() {
+		t.Fatalf("got %+v", got)
+	}
+	meta, err := w.ReadMateMeta("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta[spawn.MetaSessionID] != "019a-rollout" || meta[spawn.MetaTranscript] != "/codex/rollout.jsonl" || meta[spawn.MetaAgent] != "mate-shop" {
+		t.Fatalf("meta = %+v", meta)
+	}
+	// The same id again changes nothing.
+	again, err := hook.HandleSessionStart(w, "shop", []byte(`{"source":"resume","session_id":"019a-rollout","transcript_path":"/codex/rollout.jsonl"}`))
+	if err != nil || again.Recorded || !again.LiveOnly() {
+		t.Fatalf("again = %+v, %v", again, err)
+	}
+}
+
+// TestHandleSessionStartLeavesAMetaWithNoMateAlone: a first start has not
+// recorded a Mate yet, and StartMate writes the same id itself.
+func TestHandleSessionStartLeavesAMetaWithNoMateAlone(t *testing.T) {
+	w := newWorkspace(t)
+	got, err := hook.HandleSessionStart(w, "shop", []byte(`{"source":"startup","session_id":"s1"}`))
+	if err != nil || got.Recorded {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	if meta, _ := w.ReadMateMeta("shop"); len(meta) != 0 {
+		t.Fatalf("a meta was written: %+v", meta)
+	}
+	if _, err := hook.HandleSessionStart(w, "shop", []byte(`{not json`)); err == nil {
+		t.Fatal("want an error for malformed JSON")
+	}
+}
+
 func TestHandleStopMalformedJSONIsAnErrorAndAppendsNothing(t *testing.T) {
 	w := newWorkspace(t)
 	if err := hook.HandleStop(w, "shop", []byte(`{not json`)); err == nil {

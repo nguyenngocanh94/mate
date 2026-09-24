@@ -122,4 +122,51 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 	if !json.Valid(keys["hooks"]) || !strings.Contains(string(keys["hooks"]), "/old/matev2") {
 		t.Fatalf("the existing hooks were not kept: %s", data)
 	}
+	// Task 37: the same start adds the SessionStart hook the old file lacks.
+	if !strings.Contains(string(keys["hooks"]), `"SessionStart"`) || !strings.Contains(string(keys["hooks"]), "hook mate-session") {
+		t.Fatalf("the SessionStart hook was not added: %s", data)
+	}
+}
+
+// TestEnsureSessionHookAddsItAndKeepsTheRest is task 37's path for a Mate
+// directory made before it: the SessionStart hook is added beside whatever
+// the file already runs, the captain's own SessionStart entries included.
+func TestEnsureSessionHookAddsItAndKeepsTheRest(t *testing.T) {
+	in := []byte(`{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"'/old/matev2' hook mate-stop"}]}],"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"echo captain"}]}]}}`)
+	out, changed, err := spawn.EnsureSessionHook(in, "/usr/local/bin/matev2")
+	if err != nil || !changed {
+		t.Fatalf("EnsureSessionHook = changed %v, %v", changed, err)
+	}
+	var got struct {
+		Theme string `json:"theme"`
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if got.Theme != "dark" || len(got.Hooks["Stop"]) != 1 || got.Hooks["Stop"][0].Hooks[0].Command != "'/old/matev2' hook mate-stop" {
+		t.Fatalf("the file's other keys were not kept: %s", out)
+	}
+	starts := got.Hooks["SessionStart"]
+	if len(starts) != 2 || starts[0].Matcher != "startup" || starts[0].Hooks[0].Command != "echo captain" {
+		t.Fatalf("the captain's SessionStart entry was not kept first: %s", out)
+	}
+	if starts[1].Matcher != "" || starts[1].Hooks[0].Command != "'/usr/local/bin/matev2' hook mate-session" {
+		t.Fatalf("matev2's entry = %+v, want an unmatched hook mate-session", starts[1])
+	}
+
+	again, changed, err := spawn.EnsureSessionHook(out, "/somewhere/else/matev2")
+	if err != nil || changed || string(again) != string(out) {
+		t.Fatalf("a file that already runs hook mate-session was changed (%v, %v)", changed, err)
+	}
+	for _, bad := range []string{`[]`, `{"hooks":[]}`, `{"hooks":{"SessionStart":{}}}`} {
+		if _, _, err := spawn.EnsureSessionHook([]byte(bad), "/m"); err == nil {
+			t.Errorf("%s: want an error", bad)
+		}
+	}
 }

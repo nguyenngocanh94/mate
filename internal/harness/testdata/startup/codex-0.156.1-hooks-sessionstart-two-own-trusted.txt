@@ -1,0 +1,32 @@
+
+╭───────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.156.1)                │
+│                                           │
+│ model:       GPT-6-Sol   /model to change │
+│ directory:   /private/tmp/…/001/codexlab  │
+│ permissions: YOLO mode                    │
+╰───────────────────────────────────────────╯
+
+  Tip: This is GPT-6, a new generation of intelligence. Astra is state-of-the-art in coding,
+  computer use, science, and professional work. Give it a hard problem, a half-formed idea, or
+  anything you've been meaning to build. See where it takes you.
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+  SessionStart hooks
+  1 hook needs review before it can run.
+
+  [!] Hook 1 · new
+› [x] Hook 2
+
+  Event     SessionStart
+  Source    Project config - /private/tmp/TestLiveZZMeasureCodexHookReview8854139/001/
+            codexlab/.codex/hooks.json
+  Command   '/usr/local/bin/matev2' hook mate-session
+  Mode      Sync
+  Timeout   10s
+  Trust     Trusted
+
+
+  space/enter toggle · esc back

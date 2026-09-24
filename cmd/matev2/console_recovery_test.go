@@ -5,7 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/matev2/internal/memory"
+	"github.com/nguyenngocanh94/matev2/internal/runtime"
+	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/matev2/internal/store"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
 
@@ -31,8 +35,8 @@ func TestConsoleRestartMateStopsThenStartsTheSameProject(t *testing.T) {
 		t.Fatalf("restart action: %v", err)
 	}
 	t.Logf("restart action: %s", out)
-	if !strings.Contains(out, "stopped") || !strings.Contains(out, "is running") {
-		t.Fatalf("restart line = %q, want it to name both halves of what happened", out)
+	if !strings.HasPrefix(out, "stowed; ") || !strings.Contains(out, "stopped") || !strings.Contains(out, "is running") {
+		t.Fatalf("restart line = %q, want it to open with the stow outcome and name both halves of what happened", out)
 	}
 
 	status, err := spawn.MateStatus(context.Background(), f.ws, f.deps, "shop")
@@ -53,10 +57,15 @@ func TestConsoleRestartMateStopsThenStartsTheSameProject(t *testing.T) {
 		t.Fatalf("setup: the fixture Mate was not running before the restart: %+v", before)
 	}
 
-	// A restart is not a message: nothing about it goes into anybody's
-	// composer, so sent.log must be exactly as it was.
-	if lines := sentLines(t, f.ws); len(lines) != 0 {
-		t.Fatalf("the restart wrote to sent.log: %+v", lines)
+	// The one line a restart types (task 37, B7) is the stow line, into
+	// the Mate that is about to go, through the outbox; nothing else.
+	lines := sentLines(t, f.ws)
+	if len(lines) != 1 || lines[0].Source != store.SourceApp || lines[0].Target != store.TargetMate || lines[0].Text != memory.StowLine {
+		t.Fatalf("sent.log after the restart = %+v, want exactly the stow line to the Mate", lines)
+	}
+	typed := f.rt.SentText
+	if len(typed) != 1 || typed[0].Handle.Name != before[spawn.MetaAgent] || typed[0].Text != send.Marker+memory.StowLine {
+		t.Fatalf("typed into panes = %+v, want the marked stow line into the old Mate only", typed)
 	}
 }
 
@@ -145,3 +154,93 @@ func TestConsoleClearComposerRefusesAProjectWithNoMate(t *testing.T) {
 		t.Fatalf("a refused clear still pressed keys: %+v", f.rt.SentKeys)
 	}
 }
+
+// TestConsoleRestartHeldByUnsentTextAsksFirst is B7's one refusal: the
+// captain's own words in the Mate's composer are never typed over and never
+// discarded without being asked. The first press restarts nothing and says
+// what it found; the second, within the window, restarts without stowing.
+func TestConsoleRestartHeldByUnsentTextAsksFirst(t *testing.T) {
+	f := newBoxFixture(t)
+	f.rt.SetReadOutput(f.mate, claudePendingScreen)
+	before, err := f.ws.ReadMateMeta("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	restart := console.ActionRequest{Action: console.ActionRestartMate, Target: "shop", TargetKind: "project"}
+
+	out, err := f.action(context.Background(), restart)
+	if err != nil {
+		t.Fatalf("first press: %v", err)
+	}
+	t.Logf("first press: %s", out)
+	if !strings.HasPrefix(out, "held: ") || !strings.Contains(out, `"half typed"`) || !strings.Contains(out, "Restart again") {
+		t.Fatalf("first press = %q, want it held, quoting the unsent text and asking for a second press", out)
+	}
+	if len(f.rt.SentText) != 0 || len(sentLines(t, f.ws)) != 0 {
+		t.Fatalf("a held restart typed or recorded something: %+v", f.rt.SentText)
+	}
+	if meta, _ := f.ws.ReadMateMeta("shop"); meta[spawn.MetaAgent] != before[spawn.MetaAgent] || meta[spawn.MetaStartedAt] != before[spawn.MetaStartedAt] {
+		t.Fatalf("a held restart restarted the Mate: %+v", meta)
+	}
+
+	out, err = f.action(context.Background(), restart)
+	if err != nil {
+		t.Fatalf("second press: %v", err)
+	}
+	t.Logf("second press: %s", out)
+	if !strings.HasPrefix(out, "not stowed: the composer held unsent text; restarted on your confirmation; stopped ") || !strings.Contains(out, "is running") {
+		t.Fatalf("second press = %q, want a restart that says it did not stow and why", out)
+	}
+	if len(f.rt.SentText) != 0 {
+		t.Fatalf("the confirmed restart typed over the captain's text: %+v", f.rt.SentText)
+	}
+}
+
+// TestConsoleRestartAfterTheCeilingSaysSoAndRestarts: a Mate that takes the
+// stow line and never ends its turn does not hold the restart hostage. The
+// restart goes ahead once the ceiling passes, and says it did.
+func TestConsoleRestartAfterTheCeilingSaysSoAndRestarts(t *testing.T) {
+	f := newBoxFixture(t)
+	f.rt.OnSendText = func(h runtime.AgentHandle, _ string) {
+		// The stow line went in; the Mate is busy from here on.
+		f.rt.SetReadOutput(h, claudeBusyBoxScreen)
+	}
+	out, err := f.action(context.Background(), console.ActionRequest{Action: console.ActionRestartMate, Target: "shop", TargetKind: "project"})
+	if err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	t.Logf("restart: %s", out)
+	if !strings.HasPrefix(out, "not stowed: the Mate had not finished its stow turn after 3 minutes; stopped ") || !strings.Contains(out, "is running") {
+		t.Fatalf("restart line = %q, want the ceiling named and the restart done", out)
+	}
+	if len(f.rt.SentText) != 1 {
+		t.Fatalf("typed %+v, want the stow line once", f.rt.SentText)
+	}
+}
+
+// TestConsoleRestartOfAGoneMateSaysItDidNotStow: nothing to ask, and the
+// outcome line says so rather than implying a stow happened.
+func TestConsoleRestartOfAGoneMateSaysItDidNotStow(t *testing.T) {
+	f := newBoxFixture(t)
+	if _, err := f.action(context.Background(), console.ActionRequest{Action: console.ActionStop, Target: "shop", TargetKind: "mate"}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := f.action(context.Background(), console.ActionRequest{Action: console.ActionRestartMate, Target: "shop", TargetKind: "project"})
+	if err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if !strings.HasPrefix(out, "not stowed: the Mate was not running; ") {
+		t.Fatalf("restart line = %q", out)
+	}
+	items, err := f.ws.ReadOutbox("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("a restart of a gone Mate queued %+v", items)
+	}
+}
+
+// claudeBusyBoxScreen is Claude mid-turn: its own spinner at column 0 above
+// the composer.
+const claudeBusyBoxScreen = "✶ Pollinating… (3s · esc to interrupt)\n" + claudeEmptyScreen

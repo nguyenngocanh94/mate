@@ -176,7 +176,7 @@ type Request struct {
 }
 
 func (r Request) validate() error {
-	if r.Source != store.OutboxSourceAssign && r.Source != store.OutboxSourceDigest {
+	if r.Source != store.OutboxSourceAssign && r.Source != store.OutboxSourceDigest && r.Source != store.OutboxSourceStow {
 		return observability.NewError(observability.CodeUsage, fmt.Sprintf("outbox: unknown source %q", r.Source))
 	}
 	if strings.TrimSpace(r.Key) == "" {

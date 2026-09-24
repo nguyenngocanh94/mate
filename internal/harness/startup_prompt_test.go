@@ -40,10 +40,16 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		// `codex resume <id>` (task 35): the old conversation is replayed
 		// above the composer, prompt lines and all.
 		{KindCodex, "codex-0.154.0-resume-ready.txt", StartupScreenReady},
-		// Codex's hook-trust review is a real startup dialog, but matev2
-		// installs no Codex hook, so it is refused unanswered (task 37 owns
-		// the decision).
-		{KindCodex, "codex-0.154.0-hooks-review.txt", StartupScreenUnrecognized},
+		// Codex's hook-trust review (task 37): recognised in both measured
+		// layouts, and answered only by the settle's walk through the
+		// review, for matev2's own hook. The screens behind it are not
+		// startup screens of their own.
+		{KindCodex, "codex-0.154.0-hooks-review.txt", StartupScreenHooksReview},
+		{KindCodex, "codex-0.156.1-hooks-review.txt", StartupScreenHooksReview},
+		{KindCodex, "codex-0.156.1-hooks-review-two.txt", StartupScreenHooksReview},
+		{KindCodex, "codex-0.156.1-hooks-table-review.txt", StartupScreenUnrecognized},
+		{KindCodex, "codex-0.156.1-hooks-sessionstart-own.txt", StartupScreenUnrecognized},
+		{KindCodex, "codex-0.156.1-hooks-closed-ready.txt", StartupScreenReady},
 		// A harness's dialog is not another harness's dialog: the wording is
 		// matched per profile, never as "anything with Yes/No on it".
 		{KindClaude, "codex-0.154.0-trust-dialog.txt", StartupScreenUnrecognized},
