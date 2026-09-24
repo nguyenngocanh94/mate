@@ -36,6 +36,9 @@ const (
 	// The same shape as the shop ship task with the choice removed, so
 	// nothing in it needs the captain once it is typed.
 	twoProjectsShipBlog = `Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.`
+	// The captain's answer to the shop Crew's question, once the Mate has
+	// escalated it: the checkout page is theirs to choose.
+	twoProjectsShopChoice = `Use the express checkout page, pages/checkout-express.html.`
 	// The line the captain types at the very end, to prove an unmarked
 	// prompt ends auto mode.
 	twoProjectsEndsAuto = `Thanks - that is all for today.`
@@ -49,8 +52,9 @@ const (
 // `shop` runs in manual mode, the default. The captain types one ship
 // request, and every step after it is asserted from the files rather than
 // from a pane: the Mate spawns a Crew, the Crew works and then asks, the
-// captain hands the question to the Mate with `[assign]`, the Mate answers
-// the Crew, the Crew hands back, the Mate reports the branch ready and does
+// captain hands the question to the Mate with `[assign]`, the Mate escalates
+// it (the checkout page is the captain's choice), the captain answers in the
+// Mate's pane, the Mate relays it to the Crew, the Crew hands back, the Mate reports the branch ready and does
 // not land it, and the captain merges from the Console. Then a scout task,
 // which ends in a report the Mate summarises and the captain tells it to
 // close.
@@ -273,13 +277,36 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	resolveOut := assignAndAwaitDelivery(t, ctx, w, action, "shop", inbox, 6*time.Minute, shopPane)
 	t.Logf("shop [assign]: %s", resolveOut)
 	t.Logf("shop resolve line: %s", inbox.Resolve)
+	afterAssign := len(sentEntries(t, w, "shop"))
 
-	// The Mate answers the Crew itself: `Source: mate` is written only by a
-	// `matev2 send` run from inside the Mate's own pane.
-	answered := waitForSent(t, ctx, w, "shop", 5*time.Minute, func(e store.SentEntry) bool {
+	// `[assign]` hands the question to the Mate to handle, not to decide
+	// (decided 2026-09-24; the decision-authority skill): which checkout
+	// page "our checkout page" means is the captain's product choice, so
+	// the Mate escalates it in its own pane, naming both options, and sends
+	// the Crew no choice of its own. The Stop hook writes the Mate's final
+	// words of that turn as `Source: mate` → `user`.
+	escalation := waitForSentAfter(t, ctx, w, "shop", afterAssign, 5*time.Minute, func(e store.SentEntry) bool {
+		text := strings.ToLower(e.Text)
+		return e.Source == store.SourceMate && e.Target == store.SourceUser &&
+			strings.Contains(text, "classic") && strings.Contains(text, "express")
+	})
+	t.Logf("shop Mate → captain (escalation): %s", escalation.Text)
+	assertNoChoiceSentToCrew(t, w, "shop", ship, afterAssign)
+
+	// The captain answers in the Mate's pane, unmarked, as a person does;
+	// shop is in manual mode, so there is no `.auto` for the hook to clear.
+	beforeAnswer := len(sentEntries(t, w, "shop"))
+	typeCaptainLine(t, ctx, deps, action, "shop", shopMate, shopKind, twoProjectsShopChoice, 4*time.Minute, shopPane)
+
+	// The Mate relays it: `Source: mate` is written only by a `matev2 send`
+	// run from inside the Mate's own pane.
+	answered := waitForSentAfter(t, ctx, w, "shop", beforeAnswer, 5*time.Minute, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate && e.Target == store.CrewTarget(ship)
 	})
 	t.Logf("shop Mate → crew:%s: %s", ship, answered.Text)
+	if !strings.Contains(strings.ToLower(answered.Text), "express") {
+		t.Fatalf("the Mate relayed %q to the Crew, which does not carry the captain's choice (express)", answered.Text)
+	}
 
 	// The Crew takes it as a new prompt and hands the branch back.
 	// The Mate's own answer is the last thing in the log before it does, so
@@ -330,8 +357,8 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	}
 	shopReadme := gitOut(t, shop, "show", "main:README.md")
 	t.Logf("shop README.md on main after the merge:\n%s", shopReadme)
-	if !strings.Contains(strings.ToLower(shopReadme), "checkout") {
-		t.Fatalf("shop's README.md on main carries no link to a checkout page:\n%s", shopReadme)
+	if !strings.Contains(shopReadme, "checkout-express.html") {
+		t.Fatalf("shop's README.md on main does not link the page the captain chose:\n%s", shopReadme)
 	}
 	t.Logf("shop commits landed on main:\n%s", gitOut(t, shop, "log", "--format=%h %s", shopBefore+"..main"))
 
@@ -410,6 +437,21 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	typeCaptainLine(t, ctx, deps, action, "blog", blogMate, blogKind, twoProjectsEndsAuto, 4*time.Minute, blogPane)
 	waitForAutoOff(t, ctx, w, "blog", 3*time.Minute)
+}
+
+// assertNoChoiceSentToCrew fails when the Mate sent the Crew a line naming
+// either checkout page after the question was assigned: that choice was the
+// captain's, and a Mate that guessed it into the Crew's pane decided it.
+func assertNoChoiceSentToCrew(t *testing.T, w *store.Workspace, project, crew string, after int) {
+	t.Helper()
+	entries := sentEntries(t, w, project)
+	for _, e := range entries[after:] {
+		text := strings.ToLower(e.Text)
+		if e.Source == store.SourceMate && e.Target == store.CrewTarget(crew) &&
+			(strings.Contains(text, "classic") || strings.Contains(text, "express")) {
+			t.Fatalf("the Mate sent crew %s a checkout choice before the captain made it: %q", crew, e.Text)
+		}
+	}
 }
 
 // mateHarnessTurn is one prompt the Mate's harness took and everything it
