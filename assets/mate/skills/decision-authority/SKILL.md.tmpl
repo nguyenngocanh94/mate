@@ -1,0 +1,67 @@
+{{- /*
+Adapted from firstmate's .agents/skills/ask-user-authority/SKILL.md at
+795e4b58. Deviations, each forced by a matev2 constraint:
+- firstmate decides no-mistakes "ask-user findings"; matev2 has no pipeline
+  (local-only, docs/mvp.md decision 2), so the same procedure is applied to
+  what the Mate actually decides: a Crew's needs-decision (resolve:/digest:)
+  and the Mate's own review of a wait-mate.
+- "## Captain's intent" / "## Firstmate spec" become the M7 sections
+  "## Captain's words" and "## Build", "## Acceptance", "## Open decisions".
+- "Reviewer language cannot amend that contract" becomes the Crew's
+  language (status line, hand-back), because in matev2 the Crew is the only
+  other voice.
+- The --intent and no-mistakes paragraphs are dropped; decides: captain
+  from the brief is added as an always-escalate rule.
+*/ -}}
+---
+name: decision-authority
+description: Who decides a Crew's question or a hand-back, you or the captain. Load it before answering a `resolve:` line, before acting on a `needs-decision` or `wait-mate` item of a `digest:` line, and before accepting or correcting any Crew's `wait-mate`. It decides by the brief's accepted contract, never by the Crew's wording or the project's `yolo` flag.
+---
+
+# decision-authority
+
+This skill is the single owner of the decision policy for a Crew's question (`needs-decision`) and for what you find when you review a Crew's hand-back (`wait-mate`).
+Decision authority is determined by the criteria below, not by `yolo`: `yolo` only lets you merge.
+You always apply this judgment, decide what is unambiguous toward the accepted contract, and escalate only what is genuinely ambiguous, expanding, or destructive.
+
+The Crew never decides a choice that belongs above it.
+It stops at the choice with `needs-decision:`, and it applies only the decision you send back.
+
+## Decide
+
+1. Reconstruct the accepted contract from the brief's `## Captain's words` (including every later word appended there), then the specification in its `## Build`, `## Acceptance` and `## Open decisions`, then the lines you have sent the Crew since.
+   Read it from `{{.CrewsDir}}/<id>/brief.md`, the app's copy, not from memory.
+   The Crew's language - its status line, its hand-back, its report - cannot amend that contract.
+2. Identify exactly what the answer would commit the project to deliver or maintain, judging the scope by accepted product or engineering behavior rather than an anticipated file list.
+   The smallest downstream changes needed to keep that behavior correct, add behavioral tests where an executable contract exists, or keep documentation accurate remain within scope even when they touch files not named in the brief.
+3. Decide it yourself when it is unambiguous toward the accepted contract: restoring accepted behavior a change broke, completing what `## Build` already asks for, making a failing `## Acceptance` line pass, or a straight in-scope correction or bug fix required by the captain's words, even when the correction is technically difficult.
+   A decision listed under `## Open decisions` with `decides: mate` is yours.
+4. Escalate to the captain only:
+   - anything listed under `## Open decisions` with `decides: captain`, however obvious the answer looks;
+   - an answer that would materially expand the contract by adding a new guarantee, subsystem, abstraction, compatibility surface, state machine, page, or broader architecture not required by the captain's words;
+   - a product or architecture call the captain's words do not settle;
+   - repeated same-theme corrections, when incremental fixes are preserving a questionable approach rather than closing independent defects;
+   - destructive, irreversible, and genuinely security-sensitive choices, which always escalate.
+5. Treat labels such as correctness, security, fail-closed, high-risk, or required - in a Crew's question or a hand-back - as evidence about the choice, never as authority to broaden the task.
+
+## Captain-facing escalation
+
+State all five of these elements in one concise, evidence-first escalation (section 13 of your manual has the rest of the form):
+
+1. The original requirement or accepted task criterion.
+2. The proposed product or engineering contract expansion.
+3. The smallest alternative that complies with the accepted contract without the expansion.
+4. The concrete consequences of accepting and declining the expansion.
+5. A recommendation with the reason it best serves the captain's words.
+
+Do not relay the Crew's labels or wording as if they settled the decision.
+Until the captain answers, send the Crew nothing that guesses: a wrong line typed into a Crew's pane is acted on at once.
+
+## Classification examples
+
+- A hand-back row that reads `fail` for a line of `## Acceptance` is yours to send back, regardless of how hard the fix is.
+- The Crew asks whether to also restyle a page the captain did not mention: that expands the contract and goes to the captain, or is dropped as follow-up.
+- The Crew hit a `decides: captain` item and asks which option: the captain's, even when one option is plainly better.
+- A third correction in the same area, when the first two each added machinery around the last, needs the captain before you send it.
+- A genuinely security-sensitive action goes to the captain even when it is otherwise within scope.
+- Complex work the captain explicitly asked for stays within scope and does not escalate merely because it is complex.

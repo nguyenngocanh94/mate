@@ -18,7 +18,7 @@ var (
 // `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
 // `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
 // Code discovers a skill relative to its own working directory.
-var SkillNames = []string{"harness-adapters", "stuck-crew-recovery"}
+var SkillNames = []string{"harness-adapters", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
 // init keeps a malformed skill a build-time failure rather than a Mate that
@@ -53,6 +53,10 @@ type Params struct {
 	WorkspaceDoc string
 	// ProjectDoc is the absolute path of the project's PROJECT.md.
 	ProjectDoc string
+	// WorkspaceCrewDoc and ProjectCrewDoc are the absolute paths of the
+	// captain's two CREW.md files, which the app appends to every brief.
+	WorkspaceCrewDoc string
+	ProjectCrewDoc   string
 	// MemoryFile is the absolute path of the Mate's memory.md.
 	MemoryFile string
 	// BacklogFile is the absolute path of the Mate's backlog.md.
@@ -93,11 +97,18 @@ func RenderSkill(name string, p Params) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// BriefParams fills assets/crew/brief.md.tmpl. The `{TASK}` placeholder in
-// the rendered text is left for the Mate to replace with the task
-// description; it is not a template field, because the Mate writes it after
-// rendering, not at render time.
+// BriefParams fills assets/crew/brief.md.tmpl: the fixed worker role, the
+// Mate's `# Task` text, and the template's own sections around it
+// (docs/mvp.md M7).
 type BriefParams struct {
+	// Task is the Mate's `# Task` body: the sections internal/brief checks,
+	// inserted verbatim. A leading `# Task` line the Mate wrote is expected
+	// to have been dropped already (brief.TaskBody), since the template
+	// supplies the heading.
+	Task string
+	// Scout selects the scout shape: a report at ReportPath instead of a
+	// commit and a hand-back at HandbackPath.
+	Scout bool
 	// RepoPath is the absolute path of the project's primary git checkout.
 	RepoPath string
 	// WorktreePath is the absolute path of the Crew's own worktree.
@@ -106,6 +117,22 @@ type BriefParams struct {
 	Branch string
 	// DefaultBranch is the branch the Crew's branch is based on and merges into.
 	DefaultBranch string
+	// BriefPath is the absolute path of the rendered brief itself,
+	// `crews/<id>/brief.md`, where `brief append` adds the captain's later
+	// words.
+	BriefPath string
+	// ReportPath is the absolute path of a scout's report,
+	// `crews/<id>/report.md`. The app knows it, so the Mate no longer has
+	// to type it into the brief.
+	ReportPath string
+	// HandbackPath is the absolute path of a ship's hand-back,
+	// `crews/<id>/handback.md`.
+	HandbackPath string
+	// WorkspaceCrewRules and ProjectCrewRules are the captain's CREW.md
+	// texts (store.CrewRules), comments already stripped. Empty omits them;
+	// both empty omits the whole section.
+	WorkspaceCrewRules string
+	ProjectCrewRules   string
 }
 
 // RenderBrief fills assets/crew/brief.md.tmpl with p and returns the result.

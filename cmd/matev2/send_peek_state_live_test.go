@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -80,8 +81,8 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		Project: "shop",
 		Crew:    "k3",
 		Harness: harness.KindCodex,
-		BriefText: `Append needs-decision: pick A or B to the status file and stop. ` +
-			`When the Mate answers, append wait-mate: chose <answer> and stop.`,
+		BriefText: brieftest.Ship(`Append needs-decision: pick A or B to the status file and stop. ` +
+			`When the Mate answers, append wait-mate: chose <answer> and stop.`),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

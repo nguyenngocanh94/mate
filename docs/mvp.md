@@ -41,11 +41,13 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
 └── .matev2/
     ├── workspace.yaml                    projects, herdr session name, defaults
     ├── WORKSPACE.md                      quy tắc của người dùng cho mọi Mate
+    ├── CREW.md                           quy tắc của người dùng cho mọi Crew, nối cuối mọi brief (M7)
     ├── pricing.yaml                      bảng giá token, dùng sau
     └── projects/
         └── shop/
             ├── project.yaml              repo, default_branch, mode, yolo
             ├── PROJECT.md                bối cảnh project
+            ├── CREW.md                   quy tắc của người dùng cho Crew của project này (M7)
             ├── sent.log                  mọi dòng gửi vào pane Mate và pane Crew
             ├── incidents.log             observer ghi: mở/đóng incident theo crew (task 18)
             ├── mate/                     cwd của Mate
@@ -65,7 +67,8 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `matev2` 
                 ├── k3.status             append-only, crew ghi bằng echo
                 └── k3/
                     ├── brief.md          prompt đầu của crew
-                    ├── report.md         deliverable
+                    ├── handback.md       ship: bảng acceptance crew tự kiểm trước wait-mate (M7)
+                    ├── report.md         scout: deliverable
                     ├── usage.jsonl       sau MVP
                     └── transcript/       copy lúc teardown, sau MVP
 ```
@@ -220,7 +223,8 @@ Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở tas
 | --- | --- | --- |
 | Operating manual | `mate/AGENTS.md` | App, từ template `embed`, sinh lại mỗi lần start |
 | Quy tắc người dùng | `.matev2/WORKSPACE.md` | Người dùng |
-| Bối cảnh project | `projects/<p>/PROJECT.md` | Crew scout viết bản đầu, người dùng sửa, Mate bổ sung |
+| Bối cảnh project | `projects/<p>/PROJECT.md` | Mate, từ mục `## Durable facts` của report scout (M7); người dùng sửa |
+| Quy tắc người dùng cho Crew | `.matev2/CREW.md`, `projects/<p>/CREW.md` | Người dùng; app nối cuối mọi brief (M7) |
 | Trí nhớ Mate | `mate/memory.md`, `mate/backlog.md` | Mate qua `matev2 remember`, `matev2 backlog` |
 | Hội thoại | Session harness | Harness; app lưu `session_id` để resume |
 
@@ -368,6 +372,17 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Bản ghi `sent.log` của app có thể đứng **sau** bản của hook dù app là bên gõ.
   Cùng lần đo: dòng của hook `UserPromptSubmit` (11:08:48) nằm trước dòng outbox ghi (11:08:47 theo giờ bắt đầu lượt thử) trong file, vì `send.Send` còn ngủ 400ms chờ đọc lại composer sau Enter trong khi Claude đã đọc prompt và hook đã ghi.
   Cuộc đua này có từ trước task 30 (đường `[assign]` cũ cũng ghi sau khi `send.Send` trả về); outbox giờ ghi giờ của lúc composer sạch chứ không phải lúc bắt đầu lượt thử, nhưng thứ tự trong file vẫn không bảo đảm, nên luật "bản lặp liền sau là của hook" của timeline chỉ đúng về số lần giao, không đúng về bản nào là của ai.
+- Kiểm hình dạng brief ở `crew spawn` nghĩa là mọi nơi gọi `spawn.SpawnCrew` đều phải đưa brief đúng schema, kể cả test.
+  Task 32 (2026-09-24): 36 lời gọi trong test, trong đó 17 nằm trong 16 file live test, đưa text một dòng kiểu `"work"`; tất cả giờ đi qua `internal/brief/brieftest.Ship`, giữ nguyên câu lệnh làm cả `## Captain's words` lẫn `## Build`.
+  Hệ quả chưa đo: live test giờ chạy với template mới (bàn giao `handback.md`, luật dừng ở open decision), nên một crew được bảo "chỉ ghi `wait-mate` rồi thôi" có thể viết hand-back trước; task 34 phải chạy lại chúng chứ không coi xanh cũ là bằng chứng.
+- Nhãn `task=` phải lấy từ dòng đầu của `## Captain's words`, không phải dòng đầu của brief.
+  Brief theo schema luôn mở đầu bằng heading đó, nên luật cũ sẽ gán cho mọi crew cùng một nhãn `## Captain's words`.
+  Cùng chỗ: `oneLineTask` và `oneLineReason` cắt theo byte ở 160, mà lời captain thường là tiếng Việt, nên một nhát cắt rơi giữa một chữ; giờ cắt theo rune.
+- Một Crew không ghi được `PROJECT.md`: nó nằm ngoài worktree và không phải một trong hai file brief cho phép ghi ngoài worktree (status file và `handback.md`/`report.md`).
+  Mục 2 của manual cũ nói "scout Crew viết bản đầu" là một lời hứa không ai thực hiện được, đúng như `PROJECT.md` của `shop` vẫn trống sau năm task; M7 đổi thành: report scout kết thúc bằng `## Durable facts`, Mate chép vào `PROJECT.md` kèm nguồn (mục 14).
+  Cùng lần đọc lại: mục 6 cũ nói cwd của Mate "là nơi duy nhất được ghi" trong khi mục 14 bảo Mate bổ sung `PROJECT.md`; câu mục 6 giờ nói rõ ngoại lệ đó.
+- Test tách section của manual không được cắt ở mọi `\n## `.
+  Từ M7 manual trích heading brief (`## Build`, `## Acceptance`) trong ví dụ, nên helper `section` cũ cắt mục 4 và mục 6 ngay giữa ví dụ và test báo "không có ví dụ"; giờ chỉ heading đánh số `## N. ` mới kết thúc một mục.
 
 ## 8. Tái sử dụng từ v1
 
@@ -395,6 +410,8 @@ internal/watch/          observer và triage
 internal/autopilot/      daemon chế độ tự động: digest 90 giây, xếp vào outbox của Mate
 internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất vào composer Mate, `wedged`
 internal/spawn/          start Mate, spawn Crew
+internal/brief/          schema brief M7: tên section, `brief check`, `brief append`
+internal/facts/          `project facts`: chỉ metadata git, không mở file nào
 internal/runtime/        copy v1
 internal/harness/        copy v1
 internal/process/        copy v1
@@ -561,8 +578,8 @@ Template cố định thêm: khối vai trò worker ở đầu, luật dừng �
 
 | # | Task | Xong khi |
 | --- | --- | --- |
-| 32 | Template và CLI: `assets/crew/brief.md.tmpl` theo schema; `matev2 brief check <file> [--scout]` kiểm hình dạng (section bắt buộc, không rỗng, không placeholder, `Captain's words` không mở đầu bằng nhãn, mỗi dòng acceptance có `verify:`, open decisions là `none` hoặc mỗi mục có `decides:`, `Build` có `Out of scope:`), không phán nghĩa; `crew spawn` chạy check và từ chối brief sai; `matev2 brief append <project> <crew>` nối lời captain đến sau vào `Captain's words` của `crews/<id>/brief.md` và gửi crew một dòng trỏ tới nó; `CREW.md` nối cuối; `matev2 project facts <project>`. | Unit cho từng luật check; golden template; brief `buyesp32` cũ bị từ chối với lý do rõ, bản viết lại trong báo cáo được nhận. |
-| 33 | Manual Mate và skill: mục 3 (bootstrap: `PROJECT.md` trống thì đề xuất scout onboarding), 5 (intake: tra report có sẵn trước khi giao; bằng chứng không phải uỷ quyền; khi nào hỏi captain trước), 6 (viết brief theo schema, đảo luật "không dán lời captain", luật phạm vi), 9 (review đối chiếu `handback.md` với `Captain's words` và `Acceptance`, rồi mới đọc diff; sửa trong phạm vi Mate tự quyết), 13 (escalation: bằng chứng → hậu quả → lựa chọn → khuyến nghị), 14 (scout ghi phát hiện bền vững vào `PROJECT.md` qua Mate). Skill mới `decision-authority` (nạp khi xử lý `resolve:`/`digest:`/review) và `diagnostic-reasoning` (task bug). | Golden manual; test ngân sách; đọc lại toàn manual không còn câu mâu thuẫn với schema. |
+| 32 | Template và CLI: `assets/crew/brief.md.tmpl` theo schema; `matev2 brief check <file> [--scout]` kiểm hình dạng (section bắt buộc, không rỗng, không placeholder, `Captain's words` không mở đầu bằng nhãn, mỗi dòng acceptance có `verify:`, open decisions là `none` hoặc mỗi mục có `decides:`, `Build` có `Out of scope:`), không phán nghĩa; `crew spawn` chạy check và từ chối brief sai; `matev2 brief append <project> <crew>` nối lời captain đến sau vào `Captain's words` của `crews/<id>/brief.md` và gửi crew một dòng trỏ tới nó; `CREW.md` nối cuối; `matev2 project facts <project>`. | Unit cho từng luật check; golden template; brief `buyesp32` cũ bị từ chối với lý do rõ, bản viết lại trong báo cáo được nhận. Đã xong 2026-09-24: `internal/brief` (tên section export làm nguồn sự thật duy nhất, `Check`, `AppendCaptainsWords`), `crew spawn --scout` (cờ tường minh, không suy từ `## Deliverable`, vì lỗi cần bắt chính là scout quên section đó), template có khối vai trò, `# How to read the task`, `# Before you hand back` ghi `crews/<id>/handback.md`, report scout có `## Durable facts`, `# Project memory`, `# Captain's standing crew rules`; brief `buyesp32` cũ bị từ chối với 6 dòng, bản viết lại ở mục 11 của báo cáo được nhận; `project facts` có test ghi lại mọi lệnh git để chứng minh không đọc nội dung file. Chưa chạy live (task 34). |
+| 33 | Manual Mate và skill: mục 3 (bootstrap: `PROJECT.md` trống thì đề xuất scout onboarding), 5 (intake: tra report có sẵn trước khi giao; bằng chứng không phải uỷ quyền; khi nào hỏi captain trước), 6 (viết brief theo schema, đảo luật "không dán lời captain", luật phạm vi), 9 (review đối chiếu `handback.md` với `Captain's words` và `Acceptance`, rồi mới đọc diff; sửa trong phạm vi Mate tự quyết), 13 (escalation: bằng chứng → hậu quả → lựa chọn → khuyến nghị), 14 (scout ghi phát hiện bền vững vào `PROJECT.md` qua Mate). Skill mới `decision-authority` (nạp khi xử lý `resolve:`/`digest:`/review) và `diagnostic-reasoning` (task bug). | Golden manual; test ngân sách; đọc lại toàn manual không còn câu mâu thuẫn với schema. Đã xong 2026-09-24: sửa mục 1 (nguồn hiểu biết thêm hand-back và `project facts`), 2 (CREW.md, bốn skill), 3, 4 (`brief check`, `brief append`, `project facts`, `--scout`), 5, 6, 9 (chỉ đoạn "On `wait-mate`"), 13, 14; manual 58 KB, dưới trần 120 KiB; test `manual_schema_test.go` giữ tên section mục 6 bằng `brief.AllSections()`, ví dụ mục 6 phải qua `brief.Check`, ví dụ `project facts` mục 4 phải bằng output thật. Mục 7 (task 31) vẫn in lệnh spawn không có `--scout`; `crew spawn` từ chối scout thiếu cờ với câu nói rõ cách sửa. |
 | 34 | Acceptance: chạy lại `TestLiveAcceptanceTwoProjects` với prompting mới, thêm một kịch bản repo trống kiểu `shop` (Mate phải đề xuất scout onboarding hoặc đặt câu hỏi vào `Open decisions` với `decides: captain`, không tự dựng trang), và so sánh bằng timeline: số câu hỏi/task, số dòng sửa Mate gửi sau `wait-mate`, token/task, trước và sau M7. | Evidence `docs/evidence/m7-prompting-<ngày>.md`, hai lần pass liên tiếp. |
 
 Đợt 2 (sau M7): thăng scout thành ship tại chỗ (`crew promote`), relaunch giữ worktree (`crew relaunch`), chăm `memory.md` có ngày và nguồn, `--effort` khi spawn.

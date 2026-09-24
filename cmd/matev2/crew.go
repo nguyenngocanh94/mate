@@ -30,14 +30,15 @@ func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 // cmdCrewSpawn implements
-// `matev2 crew spawn <project> <id> --brief <file> [--harness codex|claude] [--task "<one line>"]`.
+// `matev2 crew spawn <project> <id> --brief <file> [--scout] [--harness codex|claude] [--task "<one line>"]`.
 func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew spawn", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, `usage: matev2 crew spawn <project> <id> --brief <file|-> [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]`)
+		fmt.Fprintln(stderr, `usage: matev2 crew spawn <project> <id> --brief <file|-> [--scout] [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
 	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the workspace default)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")
 	taskFlag := fs.String("task", "", "one line recorded as task= (default: the brief's first line)")
@@ -52,7 +53,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 		fs.Usage()
 		return newUsageError("matev2 crew spawn: --brief is required")
 	}
-	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag}
+	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag, Scout: *scoutFlag}
 	if *briefFlag == "-" {
 		text, err := spawn.ReadBriefStdin(stdin)
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
@@ -86,7 +87,7 @@ func spawnFakeCrew(t *testing.T, w *store.Workspace, deps spawn.Deps, project, c
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project:   project,
 		Crew:      crew,
-		BriefText: "do the thing",
+		BriefText: brieftest.Ship("do the thing"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

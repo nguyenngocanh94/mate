@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -351,7 +352,7 @@ func TestLiveConsoleStreamCrew(t *testing.T) {
 		Project:   "shop",
 		Crew:      "k3",
 		Harness:   harness.KindCodex,
-		BriefText: "Append working: looking to the status file, then wait for further instructions. Do not edit any file.",
+		BriefText: brieftest.Ship("Append working: looking to the status file, then wait for further instructions. Do not edit any file."),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

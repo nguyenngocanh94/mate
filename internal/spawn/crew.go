@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nguyenngocanh94/matev2/internal/brief"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/crewstate"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
@@ -64,10 +65,6 @@ const (
 	CrewStateFailed   = string(crewstate.StateFailed)
 )
 
-// BriefPlaceholder is the token in the rendered brief template that the
-// caller's task text replaces. mateassets renders everything else.
-const BriefPlaceholder = "{TASK}"
-
 // ErrCrewRunning is returned by SpawnCrew when the recorded crew is still
 // live in Herdr.
 var ErrCrewRunning = errors.New("crew is already running")
@@ -96,6 +93,13 @@ type SpawnCrewRequest struct {
 	// Task is the one line recorded as `task=`. Empty means the first
 	// non-empty line of the brief.
 	Task string
+	// Scout selects the scout shape (manual section 5): the brief must have
+	// a `## Deliverable`, and the template asks for a report instead of a
+	// commit. The caller says so explicitly rather than the app inferring it
+	// from a `## Deliverable` heading, because the mistake the check exists
+	// to catch is exactly a scout brief that forgot that section - inferred,
+	// it would silently become a ship.
+	Scout bool
 }
 
 // CrewResult is what a successful spawn established. Every field except the
@@ -185,9 +189,9 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if err != nil {
 		return CrewResult{}, err
 	}
-	kind := req.Harness
-	if kind == "" {
-		if kind, err = harness.ParseKind(w.Defaults().CrewHarness); err != nil {
+	harnessKind := req.Harness
+	if harnessKind == "" {
+		if harnessKind, err = harness.ParseKind(w.Defaults().CrewHarness); err != nil {
 			return CrewResult{}, err
 		}
 	}
@@ -199,6 +203,23 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		return CrewResult{}, err
 	}
 	briefText, err := readBriefText(w, req)
+	if err != nil {
+		return CrewResult{}, err
+	}
+	// The brief's shape (docs/mvp.md M7), checked before anything exists -
+	// worktree, brief.md, pane or meta - so a refused brief leaves no trace
+	// at all and the Mate fixes its file and runs the same command again.
+	kind := brief.Ship
+	if req.Scout {
+		kind = brief.Scout
+	}
+	if problems := brief.Check(briefText, kind); len(problems) > 0 {
+		return CrewResult{}, observability.WrapError(observability.CodeUsage,
+			"crew spawn refused the brief, nothing was created",
+			&brief.Error{Kind: kind, Problems: problems})
+	}
+	briefText = brief.TaskBody(briefText)
+	crewRulesWS, crewRulesProject, err := w.CrewRules(project)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -221,19 +242,22 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	}
 	saga := &crewSaga{deps: deps, git: git, repo: repo, worktree: worktree, branch: branch}
 	result, err := spawnInWorktree(ctx, w, deps, saga, crewPlan{
-		project:  project,
-		crew:     crew,
-		kind:     kind,
-		task:     task,
-		brief:    briefText,
-		repo:     repo,
-		branch:   branch,
-		worktree: worktree,
-		cfg:      cfg,
+		project:          project,
+		crew:             crew,
+		kind:             harnessKind,
+		task:             task,
+		brief:            briefText,
+		scout:            req.Scout,
+		crewRulesWS:      crewRulesWS,
+		crewRulesProject: crewRulesProject,
+		repo:             repo,
+		branch:           branch,
+		worktree:         worktree,
+		cfg:              cfg,
 	})
 	if err != nil {
 		saga.compensate(ctx)
-		recordFailedSpawn(w, project, crew, kind, task, branch, err)
+		recordFailedSpawn(w, project, crew, harnessKind, task, branch, err)
 		return CrewResult{}, err
 	}
 	result.StaleMeta = staleMeta
@@ -276,8 +300,8 @@ func oneLineReason(err error) string {
 		return ""
 	}
 	reason := strings.Join(strings.Fields(err.Error()), " ")
-	if len(reason) > maxTaskLine {
-		reason = strings.TrimSpace(reason[:maxTaskLine]) + "..."
+	if r := []rune(reason); len(r) > maxTaskLine {
+		reason = strings.TrimSpace(string(r[:maxTaskLine])) + "..."
 	}
 	return reason
 }
@@ -288,14 +312,19 @@ type crewPlan struct {
 	project string
 	crew    string
 	kind    harness.Kind
-	// task is the one line recorded as `task=`; brief is the full text the
-	// template's {TASK} placeholder is replaced with.
-	task     string
-	brief    string
-	repo     string
-	branch   string
-	worktree string
-	cfg      store.ProjectConfig
+	// task is the one line recorded as `task=`; brief is the Mate's
+	// `# Task` text, already checked, that the template's `# Task` holds.
+	task  string
+	brief string
+	// scout picks the template's scout shape.
+	scout bool
+	// crewRulesWS and crewRulesProject are the captain's CREW.md texts.
+	crewRulesWS      string
+	crewRulesProject string
+	repo             string
+	branch           string
+	worktree         string
+	cfg              store.ProjectConfig
 }
 
 // spawnInWorktree is everything a failure has to compensate for: the brief,
@@ -313,7 +342,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	// that the compensated worktree still leaves the evidence behind.
 	briefPath := w.CrewBrief(plan.project, plan.crew)
 	statusPath := w.CrewStatus(plan.project, plan.crew)
-	brief, err := renderCrewBrief(plan)
+	brief, err := renderCrewBrief(w, plan)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -524,8 +553,8 @@ func refuseIfCrewLive(ctx context.Context, w *store.Workspace, deps Deps, projec
 		WithDetails(map[string]any{"agent_name": name, "herdr_session": session.Name})
 }
 
-// readBriefText loads the task text the brief's {TASK} placeholder is
-// replaced with. A file is refused unless it resolves inside the workspace:
+// readBriefText loads the Mate's task text, which the template's `# Task`
+// holds. A file is refused unless it resolves inside the workspace:
 // `crew spawn` is an agent-facing command, and a brief is the one argument
 // that names an arbitrary path.
 func readBriefText(w *store.Workspace, req SpawnCrewRequest) (string, error) {
@@ -553,21 +582,19 @@ func readBriefText(w *store.Workspace, req SpawnCrewRequest) (string, error) {
 }
 
 // oneLineTask is what `task=` records: the caller's --task when given, else
-// the first non-empty line of the brief. A meta value is one line by
-// definition, so it is flattened and bounded rather than refused.
-func oneLineTask(task, brief string) string {
+// the first line of the brief's `## Captain's words` - every brief now opens
+// with that heading, so "the brief's first line" would label every crew
+// with the same heading. A meta value is one line by definition, so it is
+// flattened and bounded rather than refused, and bounded by runes: the
+// captain's words are often Vietnamese, and a byte cut splits a letter.
+func oneLineTask(task, briefText string) string {
 	candidate := strings.TrimSpace(task)
 	if candidate == "" {
-		for _, line := range strings.Split(brief, "\n") {
-			if trimmed := strings.TrimSpace(line); trimmed != "" {
-				candidate = trimmed
-				break
-			}
-		}
+		candidate = brief.CaptainsFirstLine(briefText)
 	}
 	candidate = strings.Join(strings.Fields(candidate), " ")
-	if len(candidate) > maxTaskLine {
-		candidate = strings.TrimSpace(candidate[:maxTaskLine]) + "..."
+	if r := []rune(candidate); len(r) > maxTaskLine {
+		candidate = strings.TrimSpace(string(r[:maxTaskLine])) + "..."
 	}
 	return candidate
 }
@@ -653,23 +680,22 @@ func assertIsolatedWorktree(ctx context.Context, git gitx.Git, repo, worktree st
 	return nil
 }
 
-// renderCrewBrief fills the embedded template with this crew's paths and
-// substitutes the caller's task text for {TASK}.
-func renderCrewBrief(plan crewPlan) ([]byte, error) {
-	rendered, err := mateassets.RenderBrief(mateassets.BriefParams{
-		RepoPath:      plan.repo,
-		WorktreePath:  plan.worktree,
-		Branch:        plan.branch,
-		DefaultBranch: plan.cfg.DefaultBranch,
+// renderCrewBrief fills the embedded template with this crew's task, paths
+// and the captain's standing crew rules.
+func renderCrewBrief(w *store.Workspace, plan crewPlan) ([]byte, error) {
+	return mateassets.RenderBrief(mateassets.BriefParams{
+		Task:               plan.brief,
+		Scout:              plan.scout,
+		RepoPath:           plan.repo,
+		WorktreePath:       plan.worktree,
+		Branch:             plan.branch,
+		DefaultBranch:      plan.cfg.DefaultBranch,
+		BriefPath:          w.CrewBrief(plan.project, plan.crew),
+		ReportPath:         w.CrewReport(plan.project, plan.crew),
+		HandbackPath:       w.CrewHandback(plan.project, plan.crew),
+		WorkspaceCrewRules: plan.crewRulesWS,
+		ProjectCrewRules:   plan.crewRulesProject,
 	})
-	if err != nil {
-		return nil, err
-	}
-	if !strings.Contains(string(rendered), BriefPlaceholder) {
-		return nil, observability.NewError(observability.CodeUnknown,
-			"the brief template no longer carries the "+BriefPlaceholder+" placeholder; the task text would be dropped")
-	}
-	return []byte(strings.Replace(string(rendered), BriefPlaceholder, plan.brief, 1)), nil
 }
 
 // prepareCrewHarnessFiles writes whatever the chosen harness needs beside

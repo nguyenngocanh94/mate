@@ -104,6 +104,12 @@ func Init(workspaceDir string) (*Workspace, error) {
 	if err := os.WriteFile(w.PricingFile(), []byte(pricingFileSeed), 0o644); err != nil {
 		return nil, err
 	}
+	// The captain's standing rules for every Crew (docs/mvp.md M7), seeded
+	// with only a comment so it is discoverable and still adds nothing to a
+	// brief until the captain writes a rule.
+	if err := w.seedOnce(w.WorkspaceCrewDoc(), workspaceCrewDocSeed); err != nil {
+		return nil, err
+	}
 	return w, nil
 }
 

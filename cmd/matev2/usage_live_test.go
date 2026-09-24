@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
@@ -118,7 +119,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	// and unambiguous to re-read. ---
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project: "shop", Crew: "k3", Harness: harness.KindCodex,
-		BriefText: `Append the line wait-mate: done to the status file and do nothing else.`,
+		BriefText: brieftest.Ship(`Append the line wait-mate: done to the status file and do nothing else.`),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

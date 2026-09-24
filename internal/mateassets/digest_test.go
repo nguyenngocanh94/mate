@@ -2,15 +2,18 @@ package mateassets
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 )
 
-// section extracts the text between a heading and the next "## " heading (or
-// end of file), so a check about section 10 cannot accidentally pass because
-// the words it looks for showed up somewhere else in the manual.
+// section extracts the text between a heading and the next numbered
+// "## N. " heading (or end of file), so a check about section 10 cannot
+// accidentally pass because the words it looks for showed up somewhere else
+// in the manual. Only numbered headings end a section: since M7 the manual
+// quotes brief sections such as "## Build" inside its own examples.
 func section(t *testing.T, text, heading string) string {
 	t.Helper()
 	start := strings.Index(text, heading)
@@ -18,12 +21,14 @@ func section(t *testing.T, text, heading string) string {
 		t.Fatalf("heading %q not found in rendered manual", heading)
 	}
 	rest := text[start+len(heading):]
-	end := strings.Index(rest, "\n## ")
-	if end < 0 {
+	loc := numberedHeading.FindStringIndex(rest)
+	if loc == nil {
 		return rest
 	}
-	return rest[:end]
+	return rest[:loc[0]]
 }
+
+var numberedHeading = regexp.MustCompile(`\n## \d+\. `)
 
 // TestRenderAgentsSection10TeachesDigestGrammar pins section 10's teaching of
 // the `digest:` line (mvp.md section 5, internal/autopilot/digest.go) to the
