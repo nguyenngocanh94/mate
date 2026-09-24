@@ -139,14 +139,14 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 	t.Logf("README.md in the worktree:\n%s", readme)
 
 	// The crew committed, so its branch is ahead of main: a stop without
-	// --discard must confirm the agent gone and the tab closed, but must
-	// refuse to remove work task 16 has not been told to discard.
+	// --discard checks the branch first and refuses before killing anything
+	// (docs/mvp.md section 4b, task 18b), so the agent is still listed.
 	stopped, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", false)
 	if !errors.Is(err, spawn.ErrUnlandedWork) {
 		t.Fatalf("StopCrew: err = %v, want ErrUnlandedWork", err)
 	}
-	if !stopped.TabClosed {
-		t.Fatal("StopCrew did not close the crew tab")
+	if stopped.TabClosed {
+		t.Fatal("a refused StopCrew closed the crew tab")
 	}
 	if stopped.Ahead < 1 {
 		t.Fatalf("stopped.Ahead = %d, want at least 1 commit", stopped.Ahead)
@@ -155,10 +155,14 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAgents: %v", err)
 	}
+	stillLive := false
 	for _, obs := range listed {
 		if obs.Handle.Name == res.Agent {
-			t.Fatalf("agent %s is still listed after StopCrew", res.Agent)
+			stillLive = true
 		}
+	}
+	if !stillLive {
+		t.Fatalf("agent %s is gone after a refused StopCrew; the refusal must change nothing", res.Agent)
 	}
 	// The unlanded work survives the refusal; the deferred cleanup discards
 	// it once this test is done looking at it.

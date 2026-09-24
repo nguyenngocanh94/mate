@@ -107,16 +107,20 @@ func TestLiveCrewTeardownRefusesThenDiscards(t *testing.T) {
 	})
 	t.Logf("status file:\n%s", status)
 
-	// First stop: refused. The agent is stopped and the tab closed, but the
-	// branch is ahead of main so teardown without --discard must not touch
-	// the worktree or branch.
+	// First stop: refused. The branch is ahead of main, so a stop without
+	// --discard checks the branch first and changes nothing at all - the
+	// agent keeps running and its tab stays open (docs/mvp.md section 4b,
+	// task 18b: no more "agent dead, worktree kept" outcome).
 	refused, err := spawn.StopCrew(ctx, w, deps, "shop", "k9", false)
 	if !errors.Is(err, spawn.ErrUnlandedWork) {
 		t.Fatalf("first StopCrew: err = %v, want ErrUnlandedWork", err)
 	}
 	t.Logf("first stop (refused): %+v", refused)
-	if !refused.TabClosed {
-		t.Fatal("a refused teardown must still close the crew's tab")
+	if refused.TabClosed || refused.AlreadyGone {
+		t.Fatal("a refused teardown must leave the crew running with its tab open")
+	}
+	if _, err := rt.InspectAgent(ctx, runtime.AgentHandle{Session: runtime.SessionHandle{Name: session, ConfigHome: configHome}, Name: res.Agent}); err != nil {
+		t.Fatalf("the crew agent must still be live after a refused stop: %v", err)
 	}
 	if refused.Ahead < 1 {
 		t.Fatalf("refused.Ahead = %d, want at least 1", refused.Ahead)
