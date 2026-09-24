@@ -8,31 +8,45 @@ Work on your own; do not wait for a human.
 
 # Task
 
-{{.Task}}
+## Captain's words
+Trang About phải hiện số phiên bản của app.
+
+## What we already know
+- The site is built with Hugo; `make build` writes it to public/ (PROJECT.md, "How to work here").
+- The version is the one line in VERSION at the repository root (report of scout k1, section 2).
+- Unknown: whether the About page is a layout template or a content file.
+
+## Build
+- Show the text of VERSION on the About page, as "Version <text>".
+- Out of scope: other pages, the footer, how VERSION is written.
+
+## Acceptance
+- The built About page contains "Version " followed by the text of VERSION. verify: `make build && grep -o 'Version [^<]*' public/about/index.html`
+- The site still builds. verify: `make build`; quote its last lines.
+
+## Open decisions
+none
 
 # How to read the task
 `## Captain's words` is what the captain actually said about this task, word for word; it is the contract, and where any other section disagrees with it, it wins.
-The other sections are the Mate's specification of it: what is already known, what to {{if .Scout}}investigate{{else}}build{{end}}, how each result is checked, and which choices are not yours.
+The other sections are the Mate's specification of it: what is already known, what to build, how each result is checked, and which choices are not yours.
 The Mate never reads this repository, so what `## What we already know` says about it is second-hand; check it against what you find, and say where it was wrong.
 Do only what `## Build` asks for.
 Anything under its `Out of scope:` line stays out, and a generalization, consistency sweep, or extra hardening the task did not ask for is follow-up work to mention when you hand back, not scope to add.
 `## Open decisions` lists choices that are not yours to make.
 When you reach one of these, append `needs-decision:` naming it, and stop.
 Do not pick an option, even the obvious one.
-{{- if .Scout}}
-`## Deliverable` names the questions your report must answer.
-{{- end}}
 
 # Setup
-You are in a disposable git worktree of `{{.RepoPath}}`, on branch `{{.Branch}}`, branched from `{{.DefaultBranch}}`.
+You are in a disposable git worktree of `/ws/shop`, on branch `matev2/k3`, branched from `main`.
 
 Verify isolation before anything else.
-Run `pwd -P` and `git rev-parse --show-toplevel`; both must resolve to `{{.WorktreePath}}`, not the project's primary checkout at `{{.RepoPath}}`.
+Run `pwd -P` and `git rev-parse --show-toplevel`; both must resolve to `/ws/.worktrees/shop-k3`, not the project's primary checkout at `/ws/shop`.
 If the top-level path is the primary checkout, STOP: do not edit or commit here, append `needs-decision: launched in primary checkout, not an isolated worktree` to the status file, and stop.
 
 # Rules
 1. Never push to any remote and never open a pull request.
-2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `{{if .Scout}}{{.ReportPath}}{{else}}{{.HandbackPath}}{{end}}`.
+2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `/ws/.matev2/projects/shop/crews/k3/handback.md`.
 3. Report status by appending one line:
    `echo "{state}: {one short line}" >> $MATEV2_STATUS`
    You have exactly three states, and no others: `working`, `needs-decision`, `wait-mate`.
@@ -46,22 +60,7 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 5. If a decision belongs to a human - a product choice, a destructive action, anything under `## Open decisions`, or anything else the task left open that the repository does not settle for you - append `needs-decision: {summary of the options}` and stop. The Mate will reply with the decision.
    Do not settle it by taking whichever option looks most natural and mentioning it afterwards. Once you have shipped a guess it is indistinguishable from an instruction you were given, and the only moment anyone could have corrected it has passed.
 6. If you genuinely cannot finish the task, that is not a failure you declare: append `wait-mate: could not do X because Y` and stop. The Mate decides what happens next.
-7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `{{.BriefPath}}` and sends you one line saying so; read that section again and carry on with it.
-{{- if .Scout}}
-
-# Definition of done
-This project ships local-only: no remote, no pull request, no pipeline.
-This task asks for knowledge - an investigation, a plan, a reproduction, an audit - and there is nothing to commit.
-Write your findings to `{{.ReportPath}}`.
-It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.
-The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
-Answer every question under `## Deliverable`, each under its own heading, and say plainly which ones you could not answer and why.
-The Mate never reads this repository, so the report is its only view of it: name files by path and line, quote commands exactly as you ran them, and keep what you observed apart from what you infer.
-End the report with a `## Durable facts` section: what almost any future task in this repository would need to know - its stack, its layout, how to build, test and run it, its current state - or `none` if this investigation found nothing of that kind.
-If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report and propose the acceptance lines for it: one observable result per line, each with `verify:` and the command that proves it.
-A summary in the status line is not the deliverable.
-When the report is written, append `wait-mate: report ready at {{.ReportPath}}` to the status file and stop.
-{{- else}}
+7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.matev2/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
 
 # Project memory
 If this task produced durable project-intrinsic knowledge, record it in the repository's own committed `AGENTS.md` on this branch, creating the file if there is none (or in `CLAUDE.md`, if that is the file the repository already keeps it in).
@@ -72,12 +71,12 @@ Keep it proportionate: skip `AGENTS.md` edits for trivial tasks that produced no
 # Definition of done
 This project ships local-only: no remote, no pull request, no pipeline.
 The task is complete only when it is committed on this branch and the hand-back below is written.
-Keep the branch a clean fast-forward onto `{{.DefaultBranch}}`; if it has advanced, rebase onto it so the eventual merge stays a fast-forward.
+Keep the branch a clean fast-forward onto `main`; if it has advanced, rebase onto it so the eventual merge stays a fast-forward.
 
 # Before you hand back
 Run every `verify:` under `## Acceptance` yourself, against the committed branch.
 Where a `verify:` asks you to find the project's own check, find it, run it, and name the exact command you ran.
-Then write `{{.HandbackPath}}`.
+Then write `/ws/.matev2/projects/shop/crews/k3/handback.md`.
 It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.
 It has exactly these three parts:
 
@@ -94,26 +93,19 @@ What you could not settle, follow-up work you noticed but did not do, and anythi
 ```
 
 A criterion that fails is reported as `fail` with its output, never left out or softened.
-When the work is committed and the hand-back is written, append `wait-mate: ready in branch {{.Branch}}` to the status file and stop.
+When the work is committed and the hand-back is written, append `wait-mate: ready in branch matev2/k3` to the status file and stop.
 If you could not finish, write the hand-back anyway, then append `wait-mate: could not do X because Y`.
-The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the branch is merged into local `{{.DefaultBranch}}`.
-{{- end}}
+The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the branch is merged into local `main`.
 
 Do NOT push. Do NOT open a pull request. Do NOT merge.
-{{- if or .WorkspaceCrewRules .ProjectCrewRules}}
 
 # Captain's standing crew rules
 These are the captain's standing rules for every Crew; every other section of this brief takes precedence over anything here that conflicts.
-{{- if .WorkspaceCrewRules}}
 
 ## Every project
-{{.WorkspaceCrewRules}}
-{{- end}}
-{{- if .ProjectCrewRules}}
+- Reproduce a bug end-to-end before you fix it.
 
 ## This project
 Where these and the rules for every project conflict, these win.
 
-{{.ProjectCrewRules}}
-{{- end}}
-{{- end}}
+- Run `make check` before you hand back.

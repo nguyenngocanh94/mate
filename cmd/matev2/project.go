@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/nguyenngocanh94/matev2/internal/facts"
+	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
@@ -298,4 +301,45 @@ func ensureProjectDoc(w *store.Workspace, name string) error {
 
 func projectDocTemplate(name string) string {
 	return fmt.Sprintf("# %s\n\n## What this project is\n\n## How to work here\n", name)
+}
+
+// cmdProjectFacts implements `matev2 project facts <project>`: what the
+// project's repository holds on its default branch, from git's metadata
+// only - commit count, file count, top-level names, build/test files by
+// name - so the Mate can tell an empty repository from a full one without
+// reading it (docs/mvp.md decision 1, M7). No file is opened.
+func cmdProjectFacts(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("project facts", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: matev2 project facts <project> [--workspace <dir>]")
+	}
+	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return &usageError{err}
+	}
+	if fs.NArg() != 1 {
+		fs.Usage()
+		return newUsageError("matev2 project facts: want exactly 1 argument: <project>")
+	}
+	name := fs.Arg(0)
+	w, err := resolveWorkspace(*workspaceFlag)
+	if err != nil {
+		return err
+	}
+	if _, ok := w.Project(name); !ok {
+		return fmt.Errorf("%w: %s", store.ErrNoProject, name)
+	}
+	cfg, err := w.LoadProject(name)
+	if err != nil {
+		return err
+	}
+	f, err := facts.Gather(context.Background(), gitx.New(), name, w.RepoDir(cfg.Repo), cfg.DefaultBranch)
+	if err != nil {
+		return fmt.Errorf("project facts %s: %w", name, err)
+	}
+	for _, line := range f.Lines() {
+		fmt.Fprintln(stdout, line)
+	}
+	return nil
 }

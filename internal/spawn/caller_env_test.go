@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -53,7 +54,7 @@ func TestSpawnCrewInjectsTheCrewCallerIntoItsPane(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

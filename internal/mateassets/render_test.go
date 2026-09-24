@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/nguyenngocanh94/matev2/internal/brief"
 )
 
 var update = flag.Bool("update", false, "update golden files in testdata/")
@@ -31,13 +33,77 @@ func fixedParams() Params {
 	}
 }
 
+// exampleShipTask is a small ship task written to the M7 schema, the kind
+// of text a Mate passes to `crew spawn`.
+const exampleShipTask = `## Captain's words
+Trang About phải hiện số phiên bản của app.
+
+## What we already know
+- The site is built with Hugo; ` + "`make build`" + ` writes it to public/ (PROJECT.md, "How to work here").
+- The version is the one line in VERSION at the repository root (report of scout k1, section 2).
+- Unknown: whether the About page is a layout template or a content file.
+
+## Build
+- Show the text of VERSION on the About page, as "Version <text>".
+- Out of scope: other pages, the footer, how VERSION is written.
+
+## Acceptance
+- The built About page contains "Version " followed by the text of VERSION. verify: ` + "`make build && grep -o 'Version [^<]*' public/about/index.html`" + `
+- The site still builds. verify: ` + "`make build`" + `; quote its last lines.
+
+## Open decisions
+none`
+
+// exampleScoutTask is a diagnostic scout, its Deliverable asking for what
+// the diagnostic-reasoning skill says a diagnosis brief should ask for.
+const exampleScoutTask = `## Captain's words
+Sometimes the cart is empty when I open checkout, but only after I log in.
+
+## What we already know
+- The captain sees it after logging in; nobody has reproduced it yet.
+- Unknown: where the cart is stored, and whether logging in replaces it.
+
+## Build
+- Reproduce the empty cart on the real login-then-checkout path and find what empties it.
+- Out of scope: fixing it; any commit.
+
+## Acceptance
+- The report holds a reproduction anyone can rerun. verify: the exact commands and their output, in the report.
+
+## Open decisions
+none
+
+## Deliverable
+- The end-to-end reproduction, or the exact reason it could not be done.
+- The initiating trigger, the masking condition and the visible symptom, kept apart.
+- The failing path compared with a path where the cart survives, and where they first diverge.
+- The relevant history: commits, migrations or earlier implementations that explain the divergence.
+- The smallest counterfactual that changes the outcome, and what it showed.
+- The observation that would disprove the explanation, and whether you ran it.`
+
 func fixedBriefParams() BriefParams {
 	return BriefParams{
+		Task:          exampleShipTask,
 		RepoPath:      "/ws/shop",
 		WorktreePath:  "/ws/.worktrees/shop-k3",
 		Branch:        "matev2/k3",
 		DefaultBranch: "main",
+		BriefPath:     "/ws/.matev2/projects/shop/crews/k3/brief.md",
+		ReportPath:    "/ws/.matev2/projects/shop/crews/k3/report.md",
+		HandbackPath:  "/ws/.matev2/projects/shop/crews/k3/handback.md",
+		// Both CREW.md files carry a rule, so the golden pins the whole
+		// section, precedence sentences included.
+		WorkspaceCrewRules: "- Reproduce a bug end-to-end before you fix it.",
+		ProjectCrewRules:   "- Run `make check` before you hand back.",
 	}
+}
+
+func fixedScoutBriefParams() BriefParams {
+	p := fixedBriefParams()
+	p.Task = exampleScoutTask
+	p.Scout = true
+	p.WorkspaceCrewRules, p.ProjectCrewRules = "", ""
+	return p
 }
 
 func compareGolden(t *testing.T, path string, got []byte) {
@@ -69,11 +135,77 @@ func TestRenderAgentsGolden(t *testing.T) {
 }
 
 func TestRenderBriefGolden(t *testing.T) {
-	got, err := RenderBrief(fixedBriefParams())
+	for name, p := range map[string]BriefParams{
+		"brief-ship.md.golden":  fixedBriefParams(),
+		"brief-scout.md.golden": fixedScoutBriefParams(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := RenderBrief(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compareGolden(t, filepath.Join("testdata", name), got)
+		})
+	}
+}
+
+// TestRenderedBriefPassesTheCheck: what the app renders from a good task is
+// itself a good brief, so `matev2 brief check` on crews/<id>/brief.md agrees
+// with the check `crew spawn` ran - and the template's own sections, which
+// mention the schema's headings in prose, are never mistaken for the task's.
+func TestRenderedBriefPassesTheCheck(t *testing.T) {
+	for kind, p := range map[brief.Kind]BriefParams{brief.Ship: fixedBriefParams(), brief.Scout: fixedScoutBriefParams()} {
+		got, err := RenderBrief(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(string(got), brief.RoleHeading+"\n") {
+			t.Fatalf("%s brief does not open with the role heading %q", kind, brief.RoleHeading)
+		}
+		if ps := brief.CheckFile(string(got), kind); len(ps) != 0 {
+			t.Fatalf("rendered %s brief fails its own check: %v", kind, ps)
+		}
+		task, ok := brief.ExtractTask(string(got))
+		if !ok || strings.TrimSpace(task) != p.Task {
+			t.Fatalf("rendered %s brief's # Task is not the task verbatim:\n%s", kind, task)
+		}
+	}
+}
+
+// TestRenderBriefShapes pins what differs between the two shapes and what
+// the optional CREW.md section does, beyond the goldens.
+func TestRenderBriefShapes(t *testing.T) {
+	ship, err := RenderBrief(fixedBriefParams())
 	if err != nil {
 		t.Fatal(err)
 	}
-	compareGolden(t, filepath.Join("testdata", "brief.md.golden"), got)
+	scout, err := RenderBrief(fixedScoutBriefParams())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"# Before you hand back", "# Project memory", "/ws/.matev2/projects/shop/crews/k3/handback.md", "wait-mate: ready in branch matev2/k3", "## Deviations from Build", "## Still open", "# Captain's standing crew rules"} {
+		if !strings.Contains(string(ship), want) {
+			t.Errorf("ship brief lacks %q", want)
+		}
+		if strings.Contains(string(scout), want) {
+			t.Errorf("scout brief carries ship-only %q", want)
+		}
+	}
+	for _, want := range []string{"wait-mate: report ready at /ws/.matev2/projects/shop/crews/k3/report.md", "## Durable facts", "propose the acceptance lines", "file:line references"} {
+		if !strings.Contains(string(scout), want) {
+			t.Errorf("scout brief lacks %q", want)
+		}
+	}
+	// Only the project's rules: the section is there, the workspace part is not.
+	p := fixedBriefParams()
+	p.WorkspaceCrewRules = ""
+	only, err := RenderBrief(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(only), "## Every project") || !strings.Contains(string(only), "## This project") {
+		t.Errorf("project-only CREW.md rendered wrong:\n%s", only)
+	}
 }
 
 // unexpandedPattern catches a template action that survived execution: a

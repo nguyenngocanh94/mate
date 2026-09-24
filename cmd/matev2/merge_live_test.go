@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
@@ -183,7 +184,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 	})
 
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: shipBrief,
+		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship(shipBrief),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -281,7 +282,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	}
 
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: shipBrief,
+		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship(shipBrief),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

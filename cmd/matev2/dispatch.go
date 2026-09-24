@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|send|peek|state|diff|merge|backlog|events|reindex|usage|dashboard|--version> ...")
+			return newUsageError("usage: matev2 <workspace-dir> | matev2 <init|project|mate|crew|brief|send|peek|state|diff|merge|backlog|events|reindex|usage|dashboard|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -50,6 +50,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdMate(args[1:], stdout, stderr)
 	case "crew":
 		return cmdCrew(args[1:], os.Stdin, stdout, stderr)
+	case "brief":
+		return cmdBrief(args[1:], os.Stdin, stdout, stderr)
 	case "hook":
 		return cmdHook(args[1:], os.Stdin, stdout, stderr)
 	case "send":
@@ -90,9 +92,11 @@ func isDir(path string) bool {
 // cmdProject dispatches `matev2 project <add|list|remove>`.
 func cmdProject(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: matev2 project <add|list|remove|yolo> ...")
+		return newUsageError("usage: matev2 project <add|list|remove|yolo|facts> ...")
 	}
 	switch args[0] {
+	case "facts":
+		return cmdProjectFacts(args[1:], stdout, stderr)
 	case "add":
 		return cmdProjectAdd(args[1:], stdout, stderr)
 	case "list":

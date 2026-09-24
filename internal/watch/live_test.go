@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -91,7 +92,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 		Project:   "shop",
 		Crew:      "k3",
 		Harness:   harness.KindCodex,
-		BriefText: "Reply with the single word ok and do nothing else. Do not run any command and do not write to any file.",
+		BriefText: brieftest.Ship("Reply with the single word ok and do nothing else. Do not run any command and do not write to any file."),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
