@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -17,6 +18,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/matev2/internal/timeline"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
 
@@ -158,11 +160,17 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	// The observer and the daemon, started the way cmdConsole starts them
 	// (console.go): one per workspace, both living only as long as the
-	// console does.
-	watcher, err := consoleWatcher(root, deps)
+	// console does. The observer records the timeline as cmdConsole's does,
+	// because the blog half's claim that the Mate yielded its turn to the
+	// digest (task 31) is read out of the Mate's turn rows.
+	watcher, timelineDB, err := consoleWatcherWithTimeline(root, deps)
 	if err != nil {
-		t.Fatalf("consoleWatcher: %v", err)
+		t.Fatalf("consoleWatcherWithTimeline: %v", err)
 	}
+	if timelineDB == nil {
+		t.Fatal("the observer opened no timeline database")
+	}
+	defer timelineDB.Close()
 	watcher.Start(ctx)
 	defer watcher.Stop()
 	pilot, err := consolePilot(root, deps)
@@ -371,6 +379,10 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("blog's README.md on main does not carry the line the captain asked for:\n%s", blogReadme)
 	}
 
+	// The Mate yielded its turn after spawning, and the daemon's digest is
+	// what woke it to land the branch (task 31).
+	assertTheMateYieldedToTheDigest(t, ctx, w, timelineDB, "blog", blogCrew, 3*time.Minute, blogPane)
+
 	// The captain typed once and then nothing: every other line in blog's
 	// log came from the app, the Mate or the Crew.
 	var typed []store.SentEntry
@@ -388,6 +400,209 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	typeCaptainLine(t, ctx, deps, action, "blog", blogMate, blogKind, twoProjectsEndsAuto, 4*time.Minute, blogPane)
 	waitForAutoOff(t, ctx, w, "blog", 3*time.Minute)
+}
+
+// mateHarnessTurn is one prompt the Mate's harness took and everything it
+// did with it. The timeline's `turn` rows are one model call each
+// (docs/mvp.md section 7), so a harness turn is the run of rows sharing one
+// `harness_turn_ref` (Claude's promptId).
+type mateHarnessTurn struct {
+	ref         string
+	started     string
+	ended       string
+	rows        int
+	triggerFrom string
+	trigger     string
+	actions     []string
+}
+
+func (h mateHarnessTurn) ran(fragments ...string) bool {
+	for _, a := range h.actions {
+		if containsEvery(a, fragments) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsEvery(s string, fragments []string) bool {
+	for _, f := range fragments {
+		if !strings.Contains(s, f) {
+			return false
+		}
+	}
+	return true
+}
+
+// mateHarnessTurns reads one Mate's turns out of the timeline, grouped into
+// harness turns, each with the line that triggered it and the commands it ran.
+func mateHarnessTurns(t *testing.T, handle *db.DB, project string) []mateHarnessTurn {
+	t.Helper()
+	rows, err := handle.SQL().Query(`
+		SELECT t.id, t.harness_turn_ref, COALESCE(t.started_at,''), COALESCE(t.ended_at,''),
+		       COALESCE(m.from_actor_id,''), COALESCE(m.text,'')
+		  FROM turn t LEFT JOIN message m ON m.event_id = t.trigger_event_id
+		 WHERE t.actor_id = ?
+		 ORDER BY t.started_at, t.ordinal`, timeline.MateActorID(project))
+	if err != nil {
+		t.Fatalf("read the %s Mate's turns: %v", project, err)
+	}
+	type row struct{ id, ref, started, ended, from, text string }
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.ref, &r.started, &r.ended, &r.from, &r.text); err != nil {
+			rows.Close()
+			t.Fatalf("scan a turn: %v", err)
+		}
+		all = append(all, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read the %s Mate's turns: %v", project, err)
+	}
+
+	var out []mateHarnessTurn
+	index := map[string]int{}
+	for _, r := range all {
+		key := r.ref
+		if key == "" {
+			// A row the harness named no prompt for: keep it on its own
+			// rather than merging it into a neighbour and inventing a turn.
+			key = "row:" + r.id
+		}
+		i, ok := index[key]
+		if !ok {
+			i = len(out)
+			index[key] = i
+			out = append(out, mateHarnessTurn{ref: key, started: r.started, triggerFrom: r.from, trigger: r.text})
+		}
+		h := &out[i]
+		h.rows++
+		if r.ended > h.ended {
+			h.ended = r.ended
+		}
+		acts, err := handle.SQL().Query(`SELECT summary FROM action WHERE turn_id = ? ORDER BY at`, r.id)
+		if err != nil {
+			t.Fatalf("read the actions of turn %s: %v", r.id, err)
+		}
+		for acts.Next() {
+			var summary string
+			if err := acts.Scan(&summary); err != nil {
+				acts.Close()
+				t.Fatalf("scan an action: %v", err)
+			}
+			h.actions = append(h.actions, summary)
+		}
+		acts.Close()
+	}
+	return out
+}
+
+// assertTheMateYieldedToTheDigest is task 31's proof on the auto half: the
+// daemon delivered at least one `digest:` line, the Mate spawned the Crew in
+// the turn the captain's request started, and the merge that closed the
+// Crew ran in a later turn that a digest started. Nothing else could have
+// started that turn - the captain typed once - so it also proves the Mate
+// ended the spawning turn rather than supervising inside it, which is the
+// only way a verified send into its composer can succeed.
+func assertTheMateYieldedToTheDigest(t *testing.T, ctx context.Context, w *store.Workspace, handle *db.DB,
+	project, crew string, within time.Duration, evidence func() string) {
+	t.Helper()
+
+	var digests int
+	for _, e := range sentEntries(t, w, project) {
+		if e.Source == store.SourceApp && e.Target == store.TargetMate && strings.HasPrefix(e.Text, "digest: ") {
+			digests++
+			t.Logf("%s sent.log %s app → mate: %s", project, e.Time.UTC().Format("15:04:05"), e.Text)
+		}
+	}
+	if digests == 0 {
+		t.Fatalf("%s's sent.log holds no app → mate digest: line; the Mate never yielded its turn to the daemon\nmate pane:\n%s",
+			project, evidence())
+	}
+
+	// The observer ingests at the end of each poll, so the rows for the
+	// Mate's last turn may land a round or two after the merge did.
+	spawnFragments := []string{"crew spawn " + project, crew}
+	mergeFragments := []string{"merge " + project + " " + crew}
+	deadline := time.Now().Add(within)
+	var turns []mateHarnessTurn
+	var spawnAt, mergeAt int
+	for {
+		turns = mateHarnessTurns(t, handle, project)
+		spawnAt, mergeAt = -1, -1
+		for i, h := range turns {
+			if spawnAt < 0 && h.ran(spawnFragments...) {
+				spawnAt = i
+			}
+			if h.ran(mergeFragments...) {
+				mergeAt = i
+			}
+		}
+		if spawnAt >= 0 && mergeAt >= 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			logMateHarnessTurns(t, project, turns)
+			t.Fatalf("the %s timeline shows no Mate turn that ran %q (found %d) and %q (found %d) within %s",
+				project, strings.Join(spawnFragments, " … "), spawnAt, mergeFragments[0], mergeAt, within)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("context ended waiting for the %s Mate's turns in the timeline", project)
+		case <-time.After(5 * time.Second):
+		}
+	}
+	logMateHarnessTurns(t, project, turns)
+
+	spawnTurn, mergeTurn := turns[spawnAt], turns[mergeAt]
+	if spawnTurn.triggerFrom != timeline.UserActorID(project) {
+		t.Fatalf("the %s Mate spawned in a turn triggered by %q (%q), want the captain's request",
+			project, spawnTurn.triggerFrom, spawnTurn.trigger)
+	}
+	if mergeAt == spawnAt {
+		t.Fatalf("the %s Mate spawned and merged inside one turn (%s); it supervised instead of yielding to the digest",
+			project, spawnTurn.ref)
+	}
+	if mergeTurn.triggerFrom != timeline.AppActorID(project) || !strings.HasPrefix(mergeTurn.trigger, "digest: ") {
+		t.Fatalf("the %s Mate merged in turn %s, triggered by %q (%q), want a digest",
+			project, mergeTurn.ref, mergeTurn.triggerFrom, mergeTurn.trigger)
+	}
+	if spawnTurn.ended == "" || mergeTurn.started < spawnTurn.ended {
+		t.Fatalf("the %s Mate's digest turn %s started at %s, before the spawning turn %s ended (%q)",
+			project, mergeTurn.ref, mergeTurn.started, spawnTurn.ref, spawnTurn.ended)
+	}
+	t.Logf("%s: spawned in turn %s (%s .. %s, the captain's request); merged in turn %s (%s .. %s, %q)",
+		project, spawnTurn.ref, spawnTurn.started, spawnTurn.ended,
+		mergeTurn.ref, mergeTurn.started, mergeTurn.ended, mergeTurn.trigger)
+}
+
+// logMateHarnessTurns prints a Mate's turn boundaries, the evidence task 31
+// records: when each turn started and ended, what started it, and the
+// matev2 commands it ran.
+func logMateHarnessTurns(t *testing.T, project string, turns []mateHarnessTurn) {
+	t.Helper()
+	var b strings.Builder
+	fmt.Fprintf(&b, "==== %s Mate turns ====\n", project)
+	for i, h := range turns {
+		fmt.Fprintf(&b, "#%d %s  %s .. %s  %d model call(s)  trigger %s: %s\n",
+			i, h.ref, h.started, h.ended, h.rows, h.triggerFrom, clip(h.trigger, 160))
+		for _, a := range h.actions {
+			if strings.Contains(a, "matev2") {
+				fmt.Fprintf(&b, "    %s\n", clip(a, 200))
+			}
+		}
+	}
+	t.Log(b.String())
+}
+
+func clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
 }
 
 // waitForSentAfter is waitForSent bounded to the lines a project's log
