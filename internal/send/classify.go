@@ -487,19 +487,29 @@ func locateCodexComposer(lines []string) (string, bool) {
 }
 
 // claudeBusy is the Claude in-flight signature: the spinner line, or the
-// queued-message placeholder in the composer, or one of the shared literal
-// seeds for a version that draws them.
+// queued-message placeholder in the composer. Nothing else.
+//
+// Claude draws its spinner at column 0, and everything it quotes - a tool's
+// output, its own prose - is indented under a `⏺` or `⎿`. So the spinner
+// only counts unindented, and the shared literal seeds (seedBusy) are not
+// consulted at all: Claude draws none of them itself (measured on 2.1.274
+// and again on 2.1.281), and a Mate's screen routinely quotes another
+// harness that does. Measured 2026-09-24 (task 31, Claude Code 2.1.281): an
+// idle Mate whose last tool call printed a working Codex crew's pane showed
+// `⎿  • Working (2s • esc to interrupt)` in its own transcript, the seed
+// matched, and every digest for that Mate was refused as mid-turn until the
+// 5-minute `wedged` incident opened.
 func claudeBusy(lines []string) (string, bool) {
 	for _, line := range busyTail(lines) {
 		trimmed := strings.TrimSpace(line)
 		if strings.Contains(trimmed, claudeQueuedPlaceholder) {
 			return trimmed, true
 		}
-		if isClaudeSpinner(trimmed) {
+		if line == strings.TrimLeft(line, " \t\u00a0") && isClaudeSpinner(trimmed) {
 			return trimmed, true
 		}
 	}
-	return seedBusy(lines)
+	return "", false
 }
 
 // isClaudeSpinner reports whether a trimmed line is the in-flight spinner:
