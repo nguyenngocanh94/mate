@@ -18,7 +18,7 @@ var (
 // `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
 // `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
 // Code discovers a skill relative to its own working directory.
-var SkillNames = []string{"harness-adapters", "stuck-crew-recovery"}
+var SkillNames = []string{"harness-adapters", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
 // init keeps a malformed skill a build-time failure rather than a Mate that
@@ -53,6 +53,10 @@ type Params struct {
 	WorkspaceDoc string
 	// ProjectDoc is the absolute path of the project's PROJECT.md.
 	ProjectDoc string
+	// WorkspaceCrewDoc and ProjectCrewDoc are the absolute paths of the
+	// captain's two CREW.md files, which the app appends to every brief.
+	WorkspaceCrewDoc string
+	ProjectCrewDoc   string
 	// MemoryFile is the absolute path of the Mate's memory.md.
 	MemoryFile string
 	// BacklogFile is the absolute path of the Mate's backlog.md.

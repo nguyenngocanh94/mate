@@ -16,20 +16,22 @@ var update = flag.Bool("update", false, "update golden files in testdata/")
 
 func fixedParams() Params {
 	return Params{
-		ProjectName:   "shop",
-		WorkspaceRoot: "/ws",
-		ProjectRepo:   "/ws/shop",
-		DefaultBranch: "main",
-		Mode:          "local-only",
-		Yolo:          false,
-		Harness:       "claude-code",
-		WorkspaceDoc:  "/ws/.matev2/WORKSPACE.md",
-		ProjectDoc:    "/ws/.matev2/projects/shop/PROJECT.md",
-		MemoryFile:    "/ws/.matev2/projects/shop/mate/memory.md",
-		BacklogFile:   "/ws/.matev2/projects/shop/mate/backlog.md",
-		MatevBin:      "/usr/local/bin/matev2",
-		MateDir:       "/ws/.matev2/projects/shop/mate",
-		CrewsDir:      "/ws/.matev2/projects/shop/crews",
+		ProjectName:      "shop",
+		WorkspaceRoot:    "/ws",
+		ProjectRepo:      "/ws/shop",
+		DefaultBranch:    "main",
+		Mode:             "local-only",
+		Yolo:             false,
+		Harness:          "claude-code",
+		WorkspaceDoc:     "/ws/.matev2/WORKSPACE.md",
+		ProjectDoc:       "/ws/.matev2/projects/shop/PROJECT.md",
+		WorkspaceCrewDoc: "/ws/.matev2/CREW.md",
+		ProjectCrewDoc:   "/ws/.matev2/projects/shop/CREW.md",
+		MemoryFile:       "/ws/.matev2/projects/shop/mate/memory.md",
+		BacklogFile:      "/ws/.matev2/projects/shop/mate/backlog.md",
+		MatevBin:         "/usr/local/bin/matev2",
+		MateDir:          "/ws/.matev2/projects/shop/mate",
+		CrewsDir:         "/ws/.matev2/projects/shop/crews",
 	}
 }
 
