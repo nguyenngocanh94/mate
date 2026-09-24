@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/db"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -17,6 +18,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
+	"github.com/nguyenngocanh94/matev2/internal/timeline"
 	"github.com/nguyenngocanh94/matev2/internal/ui/console"
 )
 
@@ -34,6 +36,9 @@ const (
 	// The same shape as the shop ship task with the choice removed, so
 	// nothing in it needs the captain once it is typed.
 	twoProjectsShipBlog = `Add the line "Published with matev2" to the end of README.md in project blog. Use a crew.`
+	// The captain's answer to the shop Crew's question, once the Mate has
+	// escalated it: the checkout page is theirs to choose.
+	twoProjectsShopChoice = `Use the express checkout page, pages/checkout-express.html.`
 	// The line the captain types at the very end, to prove an unmarked
 	// prompt ends auto mode.
 	twoProjectsEndsAuto = `Thanks - that is all for today.`
@@ -47,8 +52,9 @@ const (
 // `shop` runs in manual mode, the default. The captain types one ship
 // request, and every step after it is asserted from the files rather than
 // from a pane: the Mate spawns a Crew, the Crew works and then asks, the
-// captain hands the question to the Mate with `[assign]`, the Mate answers
-// the Crew, the Crew hands back, the Mate reports the branch ready and does
+// captain hands the question to the Mate with `[assign]`, the Mate escalates
+// it (the checkout page is the captain's choice), the captain answers in the
+// Mate's pane, the Mate relays it to the Crew, the Crew hands back, the Mate reports the branch ready and does
 // not land it, and the captain merges from the Console. Then a scout task,
 // which ends in a report the Mate summarises and the captain tells it to
 // close.
@@ -158,11 +164,17 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	// The observer and the daemon, started the way cmdConsole starts them
 	// (console.go): one per workspace, both living only as long as the
-	// console does.
-	watcher, err := consoleWatcher(root, deps)
+	// console does. The observer records the timeline as cmdConsole's does,
+	// because the blog half's claim that the Mate yielded its turn to the
+	// digest (task 31) is read out of the Mate's turn rows.
+	watcher, timelineDB, err := consoleWatcherWithTimeline(root, deps)
 	if err != nil {
-		t.Fatalf("consoleWatcher: %v", err)
+		t.Fatalf("consoleWatcherWithTimeline: %v", err)
 	}
+	if timelineDB == nil {
+		t.Fatal("the observer opened no timeline database")
+	}
+	defer timelineDB.Close()
 	watcher.Start(ctx)
 	defer watcher.Stop()
 	pilot, err := consolePilot(root, deps)
@@ -189,6 +201,14 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	t.Cleanup(func() {
 		t.Logf("final shop Mate pane:\n%s", shopPane())
 		t.Logf("final blog Mate pane:\n%s", blogPane())
+		// What the daemon last saw of the blog Mate's composer, and why it
+		// last did not deliver: a digest that never arrives is otherwise
+		// indistinguishable from one that was never due.
+		logComposerReading(t, rt, blogMate, blogKind, "blog")
+		for project, status := range pilot.Snapshot() {
+			t.Logf("daemon %s: auto=%v sends=%d last=%s notice=%q at %s", project, w.Auto(project),
+				status.Sends, status.LastSentAt.UTC().Format("15:04:05"), status.Notice, status.NoticeAt.UTC().Format("15:04:05"))
+		}
 		dumpProject(t, w, "shop")
 		dumpProject(t, w, "blog")
 	})
@@ -250,18 +270,49 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("the shop inbox holds %+v, want the ship crew's question", inbox)
 	}
 
-	// `[assign]`: the captain hands the question to the Mate.
-	resolveOut := assignUntilDelivered(t, ctx, action, "shop", inbox, 6*time.Minute, shopPane)
+	// `[assign]`: the captain hands the question to the Mate, once. A busy
+	// Mate no longer refuses it: the console queues it in `mate/.outbox`
+	// and the sender loop consolePilot started delivers it when the
+	// composer clears (task 30).
+	resolveOut := assignAndAwaitDelivery(t, ctx, w, action, "shop", inbox, 6*time.Minute, shopPane)
 	t.Logf("shop [assign]: %s", resolveOut)
 	t.Logf("shop resolve line: %s", inbox.Resolve)
-	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, inbox.Resolve)
+	afterAssign := len(sentEntries(t, w, "shop"))
 
-	// The Mate answers the Crew itself: `Source: mate` is written only by a
-	// `matev2 send` run from inside the Mate's own pane.
-	answered := waitForSent(t, ctx, w, "shop", 5*time.Minute, func(e store.SentEntry) bool {
+	// `[assign]` hands the question to the Mate to handle, not to decide
+	// (decided 2026-09-24; the decision-authority skill): which checkout
+	// page "our checkout page" means is the captain's product choice, so
+	// the Mate escalates it in its own pane, naming both options, and sends
+	// the Crew no choice of its own. The Stop hook writes the Mate's final
+	// words of that turn as `Source: mate` → `user`.
+	escalation := waitForSentAfter(t, ctx, w, "shop", afterAssign, 5*time.Minute, func(e store.SentEntry) bool {
+		text := strings.ToLower(e.Text)
+		return e.Source == store.SourceMate && e.Target == store.SourceUser &&
+			strings.Contains(text, "classic") && strings.Contains(text, "express")
+	})
+	t.Logf("shop Mate → captain (escalation): %s", escalation.Text)
+	assertNoChoiceSentToCrew(t, w, "shop", ship, afterAssign)
+
+	// The captain answers in the Mate's pane, unmarked, as a person does;
+	// shop is in manual mode, so there is no `.auto` for the hook to clear.
+	beforeAnswer := len(sentEntries(t, w, "shop"))
+	typeCaptainLine(t, ctx, deps, action, "shop", shopMate, shopKind, twoProjectsShopChoice, 4*time.Minute, shopPane)
+
+	// The Mate relays it: `Source: mate` is written only by a `matev2 send`
+	// run from inside the Mate's own pane.
+	answered := waitForSentAfter(t, ctx, w, "shop", beforeAnswer, 5*time.Minute, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate && e.Target == store.CrewTarget(ship)
 	})
 	t.Logf("shop Mate → crew:%s: %s", ship, answered.Text)
+	// The relay is either the choice itself or, the M7 way, a pointer to
+	// the captain's words appended to the Crew's brief (`matev2 brief
+	// append`); either way the choice has to reach something the Crew reads.
+	briefPath := filepath.Join(w.CrewsDir("shop"), ship, "brief.md")
+	briefText, _ := os.ReadFile(briefPath)
+	if !strings.Contains(strings.ToLower(answered.Text), "express") && !strings.Contains(string(briefText), "checkout-express") {
+		t.Fatalf("the Mate relayed %q to the Crew, and neither it nor %s carries the captain's choice (express)",
+			answered.Text, briefPath)
+	}
 
 	// The Crew takes it as a new prompt and hands the branch back.
 	// The Mate's own answer is the last thing in the log before it does, so
@@ -312,8 +363,8 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	}
 	shopReadme := gitOut(t, shop, "show", "main:README.md")
 	t.Logf("shop README.md on main after the merge:\n%s", shopReadme)
-	if !strings.Contains(strings.ToLower(shopReadme), "checkout") {
-		t.Fatalf("shop's README.md on main carries no link to a checkout page:\n%s", shopReadme)
+	if !strings.Contains(shopReadme, "checkout-express.html") {
+		t.Fatalf("shop's README.md on main does not link the page the captain chose:\n%s", shopReadme)
 	}
 	t.Logf("shop commits landed on main:\n%s", gitOut(t, shop, "log", "--format=%h %s", shopBefore+"..main"))
 
@@ -371,6 +422,10 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("blog's README.md on main does not carry the line the captain asked for:\n%s", blogReadme)
 	}
 
+	// The Mate yielded its turn after spawning, and the daemon's digest is
+	// what woke it to land the branch (task 31).
+	assertTheMateYieldedToTheDigest(t, ctx, w, timelineDB, "blog", blogCrew, 3*time.Minute, blogPane)
+
 	// The captain typed once and then nothing: every other line in blog's
 	// log came from the app, the Mate or the Crew.
 	var typed []store.SentEntry
@@ -388,6 +443,224 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	typeCaptainLine(t, ctx, deps, action, "blog", blogMate, blogKind, twoProjectsEndsAuto, 4*time.Minute, blogPane)
 	waitForAutoOff(t, ctx, w, "blog", 3*time.Minute)
+}
+
+// assertNoChoiceSentToCrew fails when the Mate sent the Crew a line naming
+// either checkout page after the question was assigned: that choice was the
+// captain's, and a Mate that guessed it into the Crew's pane decided it.
+func assertNoChoiceSentToCrew(t *testing.T, w *store.Workspace, project, crew string, after int) {
+	t.Helper()
+	entries := sentEntries(t, w, project)
+	for _, e := range entries[after:] {
+		text := strings.ToLower(e.Text)
+		if e.Source == store.SourceMate && e.Target == store.CrewTarget(crew) &&
+			(strings.Contains(text, "classic") || strings.Contains(text, "express")) {
+			t.Fatalf("the Mate sent crew %s a checkout choice before the captain made it: %q", crew, e.Text)
+		}
+	}
+}
+
+// mateHarnessTurn is one prompt the Mate's harness took and everything it
+// did with it. The timeline's `turn` rows are one model call each
+// (docs/mvp.md section 7), so a harness turn is the run of rows sharing one
+// `harness_turn_ref` (Claude's promptId).
+type mateHarnessTurn struct {
+	ref         string
+	started     string
+	ended       string
+	rows        int
+	triggerFrom string
+	trigger     string
+	actions     []string
+}
+
+func (h mateHarnessTurn) ran(fragments ...string) bool {
+	for _, a := range h.actions {
+		if containsEvery(a, fragments) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsEvery(s string, fragments []string) bool {
+	for _, f := range fragments {
+		if !strings.Contains(s, f) {
+			return false
+		}
+	}
+	return true
+}
+
+// mateHarnessTurns reads one Mate's turns out of the timeline, grouped into
+// harness turns, each with the line that triggered it and the commands it ran.
+func mateHarnessTurns(t *testing.T, handle *db.DB, project string) []mateHarnessTurn {
+	t.Helper()
+	rows, err := handle.SQL().Query(`
+		SELECT t.id, t.harness_turn_ref, COALESCE(t.started_at,''), COALESCE(t.ended_at,''),
+		       COALESCE(m.from_actor_id,''), COALESCE(m.text,'')
+		  FROM turn t LEFT JOIN message m ON m.event_id = t.trigger_event_id
+		 WHERE t.actor_id = ?
+		 ORDER BY t.started_at, t.ordinal`, timeline.MateActorID(project))
+	if err != nil {
+		t.Fatalf("read the %s Mate's turns: %v", project, err)
+	}
+	type row struct{ id, ref, started, ended, from, text string }
+	var all []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.ref, &r.started, &r.ended, &r.from, &r.text); err != nil {
+			rows.Close()
+			t.Fatalf("scan a turn: %v", err)
+		}
+		all = append(all, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read the %s Mate's turns: %v", project, err)
+	}
+
+	var out []mateHarnessTurn
+	index := map[string]int{}
+	for _, r := range all {
+		key := r.ref
+		if key == "" {
+			// A row the harness named no prompt for: keep it on its own
+			// rather than merging it into a neighbour and inventing a turn.
+			key = "row:" + r.id
+		}
+		i, ok := index[key]
+		if !ok {
+			i = len(out)
+			index[key] = i
+			out = append(out, mateHarnessTurn{ref: key, started: r.started, triggerFrom: r.from, trigger: r.text})
+		}
+		h := &out[i]
+		h.rows++
+		if r.ended > h.ended {
+			h.ended = r.ended
+		}
+		acts, err := handle.SQL().Query(`SELECT summary FROM action WHERE turn_id = ? ORDER BY at`, r.id)
+		if err != nil {
+			t.Fatalf("read the actions of turn %s: %v", r.id, err)
+		}
+		for acts.Next() {
+			var summary string
+			if err := acts.Scan(&summary); err != nil {
+				acts.Close()
+				t.Fatalf("scan an action: %v", err)
+			}
+			h.actions = append(h.actions, summary)
+		}
+		acts.Close()
+	}
+	return out
+}
+
+// assertTheMateYieldedToTheDigest is task 31's proof on the auto half: the
+// daemon delivered at least one `digest:` line, the Mate spawned the Crew in
+// the turn the captain's request started, and the merge that closed the
+// Crew ran in a later turn that a digest started. Nothing else could have
+// started that turn - the captain typed once - so it also proves the Mate
+// ended the spawning turn rather than supervising inside it, which is the
+// only way a verified send into its composer can succeed.
+func assertTheMateYieldedToTheDigest(t *testing.T, ctx context.Context, w *store.Workspace, handle *db.DB,
+	project, crew string, within time.Duration, evidence func() string) {
+	t.Helper()
+
+	var digests int
+	for _, e := range sentEntries(t, w, project) {
+		if e.Source == store.SourceApp && e.Target == store.TargetMate && strings.HasPrefix(e.Text, "digest: ") {
+			digests++
+			t.Logf("%s sent.log %s app → mate: %s", project, e.Time.UTC().Format("15:04:05"), e.Text)
+		}
+	}
+	if digests == 0 {
+		t.Fatalf("%s's sent.log holds no app → mate digest: line; the Mate never yielded its turn to the daemon\nmate pane:\n%s",
+			project, evidence())
+	}
+
+	// The observer ingests at the end of each poll, so the rows for the
+	// Mate's last turn may land a round or two after the merge did.
+	spawnFragments := []string{"crew spawn " + project, crew}
+	mergeFragments := []string{"merge " + project + " " + crew}
+	deadline := time.Now().Add(within)
+	var turns []mateHarnessTurn
+	var spawnAt, mergeAt int
+	for {
+		turns = mateHarnessTurns(t, handle, project)
+		spawnAt, mergeAt = -1, -1
+		for i, h := range turns {
+			if spawnAt < 0 && h.ran(spawnFragments...) {
+				spawnAt = i
+			}
+			if h.ran(mergeFragments...) {
+				mergeAt = i
+			}
+		}
+		if spawnAt >= 0 && mergeAt >= 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			logMateHarnessTurns(t, project, turns)
+			t.Fatalf("the %s timeline shows no Mate turn that ran %q (found %d) and %q (found %d) within %s",
+				project, strings.Join(spawnFragments, " … "), spawnAt, mergeFragments[0], mergeAt, within)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("context ended waiting for the %s Mate's turns in the timeline", project)
+		case <-time.After(5 * time.Second):
+		}
+	}
+	logMateHarnessTurns(t, project, turns)
+
+	spawnTurn, mergeTurn := turns[spawnAt], turns[mergeAt]
+	if spawnTurn.triggerFrom != timeline.UserActorID(project) {
+		t.Fatalf("the %s Mate spawned in a turn triggered by %q (%q), want the captain's request",
+			project, spawnTurn.triggerFrom, spawnTurn.trigger)
+	}
+	if mergeAt == spawnAt {
+		t.Fatalf("the %s Mate spawned and merged inside one turn (%s); it supervised instead of yielding to the digest",
+			project, spawnTurn.ref)
+	}
+	if mergeTurn.triggerFrom != timeline.AppActorID(project) || !strings.HasPrefix(mergeTurn.trigger, "digest: ") {
+		t.Fatalf("the %s Mate merged in turn %s, triggered by %q (%q), want a digest",
+			project, mergeTurn.ref, mergeTurn.triggerFrom, mergeTurn.trigger)
+	}
+	if spawnTurn.ended == "" || mergeTurn.started < spawnTurn.ended {
+		t.Fatalf("the %s Mate's digest turn %s started at %s, before the spawning turn %s ended (%q)",
+			project, mergeTurn.ref, mergeTurn.started, spawnTurn.ref, spawnTurn.ended)
+	}
+	t.Logf("%s: spawned in turn %s (%s .. %s, the captain's request); merged in turn %s (%s .. %s, %q)",
+		project, spawnTurn.ref, spawnTurn.started, spawnTurn.ended,
+		mergeTurn.ref, mergeTurn.started, mergeTurn.ended, mergeTurn.trigger)
+}
+
+// logMateHarnessTurns prints a Mate's turn boundaries, the evidence task 31
+// records: when each turn started and ended, what started it, and the
+// matev2 commands it ran.
+func logMateHarnessTurns(t *testing.T, project string, turns []mateHarnessTurn) {
+	t.Helper()
+	var b strings.Builder
+	fmt.Fprintf(&b, "==== %s Mate turns ====\n", project)
+	for i, h := range turns {
+		fmt.Fprintf(&b, "#%d %s  %s .. %s  %d model call(s)  trigger %s: %s\n",
+			i, h.ref, h.started, h.ended, h.rows, h.triggerFrom, clip(h.trigger, 160))
+		for _, a := range h.actions {
+			if strings.Contains(a, "matev2") {
+				fmt.Fprintf(&b, "    %s\n", clip(a, 200))
+			}
+		}
+	}
+	t.Log(b.String())
+}
+
+func clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
 }
 
 // waitForSentAfter is waitForSent bounded to the lines a project's log
@@ -465,52 +738,48 @@ func typeCaptainLine(t *testing.T, ctx context.Context, deps spawn.Deps, action 
 		project, within, last, evidence())
 }
 
-// assignUntilDelivered presses `[assign]` until the line reaches the Mate's
-// composer, and returns the Console's own outcome line.
-//
-// The retry is the captain's, not a weakening of the claim. Measured
-// 2026-09-19: a Mate in manual mode supervising a Crew it dispatched is
-// inside a tool call for most of every twenty-second cycle (section 9's
-// poll loop), so `[assign]` meets `target_blocked: agent is mid-turn` far
-// more often than it meets an idle composer. The console reports that
-// refusal on its outcome line and the reader presses again; this is that
-// reader. A composer holding text is answered with the Console's own
-// `[clear composer]`, for the reason typeCaptainLine gives. Every other
-// failure is fatal, because a refusal that is not one of those two is not
-// something pressing again would fix.
-func assignUntilDelivered(t *testing.T, ctx context.Context, action console.ActionFunc, project string,
-	item query.BoxEntry, within time.Duration, evidence func() string) string {
+// assignAndAwaitDelivery presses `[assign]` once and waits for the line to
+// reach the Mate. Since task 30 a busy Mate does not refuse it: the console
+// answers "queued for the Mate" and its outbox sender delivers the line when
+// the composer clears, so the proof of delivery is the `app → mate` line in
+// `sent.log`, not the action's own answer.
+func assignAndAwaitDelivery(t *testing.T, ctx context.Context, w *store.Workspace, action console.ActionFunc,
+	project string, item query.BoxEntry, within time.Duration, evidence func() string) string {
 	t.Helper()
-	deadline := time.Now().Add(within)
-	var last error
-	for time.Now().Before(deadline) {
-		out, err := action(ctx, console.ActionRequest{
-			Action: console.ActionResolve, Target: project, TargetKind: "project",
-			Crew: item.Crew, Input: item.Resolve})
-		if err == nil {
-			return out
-		}
-		if !boxSendRefusal(err) {
-			t.Fatalf("[assign] on the %s inbox item: %v\nmate pane:\n%s", project, err, evidence())
-		}
-		last = err
-		t.Logf("[assign] refused (%v); pressing again", err)
-		if errors.Is(err, send.ErrComposerPending) {
-			clearOut, clearErr := action(ctx, console.ActionRequest{
-				Action: console.ActionClearComposer, Target: project, TargetKind: "mate"})
-			if clearErr != nil {
-				t.Fatalf("[clear composer] on %s: %v", project, clearErr)
-			}
-			t.Logf("%s [clear composer]: %s", project, clearOut)
-		}
-		select {
-		case <-ctx.Done():
-			t.Fatalf("context ended pressing [assign]: %v\nmate pane:\n%s", last, evidence())
-		case <-time.After(10 * time.Second):
-		}
+	out, err := action(ctx, console.ActionRequest{
+		Action: console.ActionResolve, Target: project, TargetKind: "project",
+		Crew: item.Crew, Input: item.Resolve, Key: item.AssignKey})
+	if err != nil {
+		t.Fatalf("[assign] on the %s inbox item: %v\nmate pane:\n%s", project, err, evidence())
 	}
-	t.Fatalf("[assign] never reached the %s Mate within %s: %v\nmate pane:\n%s", project, within, last, evidence())
-	return ""
+	waitForSent(t, ctx, w, project, within, func(e store.SentEntry) bool {
+		return e.Source == store.SourceApp && e.Target == store.TargetMate && e.Text == item.Resolve
+	})
+	return out
+}
+
+// logComposerReading classifies a Mate's composer from the styled screen,
+// the reading internal/send takes before every verified send.
+func logComposerReading(t *testing.T, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, project string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	screen, err := rt.ReadAgentStyled(ctx, handle, send.DefaultLines)
+	if err != nil {
+		t.Logf("%s Mate composer: not readable: %v", project, err)
+		return
+	}
+	cls, err := send.ClassifyComposer(kind, screen)
+	t.Logf("%s Mate composer: state=%s evidence=%q err=%v\nstyled tail:\n%q", project, cls.State, cls.Evidence, err,
+		lastLines(screen, 8))
+}
+
+func lastLines(s string, n int) string {
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n")
 }
 
 // writeRepo creates a git repository with the given files, committed on
@@ -638,6 +907,9 @@ func dumpProject(t *testing.T, w *store.Workspace, project string) {
 	}
 	for _, e := range entries {
 		fmt.Fprintf(&b, "%s | %-5s → %-8s | %s\n", e.Time.UTC().Format("15:04:05"), e.Source, e.Target, e.Text)
+	}
+	if incidents, err := os.ReadFile(w.IncidentsLog(project)); err == nil {
+		fmt.Fprintf(&b, "==== %s incidents.log ====\n%s", project, incidents)
 	}
 	crews, err := spawn.ListCrews(w, project)
 	if err != nil {

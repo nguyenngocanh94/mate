@@ -143,7 +143,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 	})
 	t.Logf("shop/%s asked: %s", ship, ask.Text)
 	inbox := waitForInboxItem(t, ctx, w, "shop", time.Minute, shipPane)
-	resolveOut := assignUntilDelivered(t, ctx, action, "shop", inbox, 6*time.Minute, shopPane)
+	resolveOut := assignAndAwaitDelivery(t, ctx, w, action, "shop", inbox, 6*time.Minute, shopPane)
 	t.Logf("shop [assign]: %s", resolveOut)
 
 	answered := waitForSent(t, ctx, w, "shop", 5*time.Minute, func(e store.SentEntry) bool {

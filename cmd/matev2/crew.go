@@ -9,6 +9,7 @@ import (
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
 // cmdCrew dispatches `matev2 crew <spawn|list|stop>`.
@@ -77,6 +78,16 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	if err != nil {
 		return err
 	}
+	writeCrewSpawnReport(stdout, stderr, w, res)
+	return nil
+}
+
+// writeCrewSpawnReport prints what a successful spawn prints: notes and
+// warnings on stderr, the three lines the manual tells the Mate to keep on
+// stdout, and, in auto mode, the line telling it to end its turn now
+// (auto_turn.go). Kept apart from flag parsing so a test can drive it with
+// a result from a fake-runtime spawn.
+func writeCrewSpawnReport(stdout, stderr io.Writer, w *store.Workspace, res spawn.CrewResult) {
 	if res.StaleMeta {
 		fmt.Fprintf(stderr, "note: crew %s had a recorded agent Herdr no longer knew; the stale record was replaced\n", res.Crew)
 	}
@@ -92,7 +103,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s, branch %s, worktree %s)\n",
 		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, res.Branch, res.Worktree)
 	fmt.Fprintf(stdout, "brief %s\nstatus %s\n", res.BriefPath, res.StatusPath)
-	return nil
+	printAutoTurnEnd(stdout, w, res.Project, autoSpawnLine(res.Crew))
 }
 
 // cmdCrewList implements `matev2 crew list <project>`.

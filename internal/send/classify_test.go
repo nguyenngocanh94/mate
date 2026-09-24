@@ -201,6 +201,45 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 // half-typed human line, so `send.Send` refused to type over it and Ctrl+U
 // could not clear it - there was nothing there to clear. Two live runs of
 // the two-project acceptance deadlocked on exactly this.
+// TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude is the
+// capture of task 31's acceptance runs (Claude Code 2.1.281, Herdr 0.8.2,
+// 2026-09-24): an idle Mate, finished ("Sautéed for 26s · done"), with a
+// faint suggestion in its composer and, a few lines up, the output of a tool
+// call that printed a working Codex crew's pane - `⎿  • Working (2s • esc
+// to interrupt)`. The shared busy seed matched that quoted line, so every
+// digest was refused as mid-turn until the 5-minute `wedged` incident, and
+// the Mate was never woken.
+func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.T) {
+	styled := captureFile(t, "claude_idle_quoting_codex_busy.ansi")
+	plain := send.StripSGR(styled)
+	if !strings.Contains(plain, "• Working (2s • esc to interrupt)") {
+		t.Fatal("the capture no longer holds the quoted Codex busy line this test is about")
+	}
+	got, err := send.ClassifyComposer(harness.KindClaude, styled)
+	if err != nil {
+		t.Fatalf("ClassifyComposer: %v", err)
+	}
+	if got.State != send.StateEmpty || !strings.Contains(got.Evidence, "faint") {
+		t.Fatalf("state = %q (evidence %q), want empty: an idle Claude quoting a busy Codex is idle", got.State, got.Evidence)
+	}
+
+	// A quoted Claude spinner - indented, as every quoted line is - is not
+	// this pane's spinner either.
+	quoted := strings.Replace(plain, "• Working (2s • esc to interrupt)", "✻ Pollinating…", 1)
+	if got, _ := send.ClassifyComposer(harness.KindClaude, quoted); got.State == send.StateBusy {
+		t.Fatalf("a quoted, indented spinner classified busy (evidence %q)", got.Evidence)
+	}
+
+	// The pane's own spinner, drawn at column 0 above the composer, is.
+	own := strings.Replace(plain, "✻ Sautéed for 26s · done 11:20 AM", "✽ Transmuting… (42s · ↓ 1.4k tokens)", 1)
+	if own == plain {
+		t.Fatal("the capture no longer holds the finished line this test replaces")
+	}
+	if got, _ := send.ClassifyComposer(harness.KindClaude, own); got.State != send.StateBusy {
+		t.Fatalf("the pane's own spinner classified %q, want busy", got.State)
+	}
+}
+
 func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
 	styled := captureFile(t, "claude_ghost_suggestion.ansi")
 
