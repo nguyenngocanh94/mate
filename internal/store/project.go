@@ -79,6 +79,9 @@ func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if err := w.SaveProject(name, normalised); err != nil {
 		return err
 	}
+	if err := w.seedOnce(w.ProjectCrewDoc(name), projectCrewDocSeed(name)); err != nil {
+		return err
+	}
 	w.cfg.Projects = append(w.cfg.Projects, ProjectRef{Name: name, Repo: normalised.Repo})
 	if err := w.SaveConfig(); err != nil {
 		return err

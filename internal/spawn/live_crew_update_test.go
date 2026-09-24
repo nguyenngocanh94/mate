@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
@@ -87,8 +88,8 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 		Project: "shop",
 		Crew:    "u1",
 		Harness: harness.KindCodex,
-		BriefText: `Append the line "hello from crew" to README.md, commit it, ` +
-			`then append wait-mate: ready in branch to the status file`,
+		BriefText: brieftest.Ship(`Append the line "hello from crew" to README.md, commit it, ` +
+			`then append wait-mate: ready in branch to the status file`),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
@@ -38,7 +39,7 @@ func mergeFixture(t *testing.T, yolo bool) (*store.Workspace, spawn.Deps, spawn.
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

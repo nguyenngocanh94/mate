@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -108,7 +109,7 @@ func TestLiveAutoPolicyMateAnswersADigest(t *testing.T) {
 		Project:   "shop",
 		Crew:      "k3",
 		Harness:   harness.KindCodex,
-		BriefText: brief,
+		BriefText: brieftest.Ship(brief),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

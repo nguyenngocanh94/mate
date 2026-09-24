@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/gitx"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
@@ -66,7 +67,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project:   "shop",
 		Crew:      "k3",
-		BriefFile: briefFile(t, w, "Add a healthcheck endpoint.\nKeep it small.\n"),
+		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\nKeep it small.\n")),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -112,7 +113,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 			t.Errorf("brief.md does not carry %q:\n%s", want, brief)
 		}
 	}
-	if strings.Contains(string(brief), spawn.BriefPlaceholder) {
+	if strings.Contains(string(brief), "{TASK}") {
 		t.Error("brief.md still carries the {TASK} placeholder")
 	}
 	// Codex reads AGENTS.override.md at its cwd and nothing else.
@@ -191,7 +192,7 @@ func TestSpawnCrewKeepsTheCodexDiscoveryFileOutOfTheBranch(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	res, err := spawn.SpawnCrew(context.Background(), w, fakeDeps(t, rt), spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -214,7 +215,7 @@ func TestSpawnCrewDeliversThePointerNotThePastedBrief(t *testing.T) {
 
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project: "shop", Crew: "k3",
-		BriefText: "Line one.\n\nLine two.\n",
+		BriefText: brieftest.Ship("Line one.\n\nLine two.\n"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -235,7 +236,7 @@ func TestSpawnCrewRefusesADuplicateIDWhileTheAgentIsLive(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	req := spawn.SpawnCrewRequest{Project: "shop", Crew: "k3", BriefText: "first"}
+	req := spawn.SpawnCrewRequest{Project: "shop", Crew: "k3", BriefText: brieftest.Ship("first")}
 	if _, err := spawn.SpawnCrew(context.Background(), w, deps, req); err != nil {
 		t.Fatalf("first SpawnCrew: %v", err)
 	}
@@ -268,7 +269,7 @@ func TestSpawnCrewRefusesAnExistingBranchBeforeCreatingAnything(t *testing.T) {
 	git(t, w.RepoDir("shop"), "branch", "matev2/k3")
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err == nil {
 		t.Fatal("an existing branch must be refused")
@@ -296,7 +297,7 @@ func TestSpawnCrewRefusesAnExistingWorktreePath(t *testing.T) {
 	}
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err == nil {
 		t.Fatal("an existing worktree path must be refused")
@@ -337,7 +338,7 @@ func TestSpawnCrewCompensatesAfterTheTabExists(t *testing.T) {
 	rt.StartErr = errors.New("herdr refused the launch")
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "Add a healthcheck endpoint.",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("Add a healthcheck endpoint."),
 	})
 	if err == nil {
 		t.Fatal("SpawnCrew must fail when the agent cannot start")
@@ -404,7 +405,7 @@ func TestSpawnCrewRefusesATangledWorktree(t *testing.T) {
 	deps.Git = gitx.Git{Runner: &tangledGit{repo: repo, worktree: w.WorktreeDir("shop", "k3")}}
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err == nil {
 		t.Fatal("a worktree that resolves to the primary checkout must be refused")
@@ -450,7 +451,7 @@ func TestSpawnCrewWarnsWhenThePaneStaysIdle(t *testing.T) {
 	deps.BriefDeliveryTimeout = 20 * time.Millisecond
 
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("an undelivered brief must not fail the spawn: %v", err)
@@ -475,7 +476,7 @@ func TestListCrewsReportsTheRecordedCrews(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "Add a healthcheck endpoint.",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("Add a healthcheck endpoint."),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -518,7 +519,7 @@ func TestListCrewsStateReflectsTheMeta(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	}); err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
@@ -542,7 +543,7 @@ func TestListCrewsStateReflectsTheMeta(t *testing.T) {
 	}
 
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k4", BriefText: "work",
+		Project: "shop", Crew: "k4", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew k4: %v", err)
@@ -593,7 +594,7 @@ func TestStopCrewTearsDownCleanlyWhenLanded(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -660,7 +661,7 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -730,7 +731,7 @@ func TestStopCrewRefusesWhenOnlyTheWorktreeIsDirty(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -772,7 +773,7 @@ func TestStopCrewTearsDownAfterTheAgentIsAlreadyGone(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", BriefText: "work",
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

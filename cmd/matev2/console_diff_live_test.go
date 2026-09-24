@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
 	"github.com/nguyenngocanh94/matev2/internal/process"
 	"github.com/nguyenngocanh94/matev2/internal/query"
@@ -99,10 +100,10 @@ func TestLiveConsoleDiffShowsACrewBranch(t *testing.T) {
 		Project: "shop",
 		Crew:    "k3",
 		Harness: harness.KindCodex,
-		BriefText: "Append the single line `reviewed by the crew` to README.md in this worktree, " +
+		BriefText: brieftest.Ship("Append the single line `reviewed by the crew` to README.md in this worktree, " +
 			"then make exactly one commit with the subject `note the review in README`. " +
 			"Do not change any other file. When the commit exists, append " +
-			"wait-mate: ready in branch <the branch name> to the status file and stop.",
+			"wait-mate: ready in branch <the branch name> to the status file and stop."),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)

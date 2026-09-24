@@ -27,6 +27,8 @@ const (
 	crewsDirName      = "crews"
 	briefFileName     = "brief.md"
 	reportFileName    = "report.md"
+	handbackFileName  = "handback.md"
+	crewDocName       = "CREW.md"
 )
 
 // Every helper below returns an absolute path built from the resolved
@@ -45,6 +47,11 @@ func (w *Workspace) WorkspaceFile() string { return filepath.Join(w.StateDir(), 
 
 // WorkspaceDoc is `<root>/.matev2/WORKSPACE.md`, the user's rules for every Mate.
 func (w *Workspace) WorkspaceDoc() string { return filepath.Join(w.StateDir(), workspaceDocName) }
+
+// WorkspaceCrewDoc is `<root>/.matev2/CREW.md`, the captain's standing rules
+// for every Crew in the workspace, appended to the end of every brief
+// (docs/mvp.md M7). Optional.
+func (w *Workspace) WorkspaceCrewDoc() string { return filepath.Join(w.StateDir(), crewDocName) }
 
 // PricingFile is `<root>/.matev2/pricing.yaml`, unused before the token monitor.
 func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pricingFileName) }
@@ -65,6 +72,13 @@ func (w *Workspace) ProjectFile(project string) string {
 // ProjectDoc is `projects/<project>/PROJECT.md`.
 func (w *Workspace) ProjectDoc(project string) string {
 	return filepath.Join(w.ProjectDir(project), projectDocName)
+}
+
+// ProjectCrewDoc is `projects/<project>/CREW.md`, the captain's standing
+// rules for every Crew of one project, appended after the workspace's.
+// Optional.
+func (w *Workspace) ProjectCrewDoc(project string) string {
+	return filepath.Join(w.ProjectDir(project), crewDocName)
 }
 
 // SentLog is `projects/<project>/sent.log`.
@@ -139,6 +153,14 @@ func (w *Workspace) CrewBrief(project, crew string) string {
 // CrewReport is `projects/<project>/crews/<crew>/report.md`.
 func (w *Workspace) CrewReport(project, crew string) string {
 	return filepath.Join(w.CrewDir(project, crew), reportFileName)
+}
+
+// CrewHandback is `projects/<project>/crews/<crew>/handback.md`, the ship
+// Crew's own account of its acceptance checks, written before `wait-mate`
+// (docs/mvp.md M7). Like the report it lives outside the worktree, so it
+// outlives the Crew.
+func (w *Workspace) CrewHandback(project, crew string) string {
+	return filepath.Join(w.CrewDir(project, crew), handbackFileName)
 }
 
 // WorktreesDir is `<root>/.worktrees`.

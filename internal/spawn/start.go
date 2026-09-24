@@ -355,20 +355,22 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		return err
 	}
 	if err := mateassets.Write(mateDir, mateassets.Params{
-		ProjectName:   project,
-		WorkspaceRoot: w.Root(),
-		ProjectRepo:   w.RepoDir(cfg.Repo),
-		DefaultBranch: cfg.DefaultBranch,
-		Mode:          cfg.Mode,
-		Yolo:          cfg.Yolo,
-		Harness:       string(kind),
-		WorkspaceDoc:  w.WorkspaceDoc(),
-		ProjectDoc:    w.ProjectDoc(project),
-		MemoryFile:    w.MemoryFile(project),
-		BacklogFile:   w.BacklogFile(project),
-		MatevBin:      binary,
-		MateDir:       mateDir,
-		CrewsDir:      w.CrewsDir(project),
+		ProjectName:      project,
+		WorkspaceRoot:    w.Root(),
+		ProjectRepo:      w.RepoDir(cfg.Repo),
+		DefaultBranch:    cfg.DefaultBranch,
+		Mode:             cfg.Mode,
+		Yolo:             cfg.Yolo,
+		Harness:          string(kind),
+		WorkspaceDoc:     w.WorkspaceDoc(),
+		ProjectDoc:       w.ProjectDoc(project),
+		WorkspaceCrewDoc: w.WorkspaceCrewDoc(),
+		ProjectCrewDoc:   w.ProjectCrewDoc(project),
+		MemoryFile:       w.MemoryFile(project),
+		BacklogFile:      w.BacklogFile(project),
+		MatevBin:         binary,
+		MateDir:          mateDir,
+		CrewsDir:         w.CrewsDir(project),
 	}); err != nil {
 		return err
 	}
