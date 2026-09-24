@@ -23,6 +23,7 @@ import (
 // Herdr detail the operator needs. Nothing returns a success it did not
 // establish: an action mvp.md has not reached yet refuses by name.
 func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
+	holds := newRestartHolds()
 	return func(ctx context.Context, req console.ActionRequest) (string, error) {
 		switch req.Action {
 		case console.ActionStart, console.ActionResume:
@@ -71,7 +72,7 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 		case console.ActionDiff:
 			return crewDiffAction(ctx, ws, req)
 		case console.ActionRestartMate:
-			return restartMateAction(ctx, ws, deps, req)
+			return restartMateAction(ctx, ws, deps, req, holds)
 		case console.ActionClearComposer:
 			return clearComposerAction(ctx, ws, deps, req)
 		case console.ActionMerge:

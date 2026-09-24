@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/autopilot"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
@@ -72,12 +73,30 @@ func consolePilot(dir string, deps spawn.Deps) (*consoleDelivery, error) {
 // consoleOutbox is an outbox sender over the live Herdr adapter. Its state is
 // all on disk, so any number of them agree: the console's loop, the one an
 // `[assign]` uses for its immediate attempt, and the daemon's.
+//
+// A test's spawn.Deps clock and sleep carry over, so a stow before a restart
+// runs at memory speed under the fake adapter; the live deps set neither.
 func consoleOutbox(ws *store.Workspace, deps spawn.Deps) *outbox.Sender {
-	return outbox.New(ws, outbox.Deps{
+	od := outbox.Deps{
 		Runtime: deps.Runtime,
 		Handle:  consoleMateHandle(ws, deps),
-	})
+	}
+	if deps.Now != nil {
+		od.Clock = clockFunc(deps.Now)
+	}
+	if deps.Sleep != nil {
+		od.Sleeper = sleepFunc(deps.Sleep)
+	}
+	return outbox.New(ws, od)
 }
+
+type clockFunc func() time.Time
+
+func (f clockFunc) Now() time.Time { return f() }
+
+type sleepFunc func(context.Context, time.Duration) error
+
+func (f sleepFunc) Sleep(ctx context.Context, d time.Duration) error { return f(ctx, d) }
 
 // consoleAutoPilot is the auto daemon over ws, queueing into ws's outbox and
 // making its one immediate attempt through a sender over the same handle.

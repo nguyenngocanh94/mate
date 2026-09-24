@@ -7,7 +7,9 @@ import (
 	"io"
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
+	"github.com/nguyenngocanh94/matev2/internal/store"
 )
 
 // cmdMate dispatches `matev2 mate <start|stop|status>`.
@@ -81,14 +83,23 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// cmdMateStop implements `matev2 mate stop <project>`.
+// cmdMateStop implements `matev2 mate stop <project> [--no-stow]`.
+//
+// Stopped by the captain with its composer empty, the Mate is first asked
+// to stow (docs/mvp.md task 37, B7), exactly as the console's restart asks
+// it, and the stop waits for that turn up to outbox.DefaultStowCeiling. A
+// Mate mid-turn or with unsent text in its composer is stopped at once: a
+// captain who types `mate stop` wants it stopped, and only the console's
+// restart has a second press to ask with. A Mate stopping itself is never
+// asked - it would be waiting on its own turn.
 func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mate stop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: matev2 mate stop <project> [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: matev2 mate stop <project> [--no-stow] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	noStowFlag := fs.Bool("no-stow", false, "stop at once, without asking the Mate to stow what exists only in its conversation")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -100,7 +111,31 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := spawn.StopMate(context.Background(), w, spawn.LiveDeps(), fs.Arg(0))
+	return mateStop(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
+}
+
+// mateStop is cmdMateStop's core, over any deps, for tests.
+func mateStop(ctx context.Context, w *store.Workspace, deps spawn.Deps, project, caller string, noStow bool, stdout, stderr io.Writer) error {
+	if err := requireProject(w, project); err != nil {
+		return err
+	}
+	stowed := "not stowed: --no-stow"
+	switch {
+	case noStow:
+	case caller == spawn.CallerMate:
+		stowed = "not stowed: the Mate stopped itself"
+	case caller != spawn.CallerUser:
+		stowed = "not stowed: only the captain's stop asks the Mate to stow"
+	default:
+		fmt.Fprintf(stderr, "stowing: asking the Mate to record what exists only in its conversation, waiting up to %s for its turn (--no-stow skips this)\n",
+			outbox.Span(outbox.DefaultStowCeiling))
+		res, err := consoleOutbox(w, deps).Stow(ctx, project, outbox.StowOptions{RequireEmpty: true})
+		if err != nil {
+			return err
+		}
+		stowed = res.Outcome()
+	}
+	res, err := spawn.StopMate(ctx, w, deps, project)
 	if err != nil {
 		return err
 	}
@@ -108,7 +143,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	if res.AlreadyGone {
 		what = "already gone"
 	}
-	fmt.Fprintf(stdout, "%s: %s (agent %s, session_id kept for resume)\n", res.Project, what, res.Agent)
+	fmt.Fprintf(stdout, "%s: %s (agent %s, session_id kept for resume); %s\n", res.Project, what, res.Agent, stowed)
 	return nil
 }
 

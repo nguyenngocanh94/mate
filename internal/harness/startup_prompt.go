@@ -173,7 +173,10 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 	switch kind {
 	case KindCodex:
 		return startupProfile{
-			dialogs: []dialogProfile{
+			// The hook review (codex_hooks.go) is recognised here but
+			// answered only by the settle's own walk through it, and only
+			// for hooks matev2 names as its own.
+			dialogs: append([]dialogProfile{
 				{
 					screen:   StartupScreenTrustDialog,
 					question: codexTrustQuestion,
@@ -228,7 +231,7 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 					selectKeys:  []string{"down", "down"},
 					targetLabel: codexUpdateSkipNext,
 				},
-			},
+			}, hooksReviewDialogs()...),
 			composer: func(lines []string) bool {
 				for _, l := range lines {
 					if strings.Contains(l, CodexComposerPlaceholder) {

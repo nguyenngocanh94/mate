@@ -70,6 +70,9 @@ const (
 const (
 	OutboxSourceAssign = "assign"
 	OutboxSourceDigest = "digest"
+	// OutboxSourceStow is the `⟦matev2⟧ stow:` line the app sends just
+	// before it restarts the Mate (docs/mvp.md task 37, B7).
+	OutboxSourceStow = "stow"
 )
 
 // Compaction bounds (see the package comment above).

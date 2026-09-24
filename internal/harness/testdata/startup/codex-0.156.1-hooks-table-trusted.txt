@@ -1,0 +1,32 @@
+
+╭───────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.156.1)                │
+│                                           │
+│ model:       GPT-6-Sol   /model to change │
+│ directory:   /private/tmp/…/001/codexlab  │
+│ permissions: YOLO mode                    │
+╰───────────────────────────────────────────╯
+
+  Tip: This is GPT-6, a new generation of intelligence. Astra is state-of-the-art in coding,
+  computer use, science, and professional work. Give it a hard problem, a half-formed idea, or
+  anything you've been meaning to build. See where it takes you.
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+  Hooks
+  Lifecycle hooks from config and enabled plugins.
+
+  Event                 Installed   Active      Description
+
+  PreToolUse            0           0           Before a tool executes
+  PermissionRequest     0           0           When permission is requested
+  PostToolUse           0           0           After a tool executes
+  PreCompact            0           0           Before context compaction
+  PostCompact           0           0           After context compaction
+› SessionStart          2           2           When a new session starts
+  SessionEnd            0           0           Right before a session ends
+  UserPromptSubmit      0           0           When the user submits a prompt
+↓
+
+  enter details · esc close

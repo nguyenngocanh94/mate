@@ -19,10 +19,11 @@ import (
 )
 
 // ClaudeSettingsDir and ClaudeSettingsFile are the Claude settings the Mate
-// launches with: ClaudeSettings wires its two hooks to the matev2 binary and
+// launches with: ClaudeSettings wires its three hooks to the matev2 binary and
 // turns Claude Code's auto-memory off. Start creates the file, and on one
 // that already exists - the user's own, or one a previous start wrote - it
-// only ever adds a missing autoMemoryEnabled key.
+// only ever adds a missing autoMemoryEnabled key and a missing SessionStart
+// hook.
 const (
 	ClaudeSettingsDir  = ".claude"
 	ClaudeSettingsFile = "settings.json"
@@ -72,6 +73,9 @@ type StartResult struct {
 	// UpdateDialog is true when the startup settle skipped the harness's
 	// release-update prompt (Codex, measured 2026-09-18).
 	UpdateDialog bool
+	// HooksTrusted is true when the startup settle trusted the Codex Mate's
+	// own SessionStart hook in Codex's hook review (task 37).
+	HooksTrusted bool
 	// Resumed is true when this start resumed the harness session recorded
 	// in `mate.meta` (task 10) instead of minting a fresh one.
 	Resumed bool
@@ -308,7 +312,11 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, kind, deps.startupPromptTimeout(), deps.sleep())
+	trusted, err := ownHooks(deps, kind, mateDir)
+	if err != nil {
+		return StartResult{}, err
+	}
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, kind, deps.startupPromptTimeout(), deps.sleep(), trusted...)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -356,6 +364,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		Status:       observed.Status,
 		TrustDialog:  settled.TrustDialogAnswered,
 		UpdateDialog: settled.UpdateDialogAnswered,
+		HooksTrusted: settled.HooksTrusted,
 		Resumed:      resume,
 		ResumedFrom:  resumedFrom,
 		ResumeNote:   resumeNote,
@@ -438,16 +447,67 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		if err := writeCodexOverride(mateDir); err != nil {
 			return err
 		}
+		if err := writeCodexHooks(mateDir, binary); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
+// CodexHooksDir and CodexHooksFile are where a Codex Mate's SessionStart
+// hook lives: `.codex/hooks.json` of its cwd, which Codex loads once the
+// directory is trusted (task 35, A3). The operator's own
+// `$CODEX_HOME/hooks.json` is never read or written.
+const (
+	CodexHooksDir  = ".codex"
+	CodexHooksFile = "hooks.json"
+)
+
+// CodexHooksPath is the Codex Mate's hooks file.
+func CodexHooksPath(mateDir string) string {
+	return filepath.Join(mateDir, CodexHooksDir, CodexHooksFile)
+}
+
+// writeCodexHooks writes CodexHooks for binary, only when it differs, so an
+// unchanged file keeps its mtime as well as the trust Codex recorded for it.
+func writeCodexHooks(mateDir, binary string) error {
+	path := CodexHooksPath(mateDir)
+	want := CodexHooks(binary)
+	if have, err := os.ReadFile(path); err == nil && string(have) == string(want) {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, want, 0o644)
+}
+
+// ownHooks is what the startup settle may trust in Codex's hook review for
+// this launch: the Codex Mate's own SessionStart hook, from its own file,
+// and nothing else. A Claude Mate and every Crew get none.
+func ownHooks(deps Deps, kind harness.Kind, mateDir string) ([]harness.OwnHook, error) {
+	if kind != harness.KindCodex {
+		return nil, nil
+	}
+	binary, err := deps.binary()
+	if err != nil {
+		return nil, err
+	}
+	return []harness.OwnHook{{
+		Event:   "SessionStart",
+		Source:  CodexHooksPath(mateDir),
+		Command: SessionHookCommand(binary, harness.KindCodex),
+	}}, nil
+}
+
 // ensureClaudeSettings creates `<mate>/.claude/settings.json` if it is not
-// there, wired to binary's `hook mate-prompt`/`hook mate-stop` (ClaudeSettings).
-// An existing file - the user's own, or one a previous start already wrote -
-// keeps every key it has; the one thing a start adds to it is
-// `autoMemoryEnabled: false` when the file does not say (EnsureAutoMemoryOff),
-// so a Mate directory made before task 35 starts with auto-memory off too.
+// there, wired to binary's `hook mate-prompt`/`hook mate-stop`/`hook
+// mate-session` (ClaudeSettings). An existing file - the user's own, or one a
+// previous start already wrote - keeps every key it has; the two things a
+// start adds to it are `autoMemoryEnabled: false` when the file does not say
+// (EnsureAutoMemoryOff), and the SessionStart hook when no SessionStart entry
+// runs it (EnsureSessionHook), so a Mate directory made before task 35 or 37
+// starts with auto-memory off and its digest wired too.
 func ensureClaudeSettings(mateDir, binary string) error {
 	dir := filepath.Join(mateDir, ClaudeSettingsDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -456,11 +516,15 @@ func ensureClaudeSettings(mateDir, binary string) error {
 	path := filepath.Join(dir, ClaudeSettingsFile)
 	existing, err := os.ReadFile(path)
 	if err == nil {
-		updated, changed, err := EnsureAutoMemoryOff(existing)
+		updated, memoryChanged, err := EnsureAutoMemoryOff(existing)
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		if !changed {
+		updated, hookChanged, err := EnsureSessionHook(updated, binary)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		if !memoryChanged && !hookChanged {
 			return nil
 		}
 		return os.WriteFile(path, updated, 0o644)

@@ -74,6 +74,9 @@ type Settlement struct {
 	// UpdateDialogAnswered is true when the harness's release-update prompt
 	// was on screen and matev2 skipped it until the next version.
 	UpdateDialogAnswered bool
+	// HooksTrusted is true when Codex's hook review was on screen and
+	// matev2 trusted its own hooks in it, and nothing else.
+	HooksTrusted bool
 	// Presses is the key sequence sent, one entry per press.
 	Presses []string
 }
@@ -92,6 +95,11 @@ func (s *Settlement) markAnswered(screen harness.StartupScreen) bool {
 			return true
 		}
 		s.UpdateDialogAnswered = true
+	case harness.StartupScreenHooksReview:
+		if s.HooksTrusted {
+			return true
+		}
+		s.HooksTrusted = true
 	}
 	return false
 }
@@ -124,7 +132,12 @@ var startupDialogs = map[harness.StartupScreen]startupDialog{
 // in details, when the budget runs out on a screen it does not recognise,
 // when a select press does not move the highlight onto the accept option, or
 // when the dialog is still on screen after the confirm press.
-func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, budget time.Duration, sleep sleeper) (Settlement, error) {
+//
+// trusted names the hooks matev2 itself installed for this launch (a Codex
+// Mate's SessionStart hook). Codex's hook review is walked, and those hooks
+// trusted, only when every hook the review lists is one of them; with none,
+// the review is refused at once.
+func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
 	if sleep == nil {
 		sleep = sleepCtx
 	}
@@ -148,7 +161,26 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if class == harness.StartupScreenReady {
 			return settled, nil
 		}
-		if dialog, ok := startupDialogs[class]; ok {
+		if class == harness.StartupScreenHooksReview {
+			if len(trusted) == 0 {
+				return settled, startupRefusal(handle, kind, screen,
+					fmt.Sprintf("%s asks to review hooks matev2 did not install; matev2 trusts only its own hooks and pressed nothing. Review them once in %s yourself (/hooks), then start again", kind, kind))
+			}
+			if settled.markAnswered(class) {
+				return settled, startupRefusal(handle, kind, screen,
+					fmt.Sprintf("%s hook review is on screen again after matev2 trusted its own hooks; not pressing anything further", kind))
+			}
+			answered++
+			if answered > startupMaxDialogs {
+				return settled, startupRefusal(handle, kind, screen,
+					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; matev2 stops answering rather than press keys in a loop", kind, startupMaxDialogs))
+			}
+			presses, err := reviewOwnHooks(ctx, rt, handle, kind, screen, trusted, sleep)
+			settled.Presses = append(settled.Presses, presses...)
+			if err != nil {
+				return settled, err
+			}
+		} else if dialog, ok := startupDialogs[class]; ok {
 			if settled.markAnswered(class) {
 				return settled, startupRefusal(handle, kind, screen,
 					fmt.Sprintf("%s %s is still on screen after matev2 confirmed its selection; not pressing anything further", kind, dialog.what))
@@ -224,6 +256,169 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 	}
 	presses = append(presses, answer.ConfirmKey)
 	if err := sleep(ctx, startupKeySettle); err != nil {
+		return presses, err
+	}
+	return presses, nil
+}
+
+// reviewScreenPolls bounds how many reads the hook review waits for Codex
+// to redraw after one key, at startupPollInterval apiece.
+const reviewScreenPolls = 20
+
+// reviewOwnHooks walks Codex's hook review (harness/codex_hooks.go) from
+// the dialog on screen to the composer, trusting the hooks in own and
+// nothing else. Every hook the review lists as needing review is read, and
+// matched against own, before a single one is trusted: a review that also
+// lists a hook matev2 did not install is refused with nothing trusted.
+func reviewOwnHooks(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screen string, own []harness.OwnHook, sleep sleeper) ([]string, error) {
+	var presses []string
+	press := func(key string) error {
+		if err := rt.SendKeys(ctx, handle, []string{key}); err != nil {
+			return err
+		}
+		presses = append(presses, key)
+		return sleep(ctx, startupKeySettle)
+	}
+	refuse := func(screen, msg string) error {
+		return startupRefusal(handle, kind, screen, fmt.Sprintf("%s hook review: %s", kind, msg))
+	}
+	// readUntil re-reads until parse accepts the screen.
+	readUntil := func(what string, parse func(string) bool) (string, error) {
+		var last string
+		for i := 0; i < reviewScreenPolls; i++ {
+			s, err := rt.ReadAgent(ctx, handle, startupScreenLines)
+			if err != nil {
+				return s, err
+			}
+			if parse(s) {
+				return s, nil
+			}
+			last = s
+			if err := sleep(ctx, startupPollInterval); err != nil {
+				return s, err
+			}
+		}
+		return last, refuse(last, "expected "+what+" and did not find it; not pressing anything further")
+	}
+
+	// 1. The dialog: confirm "1. Review hooks", never "2. Trust all".
+	if !harness.HooksReviewSelected(screen) {
+		return presses, refuse(screen, `the highlight is not on "1. Review hooks"; refusing to confirm a selection matev2 cannot see`)
+	}
+	if err := press("enter"); err != nil {
+		return presses, err
+	}
+
+	// 2. The event table: every hook needing review must be a SessionStart
+	// hook, and SessionStart must be the selected event.
+	var table harness.CodexHooksTable
+	screen, err := readUntil("the hook table", func(s string) bool {
+		var ok bool
+		table, ok = harness.ParseCodexHooksTable(s)
+		return ok
+	})
+	if err != nil {
+		return presses, err
+	}
+	events := map[string]bool{}
+	for _, o := range own {
+		events[o.Event] = true
+	}
+	selected, _ := table.Selected()
+	row, _ := table.Row(selected.Event)
+	if !table.Reviewing || len(events) != 1 || !events[selected.Event] || row.Review != table.NeedReview {
+		return presses, refuse(screen, fmt.Sprintf("%d hook(s) need review, %d of them under %s (the event matev2 installs for); matev2 trusts only its own hooks and trusted nothing",
+			table.NeedReview, max(row.Review, 0), selected.Event))
+	}
+	if err := press("enter"); err != nil {
+		return presses, err
+	}
+
+	// 3. The event's hooks: read every one that needs review.
+	var event harness.CodexHookEvent
+	parseEvent := func(s string) bool {
+		var ok bool
+		event, ok = harness.ParseCodexHookEvent(s)
+		return ok
+	}
+	if screen, err = readUntil("the "+selected.Event+" hook list", parseEvent); err != nil {
+		return presses, err
+	}
+	// moveTo selects the item at index i, one key and one read at a time.
+	moveTo := func(i int) error {
+		for steps := 0; event.Selected() != i; steps++ {
+			if steps > len(event.Hooks) {
+				return refuse(screen, "the selection did not reach the hook matev2 has to read")
+			}
+			key := "down"
+			if event.Selected() > i {
+				key = "up"
+			}
+			if err := press(key); err != nil {
+				return err
+			}
+			if screen, err = readUntil("the "+selected.Event+" hook list", parseEvent); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	isOwn := func(h harness.CodexReviewHook) bool {
+		for _, o := range own {
+			if o.Matches(h) {
+				return true
+			}
+		}
+		return false
+	}
+	var toTrust []int
+	for i, item := range event.Hooks {
+		if !item.NeedsReview {
+			continue
+		}
+		if err := moveTo(i); err != nil {
+			return presses, err
+		}
+		if !isOwn(event.Detail) {
+			return presses, refuse(screen, fmt.Sprintf("hook %d needs review and is not matev2's own (Source: %s; Command: %s); matev2 trusted nothing. Review it once in %s yourself (/hooks), then start again",
+				item.Index, event.Detail.Source, event.Detail.Command, kind))
+		}
+		toTrust = append(toTrust, i)
+	}
+	if len(toTrust) == 0 || len(toTrust) != event.NeedReview {
+		return presses, refuse(screen, fmt.Sprintf("the %s list says %d hook(s) need review but matev2 found %d marked; trusted nothing", selected.Event, event.NeedReview, len(toTrust)))
+	}
+
+	// 4. Trust them, one `t` each, each confirmed on screen.
+	for _, i := range toTrust {
+		if err := moveTo(i); err != nil {
+			return presses, err
+		}
+		if err := press("t"); err != nil {
+			return presses, err
+		}
+		if screen, err = readUntil("the trusted hook", func(s string) bool {
+			return parseEvent(s) && !event.Hooks[i].NeedsReview && event.Detail.Trusted()
+		}); err != nil {
+			return presses, err
+		}
+	}
+	if event.NeedReview != 0 {
+		return presses, refuse(screen, "hooks still need review after matev2 trusted its own")
+	}
+
+	// 5. Back out: esc to the table, which must need no review now, and
+	// esc again to the composer, which the settle's own loop confirms.
+	if err := press("esc"); err != nil {
+		return presses, err
+	}
+	if screen, err = readUntil("the hook table with nothing to review", func(s string) bool {
+		t, ok := harness.ParseCodexHooksTable(s)
+		return ok && !t.Reviewing
+	}); err != nil {
+		return presses, err
+	}
+	if err := press("esc"); err != nil {
 		return presses, err
 	}
 	return presses, nil
