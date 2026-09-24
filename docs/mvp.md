@@ -618,4 +618,20 @@ Template cố định thêm: khối vai trò worker ở đầu, luật dừng �
 
 Đợt 2 (sau M7): thăng scout thành ship tại chỗ (`crew promote`), relaunch giữ worktree (`crew relaunch`), chăm `memory.md` có ngày và nguồn, `--effort` khi spawn.
 
-Sau M7: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.
+### M8. Trí nhớ của Mate theo firstmate
+
+Chốt 2026-09-24 theo `docs/research/firstmate-memory-2026-09-24.md` (firstmate upstream `9284978f`).
+Hiện trạng đo được: sau ba ngày và sáu task, `memory.md` 9 byte, `PROJECT.md` trống; Mate đọc 10 lần, ghi 0 lần; một bài học mất trong cùng session, một sự thật repo tự mâu thuẫn, câu hỏi gửi captain chỉ nằm trong hội thoại; auto-memory của Claude Code bật cho mọi thư mục Mate.
+
+Nguyên tắc: hội thoại là bộ đệm, khởi động mới không được mất gì đã ghi và mọi việc dở phải có bản ghi; mỗi loại tri thức một chủ; script lo hình dạng, ngân sách, thứ tự đọc, Mate lo chọn đích, gộp, viết lại; file phẳng là nguồn, `matev2.db` chỉ gợi ý, trí nhớ harness tắt.
+
+File và chủ (mục 12.2 của báo cáo): `WORKSPACE.md` và hai `CREW.md` của captain, Mate chỉ đề xuất; `PROJECT.md` của Mate và captain, sự thật repo có nguồn và mốc `main@<sha>`; `mate/memory.md` của Mate với `## Captain` (không hết hạn) và `## Lessons` (marker `<!--a:YYYY-MM-DD-->` 30 ngày, `<!--p:YYYY-MM-DD-->` 7 ngày), một dòng một mục, có nguồn tương đối workspace; `mate/memory-archive.md` không đọc lúc khởi động; `mate/backlog.md` thêm `## Held for the captain`, giữ 10 Done; `mate.meta` ghi cả `session_id` của Codex; auto-memory của harness tắt.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 35 ∥ | Đo năm câu hỏi mở của mục 12.9 trên harness đang cài (khoá tắt auto-memory Claude; `SessionStart` với `source=compact` trong pane Herdr và stdout có vào context không; Codex 0.154 TUI có bắn `SessionStart` không; `codex resume <id>` trong pane Herdr và dialog của nó; Claude `--resume` có nạp lại manual vừa sinh không), ghi kết quả vào mục 7. Làm luôn: tắt auto-memory cho Mate Claude (B6); resume cho Mate Codex (B11) nếu đo được là chạy. | Live cho từng điều đo; live `TestLiveSpawnMateResumeRemembers` cho Codex nếu B11 làm được; Mate Claude được bảo "remember X" ghi vào `mate/memory.md` và thư mục memory của Claude vẫn rỗng. |
+| 36 ∥ | `matev2 remember <project> --captain\|--lesson [--perishable "<expiry>"] --source <src> "<một dòng>"`, `matev2 memory check <project>` (hình dạng, nguồn, marker, mục cũ, đường dẫn tuyệt đối, ngân sách 4.000 token ước lượng cho `memory.md` + `PROJECT.md` + `WORKSPACE.md`); `project facts` in `head: <sha>`; skill `stow` (quét, định tuyến, inspect-then-update, lưu việc dở, curate, receipt); manual mục 2, 4, 13, 14 theo A1–A6, B3, B8, B12; nhắc ghi trong output của `crew stop` và `send` sau spawn (B9). | Unit cho mọi luật `memory check`; golden manual và skill; test ngân sách. |
+| 37 | Sau 35 và 36: `matev2 recall <project>` theo thứ tự mục 12.5 (trạng thái sống, facts, `PROJECT.md` kèm cảnh báo mốc cũ, backlog không Done kèm id lệch, memory, workspace, ngân sách, gợi ý timeline tuỳ chọn), `ABSENT` khác rỗng; manual mục 3 rút thành "run `matev2 recall`"; hook `SessionStart` cho Mate Claude (`startup`/`clear`/`compact` in toàn bộ, `resume` chỉ trạng thái sống) theo kết quả đo của 35; restart Mate từ console gửi `⟦matev2⟧ stow:` qua outbox, chờ turn kết thúc có trần thời gian, rồi mới restart (B7). | Unit `recall` trên fixture; live hook với `/compact`; live restart có stow. |
+| 38 | Acceptance trí nhớ: Mate nhận một lời sửa của captain cho crew thứ nhất, restart từ console, rồi với crew thứ hai tự đưa bài học vào brief (hoặc đề xuất cho `CREW.md`) mà không cần captain nhắc; một câu hỏi gửi captain trước restart vẫn còn trong `Held for the captain` sau restart; đo bằng timeline số lời sửa lặp lại giữa các crew trước và sau. Chạy cho Mate Claude và Mate Codex. | Evidence `docs/evidence/m8-memory-<ngày>.md`, hai lần pass liên tiếp mỗi harness. |
+
+Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.
