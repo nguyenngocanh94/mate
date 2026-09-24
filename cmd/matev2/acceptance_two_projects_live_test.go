@@ -79,7 +79,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	// TMPDIR must not go through a symlink (docs/mvp.md section 7).
-	root := t.TempDir()
+	root := liveWorkspaceRoot(t)
 	w, err := store.Init(root)
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)

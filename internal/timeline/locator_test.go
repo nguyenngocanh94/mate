@@ -96,6 +96,67 @@ func TestCrewCodexFallsBackToAdoptingARolloutByCwdAndLaunchTime(t *testing.T) {
 	}
 }
 
+// `started_at` is written once the crew is ready and has its brief, and Codex
+// opens its rollout before that: measured 2026-09-24 (task 34), a rollout's
+// first record 0.2s before the crew's `started_at`, so a rebuild after the
+// crew was gone found no transcript for it. The anchor is `launched_at`,
+// taken before `agent start`; an older record without it gets
+// `started_at` less a bounded slack. A rollout opened before the launch is
+// still refused.
+func TestCrewCodexAdoptionAnchorsOnTheLaunchNotTheReadyTime(t *testing.T) {
+	// The fixture rollout's first record is 2026-09-19T10:44:11.839Z.
+	for _, tc := range []struct {
+		name       string
+		launchedAt string
+		adopted    bool
+	}{
+		{name: "record from before launched_at existed", launchedAt: "", adopted: true},
+		{name: "launched before the rollout opened", launchedAt: "2026-09-19T10:44:08Z", adopted: true},
+		{name: "rollout older than the launch", launchedAt: "2026-09-19T10:44:12Z", adopted: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			worktree := filepath.Join(f.root, ".worktrees", "shop-buybtn")
+			if err := os.MkdirAll(worktree, 0o755); err != nil {
+				t.Fatalf("mkdir worktree: %v", err)
+			}
+			sessions := filepath.Join(f.root, "codex-sessions")
+			if err := os.MkdirAll(sessions, 0o755); err != nil {
+				t.Fatalf("mkdir sessions: %v", err)
+			}
+			rewriteCodexCwd(t, abs(t, codexFixture), filepath.Join(sessions, "rollout-2026-09-19T17-44-09-adopted.jsonl"), worktree)
+			clearCrewTranscript(t, f)
+			meta, err := f.ws.ReadCrewMeta(fixtureProject, fixtureCrew)
+			if err != nil {
+				t.Fatalf("ReadCrewMeta: %v", err)
+			}
+			// Ready, and so `started_at`, just after the rollout opened.
+			meta[timeline.MetaStartedAt] = "2026-09-19T10:44:12Z"
+			delete(meta, timeline.MetaLaunchedAt)
+			if tc.launchedAt != "" {
+				meta[timeline.MetaLaunchedAt] = tc.launchedAt
+			}
+			if err := f.ws.WriteCrewMeta(fixtureProject, fixtureCrew, meta); err != nil {
+				t.Fatalf("WriteCrewMeta: %v", err)
+			}
+			f.ing = timeline.New(f.ws, f.db, timeline.Deps{
+				Now:               func() time.Time { return fixtureNow },
+				ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
+				CodexSessionsDir:  sessions,
+			})
+			f.ingest(t)
+
+			n := f.count(t, `SELECT COUNT(*) FROM turn WHERE actor_id = ?`, f.crewActor())
+			if tc.adopted && n != codexTurns {
+				t.Fatalf("%d turn(s) for the crew, want %d: the rollout was not adopted", n, codexTurns)
+			}
+			if !tc.adopted && n != 0 {
+				t.Fatalf("%d turn(s) for the crew: a rollout older than the launch was adopted", n)
+			}
+		})
+	}
+}
+
 // A Claude agent has no `agent_session` at all (measured 2026-09-20, Herdr
 // 0.8.2), so it is found from its own `session_id` and Claude's naming rule:
 // `<projects root>/<slug of cwd>/<session-id>.jsonl`.

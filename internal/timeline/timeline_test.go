@@ -712,6 +712,7 @@ func TestMetaKeysMatchSpawn(t *testing.T) {
 		{timeline.MetaSessionID, spawn.MetaSessionID},
 		{timeline.MetaTranscript, spawn.MetaTranscript},
 		{timeline.MetaStartedAt, spawn.MetaStartedAt},
+		{timeline.MetaLaunchedAt, spawn.MetaLaunchedAt},
 		{timeline.MetaStoppedAt, spawn.MetaStoppedAt},
 		{timeline.MetaResumedFrom, spawn.MetaResumedFrom},
 		{timeline.MetaTask, spawn.MetaTask},

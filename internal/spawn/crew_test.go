@@ -145,6 +145,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",
 		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
+		spawn.MetaLaunchedAt: "2026-09-17T10:00:00Z",
 		// The crew exists and has written nothing yet (mvp.md section 4b).
 		spawn.MetaState: spawn.CrewStateSpawned,
 	}
@@ -761,6 +762,48 @@ func TestStopCrewRefusesWhenOnlyTheWorktreeIsDirty(t *testing.T) {
 	}
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatal("--discard must remove the dirty worktree")
+	}
+}
+
+// TestStopCrewOnAClosedCrewChangesNothing: `finished` and `failed` are final
+// (mvp.md section 4b). A second stop - the Mate's `crew stop` after its own
+// `matev2 merge`, or a cleanup sweeping every crew with --discard - must not
+// rewrite a merged crew as `failed`. Found 2026-09-24 (task 34): every live
+// acceptance run's merged crew ended its record `state=failed`.
+func TestStopCrewOnAClosedCrewChangesNothing(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
+	}); err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false); err != nil {
+		t.Fatalf("first StopCrew: %v", err)
+	}
+	closed, err := os.ReadFile(w.CrewMeta("shop", "k3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, discard := range []bool{true, false} {
+		again, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", discard)
+		if err != nil {
+			t.Fatalf("StopCrew(discard=%v) on a finished crew: %v", discard, err)
+		}
+		if !again.AlreadyClosed || again.State != spawn.CrewStateFinished || again.Teardown != spawn.TeardownClean {
+			t.Fatalf("StopCrew(discard=%v) = %+v, want the recorded finished/clean outcome, already closed", discard, again)
+		}
+		if again.WorktreeRemoved || again.BranchRemoved {
+			t.Fatalf("StopCrew(discard=%v) = %+v; a closed crew has nothing left to remove", discard, again)
+		}
+		after, err := os.ReadFile(w.CrewMeta("shop", "k3"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(after) != string(closed) {
+			t.Fatalf("StopCrew(discard=%v) rewrote a closed crew's meta:\n%s\nwant\n%s", discard, after, closed)
+		}
 	}
 }
 

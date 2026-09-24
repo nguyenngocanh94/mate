@@ -92,7 +92,7 @@ func (p *pass) locateMate() (Located, string) {
 			loc.Path, loc.Source = path, LocatorHerdrSession
 			return loc, ""
 		}
-		return p.adoptCodex(loc, p.ing.ws.MateDir(p.project), metaTime(meta, MetaStartedAt))
+		return p.adoptCodex(loc, p.ing.ws.MateDir(p.project), launchTime(meta))
 	default:
 		return loc, unresolvedNoHarness
 	}
@@ -154,7 +154,7 @@ func (p *pass) locateCrew(ctx context.Context, crew crewRecord) (Located, string
 			loc.Path, loc.Source = path, LocatorHerdrSession
 			return loc, ""
 		}
-		return p.adoptCodex(loc, cwd, metaTime(crew.Meta, MetaStartedAt))
+		return p.adoptCodex(loc, cwd, launchTime(crew.Meta))
 	default:
 		return loc, unresolvedNoHarness
 	}

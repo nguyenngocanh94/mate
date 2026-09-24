@@ -179,6 +179,14 @@ func TestCrewStopReportLineDescribesEachOutcome(t *testing.T) {
 			},
 			want: []string{"already gone", "kept"},
 		},
+		{
+			name: "already closed",
+			res: spawn.StopResult{
+				AlreadyClosed: true, AlreadyGone: true, TabClosed: true,
+				Teardown: spawn.TeardownClean, State: spawn.CrewStateFinished,
+			},
+			want: []string{"already closed", "state finished", "nothing changed"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

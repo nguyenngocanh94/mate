@@ -57,6 +57,10 @@ type StopResult struct {
 	// successful (idempotent) teardown.
 	WorktreeRemoved bool
 	BranchRemoved   bool
+	// AlreadyClosed is true when the crew's meta already recorded a final
+	// state: the stop changed nothing, and Teardown and State are the ones
+	// recorded by the stop (or merge) that closed it.
+	AlreadyClosed bool
 }
 
 // StopMate stops the Mate of one project and proves it is gone.

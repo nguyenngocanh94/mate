@@ -247,6 +247,38 @@ func TestCheckFileOnRenderedBrief(t *testing.T) {
 	}
 }
 
+// TestSectionReaders reads the report's buyesp32 rewrite the way a reviewer
+// does: the captain's sentence byte for byte, and each open decision as one
+// entry with its decider, whether the brief is the Mate's file or rendered.
+func TestSectionReaders(t *testing.T) {
+	task := readTestdata(t, "buyesp32-rewrite-task.md")
+	for name, text := range map[string]string{"mate file": task, "rendered": RoleHeading + "\nYou are a Crew.\n\n" + task + "\n# Setup\nRun pwd -P.\n"} {
+		words, ok := SectionText(text, CaptainsWords)
+		if !ok {
+			t.Fatalf("%s: no %s", name, CaptainsWords)
+		}
+		if first, _, _ := strings.Cut(words, "\n"); first != `Thêm nút "Mua ngay" lên landing page ESP32, bấm vào thì mở trang thanh toán.` {
+			t.Fatalf("%s: first line of %s = %q", name, CaptainsWords, first)
+		}
+		decisions, ok := SectionItems(text, OpenDecisions)
+		if !ok || len(decisions) != 3 {
+			t.Fatalf("%s: %s = %q, %v; want the three decisions", name, OpenDecisions, decisions, ok)
+		}
+		for _, d := range decisions {
+			if !strings.HasSuffix(d, "decides: captain") || strings.HasPrefix(d, "1.") {
+				t.Fatalf("%s: decision %q should keep its decider and lose its list marker", name, d)
+			}
+		}
+		if !strings.HasPrefix(decisions[0], "There is no ESP32 landing page") {
+			t.Fatalf("%s: first decision = %q", name, decisions[0])
+		}
+		// Setup is the template's, not a task section, and Deliverable is absent.
+		if _, ok := SectionText(text, Deliverable); ok {
+			t.Fatalf("%s: a ship brief has no %s", name, Deliverable)
+		}
+	}
+}
+
 func TestTaskBody(t *testing.T) {
 	for in, want := range map[string]string{
 		"# Task\n\n## Build\nx\n\n": "## Build\nx",

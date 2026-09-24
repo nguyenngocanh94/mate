@@ -50,6 +50,38 @@ func consoleLiveLab(t *testing.T) (session, configHome string) {
 	return session, filepath.Join(home, ".config")
 }
 
+// liveWorkspaceRoot is the directory a live proof builds its workspace in.
+// By default it is t.TempDir(), removed with the test. With
+// MATEV2_LIVE_KEEP=<dir> it is a fresh directory under <dir> that outlives
+// the test, so the run's own files - status files, sent.log, briefs,
+// hand-backs, the repositories - stay where the transcripts recorded them
+// and `matev2 reindex` can rebuild the timeline from them afterwards
+// (docs/mvp.md task 34 measures prompting that way). The directory must not
+// go through a symlink, for the same reason TMPDIR must not.
+func liveWorkspaceRoot(t *testing.T) string {
+	t.Helper()
+	keep := strings.TrimSpace(os.Getenv("MATEV2_LIVE_KEEP"))
+	if keep == "" {
+		return t.TempDir()
+	}
+	if err := os.MkdirAll(keep, 0o755); err != nil {
+		t.Fatalf("MATEV2_LIVE_KEEP: %v", err)
+	}
+	resolved, err := filepath.EvalSymlinks(keep)
+	if err != nil {
+		t.Fatalf("MATEV2_LIVE_KEEP: %v", err)
+	}
+	if abs, _ := filepath.Abs(keep); abs != resolved {
+		t.Fatalf("MATEV2_LIVE_KEEP=%s goes through a symlink (resolves to %s); Herdr reports resolved cwds", keep, resolved)
+	}
+	root, err := os.MkdirTemp(resolved, t.Name()+"-")
+	if err != nil {
+		t.Fatalf("MATEV2_LIVE_KEEP: %v", err)
+	}
+	t.Logf("workspace kept at %s (MATEV2_LIVE_KEEP)", root)
+	return root
+}
+
 // TestLiveConsoleStreamMate is the mvp.md task 09 proof: the Console's own
 // ActionFunc starts a real Claude Mate, the Console's own
 // SessionStreamFactory opens that Mate's terminal at the size the session
