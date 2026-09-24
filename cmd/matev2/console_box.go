@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nguyenngocanh94/matev2/internal/observability"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/send"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 	"github.com/nguyenngocanh94/matev2/internal/store"
@@ -46,36 +47,84 @@ const peekLines = 40
 // app-generated line from something its human typed, and what the Mate's
 // UserPromptSubmit hook checks before clearing `.auto`.
 //
-// A refused send is returned as it came back. internal/send already names
-// which composer state it observed and quotes the screen it read that from,
-// and the console prints that verbatim on its outcome line: a reader
-// deciding whether to retry or to go look at the pane needs the observation,
-// not a reworded summary of it.
+// Since task 30 the line is queued rather than refused. The Mate's composer
+// is busy most of the time (mvp.md section 7: `[assign]` met `agent is
+// mid-turn` four or five times in a row in task 24), so the action appends
+// the line to the Mate's outbox, makes one immediate attempt so an idle Mate
+// gets it with no delay, and returns either way; the console's sender loop
+// (consoleDelivery) retries every two seconds until the composer is empty.
+// sent.log is still written only once the composer cleared - by the outbox,
+// in the same words as before - so the box never shows the Mate a message no
+// agent received. The same inbox entry assigned twice is queued once
+// (req.Key, query.BoxEntry.AssignKey), and the answer says when it was.
 func boxResolveAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
 	resolve := strings.TrimSpace(req.Input)
 	if resolve == "" {
 		return "", observability.NewError(observability.CodeUsage, "no resolve line was built for this entry")
 	}
-	handle, kind, err := spawn.MateHandle(ctx, ws, deps, req.Target)
+	if err := store.ValidateProjectName(req.Target); err != nil {
+		return "", err
+	}
+	if _, ok := ws.Project(req.Target); !ok {
+		return "", fmt.Errorf("%w: %s", store.ErrNoProject, req.Target)
+	}
+	key := req.Key
+	if key == "" {
+		// A caller that did not name the entry (a script, an older test)
+		// still gets dedup, on the words themselves.
+		key = "line:" + resolve
+	}
+	sender := consoleOutbox(ws, deps)
+	queued, err := sender.Enqueue(req.Target, outbox.Request{
+		Source: store.OutboxSourceAssign, Key: key, Text: resolve,
+	})
 	if err != nil {
 		return "", err
 	}
-	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime}, handle, kind, resolve, send.Options{Marker: true})
-	if err != nil {
-		return "", err
+	item := queued.Item
+	if item.Queued() {
+		attempt, err := sender.Attempt(ctx, req.Target)
+		if err != nil {
+			return "", err
+		}
+		if attempt.Item.ID == item.ID {
+			item = attempt.Item
+			if attempt.Delivered && !queued.Duplicate {
+				return fmt.Sprintf("sent to %s; the Mate answers the crew with matev2 send", attempt.Agent), nil
+			}
+			if attempt.Refusal != nil && !queued.Duplicate {
+				return fmt.Sprintf("queued for the Mate (%s); it goes in when the composer is empty",
+					refusalReason(attempt.Refusal)), nil
+			}
+		} else if !queued.Duplicate {
+			return "queued for the Mate, behind a line it has not taken yet", nil
+		}
 	}
-	// sent.log is written only after the composer cleared. Recording a line
-	// the Mate never received would put a message in the box that no agent
-	// ever saw, which is the one thing the box must never contain.
-	if err := ws.AppendSent(req.Target, store.SentEntry{
-		Source: store.SourceApp,
-		Target: store.TargetMate,
-		Text:   resolve,
-	}); err != nil {
-		return "", err
+	switch item.State {
+	case store.OutboxSent:
+		return fmt.Sprintf("already assigned %s, sent %s; not queued again",
+			item.At.UTC().Format("15:04"), item.SentAt.UTC().Format("15:04")), nil
+	default:
+		return fmt.Sprintf("already assigned %s, still queued; not queued again",
+			item.At.UTC().Format("15:04")), nil
 	}
-	return fmt.Sprintf("%s asked to decide in %d enter(s); the Mate answers the crew with matev2 send",
-		report.Agent, report.Presses), nil
+}
+
+// refusalReason is a refusal in the few words an outcome line has room for.
+// The full observation is in the outbox item's last_refusal, and the inbox
+// row keeps saying the line is queued until it is not.
+func refusalReason(err error) string {
+	switch {
+	case errors.Is(err, send.ErrAgentBusy):
+		return "the Mate is mid-turn"
+	case errors.Is(err, send.ErrComposerPending):
+		return "its composer holds unsubmitted text"
+	case errors.Is(err, send.ErrComposerUnknown):
+		return "its pane shows no composer"
+	case errors.Is(err, send.ErrEnterSwallowed):
+		return "enter did not submit it"
+	}
+	return err.Error()
 }
 
 // boxReplyAction is `r`: one line into the crew's own composer.

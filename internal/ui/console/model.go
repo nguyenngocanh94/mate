@@ -118,6 +118,10 @@ type ActionRequest struct {
 	// of its crews, and folding the two into one string would make the
 	// bridge guess which it had been given.
 	Crew string
+	// Key is the outbox dedup key of the box entry an ActionResolve hands
+	// to the Mate (query.BoxEntry.AssignKey, mvp.md task 30), so a second
+	// press on the same question is recognised rather than queued again.
+	Key string
 	// Harness is the agent chosen for this request: on an onboard it is the
 	// harness the new Mate is created with. Empty everywhere else - an
 	// existing Mate keeps its recorded harness.

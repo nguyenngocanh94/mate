@@ -455,3 +455,127 @@ func TestStartTicksAndStopEndsIt(t *testing.T) {
 		t.Fatal("the running daemon sent nothing")
 	}
 }
+
+// Task 30: the daemon types nothing itself. A digest the Mate cannot take
+// yet is queued in `mate/.outbox`, and the cursor stays where it was until
+// the outbox reports that digest sent - the invariant task 19 put on the
+// cursor ("only a verified send advances it"), now kept across two
+// components rather than inside one tick.
+func TestTheDigestGoesThroughTheOutboxAndTheCursorWaitsForSent(t *testing.T) {
+	f := newFixture(t)
+	f.auto(true)
+	f.status("k3", "needs-decision: pick A or B")
+	f.rt.SetReadOutput(f.handle, claudeBusyScreen())
+
+	f.mustTick()
+
+	items := f.outboxItems()
+	if len(items) != 1 {
+		t.Fatalf("outbox = %+v, want the one digest queued", items)
+	}
+	queued := items[0]
+	if queued.Source != store.OutboxSourceDigest || queued.State != store.OutboxQueued ||
+		!strings.HasPrefix(queued.Text, "digest: 1 item(s) — k3 needs-decision") {
+		t.Fatalf("outbox item = %+v, want a queued digest carrying k3's question", queued)
+	}
+	if queued.Attempts != 1 || !strings.Contains(queued.LastRefusal, "mid-turn") {
+		t.Fatalf("outbox item = %+v, want the tick's one immediate attempt refused as mid-turn", queued)
+	}
+	if cursor := f.cursor(); len(cursor) != 0 {
+		t.Fatalf("cursor = %v after a digest was only queued, want it untouched", cursor)
+	}
+
+	// A second tick with nothing new does not queue a second digest.
+	f.clock.Advance(autopilot.DefaultInterval)
+	f.mustTick()
+	if items := f.outboxItems(); len(items) != 1 {
+		t.Fatalf("outbox = %+v, want still the one digest", items)
+	}
+
+	// The Mate's turn ends; the console's sender loop delivers it.
+	f.rt.SetReadOutput(f.handle, claudeScreen(""))
+	f.drain()
+
+	line := f.requireOneDigest()
+	if line != send.Marker+queued.Text {
+		t.Fatalf("typed %q, want the queued digest %q", line, queued.Text)
+	}
+	items = f.outboxItems()
+	if len(items) != 1 || items[0].State != store.OutboxSent || !items[0].SentAt.Equal(f.clock.Now()) {
+		t.Fatalf("outbox = %+v, want the digest marked sent now", items)
+	}
+	cursor := f.cursor()
+	if got, ok := cursor[f.ws.CrewStatus(project, "k3")]; !ok || got != 0 || len(cursor) != 1 {
+		t.Fatalf("cursor = %v, want k3's status file advanced to the question's offset 0", cursor)
+	}
+
+	// And the next tick has nothing new: the item was digested exactly once.
+	f.clock.Advance(autopilot.DefaultInterval)
+	f.mustTick()
+	f.drain()
+	if typed := f.typed(); len(typed) != 1 {
+		t.Fatalf("typed %#v, want the one digest only", typed)
+	}
+	if status := f.daemonStatus(); status.Sends != 1 || status.Notice != "" {
+		t.Fatalf("daemon status = %+v, want one delivered digest and no notice", status)
+	}
+}
+
+// A digest waiting in the outbox while the inbox changes is refreshed in
+// place rather than joined by a second one: the Mate gets one line with the
+// current picture, and the wedged clock (the item's `at`) keeps running.
+func TestAQueuedDigestIsRefreshedNotDuplicated(t *testing.T) {
+	f := newFixture(t)
+	f.auto(true)
+	f.status("k3", "needs-decision: pick A or B")
+	f.rt.SetReadOutput(f.handle, claudeBusyScreen())
+	f.mustTick()
+	first := f.outboxItems()[0]
+
+	f.status("k9", "needs-decision: rebase or merge")
+	f.clock.Advance(autopilot.DefaultInterval)
+	f.mustTick()
+
+	items := f.outboxItems()
+	if len(items) != 1 {
+		t.Fatalf("outbox = %+v, want one digest refreshed in place", items)
+	}
+	if items[0].ID != first.ID || !items[0].At.Equal(first.At) {
+		t.Fatalf("refreshed digest = %+v, want the first one's id and queue time kept", items[0])
+	}
+	if !strings.Contains(items[0].Text, "2 item(s)") || !strings.Contains(items[0].Text, "k9") {
+		t.Fatalf("refreshed digest = %q, want both questions", items[0].Text)
+	}
+
+	f.rt.SetReadOutput(f.handle, claudeScreen(""))
+	f.drain()
+	if line := f.requireOneDigest(); !strings.Contains(line, "k3") || !strings.Contains(line, "k9") {
+		t.Fatalf("digest = %q, want both questions in the one line", line)
+	}
+}
+
+// A digest queued while auto mode was on is withdrawn, not typed, once the
+// captain takes the composer back - even by the sender loop, long after the
+// tick that queued it.
+func TestAQueuedDigestIsWithdrawnWhenAutoGoesOff(t *testing.T) {
+	f := newFixture(t)
+	f.auto(true)
+	f.status("k3", "needs-decision: pick A or B")
+	f.rt.SetReadOutput(f.handle, claudeBusyScreen())
+	f.mustTick()
+
+	f.auto(false)
+	f.rt.SetReadOutput(f.handle, claudeScreen(""))
+	f.drain()
+
+	if typed := f.typed(); len(typed) != 0 {
+		t.Fatalf("typed %#v after auto mode went off", typed)
+	}
+	items := f.outboxItems()
+	if len(items) != 1 || items[0].State != store.OutboxDropped {
+		t.Fatalf("outbox = %+v, want the digest dropped", items)
+	}
+	if cursor := f.cursor(); len(cursor) != 0 {
+		t.Fatalf("cursor = %v, want the question still owed", cursor)
+	}
+}

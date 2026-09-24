@@ -20,6 +20,8 @@ const (
 	mateMetaName      = "mate.meta"
 	autoFlagName      = ".auto"
 	autoCursorName    = ".auto-cursor"
+	outboxName        = ".outbox"
+	outboxLockName    = ".outbox.lock"
 	memoryFileName    = "memory.md"
 	backlogFileName   = "backlog.md"
 	crewsDirName      = "crews"
