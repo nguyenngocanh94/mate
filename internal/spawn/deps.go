@@ -24,7 +24,14 @@ const (
 	MetaSession   = "session"
 	MetaSessionID = "session_id"
 	MetaStartedAt = "started_at"
-	MetaStoppedAt = "stopped_at"
+	// MetaLaunchedAt is when the harness process was started, taken just
+	// before `agent start`. started_at is written only once the agent is
+	// ready and has its first prompt, which for Codex is after the rollout
+	// already exists, so it cannot anchor the rollout adoption rule
+	// (harness.AdoptCodexRollout rejects a rollout older than its anchor;
+	// measured 2026-09-24, task 34: a rollout opened 0.2s before started_at).
+	MetaLaunchedAt = "launched_at"
+	MetaStoppedAt  = "stopped_at"
 	// MetaTranscript is the Claude transcript path the Stop hook reports
 	// (docs/mvp.md decision 9: ".meta ghi transcript= và session_id= từ
 	// ngày đầu"). Task 08's mate-stop hook writes it; StartMate does not.

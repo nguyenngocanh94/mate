@@ -25,6 +25,7 @@ const (
 	MetaSessionID    = "session_id"
 	MetaTranscript   = "transcript"
 	MetaStartedAt    = "started_at"
+	MetaLaunchedAt   = "launched_at"
 	MetaStoppedAt    = "stopped_at"
 	MetaResumedFrom  = "resumed_from"
 	MetaTask         = "task"
@@ -65,6 +66,28 @@ func metaTime(meta map[string]string, key string) time.Time {
 		return time.Time{}
 	}
 	return t
+}
+
+// legacyLaunchSlack is how far before `started_at` a Codex rollout may have
+// been opened, for a record written before `launched_at` existed.
+// `started_at` is taken once the agent is ready and has its brief, which is
+// bounded by spawn's own startup, trust-dialog and readiness timeouts; five
+// minutes covers them. Widening the window cannot adopt another agent's
+// rollout: adoption also needs the exact cwd, a crew's worktree path is its
+// own (ids are never reused), and a second match is refused as ambiguous.
+const legacyLaunchSlack = 5 * time.Minute
+
+// launchTime is the anchor harness.AdoptCodexRollout needs: the moment the
+// harness was launched, which is `launched_at`, or for an older record
+// `started_at` less legacyLaunchSlack.
+func launchTime(meta map[string]string) time.Time {
+	if t := metaTime(meta, MetaLaunchedAt); !t.IsZero() {
+		return t
+	}
+	if t := metaTime(meta, MetaStartedAt); !t.IsZero() {
+		return t.Add(-legacyLaunchSlack)
+	}
+	return time.Time{}
 }
 
 // ingestMeta reads the `.meta` files: who exists, what each crew was hired

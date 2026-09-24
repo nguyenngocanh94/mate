@@ -272,7 +272,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 // the branch, the worktree and the harness session identity.
 func clearCrewRunMeta(meta map[string]string) map[string]string {
 	next := map[string]string{}
-	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, MetaStartedAt} {
+	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, MetaStartedAt, MetaLaunchedAt} {
 		if v, ok := meta[key]; ok {
 			next[key] = v
 		}

@@ -32,6 +32,9 @@ An agent's transcript is found by the first rule that answers, and the rule that
    Measured 2026-09-20 on Herdr 0.8.2: `agent_session` is present and correct for every Codex agent and **null for every Claude agent**, so this is a Codex rule and only a Codex rule.
 4. `codex.adopt` - `harness.AdoptCodexRollout` over the rollout directory, matching on the canonical cwd and a `session_meta` timestamp at or after the recorded launch.
    This is the fallback for a crew whose agent Herdr no longer has, and it is deliberately conservative: two crews launched in the same worktree are genuinely ambiguous, and an ambiguous match is no match.
+   The recorded launch is `launched_at=`, which `crew spawn` and `mate start` take just before `agent start`.
+   It is not `started_at=`: that is written once the agent is ready and has its first prompt, and Codex has opened its rollout by then (measured 2026-09-24, task 34: a rollout's first record 0.2s before `started_at`, so every rebuild after the crew was gone lost its transcript, and whether a crew was affected was a sub-second race).
+   A record written before `launched_at` existed uses `started_at` less five minutes, which spawn's own timeouts bound; the exact cwd still has to match, and a crew's worktree path is its own.
 
 A crew's binding never moves - a crew is spawned once and is never resumed (docs/mvp.md section 4b) - so once one of those rules has answered, a later pass reuses the path the `session` row already carries (`session.recorded`) instead of asking the runtime again.
 Without that, every Codex crew would cost two more `herdr` calls every five seconds on top of the observer's three.

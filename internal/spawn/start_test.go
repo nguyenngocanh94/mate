@@ -61,14 +61,15 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 
 	meta := readMeta(t, w, "shop")
 	want := map[string]string{
-		spawn.MetaHarness:   "claude",
-		spawn.MetaAgent:     "mate-shop",
-		spawn.MetaPane:      res.Pane,
-		spawn.MetaTab:       res.Tab,
-		spawn.MetaWorkspace: res.Workspace,
-		spawn.MetaSession:   w.Session(),
-		spawn.MetaSessionID: "11111111-2222-3333-4444-555555555555",
-		spawn.MetaStartedAt: "2026-09-17T10:00:00Z",
+		spawn.MetaHarness:    "claude",
+		spawn.MetaAgent:      "mate-shop",
+		spawn.MetaPane:       res.Pane,
+		spawn.MetaTab:        res.Tab,
+		spawn.MetaWorkspace:  res.Workspace,
+		spawn.MetaSession:    w.Session(),
+		spawn.MetaSessionID:  "11111111-2222-3333-4444-555555555555",
+		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
+		spawn.MetaLaunchedAt: "2026-09-17T10:00:00Z",
 	}
 	for k, v := range want {
 		if meta[k] != v {

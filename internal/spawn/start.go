@@ -252,6 +252,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
+	launchedAt := deps.now()
 	handle, err := deps.Runtime.StartAgent(ctx, spec)
 	if err != nil {
 		return StartResult{}, err
@@ -278,6 +279,8 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 		MetaSession:   session.Name,
 		MetaSessionID: sessionID,
 		MetaStartedAt: startedAt.Format(time.RFC3339),
+		// See MetaLaunchedAt: a Codex Mate's rollout is adopted from it.
+		MetaLaunchedAt: launchedAt.Format(time.RFC3339),
 	}
 	var resumedFrom string
 	if resume {

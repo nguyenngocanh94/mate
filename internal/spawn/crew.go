@@ -400,6 +400,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	if err != nil {
 		return CrewResult{}, err
 	}
+	launchedAt := deps.now()
 	handle, err := deps.Runtime.StartAgent(ctx, spec)
 	if err != nil {
 		return CrewResult{}, err
@@ -444,6 +445,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		MetaSessionID:  sessionID,
 		MetaTranscript: "",
 		MetaStartedAt:  startedAt.Format(time.RFC3339),
+		MetaLaunchedAt: launchedAt.Format(time.RFC3339),
 		// The crew exists and has written nothing yet. It is not an
 		// override: the moment the crew appends its first `working:` line
 		// that verb is what the state resolves to (mvp.md section 4b).

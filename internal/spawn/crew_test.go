@@ -145,6 +145,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",
 		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
+		spawn.MetaLaunchedAt: "2026-09-17T10:00:00Z",
 		// The crew exists and has written nothing yet (mvp.md section 4b).
 		spawn.MetaState: spawn.CrewStateSpawned,
 	}
