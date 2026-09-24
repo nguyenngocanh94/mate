@@ -304,8 +304,14 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		return e.Source == store.SourceMate && e.Target == store.CrewTarget(ship)
 	})
 	t.Logf("shop Mate → crew:%s: %s", ship, answered.Text)
-	if !strings.Contains(strings.ToLower(answered.Text), "express") {
-		t.Fatalf("the Mate relayed %q to the Crew, which does not carry the captain's choice (express)", answered.Text)
+	// The relay is either the choice itself or, the M7 way, a pointer to
+	// the captain's words appended to the Crew's brief (`matev2 brief
+	// append`); either way the choice has to reach something the Crew reads.
+	briefPath := filepath.Join(w.CrewsDir("shop"), ship, "brief.md")
+	briefText, _ := os.ReadFile(briefPath)
+	if !strings.Contains(strings.ToLower(answered.Text), "express") && !strings.Contains(string(briefText), "checkout-express") {
+		t.Fatalf("the Mate relayed %q to the Crew, and neither it nor %s carries the captain's choice (express)",
+			answered.Text, briefPath)
 	}
 
 	// The Crew takes it as a new prompt and hands the branch back.
