@@ -1,0 +1,11 @@
+ate_on_startup=false -c project_doc_max_bytes=131072
+
+  Hooks need review
+  2 hooks are new or changed.
+  Hooks can run outside the sandbox after you trust them.
+
+› 1. Review hooks
+  2. Trust all and continue
+  3. Continue without trusting (hooks won't run)
+
+  Press enter to confirm or esc to go back

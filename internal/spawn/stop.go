@@ -3,6 +3,8 @@ package spawn
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/matev2/internal/harness"
@@ -116,18 +118,33 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 		Label:       MateTabLabel,
 	}
 	if !running {
-		// No server, no agent, no tab. The record is stale; clear it.
+		// No server, no agent, no tab. The record is stale; clear it,
+		// keeping a Codex session the rollouts can still name.
 		out.AlreadyGone, out.TabClosed = true, true
+		if meta[MetaHarness] == string(harness.KindCodex) {
+			if id := codexSessionAtStop(deps, w.MateDir(project), meta, ""); id != "" {
+				meta[MetaSessionID] = id
+				out.SessionID = id
+			}
+		}
 		return out, clearRunMeta(w, project, meta, deps.now())
 	}
 
 	kind, _ := harness.ParseKind(meta[MetaHarness])
 	handle := runtime.AgentHandle{Session: session, Name: out.Agent, RawID: project, Kind: kind, Tab: tab}
-	live, err := agentLive(ctx, deps, handle)
+	observed, live, err := inspectLive(ctx, deps, handle)
 	if err != nil {
 		return StopResult{}, err
 	}
 	out.AlreadyGone = !live
+	if kind == harness.KindCodex {
+		// Read before the agent is gone: Herdr forgets agent_session with
+		// the agent, and a Codex session id exists nowhere matev2 writes.
+		if id := codexSessionAtStop(deps, w.MateDir(project), meta, observed.SessionRef); id != "" {
+			meta[MetaSessionID] = id
+			out.SessionID = id
+		}
+	}
 	if live {
 		if err := stopLiveAgent(ctx, deps, handle); err != nil {
 			return StopResult{}, err
@@ -195,13 +212,62 @@ func confirmGone(ctx context.Context, deps Deps, handle runtime.AgentHandle) err
 
 // agentLive reports whether Herdr still knows the recorded name.
 func agentLive(ctx context.Context, deps Deps, handle runtime.AgentHandle) (bool, error) {
-	if _, err := deps.Runtime.InspectAgent(ctx, handle); err != nil {
+	_, live, err := inspectLive(ctx, deps, handle)
+	return live, err
+}
+
+// inspectLive is agentLive that keeps what Herdr said about the agent.
+func inspectLive(ctx context.Context, deps Deps, handle runtime.AgentHandle) (runtime.ObservedAgent, bool, error) {
+	observed, err := deps.Runtime.InspectAgent(ctx, handle)
+	if err != nil {
 		if runtime.IsAgentNotFound(err) {
-			return false, nil
+			return runtime.ObservedAgent{}, false, nil
 		}
-		return false, err
+		return runtime.ObservedAgent{}, false, err
 	}
-	return true, nil
+	return observed, true, nil
+}
+
+// codexSessionAtStop is the Codex session a stopping Mate was in, for the
+// next start to resume (task 35, B11). Codex has no launch-time session id:
+// it exists once the first prompt opens the rollout, and after a `/clear` it
+// is a new one, so it is read at the one moment that knows the answer.
+//
+// Herdr's agent_session.value is the first rule. It is exact, and on Herdr
+// 0.8.2 it is filled by the Herdr integration's SessionStart hook in the
+// operator's ~/.codex/hooks.json, which codex-cli 0.154.0 runs at the first
+// prompt of a session, not at launch (measured 2026-09-24). When Herdr has
+// none - the agent already gone, or no integration - the rollout is adopted
+// by the timeline's own rule (harness.AdoptCodexRollout: this cwd, a
+// session_meta at or after launched_at, and exactly one of them). Empty
+// means neither answered, and the caller keeps whatever session_id the meta
+// already had: a resumed session's rollout is older than its launch, so the
+// adoption rule rightly finds nothing new for it.
+func codexSessionAtStop(deps Deps, mateDir string, meta map[string]string, herdrRef string) string {
+	if ref := strings.TrimSpace(herdrRef); ref != "" {
+		return ref
+	}
+	launched, err := time.Parse(time.RFC3339, strings.TrimSpace(meta[MetaLaunchedAt]))
+	if err != nil {
+		return ""
+	}
+	dir, err := deps.codexSessionsDir()
+	if err != nil {
+		return ""
+	}
+	candidates, err := harness.CodexRolloutCandidatesSince(dir, launched)
+	if err != nil {
+		return ""
+	}
+	cwd := mateDir
+	if resolved, err := filepath.EvalSymlinks(mateDir); err == nil {
+		cwd = resolved
+	}
+	adopted := harness.AdoptCodexRollout(candidates, cwd, launched, "")
+	if adopted.Status != harness.CodexAdoptionKnown {
+		return ""
+	}
+	return adopted.Candidate.Meta.SessionID
 }
 
 // clearRunMeta drops everything that named a live pane and keeps what a

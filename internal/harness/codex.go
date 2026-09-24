@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/observability"
 )
@@ -72,13 +73,19 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	if spec.Kind != "" && spec.Kind != KindCodex {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("codex adapter got kind %q", spec.Kind))
 	}
+	resumeID := strings.TrimSpace(spec.ResumeSessionID)
 	if spec.ResumeSessionID != "" {
-		// codex-cli 0.154.0's `resume` subcommand is documented as "picker
-		// by default": mate has no proven, non-interactive way to drive it
-		// through Herdr the way Claude's --resume flag works, so a resume
-		// request for Codex is refused rather than silently guessed at.
-		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
-			"resume not supported for codex: `codex resume` opens an interactive session picker", ErrResumeUnsupported)
+		// `codex resume [OPTIONS] [SESSION_ID]` opens the picker only when
+		// no id is given (codex-cli 0.154.0 --help). With an id it resumes
+		// that session straight to the composer: measured 2026-09-24 in a
+		// Herdr 0.8.2 pane (docs/mvp.md section 7, task 35). The id is only
+		// ever one Herdr's agent_session or a rollout's session_meta
+		// recorded, so anything that is not a UUID is refused rather than
+		// passed on as an argument Codex might read as a flag or a name.
+		if _, err := uuid.Parse(resumeID); err != nil {
+			return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
+				fmt.Sprintf("codex resume id %q is not a session UUID", spec.ResumeSessionID), ErrContextRequired)
+		}
 	}
 	cwd := spec.Cwd
 	if cwd == "" || !filepath.IsAbs(cwd) {
@@ -118,9 +125,19 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	if err != nil {
 		return LaunchSpec{}, err
 	}
+	args := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride}
+	if resumeID != "" {
+		// The subcommand takes the same flags as a fresh launch (0.154.0
+		// `codex resume --help`), and the id goes last, after every flag.
+		// Measured 2026-09-24: without CodexDisableUpdateCheck a resume
+		// draws the same release-update prompt as a fresh launch; with it,
+		// a resume in an already-trusted directory goes straight to the
+		// composer with the old conversation replayed above it.
+		args = append(append([]string{"resume"}, args...), resumeID)
+	}
 	out := LaunchSpec{
 		kind:            string(KindCodex),
-		args:            []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride},
+		args:            args,
 		cwd:             cwd,
 		env:             env,
 		contextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
