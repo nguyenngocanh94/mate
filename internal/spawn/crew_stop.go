@@ -105,6 +105,21 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		SessionID: meta[MetaSessionID],
 	}
 
+	// 0. A closed task stays closed. `finished` and `failed` are final
+	// (mvp.md section 4b), so a second stop - after `matev2 merge` closed
+	// the crew, or a --discard sweep over every crew - reports the outcome
+	// already recorded and changes nothing; it never turns a merged crew
+	// into a failed one.
+	if state := meta[MetaState]; state == CrewStateFinished || state == CrewStateFailed {
+		out.AlreadyClosed, out.AlreadyGone, out.TabClosed = true, true, true
+		out.Branch = meta[MetaBranch]
+		if rel := meta[MetaWorktree]; rel != "" {
+			out.Worktree = filepath.Join(w.Root(), filepath.FromSlash(rel))
+		}
+		out.Teardown, out.State = meta[MetaTeardown], state
+		return out, nil
+	}
+
 	// 1. The teardown decision, from git facts, before anything is touched.
 	cfg, err := w.LoadProject(project)
 	if err != nil {

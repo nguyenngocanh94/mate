@@ -216,6 +216,9 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 // crewStopReport is the one line `matev2 crew stop` prints describing
 // exactly what happened, what was kept, and the state the crew ends in.
 func crewStopReport(project, crew string, res spawn.StopResult) string {
+	if res.AlreadyClosed {
+		return fmt.Sprintf("%s/%s: already closed, state %s; nothing changed", project, crew, res.State)
+	}
 	agent := res.Agent
 	if agent == "" {
 		agent = "(none recorded)"
