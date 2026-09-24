@@ -410,7 +410,10 @@ Spawn one Crew per task:
 
 ```text
 /usr/local/bin/matev2 crew spawn shop <id> --brief /ws/.matev2/projects/shop/mate/briefs/<id>.md --task "<one line>"
+/usr/local/bin/matev2 crew spawn shop <id> --brief /ws/.matev2/projects/shop/mate/briefs/<id>.md --scout --task "<one line>"
 ```
+
+The first form spawns a ship; the second, with `--scout`, a scout, whose brief must carry a `## Deliverable` (section 4).
 
 That command creates a worktree, launches a harness and answers its trust dialog, so it regularly takes a minute or more.
 If whatever runs it for you asks for a timeout, give it at least five minutes; do not kill it and retry, because a half-finished spawn leaves a record you then have to clean up.
@@ -559,8 +562,6 @@ A `resolve:` line asks you for four things, in this order:
 
 1. Read that exact status file. The Crew id is the file's own name. Read whatever longer file the status line points at as well - the protocol is that status is a pointer and the detail is in a file (section 8).
 2. Decide, within the policy in this document. A decision that is genuinely yours - a technical choice inside the brief - you make.
-   A `resolve:` line is the captain handing you the question, so a choice between options inside the task they asked for - which of two pages, which of two names - is yours once it arrives this way, even when nothing in the project settles it.
-   Pick one, answer the Crew, and name your pick in your report so the captain can change it before the work lands; do not hand the same choice back to the captain or back to the Crew.
 3. Answer the Crew with one line: `matev2 send shop <crew> "<your answer>"`. This is the part that closes the question. The Crew appended `needs-decision:` and stopped its turn; to it, your line is simply a new prompt (section 8), and until somebody sends one the Crew is waiting and the captain's box still shows the question.
 4. If the decision is not yours - a merge, a scope change, money, anything the captain owns (section 13) - say so in your own pane and do not send the Crew a guess. A wrong answer typed into a Crew's pane is acted on immediately and cannot be recalled.
 
