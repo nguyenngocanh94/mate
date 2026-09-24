@@ -523,4 +523,11 @@ Mọi số trên trang truy ngược được: mỗi turn và action có link `r
 
 Nợ M6 (đo 2026-09-21, task 29): `matev2 reindex` đặt lại `event.id` từ đầu, nên con trỏ `since` của một trang đang mở trỏ vào tương lai và trang đứng yên mà vẫn báo `live`; UI hiện tự nhận ra khi `last_event_id` nhỏ hơn con trỏ và đồng bộ lại, nhưng đúng ra server nên phát một `generation` đổi sau mỗi reindex. `Task.waited_ms` là số 0 khi câu hỏi còn chờ trong khi `Question.waited_ms` là `null`; hai chỗ nên thống nhất `null`.
 
+### Trả nợ sau M6
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 30 | `[assign]` khi Mate bận: không từ chối nữa mà xếp hàng. Console giữ một hàng đợi gửi vào Mate (ghi ở `mate/.outbox`, mỗi dòng một mục, để console khởi động lại vẫn gửi tiếp), một vòng gửi thử lại mỗi 2 giây bằng `send.Send` có kiểm chứng cho tới khi composer trống; trùng mục thì bỏ; dòng inbox hiện `assigned · queued` rồi `assigned · sent HH:MM`; quá 5 phút chưa gửi được thì mở incident `wedged` trên `mate` như daemon. Không bao giờ dùng hàng đợi của harness (`herdr agent prompt`). Daemon auto dùng chung hàng đợi này thay vì vòng thử lại riêng. | Unit với pane giả: bận rồi trống thì gửi đúng một lần, khởi động lại vẫn gửi, trùng bị bỏ, quá hạn thì `wedged`. Live: Mate Claude đang trong vòng `sleep 20; matev2 state`, bấm `[assign]` một lần, dòng `resolve:` tới hook của Mate trong vòng một chu kỳ. |
+| 31 | Mate ở chế độ auto phải dừng turn sau khi spawn để digest đánh thức nó. Manual đã dặn mà Mate không nghe (đo 2026-09-19, task 24), nên đưa lời nhắc vào chỗ Mate chắc chắn đọc: output của `matev2 crew spawn`, `matev2 state`, `matev2 send` khi project có `.auto` in thêm một dòng cuối "auto mode: end your turn now; the console will wake you with a digest when <crew> speaks". Rà lại mục 7 và 9 của manual cho một câu duy nhất, không mâu thuẫn. | Live: nửa `blog` của `TestLiveAcceptanceTwoProjects` có ít nhất một dòng `app → mate` `digest:` trong `sent.log` và Mate xử lý nó ở một turn riêng; chạy hai lần liên tiếp đều pass. |
+
 Sau M6: replay theo tốc độ cho content; skin tuỳ biến (`.matev2/dashboard/`) nếu còn cần.
