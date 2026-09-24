@@ -461,6 +461,33 @@ func (p *codexParse) stateAt(offset int64) TranscriptParseState {
 	return TranscriptParseState{HarnessTurnRef: turnRef, LastCumulativeJSON: lastJSON, CodexModel: model}
 }
 
+// CodexTurnCompletedAfter reports whether a Codex rollout records a finished
+// turn (`event_msg` `task_complete`) stamped after after. It is how a caller
+// that typed a line into a Codex agent knows the turn on it ended: Codex has
+// no Stop hook, and its composer reads empty between tool calls, so an empty
+// composer is not the end of a turn (measured 2026-09-24, task 38: a stow
+// judged over by the composer was cut off mid-turn by the restart). A turn
+// Codex aborted is not a finished one. Lines that do not parse are skipped.
+func CodexTurnCompletedAfter(rollout []byte, after time.Time) bool {
+	for _, line := range bytes.Split(rollout, []byte("\n")) {
+		if !bytes.Contains(line, []byte(`"task_complete"`)) {
+			continue
+		}
+		var rec codexEnvelope
+		if json.Unmarshal(line, &rec) != nil || rec.Type != "event_msg" {
+			continue
+		}
+		var payload codexEventPayload
+		if json.Unmarshal(rec.Payload, &payload) != nil || payload.Type != "task_complete" {
+			continue
+		}
+		if ts, err := time.Parse(time.RFC3339Nano, rec.Timestamp); err == nil && ts.After(after) {
+			return true
+		}
+	}
+	return false
+}
+
 type codexEnvelope struct {
 	Timestamp string          `json:"timestamp"`
 	Ordinal   *int64          `json:"ordinal"`

@@ -7,6 +7,7 @@ import (
 	"github.com/nguyenngocanh94/matev2/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/matev2/internal/config"
 	"github.com/nguyenngocanh94/matev2/internal/harness"
+	"github.com/nguyenngocanh94/matev2/internal/outbox"
 	"github.com/nguyenngocanh94/matev2/internal/runtime"
 	"github.com/nguyenngocanh94/matev2/internal/spawn"
 )
@@ -108,6 +109,14 @@ func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
 				t.Fatalf("the workspace create gave the Mate pane CODEX_HOME=%q, want %q", got, home)
 			}
 		})
+	}
+}
+
+// The outbox finds a Codex Mate's rollout under the same mate.meta key the
+// SessionStart hook writes; it names the key itself to avoid an import cycle.
+func TestOutboxReadsTheTranscriptKeySpawnWrites(t *testing.T) {
+	if outbox.MateMetaTranscript != spawn.MetaTranscript {
+		t.Fatalf("outbox reads mate.meta %q, spawn writes %q", outbox.MateMetaTranscript, spawn.MetaTranscript)
 	}
 }
 
