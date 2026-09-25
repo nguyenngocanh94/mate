@@ -434,12 +434,14 @@ func (f *Fake) InspectAgent(_ context.Context, handle AgentHandle) (ObservedAgen
 		return ObservedAgent{}, NewHerdrError(HerdrAgentNotFound, "agent target not found")
 	}
 	live := false
-	if _, ok := f.Tabs[ag.Handle.Tab.PaneID]; ok {
+	tab, ok := f.Tabs[ag.Handle.Tab.PaneID]
+	if ok {
 		live = true
 	}
 	return ObservedAgent{
 		Handle:        ag.Handle,
 		SessionRef:    ag.SessionRef,
+		Cwd:           tab.Cwd,
 		Status:        ag.Status,
 		LaunchPending: ag.LaunchPending,
 		Interactive:   ag.Interactive,

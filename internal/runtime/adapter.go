@@ -341,7 +341,11 @@ type ObservedAgent struct {
 	// fact like the rest of this struct - the timeline's transcript locator
 	// asks for it - and an empty value means "Herdr did not say", never "no
 	// session exists".
-	SessionRef    string
+	SessionRef string
+	// Cwd is the directory the agent's pane was started in, as Herdr
+	// reports it. A start uses it to tell its own interrupted launch (the
+	// Mate directory) from an unrelated agent that holds the same name.
+	Cwd           string
 	Status        AgentStatus
 	LaunchPending bool
 	Interactive   bool
