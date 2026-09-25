@@ -118,6 +118,9 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 		return "", err
 	}
 	line := fmt.Sprintf("Mate %s is running on %s in pane %s", res.Agent, res.Harness, res.Pane)
+	if res.Adopted {
+		line += "; adopted: an interrupted start had left it running unrecorded"
+	}
 	if res.StaleMeta {
 		line += "; the previous record was stale and has been replaced"
 	}

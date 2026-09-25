@@ -86,6 +86,9 @@ type StartResult struct {
 	// resumed launch that did not come up), so this start went fresh
 	// instead. Empty when nothing needed saying.
 	ResumeNote string
+	// Adopted reports that nothing was launched: an interrupted start had
+	// left this Mate running without a mate.meta, and this start recorded it.
+	Adopted bool
 }
 
 // StartMate starts the Mate of one project: it refreshes the Mate's
@@ -167,6 +170,20 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	if err != nil {
 		return StartResult{}, err
 	}
+
+	// 3b. A start that was interrupted after Herdr launched the agent (the
+	// Console quit mid-start, the process was killed) leaves the Mate
+	// running with no mate.meta. It is this project's Mate, so it is
+	// adopted rather than launched a second time - which Herdr would refuse
+	// by name - or stopped, which would throw its conversation away.
+	if strings.TrimSpace(priorMeta[MetaAgent]) == "" {
+		adopted, ok, err := adoptInterruptedStart(ctx, w, deps, project, kind, mateDir, session)
+		if err != nil || ok {
+			adopted.StaleMeta = staleMeta
+			return adopted, err
+		}
+	}
+
 	tab, err := openMateTab(ctx, deps, session, project, mateDir)
 	if err != nil {
 		return StartResult{}, err
@@ -294,7 +311,6 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if !resume {
 		sessionID = freshSessionID(deps, kind)
 	}
-	resumeNote := decision.Note
 	env, err := mateEnv(project, session)
 	if err != nil {
 		return StartResult{}, err
@@ -316,6 +332,14 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
+	return settleAndRecord(ctx, w, deps, project, kind, mateDir, decision, session, tab, handle, sessionID, launchedAt)
+}
+
+// settleAndRecord takes a launched Mate agent the rest of the way: the
+// startup dialogs, readiness, and the mate.meta that makes it this
+// project's Mate. A fresh launch and an adopted interrupted one share it.
+func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle, handle runtime.AgentHandle, sessionID string, launchedAt time.Time) (StartResult, error) {
+	resume, resumeNote := decision.Resume, decision.Note
 	trusted, err := ownHooks(deps, kind, mateDir)
 	if err != nil {
 		return StartResult{}, err
@@ -664,14 +688,77 @@ func launchEnv(env []runtime.EnvVar, kind harness.Kind) []harness.EnvVar {
 // a meta naming a pane nobody owns is worse than none. Its own failures are
 // deliberately swallowed: the caller must see why the start was refused.
 func compensate(ctx context.Context, deps Deps, w *store.Workspace, project string, session runtime.SessionHandle, tab runtime.TabHandle) {
+	ctx, cancel := cleanupContext(ctx)
+	defer cancel()
 	name, _ := runtime.SanitizeAgentName(AgentNamePrefix, project)
 	if name != "" {
+		// The agent is stopped only when Herdr has it in this attempt's own
+		// pane: a launch Herdr accepted whose answer was lost is ours to
+		// undo, but an agent of the same name anywhere else is not - it
+		// may be a Mate whose meta was lost, and stopping it would throw
+		// its conversation away.
 		handle := runtime.AgentHandle{Session: session, Name: name, RawID: project, Tab: tab}
-		_ = deps.Runtime.StopAgent(ctx, handle, runtime.StopForce)
+		if obs, err := deps.Runtime.InspectAgent(ctx, handle); err == nil && obs.Handle.Tab.PaneID == tab.PaneID {
+			_ = deps.Runtime.StopAgent(ctx, handle, runtime.StopForce)
+		}
 	}
 	if err := deps.Runtime.RemoveTab(ctx, tab); err != nil && !runtime.IsTabGone(err) {
 		_ = err
 	}
 	deps.Names.Release(session.Name, name)
 	_ = os.Remove(w.MateMeta(project))
+}
+
+// adoptInterruptedStart looks for this project's Mate agent already running
+// in Herdr although mate.meta records none. ok is false when there is none,
+// and the caller launches as usual. One running from the Mate directory is
+// what an interrupted start leaves behind; it is settled and recorded like
+// a fresh launch. One running anywhere else is not this Mate, and mate
+// neither adopts nor stops an agent it did not start.
+func adoptInterruptedStart(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, session runtime.SessionHandle) (StartResult, bool, error) {
+	name, err := runtime.SanitizeAgentName(AgentNamePrefix, project)
+	if err != nil {
+		return StartResult{}, false, err
+	}
+	obs, err := deps.Runtime.InspectAgent(ctx, runtime.AgentHandle{Session: session, Name: name, RawID: project})
+	if err != nil {
+		if runtime.IsAgentNotFound(err) {
+			return StartResult{}, false, nil
+		}
+		return StartResult{}, false, err
+	}
+	pane := obs.Handle.Tab.PaneID
+	if !sameDir(obs.Cwd, mateDir) {
+		return StartResult{}, false, observability.NewError(observability.CodeAlreadyExists, fmt.Sprintf(
+			"Herdr already runs an agent named %s in pane %s of session %s, started in %s rather than this project's Mate directory %s; mate neither adopts nor stops an agent it did not start - stop or rename it in Herdr, then start again",
+			name, pane, session.Name, obs.Cwd, mateDir))
+	}
+	if obs.Handle.Kind != "" && obs.Handle.Kind != kind {
+		return StartResult{}, false, observability.NewError(observability.CodeAlreadyExists, fmt.Sprintf(
+			"an interrupted start left a %s Mate running as %s in pane %s; start with the %s harness to adopt it, or stop it in Herdr first",
+			obs.Handle.Kind, name, pane, obs.Handle.Kind))
+	}
+	handle := obs.Handle
+	handle.Session, handle.Name, handle.RawID, handle.Kind = session, name, project, kind
+	decision := resumeDecision{Note: fmt.Sprintf(
+		"adopted agent %s, left running in pane %s by a start that was interrupted before it finished", name, pane)}
+	// Herdr reports a Codex rollout's session id; Claude's is filled in by
+	// the Mate's own SessionStart hook on its next turn.
+	res, err := settleAndRecord(ctx, w, deps, project, kind, mateDir, decision, session, handle.Tab, handle, obs.SessionRef, deps.now())
+	res.Adopted = err == nil
+	return res, true, err
+}
+
+// sameDir reports whether two paths name the same directory, following
+// symlinks (a workspace under /tmp is /private/tmp on macOS).
+func sameDir(a, b string) bool {
+	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
+		return false
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return ra == rb
 }

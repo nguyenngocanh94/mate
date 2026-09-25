@@ -169,6 +169,15 @@ func (m Model) onTreeTick(msg treeTickMsg) (Model, tea.Cmd) {
 	if msg.gen != m.treeGen {
 		return m, nil
 	}
+	if m.actionBusy && !m.actionStartedAt.IsZero() && !msg.at.IsZero() {
+		prev := m.msg
+		m.msg = m.runningLine(msg.at.Sub(m.actionStartedAt))
+		// A box action mirrors its running line into the box zone
+		// (runAction); keep the two saying the same thing.
+		if m.boxMsg == prev {
+			m.boxMsg = m.msg
+		}
+	}
 	next := treeTickCmd(m.treeTickInterval(), m.treeGen)
 	if m.treeLoadInFlight {
 		return m, next

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -438,5 +439,127 @@ func TestStartMateForAProjectWithTwoRepos(t *testing.T) {
 		if !strings.Contains(manual, row) {
 			t.Errorf("the manual does not list the repo row %s", row)
 		}
+	}
+}
+
+// TestStartMateAdoptsAnInterruptedStart: a start interrupted after Herdr
+// launched the agent (the Console quit mid-start) leaves the Mate running
+// with no mate.meta. The next start adopts it - no second launch, which
+// Herdr would refuse by name, and no stop, which would lose its
+// conversation.
+func TestStartMateAdoptsAnInterruptedStart(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if err := os.Remove(w.MateMeta("shop")); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err != nil {
+		t.Fatalf("StartMate over an interrupted start: %v", err)
+	}
+	if got := len(rt.StartArgv); got != 1 {
+		t.Fatalf("%d launches, want the running agent adopted, not launched again", got)
+	}
+	if slices.Contains(rt.Calls, "StopAgent:force") {
+		t.Fatalf("calls %v: the adopted Mate was stopped", rt.Calls)
+	}
+	meta := readMeta(t, w, "shop")
+	if meta[spawn.MetaPane] != first.Pane || meta[spawn.MetaAgent] != first.Agent || second.Pane != first.Pane {
+		t.Fatalf("meta %v / result pane %q, want the running agent %s in pane %s recorded", meta, second.Pane, first.Agent, first.Pane)
+	}
+	if !second.Adopted || !strings.Contains(second.ResumeNote, "adopted agent "+first.Agent) {
+		t.Fatalf("result note = %q, want it to say the agent was adopted", second.ResumeNote)
+	}
+}
+
+// TestStartMateLeavesASameNamedAgentElsewhereAlone: an agent holding the
+// Mate's name but started outside the Mate directory is not this project's
+// Mate. The start refuses, and neither adopts nor stops it.
+func TestStartMateLeavesASameNamedAgentElsewhereAlone(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if err := os.Remove(w.MateMeta("shop")); err != nil {
+		t.Fatal(err)
+	}
+	tab := rt.Tabs[first.Pane]
+	tab.Cwd = t.TempDir()
+	rt.Tabs[first.Pane] = tab
+
+	_, err = spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || observability.ExitCode(err) != observability.ExitStateConflict || !strings.Contains(err.Error(), "neither adopts nor stops") {
+		t.Fatalf("err = %v, want an already-exists refusal saying the agent is left alone", err)
+	}
+	if slices.Contains(rt.Calls, "StopAgent:force") || len(rt.Agents) != 1 {
+		t.Fatalf("calls %v, agents %v: the unrelated agent was touched", rt.Calls, rt.Agents)
+	}
+	if _, statErr := os.Stat(w.MateMeta("shop")); !os.IsNotExist(statErr) {
+		t.Fatalf("a refused start wrote mate.meta: %v", statErr)
+	}
+}
+
+// TestStartMateAdoptionKeepsTheRunningHarness: adopting never swaps the
+// agent's harness; asking for another one is refused with the fix.
+func TestStartMateAdoptionKeepsTheRunningHarness(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude}); err != nil {
+		t.Fatalf("first StartMate: %v", err)
+	}
+	if err := os.Remove(w.MateMeta("shop")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	if err == nil || !strings.Contains(err.Error(), "left a claude Mate running") {
+		t.Fatalf("err = %v, want a refusal naming the running claude Mate", err)
+	}
+	if len(rt.Agents) != 1 || slices.Contains(rt.Calls, "StopAgent:force") {
+		t.Fatalf("agents %v calls %v: the running Mate was touched", rt.Agents, rt.Calls)
+	}
+}
+
+// cancelOnWait cancels the start's context the moment readiness is awaited,
+// the way quitting the Console mid-start does, and fails the wait.
+type cancelOnWait struct {
+	*runtime.Fake
+	cancel context.CancelFunc
+}
+
+func (c cancelOnWait) WaitAgent(ctx context.Context, h runtime.AgentHandle, until runtime.WaitCondition) (runtime.ObservedAgent, error) {
+	c.cancel()
+	return runtime.ObservedAgent{}, context.Canceled
+}
+
+// TestStartMateCleansUpAfterItsContextIsCancelled: quitting the Console
+// mid-start cancels the start's context. The compensation must still stop
+// the agent and close the tab it created - with the cancelled context every
+// Herdr call would fail at once and leave the Mate running unrecorded.
+func TestStartMateCleansUpAfterItsContextIsCancelled(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	deps := fakeDeps(t, rt)
+	deps.Runtime = cancelOnWait{Fake: rt, cancel: cancel}
+
+	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop"}); err == nil {
+		t.Fatal("StartMate succeeded although its context was cancelled mid-start")
+	}
+	if len(rt.Agents) != 0 || len(rt.Tabs) != 0 {
+		t.Fatalf("agents %v tabs %v left behind by a cancelled start", rt.Agents, rt.Tabs)
+	}
+	if _, statErr := os.Stat(w.MateMeta("shop")); !os.IsNotExist(statErr) {
+		t.Fatalf("a cancelled start left a mate.meta: %v", statErr)
 	}
 }

@@ -1611,9 +1611,13 @@ func (h *Herdr) observed(handle AgentHandle, info agentInfo) ObservedAgent {
 	if info.WorkspaceID != "" {
 		out.Tab.WorkspaceID = info.WorkspaceID
 	}
+	if out.Kind == "" && info.Kind != "" {
+		out.Kind = harness.Kind(info.Kind)
+	}
 	return ObservedAgent{
 		Handle:        out,
 		SessionRef:    info.SessionRef,
+		Cwd:           info.Cwd,
 		Status:        info.Status,
 		LaunchPending: info.LaunchPending,
 		ObservedAt:    h.now(),

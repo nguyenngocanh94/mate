@@ -37,6 +37,8 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		{KindClaude, "claude-2.1.270-trust-dialog.txt", StartupScreenTrustDialog},
 		{KindClaude, "claude-2.1.270-trust-dialog-accept-selected.txt", StartupScreenTrustDialog},
 		{KindClaude, "claude-2.1.270-ready.txt", StartupScreenReady},
+		// 2.1.282 draws a suggestion inside the empty composer.
+		{KindClaude, "claude-2.1.282-ready.txt", StartupScreenReady},
 		// `codex resume <id>` (task 35): the old conversation is replayed
 		// above the composer, prompt lines and all.
 		{KindCodex, "codex-0.154.0-resume-ready.txt", StartupScreenReady},
@@ -449,6 +451,36 @@ func TestStartupDialogLayoutsOfOneScreenShareTheirAnswer(t *testing.T) {
 			if !slices.Equal(d.selectKeys, first.selectKeys) || d.target != first.target {
 				t.Fatalf("%s %s layouts disagree: %v/%d vs %v/%d", kind, d.screen, d.selectKeys, d.target, first.selectKeys, first.target)
 			}
+		}
+	}
+}
+
+// TestClaudeComposerSuggestionIsStillEmpty: from 2.1.282 the empty composer
+// carries a dim `Try "..."` suggestion after the marker. That is still the
+// empty composer, whatever the suggestion says; anything else after the
+// marker is text someone typed, and a composer with text in it is not ready.
+// The line must sit inside the composer's two rules, so a shell prompt or a
+// quoted capture that happens to start with the marker is not mistaken for it.
+func TestClaudeComposerSuggestionIsStillEmpty(t *testing.T) {
+	t.Parallel()
+	ready := startupFixture(t, "claude-2.1.282-ready.txt")
+	const suggestion = "❯\u00a0Try \"edit <filepath> to...\""
+	if !strings.Contains(ready, suggestion) {
+		t.Fatalf("fixture no longer carries the measured suggestion line %q", suggestion)
+	}
+	for _, tc := range []struct {
+		name   string
+		screen string
+		want   StartupScreen
+	}{
+		{"another suggestion", strings.Replace(ready, suggestion, "❯\u00a0Try \"refactor <filepath>\"", 1), StartupScreenReady},
+		{"typed text", strings.Replace(ready, suggestion, "❯\u00a0fix the login bug", 1), StartupScreenUnrecognized},
+		{"typed text that starts like a suggestion", strings.Replace(ready, suggestion, "❯\u00a0Try \"edit\" and then run the tests", 1), StartupScreenUnrecognized},
+		{"suggestion outside the composer rules", "  /tmp/x main ❯ Try \"edit <filepath> to...\"\n", StartupScreenUnrecognized},
+	} {
+		got, err := ClassifyStartupScreen(KindClaude, tc.screen)
+		if err != nil || got != tc.want {
+			t.Errorf("%s: got %s err=%v, want %s", tc.name, got, err, tc.want)
 		}
 	}
 }
