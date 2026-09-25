@@ -108,6 +108,9 @@ func lineAnchors(line string, repos []Repo) ([]Anchor, string) {
 	if len(found) > 0 {
 		return found, ""
 	}
+	if msg := misnamedAnchor(line, repos); msg != "" {
+		return nil, msg
+	}
 	if len(repos) == 1 {
 		if m := bareAnchorPattern(repos[0].Branch).FindStringSubmatch(line); m != nil {
 			return []Anchor{{Repo: repos[0].Name, SHA: m[1]}}, ""
@@ -134,6 +137,31 @@ func lineAnchors(line string, repos []Repo) ([]Anchor, string) {
 	}
 	return nil, fmt.Sprintf("line has no <repo>:<branch>@<sha> anchor for one of the project's repos (%s): add the head `mate project facts` printed for that repo when the fact was recorded, e.g. (crews/k1/report.md §Durable facts, %s, 2026-09-24)",
 		strings.Join(wants, ", "), facts.Anchor(repos[0].Name, repos[0].Branch, "3f2a91c"))
+}
+
+// qualifiedAnchorPattern matches any `<name>:<branch>@<sha>`, whether or
+// not name is one of the project's repos.
+var qualifiedAnchorPattern = regexp.MustCompile(`(?:^|[^\w/.:-])([a-z][a-z0-9-]{0,31}):([\w./-]+)` + anchorSHA)
+
+// misnamedAnchor says what is wrong with a line's qualified anchor that
+// matched none of repos: it names a repo the project does not have, or a
+// branch that is not the repo's default. Empty when the line has none.
+func misnamedAnchor(line string, repos []Repo) string {
+	m := qualifiedAnchorPattern.FindStringSubmatch(line)
+	if m == nil {
+		return ""
+	}
+	name, branch := m[1], m[2]
+	names := make([]string, len(repos))
+	for i, r := range repos {
+		names[i] = r.Name
+		if r.Name == name {
+			return fmt.Sprintf("line's anchor %s:%s@%s is on the wrong branch: %s's default branch is %s, not %s; re-read the fact against %s",
+				name, branch, m[3], name, r.Branch, branch, facts.Anchor(name, r.Branch, "<sha>"))
+		}
+	}
+	return fmt.Sprintf("line's anchor %s:%s@%s names repo %s, which this project does not have (its repos: %s): fix the repo name, or ask the captain to add the repo",
+		name, branch, m[3], name, strings.Join(names, ", "))
 }
 
 func isRepoState(section string) bool {
