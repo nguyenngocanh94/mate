@@ -295,7 +295,7 @@ func TestCheckProjectAnchorsTwoRepos(t *testing.T) {
 	anchors, problems := CheckProject(doc, repos)
 	assertProblems(t, problems,
 		"PROJECT.md:6: `## Layout and state` line's anchor main@3f2a91c names no repo, and the project has 2: write it as shop:main@3f2a91c if the fact is about shop",
-		"PROJECT.md:7: `## Layout and state` line has no <repo>:<branch>@<sha> anchor for one of the project's repos (shop:main@<sha>, api:release/2.x@<sha>)",
+		"PROJECT.md:7: `## Layout and state` line's anchor api:main@3f2a91c is on the wrong branch: api's default branch is release/2.x, not main",
 		"PROJECT.md:9: `## How to work here` line has no <repo>:<branch>@<sha> anchor")
 	assertAnchors(t, anchors, []Anchor{
 		{3, "shop", "3f2a91c"}, {4, "api", "none"}, {5, "shop", "aaaaaaa"}, {5, "api", "bbbbbbb"},
@@ -364,5 +364,28 @@ func TestHeadersHaveTheirSections(t *testing.T) {
 	}
 	if !strings.Contains(RepoStateComment, "<repo>:<branch>@<sha>") {
 		t.Errorf("RepoStateComment = %q does not name the anchor shape", RepoStateComment)
+	}
+}
+
+// TestCheckProjectNamesAWrongRepoOrBranch: an anchor that is qualified but
+// names a repo the project does not have, or a branch that is not that
+// repo's default, is reported as exactly that - not as a missing anchor,
+// which would send the reader looking for something that is there.
+func TestCheckProjectNamesAWrongRepoOrBranch(t *testing.T) {
+	repos := []Repo{{Name: "web", Branch: "main"}, {Name: "api", Branch: "develop"}}
+	for _, tc := range []struct{ line, want string }{
+		{"- mobile has an app (crews/k3/report.md, mobile:main@3f2a91c, 2026-09-25)", "names repo mobile, which this project does not have"},
+		{"- api builds with make (crews/k2/report.md, api:main@3f2a91c, 2026-09-25)", "api's default branch is develop, not main"},
+	} {
+		doc := "# shop\n\n## Layout and state\n" + tc.line + "\n"
+		for _, rs := range [][]Repo{repos, repos[1:]} {
+			if rs[0].Name != "api" && strings.Contains(tc.line, "api:") {
+				continue
+			}
+			_, problems := CheckProject(doc, rs)
+			if len(problems) != 1 || !strings.Contains(problems[0].Msg, tc.want) {
+				t.Errorf("repos %v, line %q: problems = %+v, want one naming %q", rs, tc.line, problems, tc.want)
+			}
+		}
 	}
 }
