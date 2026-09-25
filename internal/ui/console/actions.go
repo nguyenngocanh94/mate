@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -621,7 +622,8 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 	m.pendingChoice = actionChoice{}
 	m.actionBusy = true
 	m.actionRunningDesc = string(choice.action) + " " + actionObject(choice)
-	m.msg = infoMsg("Running " + m.actionRunningDesc + " " + m.g.Ellipsis)
+	m.actionStartedAt = time.Now()
+	m.msg = m.runningLine(0)
 	if boxAction(choice.action) {
 		m.boxMsg = m.msg
 	}
@@ -642,6 +644,17 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 		text, err := action(ctx, req)
 		return actionDoneMsg{choice: choice, text: text, err: err}
 	}
+}
+
+// runningLine is the footer while an action runs. Past the first second it
+// carries the time spent, so a slow start reads as progress rather than a
+// hang.
+func (m Model) runningLine(elapsed time.Duration) footerMsg {
+	text := "Running " + m.actionRunningDesc + " " + m.g.Ellipsis
+	if elapsed >= time.Second {
+		text += " " + elapsed.Truncate(time.Second).String()
+	}
+	return infoMsg(text)
 }
 
 // actionObject is what the running line and the confirmation name as the

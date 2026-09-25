@@ -417,6 +417,9 @@ type Model struct {
 	// (AbandonedActionDone) so the process waits for the action's own
 	// cleanup instead of exiting under it.
 	actionDone chan struct{}
+	// actionStartedAt is when the in-flight action began; the refresh tick
+	// shows the time since then on the running line (runningLine).
+	actionStartedAt time.Time
 	// actionAbandoned is set when the operator quits while actionBusy: the
 	// description of what was abandoned, surfaced to cmd/mate via
 	// AbandonedAction so it can tell the operator plainly after the
@@ -589,12 +592,16 @@ func (m Model) treeTickInterval() time.Duration {
 	return defaultTreeTickInterval
 }
 
-// treeTickMsg requests the next background tree load.
-type treeTickMsg struct{ gen int }
+// treeTickMsg requests the next background tree load. at is when it fired,
+// which is also the clock the running-action line counts its seconds by.
+type treeTickMsg struct {
+	gen int
+	at  time.Time
+}
 
 func treeTickCmd(interval time.Duration, gen int) tea.Cmd {
-	return tea.Tick(interval, func(time.Time) tea.Msg {
-		return treeTickMsg{gen: gen}
+	return tea.Tick(interval, func(at time.Time) tea.Msg {
+		return treeTickMsg{gen: gen, at: at}
 	})
 }
 

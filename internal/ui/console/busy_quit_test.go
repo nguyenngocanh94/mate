@@ -193,3 +193,33 @@ func TestAbandonedActionDoneClosesWhenTheActionReturns(t *testing.T) {
 		t.Fatal("done never closed after the action returned")
 	}
 }
+
+// TestRunningActionShowsElapsedTime: a Mate start can take a while (Herdr,
+// the harness's own startup), and a footer that says only "Running ..." for
+// a minute reads as a hang - which is how a quit mid-start happened. While
+// the action runs, the Console's own refresh tick rewrites the line with the
+// time spent; once nothing is running a tick leaves the line alone.
+func TestRunningActionShowsElapsedTime(t *testing.T) {
+	started := make(chan context.Context, 1)
+	release := make(chan struct{})
+	m, cmd := confirmAndRunStop(t, blockingAction(started, release))
+	result := make(chan tea.Msg, 1)
+	go func() { result <- cmd() }()
+	<-started
+	if !strings.HasSuffix(m.msg.text, m.g.Ellipsis) {
+		t.Fatalf("initial running line = %q, want it unchanged until the first tick", m.msg.text)
+	}
+
+	m, _ = send(t, m, treeTickMsg{gen: m.treeGen, at: m.actionStartedAt.Add(12*time.Second + 400*time.Millisecond)})
+	if !strings.HasSuffix(m.msg.text, m.g.Ellipsis+" 12s") {
+		t.Fatalf("running line after 12.4s = %q, want it to end with the elapsed 12s", m.msg.text)
+	}
+
+	close(release)
+	m, _ = send(t, m, <-result)
+	after := m.msg
+	m, _ = send(t, m, treeTickMsg{gen: m.treeGen, at: m.actionStartedAt.Add(time.Minute)})
+	if m.msg != after {
+		t.Fatalf("a tick after the action finished rewrote the line to %q", m.msg.text)
+	}
+}
