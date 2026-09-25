@@ -417,6 +417,8 @@ type Model struct {
 	// (AbandonedActionDone) so the process waits for the action's own
 	// cleanup instead of exiting under it.
 	actionDone chan struct{}
+	// clipboard is WithClipboard's writer; nil drops agent copies.
+	clipboard ClipboardFunc
 	// actionStartedAt is when the in-flight action began; the refresh tick
 	// shows the time since then on the running line (runningLine).
 	actionStartedAt time.Time
@@ -454,6 +456,18 @@ type Model struct {
 // context.Background() in baseCtx.
 func (m Model) WithContext(ctx context.Context) Model {
 	m.ctx = ctx
+	return m
+}
+
+// ClipboardFunc writes one complete OSC 52 clipboard sequence to the real
+// terminal the Console is drawn on.
+type ClipboardFunc func(seq []byte)
+
+// WithClipboard attaches the real terminal's clipboard. An agent's own copy
+// (OSC 52 in its PTY output) is handed to it; without one (tests, a
+// read-only Console) the copy is dropped, as it was before.
+func (m Model) WithClipboard(fn ClipboardFunc) Model {
+	m.clipboard = fn
 	return m
 }
 

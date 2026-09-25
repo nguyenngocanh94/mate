@@ -94,6 +94,7 @@ func (m Model) sessionRailState() boxRail {
 		zone:    m.sess.zone,
 		railW:   m.railWidth,
 		outcome: m.boxMsg,
+		copied:  m.sess.copied,
 	}
 }
 

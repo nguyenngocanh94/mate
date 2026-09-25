@@ -235,9 +235,11 @@ func TestStreamModeForwardsMouseEventsToThePTYInPaneCoordinates(t *testing.T) {
 	m, channel := enterStreamMode(t, &controllerTestFactory{})
 	geo := m.sessionGeom()
 
+	// The middle button: the left one is the Console's own selection
+	// (session_select.go) and never reaches the PTY.
 	m, cmd := send(t, m, tea.MouseMsg{
 		X: geo.paneX + 4, Y: geo.paneTop + 9,
-		Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+		Action: tea.MouseActionPress, Button: tea.MouseButtonMiddle})
 	if cmd != nil {
 		t.Fatalf("mouse press produced a Cmd; want nil (the write is enqueued synchronously)")
 	}
@@ -245,7 +247,7 @@ func TestStreamModeForwardsMouseEventsToThePTYInPaneCoordinates(t *testing.T) {
 		t.Fatalf("a click in the terminal zone left focus at %v", m.sess.zone)
 	}
 	got := waitForWrites(t, channel, 1)
-	want := []byte("\x1b[<0;5;10M")
+	want := []byte("\x1b[<1;5;10M")
 	if len(got) != 1 || !bytes.Equal(got[0], want) {
 		t.Fatalf("written bytes = %q, want %q (pane-relative)", got, want)
 	}

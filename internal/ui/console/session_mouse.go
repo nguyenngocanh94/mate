@@ -46,6 +46,20 @@ func (m Model) onSessionMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.dragRailTo(ev.X)
 	}
+	// A selection drag owns the pointer until its release, wherever the
+	// pointer goes, the way a terminal's own selection does.
+	if m.sess.sel.dragging {
+		if ev.Action != tea.MouseActionPress {
+			return m.onSelectionMouse(ev, geo)
+		}
+		// Another press means the release was never seen (the pointer
+		// left the window, say): the drag is over, and this press is a
+		// gesture of its own.
+		m.sess.sel.dragging = false
+		if !m.sess.sel.active() {
+			m.sess.sel = termSelection{}
+		}
+	}
 	if geo.inSplitter(ev.X, ev.Y) {
 		if ev.Action == tea.MouseActionPress && ev.Button == tea.MouseButtonLeft {
 			m.draggingSplit = true
@@ -139,6 +153,14 @@ func (m Model) onSessionPaneMouse(ev tea.MouseEvent, geo sessionGeom) (tea.Model
 	if ev.Action == tea.MouseActionPress && ev.Button == tea.MouseButtonLeft {
 		m.sess.zone = zoneTerminal
 		m.boxHover = -1
+		// The left button is the Console's own selection: the PTY behind
+		// the pane is `herdr agent attach`, which would drop it anyway.
+		if m.sess.terminal != nil {
+			return m.onSelectionMouse(ev, geo)
+		}
+	}
+	if ev.Button == tea.MouseButtonLeft {
+		return m, nil
 	}
 	if m.sess.stream == nil {
 		return m, nil

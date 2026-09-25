@@ -46,9 +46,11 @@ func railRowOf(t *testing.T, m Model, i int) int {
 	return 0
 }
 
-// TestClickInTheTerminalZoneFocusesItAndForwardsToThePTY: the click both
-// moves focus and reaches the agent, because that is what a click on a
-// terminal does everywhere else a person has ever used one.
+// TestClickInTheTerminalZoneFocusesItAndForwardsToThePTY: a click moves
+// focus to the terminal. The left button is the Console's own text
+// selection (session_select.go) - `herdr agent attach` never delivers mouse
+// input to the agent (measured 2026-09-25, Herdr 0.8.2) - so it is not
+// written to the PTY; the other buttons still are, in pane coordinates.
 func TestClickInTheTerminalZoneFocusesItAndForwardsToThePTY(t *testing.T) {
 	m, channel := mouseBoxFixture(t)
 	m.sess.zone = zoneBox
@@ -61,8 +63,12 @@ func TestClickInTheTerminalZoneFocusesItAndForwardsToThePTY(t *testing.T) {
 	if m.sess.zone != zoneTerminal {
 		t.Fatalf("zone after a click in the terminal = %v, want the terminal", m.sess.zone)
 	}
+	if got := channel.writtenBytes(); len(got) != 0 {
+		t.Fatalf("a left click reached the PTY: %q", got)
+	}
+	m, _ = send(t, m, tea.MouseMsg{X: geo.paneX + 2, Y: geo.paneTop + 3, Action: tea.MouseActionPress, Button: tea.MouseButtonRight})
 	got := waitForWrites(t, channel, 1)
-	want := []byte("\x1b[<0;3;4M")
+	want := []byte("\x1b[<2;3;4M")
 	if len(got) != 1 || !bytes.Equal(got[0], want) {
 		t.Fatalf("forwarded %q, want %q (pane-relative coordinates)", got, want)
 	}
@@ -459,9 +465,10 @@ func TestBareMotionOverThePaneIsNeverForwarded(t *testing.T) {
 	if got := channel.writtenBytes(); len(got) != 0 {
 		t.Fatalf("bare pointer motion reached the PTY: %q", got)
 	}
-	// A drag - motion with a button held - is a real gesture and does go.
+	// A drag with a button other than the left one - the left is the
+	// Console's own selection - is a real gesture and does go.
 	m, _ = send(t, m, tea.MouseMsg{
-		X: geo.paneX + 1, Y: geo.paneTop + 1, Action: tea.MouseActionMotion, Button: tea.MouseButtonLeft})
+		X: geo.paneX + 1, Y: geo.paneTop + 1, Action: tea.MouseActionMotion, Button: tea.MouseButtonRight})
 	if got := waitForWrites(t, channel, 1); len(got) != 1 {
 		t.Fatalf("a drag over the pane wrote %d times, want 1", len(got))
 	}
