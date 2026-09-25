@@ -43,6 +43,12 @@ const (
 	// brand new map) leaves them absent, not "false"/"".
 	MetaResumed     = "resumed"
 	MetaResumedFrom = "resumed_from"
+	// MetaModel and MetaEffort are the launch profile the agent was started
+	// with (harness/profile.go): what was asked for, written only when
+	// something was. An effort the harness does not take is still recorded;
+	// it was requested, and left out of the launch.
+	MetaModel  = "model"
+	MetaEffort = "effort"
 )
 
 // AgentNamePrefix is the first half of a Mate's live Herdr agent name; the

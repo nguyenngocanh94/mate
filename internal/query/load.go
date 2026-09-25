@@ -326,6 +326,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 	} else {
 		c.HarnessKind = HarnessKind(meta["harness"])
 	}
+	c.Model, c.Effort = meta["model"], meta["effort"]
 
 	if worktree := meta["worktree"]; worktree != "" {
 		c.Worktree = KnownField(WorktreeValue{

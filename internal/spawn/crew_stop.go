@@ -310,7 +310,11 @@ func writeCrewTeardownMeta(w *store.Workspace, project, crew string, meta map[st
 type CrewSummary struct {
 	Crew    string
 	Harness string
-	Branch  string
+	// Model and Effort are the launch profile (`model=`, `effort=`), ""
+	// for the harness's own default.
+	Model  string
+	Effort string
+	Branch string
 	// State is the declared state of mvp.md section 4b, resolved in the
 	// fixed order: `.meta` state=, then an open incident, then the last
 	// status verb, then `spawned`.
@@ -385,6 +389,8 @@ func ListCrews(w *store.Workspace, project string) ([]CrewSummary, error) {
 		out = append(out, CrewSummary{
 			Crew:    id,
 			Harness: meta[MetaHarness],
+			Model:   meta[MetaModel],
+			Effort:  meta[MetaEffort],
 			Branch:  meta[MetaBranch],
 			State:   string(state),
 			Note:    note,

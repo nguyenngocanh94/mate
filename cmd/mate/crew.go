@@ -16,11 +16,13 @@ import (
 // cmdCrew dispatches `mate crew <spawn|list|stop>`.
 func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate crew <spawn|list|stop> ...")
+		return newUsageError("usage: mate crew <spawn|list|stop|dispatch> ...")
 	}
 	switch args[0] {
 	case "spawn":
 		return cmdCrewSpawn(args[1:], stdin, stdout, stderr)
+	case "dispatch":
+		return cmdCrewDispatch(args[1:], stdout, stderr)
 	case "list":
 		return cmdCrewList(args[1:], stdout, stderr)
 	case "stop":
@@ -31,16 +33,18 @@ func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 // cmdCrewSpawn implements
-// `mate crew spawn <project> <id> --brief <file> [--repo <name>] [--scout] [--harness codex|claude] [--task "<one line>"]`.
+// `mate crew spawn <project> <id> --brief <file> [--repo <name>] [--scout] [--harness codex|claude] [--model <name>] [--effort <level>] [--task "<one line>"]`.
 func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew spawn", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]`)
+		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
 	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the workspace default)")
+	modelFlag := fs.String("model", "", "model the harness runs, as it names it (default: the harness's own)")
+	effortFlag := fs.String("effort", "", "reasoning effort: low, medium, high, xhigh or max (default: the harness's own)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")
 	repoFlag := fs.String("repo", "", "the project repo the crew works in (required when the project has several)")
 	taskFlag := fs.String("task", "", "one line recorded as task= (default: the brief's first line)")
@@ -72,8 +76,20 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 		}
 		req.Harness = kind
 	}
+	model, err := harness.ParseModel(*modelFlag)
+	if err != nil {
+		return &usageError{err}
+	}
+	effort, err := harness.ParseEffort(*effortFlag)
+	if err != nil {
+		return &usageError{err}
+	}
+	req.Model, req.Effort = model, effort
 	w, err := resolveWorkspace(*workspaceFlag)
 	if err != nil {
+		return err
+	}
+	if err := checkDispatch(w, req); err != nil {
 		return err
 	}
 	res, err := spawn.SpawnCrew(context.Background(), w, spawn.LiveDeps(), req)
@@ -107,8 +123,11 @@ func writeCrewSpawnReport(stdout, stderr io.Writer, w *store.Workspace, res spaw
 	if res.DeliveryWarning != "" {
 		fmt.Fprintf(stderr, "warning: %s\nlast pane lines:\n%s\n", res.DeliveryWarning, res.PaneTail)
 	}
-	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s, repo %s, branch %s, worktree %s)\n",
-		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, res.Repo, res.Branch, res.Worktree)
+	if res.EffortOmitted {
+		fmt.Fprintf(stderr, "note: %s does not take effort %s; it was recorded and left out of the launch\n", res.Harness, res.Effort)
+	}
+	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s%s, repo %s, branch %s, worktree %s)\n",
+		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, profileNote(res), res.Repo, res.Branch, res.Worktree)
 	fmt.Fprintf(stdout, "brief %s\nstatus %s\n", res.BriefPath, res.StatusPath)
 	printAutoTurnEnd(stdout, w, res.Project, autoSpawnLine(res.Crew))
 }
@@ -166,7 +185,7 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	fmt.Fprintln(tw, "ID\tHARNESS\tBRANCH\tSTATE\tNOTE\tPANE")
 	for _, c := range crews {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			c.Crew, c.Harness, c.Branch, dashIfEmpty(c.State), dashIfEmpty(c.Note), dashIfEmpty(c.Pane))
+			c.Crew, harnessCell(c), c.Branch, dashIfEmpty(c.State), dashIfEmpty(c.Note), dashIfEmpty(c.Pane))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -249,4 +268,31 @@ func crewStopReport(project, crew string, res spawn.StopResult) string {
 		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch kept; state %s",
 			project, crew, agent, stopped, tab, res.State)
 	}
+}
+
+// profileNote is ", model m, effort e" for the axes a spawn set.
+func profileNote(res spawn.CrewResult) string {
+	out := ""
+	if res.Model != "" {
+		out += ", model " + res.Model
+	}
+	if res.Effort != "" {
+		out += ", effort " + string(res.Effort)
+	}
+	return out
+}
+
+// harnessCell is the HARNESS column: the harness, then the model and
+// effort it was spawned with when either was set - "codex gpt-5.5/high".
+func harnessCell(c spawn.CrewSummary) string {
+	cell := c.Harness
+	switch {
+	case c.Model != "" && c.Effort != "":
+		cell += " " + c.Model + "/" + c.Effort
+	case c.Model != "":
+		cell += " " + c.Model
+	case c.Effort != "":
+		cell += " /" + c.Effort
+	}
+	return cell
 }

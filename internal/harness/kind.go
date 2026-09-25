@@ -42,38 +42,6 @@ func ParseKind(s string) (Kind, error) {
 
 func (k Kind) String() string { return string(k) }
 
-// ModelRef names a provider/model pair. Empty is allowed and means "harness
-// default". A provider without a model is rejected.
-type ModelRef struct {
-	Provider string
-	Model    string
-}
-
-// ParseModelRef accepts an empty pair (harness default) or a provider+model.
-func ParseModelRef(provider, model string) (ModelRef, error) {
-	provider = strings.TrimSpace(provider)
-	model = strings.TrimSpace(model)
-	if provider == "" && model == "" {
-		return ModelRef{}, nil
-	}
-	if provider == "" || model == "" {
-		return ModelRef{}, fmt.Errorf("model ref: provider and model must both be set or both empty")
-	}
-	return ModelRef{Provider: provider, Model: model}, nil
-}
-
-func (m ModelRef) String() string {
-	if m.Provider == "" {
-		return ""
-	}
-	return m.Provider + "/" + m.Model
-}
-
-// IsZero reports whether this is the harness-default (unset) ref.
-func (m ModelRef) IsZero() bool {
-	return m.Provider == "" && m.Model == ""
-}
-
 // AgentRole is the caller role. Agents never self-declare a different
 // identity; the binary injects this via MATE_AGENT_ROLE.
 type AgentRole string

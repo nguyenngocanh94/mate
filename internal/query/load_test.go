@@ -95,7 +95,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 		t.Fatalf("write mate.meta: %v", err)
 	}
 	if err := ws.WriteCrewMeta("shop", "k3", map[string]string{
-		"task": "wire the webhook", "harness": "codex",
+		"task": "wire the webhook", "harness": "codex", "model": "gpt-5.5", "effort": "high",
 		"worktree": "/w/shop-k3", "branch": "mate/k3",
 	}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
@@ -130,6 +130,9 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 	c := p.Crews[0]
 	if c.CrewID != "k3" || c.Task != "wire the webhook" || c.HarnessKind != HarnessCodex {
 		t.Fatalf("crew = %+v, want k3 from its meta", c)
+	}
+	if c.Model != "gpt-5.5" || c.Effort != "high" {
+		t.Fatalf("crew profile = %q/%q, want the model and effort it was spawned with", c.Model, c.Effort)
 	}
 	if got := c.Status; got != CrewStatus("needs-decision") {
 		t.Fatalf("crew status = %q, want the last status line's state word", got)

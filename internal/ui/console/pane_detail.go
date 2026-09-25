@@ -349,6 +349,13 @@ func (m Model) crewDetailFields(c query.CrewNode, vw int) []detailField {
 	if h := string(c.HarnessKind); h != "" {
 		out = append(out, detailField{label: "harness", lines: one(gl().add(harnessIcon(h, m.g), tFg).pad(1).add(h, tFg))})
 	}
+	// The launch profile, as spawned; absent means the harness's own.
+	if c.Model != "" {
+		out = append(out, detailField{label: "model", lines: text(c.Model, tFg), copy: c.Model})
+	}
+	if c.Effort != "" {
+		out = append(out, detailField{label: "effort", lines: text(c.Effort, tFg)})
+	}
 	word := crewWord(c)
 	status := gl().add(word, statusTokFg(word))
 	if since := m.since(c.CreatedAt); since != "" {

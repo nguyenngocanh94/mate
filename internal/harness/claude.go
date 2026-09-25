@@ -137,6 +137,8 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	case spec.ClaudeSessionID != "":
 		extra = append(extra, "--session-id", spec.ClaudeSessionID, "--settings", spec.ClaudeSettingsPath)
 	}
+	profile, effortOmitted := profileArgs(KindClaude, spec.Model, spec.Effort)
+	extra = append(extra, profile...)
 	// dangerousPermissionNotes records why --dangerously-skip-permissions is
 	// carried and what it does not cover; see the analogous (not identical -
 	// Codex carries its own extra bullets) record on the Codex adapter
@@ -158,6 +160,8 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 		maxInlineBytes:  max,
 		taskPrompt:      spec.TaskPrompt,
 		model:           spec.Model,
+		effort:          spec.Effort,
+		effortOmitted:   effortOmitted,
 		claudeConfigDir: configDir,
 		unsetEnv:        unsetEnv,
 	}

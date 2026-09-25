@@ -231,3 +231,32 @@ func TestLongNamesAreCutNotWrapped(t *testing.T) {
 		t.Fatalf("long workspace name = %q (%d cells), want it cut to fit", l, cells(l))
 	}
 }
+
+// A crew spawned with a profile shows it in detail, beside its harness;
+// one spawned without shows neither field rather than an empty one.
+func TestCrewDetailShowsTheLaunchProfile(t *testing.T) {
+	tree := designTree()
+	for i := range tree.Projects {
+		if tree.Projects[i].Name != "payments-api" {
+			continue
+		}
+		tree.Projects[i].Crews[0].Model = "gpt-5.5"
+		tree.Projects[i].Crews[0].Effort = "high"
+	}
+	m := newFixture(t, tree, 40, 36, unicodeGlyphs)
+	for i := 0; i < 7; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	m, _ = send(t, m, key("enter")) // payments-api
+	m, _ = send(t, m, key("down"))  // the codex crew
+	frame := renderFrame(t, m)
+	for _, want := range []string{"model    gpt-5.5", "effort   high"} {
+		if !strings.Contains(frame, want) {
+			t.Fatalf("detail lacks %q:\n%s", want, frame)
+		}
+	}
+	m, _ = send(t, m, key("down")) // the claude crew, no profile
+	if frame := renderFrame(t, m); strings.Contains(frame, "model ") || strings.Contains(frame, "effort ") {
+		t.Fatalf("a crew with no profile shows model/effort fields:\n%s", frame)
+	}
+}

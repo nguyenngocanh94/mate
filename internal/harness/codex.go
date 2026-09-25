@@ -126,6 +126,8 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		return LaunchSpec{}, err
 	}
 	args := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride}
+	profile, effortOmitted := profileArgs(KindCodex, spec.Model, spec.Effort)
+	args = append(args, profile...)
 	if resumeID != "" {
 		// The subcommand takes the same flags as a fresh launch (0.154.0
 		// `codex resume --help`), and the id goes last, after every flag.
@@ -147,6 +149,8 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		maxFileBytes:    max,
 		taskPrompt:      spec.TaskPrompt,
 		model:           spec.Model,
+		effort:          spec.Effort,
+		effortOmitted:   effortOmitted,
 		notes: []string{
 			"the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code",
 			"the captain first chose the narrower --ask-for-approval never --sandbox workspace-write pair, then reversed that ruling the same day: a linked Crew worktree's .git is a pointer file into the primary repo's git dir, outside workspace-write's writable root, so a Codex Crew under the narrow pair could do work but could never git commit it (measured both directions) - and mate never commits on a Crew's behalf, it only fast-forwards the Crew branch, so uncommitted work can never be delivered",

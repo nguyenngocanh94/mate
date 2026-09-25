@@ -815,4 +815,23 @@ Quyết định:
 | 47 | `cmd/mate`: probe kind (CSI 6n), probe icon (font report của host), notice của split lỗi lên status line, WezTerm split theo cell. | Unit probe với fake host; chạy binary thật trong WezTerm.app: split 40/39 ở cửa sổ 80 cột, new project tạo và chọn hàng mới. Đã xong 2026-09-25. |
 | 48 | Acceptance live: Enter trên Mate và Crew đang chạy hiện đúng agent ở pane phải trong WezTerm và Ghostty, lần hai thay pane cũ. | Evidence `docs/evidence/m11-console-stage-<ngày>.md`. |
 
+### M12. Crew dispatch: harness, model, effort
+
+Chốt 2026-09-25, học theo firstmate (`config/crew-dispatch.json`, `fm-spawn.sh --harness --model --effort`).
+
+Quyết định:
+
+- `mate crew spawn` nhận `--model <name>` và `--effort low|medium|high|xhigh|max`, cạnh `--harness`. Trống là mặc định của harness, không truyền flag.
+- Claude: `--model`, `--effort` (claude 2.1.282). Codex: `-m`, `-c model_reasoning_effort="<e>"` (codex-cli 0.157.0), đặt trước session id khi resume.
+- Effort harness không nhận (Codex không có `max`) được ghi `effort=` vào meta nhưng không truyền, có note trên stderr (hợp đồng record-and-omit của firstmate).
+- Bảng `.mate/crew-dispatch.json` theo đúng schema firstmate: `rules[]` với `when` bằng lời, `use` là một profile hoặc mảng lựa chọn, `why` tuỳ chọn; `default` cùng dạng. Không có quota/typed resolution.
+- Binary không bao giờ khớp rule. Mate đọc `mate crew dispatch` (in bảng thành flag) và tự chọn; lời captain cho từng task thắng bảng, bảng thắng ý Mate; không tự chọn `max`.
+- Có bảng thì spawn thiếu `--harness` bị từ chối (exit 2); bảng hỏng (JSON sai, harness lạ, effort sai hoặc harness không nhận, model như flag, field lạ) chặn mọi spawn tới khi sửa.
+- Meta ghi `model=`, `effort=`; query, `crew list` (cột HARNESS: `codex gpt-5.5/high`) và detail console hiện chúng.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 49 | `harness`: `Effort`, `ParseModel`, argv hai adapter; `spawn`: request/meta/result; `internal/dispatch`: đọc và kiểm bảng; CLI `--model`, `--effort`, `crew dispatch [--example]`, gate khi có bảng; manual Mate §7 và skill harness-adapters. | Unit cho từng lớp; golden manual; hai CLI thật nhận đúng flag (`claude -p --model haiku --effort low`, `codex exec -m gpt-6-sol -c model_reasoning_effort="low"` in `reasoning effort: low`). `make check` xanh. Đã xong 2026-09-25. |
+| 50 | Acceptance live: Mate đọc bảng, spawn hai crew khác profile theo hai task khác độ khó, `crew list` và meta khớp. | Evidence `docs/evidence/m12-crew-dispatch-<ngày>.md`. |
+
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

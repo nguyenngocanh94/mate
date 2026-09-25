@@ -63,6 +63,8 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 
 	if err := w.WriteCrewMeta("shop", "k3", map[string]string{
 		"harness": "codex",
+		"model":   "gpt-5.5",
+		"effort":  "high",
 		"branch":  "mate/k3",
 		"pane":    "w1:p2",
 		"task":    "Add a healthcheck endpoint.",
@@ -78,7 +80,8 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 	}
 	// STATE is the app's word, NOTE the crew's own. A legacy `done:` line
 	// reads as `wait-mate` and its text lands in NOTE (mvp.md section 4b).
-	for _, want := range []string{"k3", "codex", "mate/k3", "wait-mate", "ready in branch mate/k3", "w1:p2"} {
+	// HARNESS carries the launch profile the crew was spawned with.
+	for _, want := range []string{"k3", "codex gpt-5.5/high", "mate/k3", "wait-mate", "ready in branch mate/k3", "w1:p2"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("out = %q, want it to carry %q", out.String(), want)
 		}

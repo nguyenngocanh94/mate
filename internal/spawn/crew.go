@@ -84,6 +84,12 @@ type SpawnCrewRequest struct {
 	// Harness is the harness kind to launch. Empty means the workspace
 	// default for a Crew (Codex).
 	Harness harness.Kind
+	// Model and Effort are the launch profile (harness.ParseModel,
+	// harness.ParseEffort). Empty is the harness's own default. The Mate
+	// picks them from .mate/crew-dispatch.json; the app never matches a
+	// rule, it only launches what it is told.
+	Model  string
+	Effort harness.Effort
 	// BriefFile is the file holding the task text. It must be readable and
 	// inside the workspace. Empty means BriefText is already the text
 	// (`--brief -` reads it from stdin).
@@ -108,16 +114,21 @@ type SpawnCrewRequest struct {
 // CrewResult is what a successful spawn established. Every field except the
 // three delivery ones is also a line of `crews/<id>.meta`.
 type CrewResult struct {
-	Project   string
-	Crew      string
-	Harness   harness.Kind
-	Task      string
-	Agent     string
-	Session   string
-	Workspace string
-	Tab       string
-	Pane      string
-	SessionID string
+	Project string
+	Crew    string
+	Harness harness.Kind
+	Model   string
+	Effort  harness.Effort
+	// EffortOmitted is true when Effort was recorded but left out of the
+	// launch because the harness does not take it.
+	EffortOmitted bool
+	Task          string
+	Agent         string
+	Session       string
+	Workspace     string
+	Tab           string
+	Pane          string
+	SessionID     string
 	// Repo is the name of the project repo the crew works in.
 	Repo   string
 	Branch string
@@ -251,6 +262,8 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		project:          project,
 		crew:             crew,
 		kind:             harnessKind,
+		model:            req.Model,
+		effort:           req.Effort,
 		task:             task,
 		brief:            briefText,
 		scout:            req.Scout,
@@ -319,6 +332,8 @@ type crewPlan struct {
 	project string
 	crew    string
 	kind    harness.Kind
+	model   string
+	effort  harness.Effort
 	// task is the one line recorded as `task=`; brief is the Mate's
 	// `# Task` text, already checked, that the template's `# Task` holds.
 	task  string
@@ -451,6 +466,12 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		// that verb is what the state resolves to (mvp.md section 4b).
 		MetaState: CrewStateSpawned,
 	}
+	if plan.model != "" {
+		meta[MetaModel] = plan.model
+	}
+	if plan.effort != "" {
+		meta[MetaEffort] = string(plan.effort)
+	}
 	if err := w.WriteCrewMeta(plan.project, plan.crew, meta); err != nil {
 		return CrewResult{}, err
 	}
@@ -458,6 +479,9 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		Project:         plan.project,
 		Crew:            plan.crew,
 		Harness:         plan.kind,
+		Model:           plan.model,
+		Effort:          plan.effort,
+		EffortOmitted:   plan.effort != "" && !plan.kind.SupportsEffort(plan.effort),
 		Task:            plan.task,
 		Agent:           handle.Name,
 		Session:         session.Name,
@@ -800,6 +824,8 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionI
 		// so the crew's identity (and MATE_STATUS) is injected by the tab
 		// create above.
 		Config: harness.Config{Kind: plan.kind},
+		Model:  plan.model,
+		Effort: plan.effort,
 	}
 	switch plan.kind {
 	case harness.KindClaude:

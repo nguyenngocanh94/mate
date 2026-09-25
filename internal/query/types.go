@@ -149,10 +149,15 @@ type CrewNode struct {
 	// `task=`). It is the Crew row's title.
 	Task        string
 	HarnessKind HarnessKind
-	Status      CrewStatus
-	CreatedAt   time.Time
-	Repo        Field[RepoValue]
-	Worktree    Field[WorktreeValue]
+	// Model and Effort are the launch profile the Crew was spawned with
+	// (`model=`, `effort=`): what was asked for, "" for the harness's own
+	// default. The model a harness actually ran is the ledger's, not this.
+	Model     string
+	Effort    string
+	Status    CrewStatus
+	CreatedAt time.Time
+	Repo      Field[RepoValue]
+	Worktree  Field[WorktreeValue]
 	// AgentName is the Herdr agent name recorded for this Crew, from its most
 	// recent runtime_binding row (released rows included) - see
 	// MateNode.AgentName.

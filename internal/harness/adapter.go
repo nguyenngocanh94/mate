@@ -19,7 +19,6 @@ type Adapter interface {
 type Config struct {
 	Kind       Kind
 	Executable string
-	Model      ModelRef
 	// CodexHome is $CODEX_HOME used for global instruction discovery.
 	// Empty means "not provided"; Codex validation then skips the global
 	// file rather than guessing ~/.codex (which would mix operator files
@@ -79,7 +78,11 @@ type AgentSpec struct {
 	// TaskPrompt is a Crew's first user message. It is intentionally separate
 	// from ContextPath: every harness instruction delivery is passive.
 	TaskPrompt string
-	Model      ModelRef
+	// Model and Effort are the launch profile (profile.go): empty is the
+	// harness's own default. An effort the harness does not take stays on
+	// the spec, so it is recorded, and is left out of the argv.
+	Model  string
+	Effort Effort
 }
 
 // CapabilitySet is what Validate returns. Unproven items stay marked.

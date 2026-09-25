@@ -47,6 +47,7 @@ Codex is the default Crew harness.
 | Idle composer | a bordered input box with the cursor in it |
 | Directory trust | `Do you trust the contents of this directory?`, asked per absolute path |
 | Instructions | the brief is delivered as a file in the worktree that Codex reads at startup |
+| Model and effort | `--model` becomes `-m <model>`; `--effort` low to xhigh becomes `model_reasoning_effort`; `max` is recorded, not passed |
 
 Codex confirms trust for each absolute path separately, and a Crew worktree is always a path it has never seen, so the dialog appears on essentially every spawn.
 `mate crew spawn` answers it during launch and prints a `note: answered the codex directory-trust dialog for <worktree>` line on stderr when it did.
@@ -65,6 +66,7 @@ Claude Code is what you run on, and what a Crew runs on when a spawn is given `-
 | Idle composer | a `>` prompt box |
 | Directory trust | a trust confirmation whose default highlight is the refusing option |
 | Instructions | the brief is delivered as a launch-time system prompt, so nothing lands in the worktree |
+| Model and effort | `--model` takes an alias (`haiku`, `sonnet`, `opus`) or a full name; `--effort` takes low to max |
 
 The trust dialog's default highlight is the choice that exits the agent.
 This is exactly why you have no key-sending command: a blind confirmation here kills the Crew rather than starting it.

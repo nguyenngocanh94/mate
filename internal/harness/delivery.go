@@ -102,7 +102,9 @@ type LaunchSpec struct {
 	maxInlineBytes  int
 	maxFileBytes    int
 	taskPrompt      string
-	model           ModelRef
+	model           string
+	effort          Effort
+	effortOmitted   bool
 	notes           []string
 	codexHome       string
 	claudeConfigDir string
@@ -160,7 +162,14 @@ func (s LaunchSpec) MaxFileBytes() int { return s.maxFileBytes }
 func (s LaunchSpec) TaskPrompt() string { return s.taskPrompt }
 
 // Model is the optional provider/model ref.
-func (s LaunchSpec) Model() ModelRef { return s.model }
+func (s LaunchSpec) Model() string { return s.model }
+
+// Effort is the requested reasoning effort, passed or not.
+func (s LaunchSpec) Effort() Effort { return s.effort }
+
+// EffortOmitted reports that Effort was requested but left out of the argv
+// because the harness does not take it.
+func (s LaunchSpec) EffortOmitted() bool { return s.effortOmitted }
 
 // CodexHome is the effective configured CODEX_HOME used while validating
 // instruction discovery. Empty means the provider default is in effect.

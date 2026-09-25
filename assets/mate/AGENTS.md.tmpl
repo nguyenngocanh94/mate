@@ -144,7 +144,8 @@ Exit 2 is a usage mistake you made, exit 1 is a refusal or a real failure, and t
 ### Crew lifecycle
 
 ```text
-mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]
+mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]
+mate crew dispatch [--workspace <dir>]
 mate crew list <project> [--workspace <dir>]
 mate crew stop <project> <id> [--discard] [--workspace <dir>]
 ```
@@ -157,12 +158,16 @@ Before it creates anything, `crew spawn` runs the check `brief check` runs (belo
 `--scout` makes the task a scout (section 5): the brief must then have a `## Deliverable`, and the Crew is told to write its report to `{{.CrewsDir}}/<id>/report.md` instead of committing.
 Without `--scout` it is a ship, and a `## Deliverable` is refused.
 `--task "<one line>"` is the label recorded in the crew's record and shown by `crew list`; without it the first line of the brief's `## Captain's words` is used.
-`--harness` defaults to the workspace default for a Crew, which is Codex; you do not normally set it.
+`--harness`, `--model` and `--effort` are the Crew's launch profile; section 7 says how to choose them.
+Without them the Crew runs the workspace default harness, which is Codex, on that harness's own model and effort.
+An effort the harness does not take (Codex has no `max`) is recorded and left out of the launch, with a note on stderr.
+`crew dispatch` prints the captain's dispatch table, `{{.WorkspaceRoot}}/.mate/crew-dispatch.json`: each rule's condition and its profiles as the exact flags to pass.
+While that table exists, a spawn without `--harness` is refused (exit 2), and a malformed table refuses every spawn until the captain fixes it.
 
 A successful spawn prints three lines:
 
 ```text
-spawned {{.ProjectName}}/k3: agent crew-k3-ab12 in pane pane-7 (harness codex, repo {{.ExampleRepo.Name}}, branch mate/k3, worktree {{.WorkspaceRoot}}/.worktrees/{{.ProjectName}}-k3)
+spawned {{.ProjectName}}/k3: agent crew-k3-ab12 in pane pane-7 (harness codex, model gpt-5.5, effort medium, repo {{.ExampleRepo.Name}}, branch mate/k3, worktree {{.WorkspaceRoot}}/.worktrees/{{.ProjectName}}-k3)
 brief {{.CrewsDir}}/k3/brief.md
 status {{.CrewsDir}}/k3.status
 ```
@@ -537,12 +542,19 @@ Your own build constraints still go to the Crew as one `mate send` line, not int
 
 ## 7. Spawn
 
-You yourself run on the `{{.Harness}}` harness; that has no bearing on which harness a Crew runs, which `mate crew spawn` resolves on its own.
+You yourself run on the `{{.Harness}}` harness; that has no bearing on which harness a Crew runs.
+
+**Choose the profile first.** Run `{{.MatevBin}} crew dispatch` before a spawn.
+With no table it says so, and you spawn without `--harness`, `--model` or `--effort`.
+With a table, match the task to the first rule whose condition fits, by your own judgment of the brief, and pass that rule's flags exactly; when the rule lists alternatives, pick one and say why in your note to the captain.
+No rule fits: use `default`.
+The captain's own words for this task ("use opus", "keep it cheap") beat the table; the table beats your own preference.
+Never pick `max` effort unless the captain asked for it.
 Spawn one Crew per task, and one Crew per repo:
 
 ```text
-{{.MatevBin}} crew spawn {{.ProjectName}} <id> --repo <repo> --brief {{.MateDir}}/briefs/<id>.md --task "<one line>"
-{{.MatevBin}} crew spawn {{.ProjectName}} <id> --repo <repo> --brief {{.MateDir}}/briefs/<id>.md --scout --task "<one line>"
+{{.MatevBin}} crew spawn {{.ProjectName}} <id> --repo <repo> --brief {{.MateDir}}/briefs/<id>.md [<profile flags>] --task "<one line>"
+{{.MatevBin}} crew spawn {{.ProjectName}} <id> --repo <repo> --brief {{.MateDir}}/briefs/<id>.md --scout [<profile flags>] --task "<one line>"
 ```
 
 The first form spawns a ship; the second, with `--scout`, a scout, whose brief must carry a `## Deliverable` (section 4).
