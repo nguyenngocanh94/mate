@@ -50,7 +50,7 @@ func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 	if p.Repos.State != Known || len(p.Repos.Value) != 1 {
 		t.Fatalf("repos = %+v, want the one registered repo", p.Repos)
 	}
-	if got, want := p.Repos.Value[0].Path, filepath.Join(ws.Root(), "shop"); got != want {
+	if got, want := p.Repos.Value[0].Path, "shop"; got != want {
 		t.Fatalf("repo path = %q, want %q", got, want)
 	}
 	if got := p.Repos.Value[0].DefaultBranch; got != store.DefaultBranch {

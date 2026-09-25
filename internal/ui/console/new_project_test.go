@@ -306,23 +306,32 @@ func TestCtrlCStillQuitsFromTheNewProjectInput(t *testing.T) {
 	}
 }
 
-// TestNewProjectFormRefusesAnEmptyRepoWithoutCallingTheService: the bridge
-// cannot register a repo it has not been given, so the form never sends one
-// without it - the refusal is here, before anything runs, not after.
-func TestNewProjectFormRefusesAnEmptyRepoWithoutCallingTheService(t *testing.T) {
-	m, got := withRunner(loaded(t, emptyWorkspaceTree(), nil), "must not run", nil)
+// TestNewProjectFormSendsNoRepoWhenTheRepoIsLeftEmpty: the repo is
+// optional (docs/mvp.md M9). Name, Enter, Enter creates the Project with no
+// repo - the request carries none - and the key line says so before the
+// second Enter.
+func TestNewProjectFormSendsNoRepoWhenTheRepoIsLeftEmpty(t *testing.T) {
+	m, got := withRunner(loaded(t, emptyWorkspaceTree(), nil), "Project ledger added with no repo yet", nil)
 	m, _ = send(t, m, key("n"))
 	m = typeText(t, m, "ledger")
 	m = fillRepo(t, m, "  ")
+	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create without repo") {
+		t.Fatalf("an empty repo field does not say Enter creates the Project without one:\n%s", view)
+	}
 	m, cmd := send(t, m, key("enter"))
-	if cmd != nil || len(*got) != 0 {
-		t.Fatalf("a blank repo dispatched: cmd=%v calls=%d", cmd, len(*got))
+	if cmd == nil {
+		t.Fatal("enter on an empty repo did not dispatch")
 	}
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "repo path is required") {
-		t.Fatalf("refusal message = %+v", m.msg)
+	m, _ = send(t, m, cmd())
+	if len(*got) != 1 {
+		t.Fatalf("runner calls = %d, want exactly one", len(*got))
 	}
-	if !m.actionInputMode || m.actionField != fieldRepo {
-		t.Fatalf("the refusal moved the reader away from the repo field: input=%v field=%d", m.actionInputMode, m.actionField)
+	req := (*got)[0]
+	if req.Action != ActionOnboard || req.TargetKind != "workspace" || req.Input != "ledger" || req.Repo != "" {
+		t.Fatalf("onboard request = %+v, want a workspace onboard for ledger with no repo", req)
+	}
+	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "no repo yet") {
+		t.Fatalf("result message = %+v, want the service's own reply", m.msg)
 	}
 }
 
@@ -345,11 +354,15 @@ func TestNewProjectFormFieldsAreEditedIndependently(t *testing.T) {
 		t.Fatalf("backspace on an empty repo: input=%v field=%d name=%q, want back on the kept name",
 			m.actionInputMode, m.actionField, m.actionInput)
 	}
-	if view := renderFrame(t, m); !strings.Contains(view, "relative to /Users/dev/work/acme") {
+	if view := renderFrame(t, m); !strings.Contains(view, "relative to the workspace:") || !strings.Contains(view, "    /Users/dev/work/acme") {
 		t.Fatalf("form view does not name the root a relative repo resolves against:\n%s", view)
 	}
 	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyTab})
+	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create without repo") {
+		t.Fatalf("empty repo field view does not offer to create without a repo:\n%s", view)
+	}
+	m = typeText(t, m, "ledger")
 	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create project") {
-		t.Fatalf("repo field view does not offer the create key:\n%s", view)
+		t.Fatalf("typed repo field view does not offer the create key:\n%s", view)
 	}
 }

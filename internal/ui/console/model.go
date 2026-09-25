@@ -115,7 +115,8 @@ type ActionRequest struct {
 	Input      string // project name for onboarding; the line to send for forward/reply
 	// Repo is the repository path a workspace onboard registers, as typed
 	// into the new-project form: absolute, or relative to the workspace
-	// root. Empty on every other request.
+	// root. Empty on a workspace onboard means the Project starts with no
+	// repo (docs/mvp.md M9), and it is empty on every other request.
 	Repo string
 	// Crew is the crew a box action names (mvp.md task 15). It is separate
 	// from Target because those actions are addressed to a Project *and* one

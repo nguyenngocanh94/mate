@@ -352,12 +352,12 @@ func sampleTree() query.Snapshot {
 					Error: query.AbsentField[query.ErrorReason](notErrorState),
 				},
 				Repos: query.KnownField([]query.RepoValue{
-					{RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api", Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main"},
+					{RepoID: "payments-api", DisplayName: "payments-api", Path: "repos/payments-api", DefaultBranch: "main"},
 				}),
 				Crews: []query.CrewNode{
 					{
 						CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-						RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+						RepoID: "payments-api",
 						Task:   "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
 						Status: query.CrewFailed,
 						// `failed` is terminal, so this row lives in the
@@ -365,8 +365,8 @@ func sampleTree() query.Snapshot {
 						Closed:      true,
 						HarnessKind: query.HarnessCodex,
 						Repo: query.KnownField(query.RepoValue{
-							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-							Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
+							RepoID: "payments-api", DisplayName: "payments-api",
+							Path: "repos/payments-api", DefaultBranch: "main",
 						}),
 						Worktree: query.KnownField(query.WorktreeValue{
 							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
@@ -390,13 +390,13 @@ func sampleTree() query.Snapshot {
 					},
 					{
 						CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
-						RepoID:      "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+						RepoID:      "payments-api",
 						Task:        "Add idempotency-key index",
 						Status:      query.CrewWorking,
 						HarnessKind: query.HarnessClaude,
 						Repo: query.KnownField(query.RepoValue{
-							RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-							Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
+							RepoID: "payments-api", DisplayName: "payments-api",
+							Path: "repos/payments-api", DefaultBranch: "main",
 						}),
 						Worktree: query.KnownField(query.WorktreeValue{
 							Path:   "/Users/dev/work/acme/.worktrees/payments-api-crew_01J9P6Q6W0E5V8XK2M4B8DT",
@@ -424,6 +424,9 @@ func sampleTree() query.Snapshot {
 				Mode:      query.ModeAuto,
 				Name:      "ledger-worker",
 				Mate:      absentMate("this project has no designated Mate"),
+				Repos: query.KnownField([]query.RepoValue{
+					{RepoID: "ledger-worker", DisplayName: "ledger-worker", Path: "repos/ledger-worker", DefaultBranch: "main"},
+				}),
 				// A project whose crews directory is empty still reads
 				// successfully: box.Load returns an empty view, which is Known
 				// and not Absent - "nothing has been written yet" is a fact,
