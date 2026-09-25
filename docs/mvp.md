@@ -240,6 +240,10 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Trust dialog: Claude highlight mặc định là "No, exit"; gửi Enter mù là chết agent. Nhận diện dialog theo shape, một phím một lần, đọc lại giữa các lần.
   Worktree liên kết KHÔNG thừa kế trust với Codex: đo 2026-09-17 (task 11, Codex 0.154), crew trong `.worktrees/<p>-<id>` vẫn hiện directory-trust dialog vì Codex xác nhận theo từng absolute path.
   ADR 0028 của v1 nói ngược lại; settle step là bắt buộc cho crew, không phải thủ tục.
+- Harness tự cập nhật đổi màn hình khởi động. Đo 2026-09-25: Claude Code tự lên 2.1.282 lúc 02:30, ô soạn tin trống thành `❯` NBSP `Try "edit <filepath> to..."` (gợi ý đổi giữa các lần launch), mọi start Mate Claude chờ 90 giây rồi chết với `startup screen not recognised`.
+  Gợi ý chỉ được coi là ô trống khi nằm giữa hai dòng kẻ của ô soạn tin và không có gì sau dấu nháy đóng; chữ khác sau `❯` là có người gõ, không phải ô trống.
+  Hệ quả dây chuyền cùng ngày: 90 giây "Running …" trông như treo, captain thoát console giữa chừng, Herdr đã launch agent nhưng `mate.meta` chưa ghi; lần start sau đụng tên với chính agent đó, và bước bù trừ dừng agent theo tên nên giết luôn nó.
+  Luật từ đó: bù trừ chạy với context không bị huỷ (tối đa 30 giây) và console chờ action bị bỏ dở xong mới thoát; bù trừ chỉ dừng agent Herdr báo nằm trong pane của chính lần start đó; start thấy agent `mate-<project>` không có trong `mate.meta` thì nhận lại nếu cwd là thư mục Mate, từ chối và không đụng tới nếu ở chỗ khác; dòng "Running" hiện số giây đã chờ.
 - Startup không chỉ có một modal. Đo 2026-09-18 (codex-cli 0.154.0 đã cài, 0.155.0 vừa ra): Codex vẽ prompt cập nhật ba lựa chọn TRƯỚC trust dialog, mọi `crew spawn` chết với `target_blocked: startup screen not recognised`.
   Settle phải xử lý một chuỗi dialog (cập nhật → trust → composer), mỗi cái vẫn một phím một lần và xác minh highlight trước Enter, với trần 3 dialog mỗi lần khởi động.
   Trả lời `3. Skip until next version` (không phải `2. Skip`, sẽ hiện lại ngay lần sau; không phải `1. Update now`, chạy `npm install` dưới agent).
