@@ -168,7 +168,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	repoCfg, err := cfg.CrewRepo(meta)
 	if err != nil {
 		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
-			fmt.Sprintf("crew %s/%s: %v", project, crew, err))
+			fmt.Sprintf("crew %s/%s (meta %s): %v", project, crew, w.CrewMeta(project, crew), err))
 	}
 	out.DefaultBranch = repoCfg.DefaultBranch
 

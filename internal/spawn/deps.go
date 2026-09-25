@@ -92,6 +92,9 @@ type Deps struct {
 	BriefDeliveryTimeout time.Duration
 	// Git runs the crew worktree commands. The zero value is the real git.
 	Git gitx.Git
+	// Worktrees acquires and releases crew working copies. Nil means
+	// GitWorktrees over Git: linked git worktrees under `.worktrees/`.
+	Worktrees Worktrees
 	// Sleep is the pause between pane polls; tests shorten it.
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Now is the clock the meta's timestamps come from.
@@ -159,6 +162,15 @@ func (d Deps) git() gitx.Git {
 		return d.Git
 	}
 	return gitx.New()
+}
+
+// worktrees is the working-copy backend a spawn acquires from and a stop
+// releases to.
+func (d Deps) worktrees() Worktrees {
+	if d.Worktrees != nil {
+		return d.Worktrees
+	}
+	return GitWorktrees{Git: d.git()}
 }
 
 func (d Deps) startTimeout() time.Duration {

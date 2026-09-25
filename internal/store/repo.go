@@ -77,11 +77,16 @@ func (cfg ProjectConfig) SoleRepo() (RepoConfig, error) {
 func (cfg ProjectConfig) CrewRepo(meta map[string]string) (RepoConfig, error) {
 	name := strings.TrimSpace(meta[MetaRepo])
 	if name == "" {
-		r, err := cfg.SoleRepo()
-		if err != nil {
-			return RepoConfig{}, fmt.Errorf("crew meta names no repo (written before M9): %w", err)
+		// SoleRepo's own fix (`--repo`) is a spawn flag and means nothing
+		// for a crew that already exists; the fix here is the meta line.
+		switch len(cfg.Repos) {
+		case 0:
+			return RepoConfig{}, fmt.Errorf("%w: crew meta names no repo (written before M9) and the project has none; register the crew's repo with `mate project repo add`, then add `repo=<name>` to the crew's .meta", ErrNoRepo)
+		case 1:
+			return cfg.Repos[0], nil
+		default:
+			return RepoConfig{}, fmt.Errorf("%w: crew meta names no repo (written before M9) and the project has several (%s); add `repo=<name>` naming the crew's repo to the crew's .meta", ErrAmbiguousRepo, strings.Join(cfg.RepoNames(), ", "))
 		}
-		return r, nil
 	}
 	r, ok := cfg.Repo(name)
 	if !ok {

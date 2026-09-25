@@ -380,7 +380,7 @@ func TestDiffIsTheCLIsTextAndSaysSoWhenTheBranchIsGone(t *testing.T) {
 	// A branch git no longer has: the answer is empty with a reason, not an
 	// error, because a crew whose branch was deleted is a crew whose work
 	// landed.
-	f.server.deps.BranchExists = func(context.Context, string, string) (bool, error) { return false, nil }
+	f.server.deps.BranchExists = func(context.Context, string, string, string) (bool, error) { return false, nil }
 	f.server.cache = newCache()
 	var gone DiffResponse
 	f.get(t, "/api/projects/"+fixtureProject+"/tasks/"+fixtureCrew+"/diff", http.StatusOK, &gone)

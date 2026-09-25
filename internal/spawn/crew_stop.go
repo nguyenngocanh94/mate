@@ -126,7 +126,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	repoCfg, err := cfg.CrewRepo(meta)
 	if err != nil {
 		return StopResult{}, observability.WrapError(observability.CodeStateConflict,
-			fmt.Sprintf("crew stop %s/%s refused, nothing was stopped", project, crew), err)
+			fmt.Sprintf("crew stop %s/%s refused, nothing was stopped (meta %s)", project, crew, w.CrewMeta(project, crew)), err)
 	}
 	repo := w.RepoDir(repoCfg.Path)
 	git := deps.git()
@@ -235,16 +235,19 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		stoppedMeta = clearCrewRunMeta(meta)
 	}
 
-	// 4. `git worktree remove --force`, then the branch - only when it is
-	// already contained in default or the caller accepted the loss.
+	// 4. The worktree is given back, then the branch - only when it is
+	// already contained in default or the caller accepted the loss. Two
+	// releases, not one, because the result reports each half.
+	worktrees := deps.worktrees()
+	lease := WorktreeLease{Repo: repo, Path: worktree, Branch: branch, Base: repoCfg.DefaultBranch}
 	if worktreeExists {
-		if err := git.RemoveWorktree(ctx, repo, worktree); err != nil {
+		if err := worktrees.Release(ctx, lease, ReleaseParts{Worktree: true}); err != nil {
 			return out, err
 		}
 		out.WorktreeRemoved = true
 	}
 	if branchExists && (isAncestor || discard) {
-		if err := git.DeleteBranch(ctx, repo, branch); err != nil {
+		if err := worktrees.Release(ctx, lease, ReleaseParts{Branch: true}); err != nil {
 			return out, err
 		}
 		out.BranchRemoved = true
@@ -275,7 +278,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 // the branch, the worktree and the harness session identity.
 func clearCrewRunMeta(meta map[string]string) map[string]string {
 	next := map[string]string{}
-	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, MetaStartedAt, MetaLaunchedAt} {
+	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, store.MetaRepo, MetaStartedAt, MetaLaunchedAt} {
 		if v, ok := meta[key]; ok {
 			next[key] = v
 		}

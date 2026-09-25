@@ -240,7 +240,7 @@ func TestDashboardDiffIsTheCLIsOwnText(t *testing.T) {
 	if got.Exists || got.Text != "" || got.Reason == "" {
 		t.Fatalf("diff = %+v, want an empty answer with a reason", got)
 	}
-	if _, err := dashboardDeps(w).BranchExists(context.Background(), "shop", "nosuch"); err != nil {
+	if _, err := dashboardDeps(w).BranchExists(context.Background(), "shop", "k3", "nosuch"); err != nil {
 		t.Fatalf("BranchExists on a real repo: %v", err)
 	}
 }
