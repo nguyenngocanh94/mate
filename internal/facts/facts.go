@@ -25,7 +25,10 @@ import (
 
 // Facts is what Gather found about one branch of one repository.
 type Facts struct {
-	Project       string
+	Project string
+	// RepoName is the repo's name inside its project, the `<repo>:` of a
+	// PROJECT.md anchor (docs/mvp.md M9).
+	RepoName      string
 	Repo          string
 	DefaultBranch string
 	// HasCommit is false for a branch with no commit, including the unborn
@@ -33,8 +36,8 @@ type Facts struct {
 	HasCommit bool
 	// Head is the abbreviated commit the branch points at, empty when it
 	// has none. It is the anchor PROJECT.md's repo-state lines carry
-	// (`main@<head>`), so a fact can be told apart from one recorded
-	// before the branch moved.
+	// (`<repo>:main@<head>`), so a fact can be told apart from one
+	// recorded before the branch moved.
 	Head    string
 	Commits int
 	Files   int
@@ -81,9 +84,10 @@ var docNames = map[string]bool{"AGENTS.md": true, "CLAUDE.md": true, "README.md"
 // somebody else's project.
 var skippedDirs = map[string]bool{"node_modules": true, "vendor": true, "third_party": true, ".git": true}
 
-// Gather reads the facts of branch in repo.
-func Gather(ctx context.Context, git gitx.Git, project, repo, branch string) (Facts, error) {
-	f := Facts{Project: project, Repo: repo, DefaultBranch: branch}
+// Gather reads the facts of branch in the repository at repo, registered in
+// project as repoName.
+func Gather(ctx context.Context, git gitx.Git, project, repoName, repo, branch string) (Facts, error) {
+	f := Facts{Project: project, RepoName: repoName, Repo: repo, DefaultBranch: branch}
 	ref := "refs/heads/" + branch
 	has, err := git.RevisionExists(ctx, repo, ref)
 	if err != nil {
@@ -151,23 +155,48 @@ func isBuildFile(p string) bool {
 }
 
 // NoHead is the head line of a branch with no commit, and the anchor a
-// PROJECT.md fact recorded then carries (`main@none`).
+// PROJECT.md fact recorded then carries (`<repo>:main@none`).
 const NoHead = "none"
+
+// Anchor is the anchor a PROJECT.md repo-state line carries for a fact
+// about repo: `<repo>:<branch>@<head>`, or `@none` for an empty head
+// (docs/mvp.md M9).
+func Anchor(repo, branch, head string) string {
+	if head == "" {
+		head = NoHead
+	}
+	return repo + ":" + branch + "@" + head
+}
+
+// Anchor is the anchor a fact recorded now about this repo carries.
+func (f Facts) Anchor() string {
+	return Anchor(f.RepoName, f.DefaultBranch, f.Head)
+}
+
+// NoRepoLines is what `project facts` prints for a project without a repo:
+// there is nothing to gather, and nothing a crew could work in.
+func NoRepoLines(project string) []string {
+	return []string{
+		"repos: none",
+		fmt.Sprintf("hint: project %s has no repo yet, so no crew can be spawned; add one with `mate project repo add %s <repo-path>`", project, project),
+	}
+}
 
 // maxListed bounds each list line: past it the line ends in `+N more`.
 const maxListed = 30
 
-// Lines renders the facts as the fixed block `project facts` prints.
+// Lines renders the facts as the fixed block `project facts` prints for
+// one repo. The head line spells out the anchor a fact recorded now carries.
 func (f Facts) Lines() []string {
-	lines := []string{fmt.Sprintf("%s: repo %s, default branch %s", f.Project, f.Repo, f.DefaultBranch)}
+	lines := []string{fmt.Sprintf("%s: repo %s at %s, default branch %s", f.Project, f.RepoName, f.Repo, f.DefaultBranch)}
 	if !f.HasCommit {
 		lines = append(lines,
 			fmt.Sprintf("commits: 0 (%s has no commit yet)", f.DefaultBranch),
-			"head: "+NoHead,
+			fmt.Sprintf("head: %s (anchor %s)", NoHead, f.Anchor()),
 			"tree: empty",
 		)
 	} else {
-		lines = append(lines, fmt.Sprintf("commits: %d on %s", f.Commits, f.DefaultBranch), "head: "+f.Head)
+		lines = append(lines, fmt.Sprintf("commits: %d on %s", f.Commits, f.DefaultBranch), fmt.Sprintf("head: %s (anchor %s)", f.Head, f.Anchor()))
 		if f.Files == 0 {
 			lines = append(lines, "tree: empty")
 		} else {

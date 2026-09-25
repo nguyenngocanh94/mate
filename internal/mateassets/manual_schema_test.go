@@ -79,13 +79,97 @@ func TestManualSection4TeachesTheCheckRules(t *testing.T) {
 	}
 }
 
-// TestManualFactsExampleIsTheRealOutput: the empty-repository example in
-// section 4 is what `project facts` prints, byte for byte.
-func TestManualFactsExampleIsTheRealOutput(t *testing.T) {
+// noRepoParams and twoRepoParams are fixedParams for a project with no repo
+// and one with two (docs/mvp.md M9).
+func noRepoParams() Params {
 	p := fixedParams()
-	want := strings.Join(facts.Facts{Project: p.ProjectName, Repo: p.ProjectRepo, DefaultBranch: p.DefaultBranch}.Lines(), "\n")
-	if !strings.Contains(renderedManual(t), "```text\n"+want+"\n```") {
-		t.Fatalf("section 4's project facts example is not the real output:\n%s", want)
+	p.Repos = nil
+	return p
+}
+
+func twoRepoParams() Params {
+	p := fixedParams()
+	p.Repos = append(p.Repos, RepoParams{Name: "api", Path: "/ws/api", DefaultBranch: "develop"})
+	return p
+}
+
+func renderWith(t *testing.T, p Params) string {
+	t.Helper()
+	got, err := Render(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
+// TestManualFactsExampleIsTheRealOutput: the example in section 4 is what
+// `project facts` prints, byte for byte: the first repo's block while its
+// branch is empty, or the no-repo lines for a project with none.
+func TestManualFactsExampleIsTheRealOutput(t *testing.T) {
+	for name, p := range map[string]Params{"none": noRepoParams(), "one": fixedParams(), "two": twoRepoParams()} {
+		t.Run(name, func(t *testing.T) {
+			want := strings.Join(facts.NoRepoLines(p.ProjectName), "\n")
+			if len(p.Repos) > 0 {
+				r := p.Repos[0]
+				want = strings.Join(facts.Facts{Project: p.ProjectName, RepoName: r.Name, Repo: r.Path, DefaultBranch: r.DefaultBranch}.Lines(), "\n")
+			}
+			sec := section(t, renderWith(t, p), "## 4. The `mate` command contract")
+			if !strings.Contains(sec, "```text\n"+want+"\n```") {
+				t.Fatalf("section 4's project facts example is not the real output:\n%s", want)
+			}
+		})
+	}
+}
+
+// TestManualListsTheRepos: section 1 lists every repo with its absolute
+// path and default branch, or says there is none and what that means.
+func TestManualListsTheRepos(t *testing.T) {
+	sec := section(t, renderWith(t, twoRepoParams()), "## 1. Identity and prime directives")
+	for _, want := range []string{
+		"| Repo | Path | Default branch |",
+		"| `shop` | `/ws/shop` | `main` |",
+		"| `api` | `/ws/api` | `develop` |",
+		"exactly one repo",
+		"`/usr/local/bin/mate project repo list shop`",
+	} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("section 1 with two repos does not say %q", want)
+		}
+	}
+	none := section(t, renderWith(t, noRepoParams()), "## 1. Identity and prime directives")
+	for _, want := range []string{"no repo yet", "no Crew can be spawned", "`mate project repo add shop <repo-path>`"} {
+		if !strings.Contains(none, want) {
+			t.Errorf("section 1 with no repo does not say %q", want)
+		}
+	}
+	if strings.Contains(none, "| Repo |") {
+		t.Error("section 1 with no repo still prints a repo table")
+	}
+}
+
+// TestManualTeachesOneCrewOneRepo: the manual teaches --repo, the rule it
+// follows, splitting work that spans repos into several Crews, and the
+// <repo>:<branch>@<sha> anchor; no example names a repo the project lacks.
+func TestManualTeachesOneCrewOneRepo(t *testing.T) {
+	text := renderWith(t, twoRepoParams())
+	for heading, wants := range map[string][]string{
+		"## 4. The `mate` command contract": {"[--repo <name>]", "repo shop, branch mate/k3", "<repo>:<branch>@<sha>", "shop:main@none"},
+		"## 5. Task intake":                 {"one Crew per repo"},
+		"## 7. Spawn":                       {"--repo <repo>", "required", "one Crew per repo", "blocked-by:"},
+		"## 14. Project memory":             {"<repo>:<branch>@<sha>", "shop:main@3f2a91c"},
+	} {
+		sec := section(t, text, heading)
+		for _, want := range wants {
+			if !strings.Contains(sec, want) {
+				t.Errorf("%s does not say %q", heading, want)
+			}
+		}
+	}
+	none := renderWith(t, noRepoParams())
+	for _, gone := range []string{"shop:main@", "/ws/shop"} {
+		if strings.Contains(none, gone) {
+			t.Errorf("the manual of a project with no repo names %q", gone)
+		}
 	}
 }
 

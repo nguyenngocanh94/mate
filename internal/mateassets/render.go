@@ -39,10 +39,9 @@ type Params struct {
 	ProjectName string
 	// WorkspaceRoot is the absolute path of the workspace directory.
 	WorkspaceRoot string
-	// ProjectRepo is the absolute path of the project's primary git checkout.
-	ProjectRepo string
-	// DefaultBranch is the branch Crew worktrees branch from and merge into.
-	DefaultBranch string
+	// Repos are the project's repos as of this start, in the project's
+	// order: zero or more, each Crew working in exactly one (docs/mvp.md M9).
+	Repos []RepoParams
 	// Mode is the project's delivery mode (`local-only` in the MVP).
 	Mode string
 	// Yolo reports whether the Mate may approve merges without asking.
@@ -70,6 +69,28 @@ type Params struct {
 	// crew's `.meta` and `.status` file lives. The Mate reads it, never
 	// writes it.
 	CrewsDir string
+}
+
+// RepoParams is one repo of the project, as the manual lists it.
+type RepoParams struct {
+	// Name is the repo's name inside the project: `crew spawn --repo`, the
+	// `<repo>:` of a PROJECT.md anchor.
+	Name string
+	// Path is the absolute path of the repo's git checkout.
+	Path string
+	// DefaultBranch is the branch this repo's Crew worktrees branch from and
+	// merge into.
+	DefaultBranch string
+}
+
+// ExampleRepo is the repo the manual's examples name: the project's first,
+// or placeholders when it has none, so an example never names a repo the
+// project does not have.
+func (p Params) ExampleRepo() RepoParams {
+	if len(p.Repos) > 0 {
+		return p.Repos[0]
+	}
+	return RepoParams{Name: "<repo>", Path: "<repo-path>", DefaultBranch: "<branch>"}
 }
 
 // Render fills assets/mate/AGENTS.md.tmpl with p and returns the result. It

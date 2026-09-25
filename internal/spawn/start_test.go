@@ -12,6 +12,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 func TestStartMateWritesManualAndMeta(t *testing.T) {
@@ -385,5 +386,57 @@ func TestStartMateRefusesAnUnregisteredProject(t *testing.T) {
 	}
 	if len(rt.Calls) != 0 {
 		t.Fatalf("calls %v, want nothing to have reached Herdr", rt.Calls)
+	}
+}
+
+// startedManual starts a Mate for shop and returns the manual it was given.
+func startedManual(t *testing.T, w *store.Workspace) string {
+	t.Helper()
+	if _, err := spawn.StartMate(context.Background(), w, fakeDeps(t, runtime.NewFake()), spawn.StartRequest{Project: "shop"}); err != nil {
+		t.Fatalf("StartMate: %v", err)
+	}
+	manual, err := os.ReadFile(filepath.Join(w.MateDir("shop"), "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(manual)
+}
+
+// TestStartMateForAProjectWithNoRepo: a project with no repo still gets a
+// Mate (docs/mvp.md M9); its manual says no Crew can be spawned yet.
+func TestStartMateForAProjectWithNoRepo(t *testing.T) {
+	w, err := store.Init(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AddProject("shop", store.ProjectConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	manual := startedManual(t, w)
+	if !strings.Contains(manual, "no repo yet") || !strings.Contains(manual, "mate project repo add shop <repo-path>") {
+		t.Fatal("the manual of a project with no repo does not say so, or how one is added")
+	}
+}
+
+// TestStartMateForAProjectWithTwoRepos: the manual lists every repo with
+// its absolute path and its own default branch.
+func TestStartMateForAProjectWithTwoRepos(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	api := filepath.Join(w.Root(), "api")
+	if err := os.MkdirAll(api, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitInit(t, api)
+	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api", Path: api, DefaultBranch: "develop"}); err != nil {
+		t.Fatal(err)
+	}
+	manual := startedManual(t, w)
+	for _, row := range []string{
+		"| `shop` | `" + w.RepoDir("shop") + "` | `main` |",
+		"| `api` | `" + api + "` | `develop` |",
+	} {
+		if !strings.Contains(manual, row) {
+			t.Errorf("the manual does not list the repo row %s", row)
+		}
 	}
 }
