@@ -803,7 +803,9 @@ Quyết định:
 - Chức năng backend chưa có thì không vẽ theo board (tool call cuối, Answered today, New crew, tokens in/out); frame hiện đúng thứ snapshot có.
 - Harness vẽ bằng icon thay chữ; Nerd Font chỉ khi `cmd/mate` hỏi font report của host thấy glyph, không thì ✻ ⌬.
 - Kind mark đo bằng CSI 6n một lần trước khi TUI chạy, lệch thì lùi về ◆ ◇; `MATE_KINDS` ghi đè (phím gõ trong ≤150ms probe có thể mất).
-- WezTerm: stage split theo cell để mate giữ `clamp(cols/5, 40, 48)` cột; CLI lấy từ `WEZTERM_EXECUTABLE_DIR` (bản .app không có `wezterm` trong PATH).
+- WezTerm: stage split theo cell để mate giữ `clamp(cols/5, 40, 48)` cột; CLI lấy từ `WEZTERM_EXECUTABLE_DIR`, rồi PATH, rồi app bundle (bản .app không có `wezterm` trong PATH).
+- Attach của stage luôn `--takeover`: stage là nơi captain muốn xem agent, nên lấy terminal từ client nào còn giữ nó.
+- Ghostty `close` bỏ surface nhưng để tiến trình con chạy tiếp, vẫn attach (đo 2026-09-25, Ghostty 1.3.1). Trước khi thay stage, `pkill -f -x` đúng dòng lệnh attach của stage cũ (chỉ stage mới có `-` đầu do `login`/`exec -l`), rồi mới `close`, rồi `split`.
 - Quy tắc tên project nằm ở `internal/names`, store và form New project dùng chung.
 
 | # | Task | Xong khi |

@@ -66,7 +66,12 @@ func attachArgs(herdr, session, agent string) (string, []string) {
 	if herdr == "" {
 		herdr = "herdr"
 	}
-	return herdr, []string{"--session", session, "agent", "attach", agent}
+	// --takeover: the stage is where the captain asked to see this agent,
+	// so it takes the agent's terminal from any client still holding it - a
+	// stage pane Ghostty has not closed yet, or one left by an earlier run.
+	// Without it herdr refuses ("already has an attached client") and the
+	// new pane exits at once.
+	return herdr, []string{"--session", session, "agent", "attach", agent, "--takeover"}
 }
 
 func attachCommand(herdr, session, agent string) string {

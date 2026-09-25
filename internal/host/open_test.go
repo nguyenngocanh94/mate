@@ -27,7 +27,7 @@ func TestResolveExecLooksUpPATH(t *testing.T) {
 func TestGhosttyAttachCommandIsAbsoluteShellString(t *testing.T) {
 	t.Parallel()
 	got := ghosttyAttachCommand("/opt/herdr", "mate-acme", "mate-shop")
-	want := "/opt/herdr --session mate-acme agent attach mate-shop"
+	want := "/opt/herdr --session mate-acme agent attach mate-shop --takeover"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}

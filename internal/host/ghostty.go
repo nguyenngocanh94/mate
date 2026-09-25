@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -15,6 +16,9 @@ type ghostty struct {
 
 	mu   sync.Mutex
 	last StageHandle
+	// lastTarget is the agent the last stage attached, "" for the empty
+	// pane EnsureSplit makes: whose client to end before replacing it.
+	lastTarget StageTarget
 }
 
 func newGhostty(opt Options) *ghostty {
@@ -59,6 +63,11 @@ func (g *ghostty) Stage(ctx context.Context, target StageTarget) (StageHandle, e
 		return StageHandle{}, errForeignPane()
 	}
 	if ours {
+		// Ghostty's close drops the surface but leaves its process
+		// running, still attached to the agent. End the old stage's client
+		// first; its surface then holds no process, so the close needs no
+		// confirmation.
+		g.endClient(ctx)
 		if err := g.close(ctx, last.PaneID); err != nil {
 			return StageHandle{}, err
 		}
@@ -67,7 +76,28 @@ func (g *ghostty) Stage(ctx context.Context, target StageTarget) (StageHandle, e
 	if err != nil {
 		return StageHandle{}, err
 	}
-	return g.commit(id), nil
+	h := g.commit(id)
+	g.mu.Lock()
+	g.lastTarget = target
+	g.mu.Unlock()
+	return h, nil
+}
+
+// endClient ends the `herdr agent attach` the last stage started, found by
+// its exact command line. Only a stage launches one with a leading "-"
+// (login's `exec -l`, which Ghostty wraps every command in), so a client
+// the captain runs in a shell of their own is never matched. No match is
+// not an error: the client may already have exited.
+func (g *ghostty) endClient(ctx context.Context) {
+	g.mu.Lock()
+	t := g.lastTarget
+	g.mu.Unlock()
+	if t.AgentName == "" {
+		return
+	}
+	name, args := attachArgs(resolveExec(g.herdr), t.Session, t.AgentName)
+	pattern := "^-" + regexp.QuoteMeta(name+" "+strings.Join(args, " ")) + "$"
+	_, _ = g.runner.Run(ctx, process.Spec{Name: "pkill", Args: []string{"-f", "-x", pattern}})
 }
 
 func (g *ghostty) layout(ctx context.Context) ([]string, StageHandle, bool, error) {

@@ -39,7 +39,7 @@ func TestWezTermStageSplitsThenReplacesOwnPane(t *testing.T) {
 	assertWeztermSeq(t, fake.Calls, [][]string{
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
 		{"cli", "list", "--format", "json"},
-		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop"},
+		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop", "--takeover"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
 	assertNoSendText(t, fake.Calls)
@@ -56,7 +56,7 @@ func TestWezTermStageSplitsThenReplacesOwnPane(t *testing.T) {
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
 		{"cli", "kill-pane", "--pane-id", "20"},
 		{"cli", "list", "--format", "json"},
-		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "crew-k3"},
+		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "crew-k3", "--takeover"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
 	assertNoSendText(t, fake.Calls)
@@ -146,7 +146,7 @@ func TestWezTermEnsureSplitThenStageReplacesTheEmptyPane(t *testing.T) {
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
 		{"cli", "kill-pane", "--pane-id", "20"},
 		{"cli", "list", "--format", "json"},
-		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop"},
+		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop", "--takeover"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
 }
