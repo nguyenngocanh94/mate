@@ -408,17 +408,40 @@ func cmdProjectFacts(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// TODO(mvp.md task 41): one block per repo, and `repos: none`.
-	repoCfg, err := cfg.SoleRepo()
+	lines, err := projectFactsLines(context.Background(), w, gitx.New(), name, cfg, false)
 	if err != nil {
 		return fmt.Errorf("project facts %s: %w", name, err)
 	}
-	f, err := facts.Gather(context.Background(), gitx.New(), name, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch)
-	if err != nil {
-		return fmt.Errorf("project facts %s: %w", name, err)
-	}
-	for _, line := range f.Lines() {
+	for _, line := range lines {
 		fmt.Fprintln(stdout, line)
 	}
 	return nil
+}
+
+// projectFactsLines is `project facts` over every repo of the project: one
+// block per repo in the project's order, a blank line between blocks, or
+// facts.NoRepoLines for a project with none (docs/mvp.md M9). With
+// keepGoing, a repo git cannot read prints its failure in its block's place
+// and the other blocks still print; without it the first failure is
+// returned and nothing is.
+func projectFactsLines(ctx context.Context, w *store.Workspace, git gitx.Git, project string, cfg store.ProjectConfig, keepGoing bool) ([]string, error) {
+	if len(cfg.Repos) == 0 {
+		return facts.NoRepoLines(project), nil
+	}
+	var lines []string
+	for i, r := range cfg.Repos {
+		if i > 0 {
+			lines = append(lines, "")
+		}
+		f, err := facts.Gather(ctx, git, project, r.Name, w.RepoDir(r.Path), r.DefaultBranch)
+		if err != nil {
+			if !keepGoing {
+				return nil, fmt.Errorf("repo %s: %w", r.Name, err)
+			}
+			lines = append(lines, fmt.Sprintf("%s: repo %s at %s: project facts failed: %v", project, r.Name, w.RepoDir(r.Path), err))
+			continue
+		}
+		lines = append(lines, f.Lines()...)
+	}
+	return lines, nil
 }

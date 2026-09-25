@@ -204,46 +204,126 @@ func TestCheckRules(t *testing.T) {
 	}
 }
 
-func TestCheckProjectAnchors(t *testing.T) {
+// problemStrings renders problems the way memory check prints them.
+func problemStrings(ps []Problem) []string {
+	var out []string
+	for _, p := range ps {
+		out = append(out, p.String())
+	}
+	return out
+}
+
+func assertAnchors(t *testing.T, got, want []Anchor) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("anchors = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("anchor %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+// assertProblems holds problems to one prefix each, in order.
+func assertProblems(t *testing.T, ps []Problem, prefixes ...string) {
+	t.Helper()
+	got := problemStrings(ps)
+	if len(got) != len(prefixes) {
+		t.Fatalf("problems:\n%s\nwant %d", strings.Join(got, "\n"), len(prefixes))
+	}
+	for i, p := range prefixes {
+		if !strings.HasPrefix(got[i], p) {
+			t.Errorf("problem %d = %q, want prefix %q", i+1, got[i], p)
+		}
+	}
+}
+
+var oneRepo = []Repo{{Name: "shop", Branch: "main"}}
+
+// TestCheckProjectAnchorsOneRepo: with one repo the anchor is
+// <repo>:<branch>@<sha>, and the bare <branch>@<sha> every PROJECT.md was
+// written with before M9 stays valid, so no workspace goes red.
+func TestCheckProjectAnchorsOneRepo(t *testing.T) {
 	doc := ProjectTemplate("shop")
-	if anchors, problems := CheckProject(doc, "main"); len(anchors) != 0 || len(problems) != 0 {
+	if anchors, problems := CheckProject(doc, oneRepo); len(anchors) != 0 || len(problems) != 0 {
 		t.Fatalf("a fresh PROJECT.md has anchors %v, problems %v", anchors, problems)
 	}
 	doc = strings.Join([]string{
 		"# shop",
 		"## What this project is",
-		"- A storefront. (captain, 2026-09-17)", // not repo state: no anchor needed
+		"- A storefront. (captain, 2026-09-17)", // 3: not repo state: no anchor needed
 		"## Layout and state",
-		"- main has no commit. (mate project facts, main@none, 2026-09-19)",
-		"- A Hugo site. (crews/k1/report.md §Durable facts, main@3f2a91c, 2026-09-24)",
-		"- An app with no anchor. (crews/k1/report.md)",
-		"- Anchored on another branch. (dev@3f2a91c)",
-		"- Only the word domain@none.com. (captain)",
+		"- main has no commit. (mate project facts, shop:main@none, 2026-09-19)",       // 5
+		"- A Hugo site. (crews/k1/report.md §Durable facts, main@3f2a91c, 2026-09-24)", // 6: bare, pre-M9
+		"- An app with no anchor. (crews/k1/report.md)",                                // 7
+		"- Anchored on another branch. (shop:dev@3f2a91c)",                             // 8
+		"- Only the word domain@none.com. (captain)",                                   // 9
+		"- Anchored in a repo the project lacks. (api:main@3f2a91c)",                   // 10
 		"## How to work here",
-		"- make build (crews/k1/report.md, main@3f2a91cdeadbeef)",
-		"- make test (crews/k1/report.md)",
+		"- make build (crews/k1/report.md, shop:main@3f2a91cdeadbeef)", // 12
+		"- make test (crews/k1/report.md)",                             // 13
 		"## Research on file",
 		"- crews/k1/report.md", // not repo state
 	}, "\n")
-	anchors, problems := CheckProject(doc, "main")
-	var got []string
-	for _, p := range problems {
-		got = append(got, p.String())
+	anchors, problems := CheckProject(doc, oneRepo)
+	want := "line has no shop:main@<sha> anchor: add the head `mate project facts` printed when the fact was recorded, e.g. (crews/k1/report.md §Durable facts, shop:main@3f2a91c, 2026-09-24)"
+	assertProblems(t, problems,
+		"PROJECT.md:7: `## Layout and state` "+want,
+		"PROJECT.md:8: ", "PROJECT.md:9: ", "PROJECT.md:10: ",
+		"PROJECT.md:13: `## How to work here` "+want)
+	assertAnchors(t, anchors, []Anchor{{5, "shop", "none"}, {6, "shop", "3f2a91c"}, {12, "shop", "3f2a91cdeadbeef"}})
+}
+
+// TestCheckProjectAnchorsTwoRepos: each anchor names its repo and that
+// repo's own default branch; a bare anchor no longer says which repo it
+// is about, and the problem says how to fix it.
+func TestCheckProjectAnchorsTwoRepos(t *testing.T) {
+	repos := []Repo{{Name: "shop", Branch: "main"}, {Name: "api", Branch: "release/2.x"}}
+	doc := strings.Join([]string{
+		"# shop",
+		"## Layout and state",
+		"- The web app. (crews/k1/report.md, shop:main@3f2a91c)",                             // 3
+		"- The API. (crews/k2/report.md, api:release/2.x@none)",                              // 4
+		"- Both talk JSON. (crews/k3/report.md, shop:main@aaaaaaa, api:release/2.x@bbbbbbb)", // 5
+		"- A bare anchor. (crews/k1/report.md, main@3f2a91c)",                                // 6
+		"- The API on the web's branch. (api:main@3f2a91c)",                                  // 7
+		"## How to work here",
+		"- make test (crews/k1/report.md)", // 9
+		"",
+	}, "\n")
+	anchors, problems := CheckProject(doc, repos)
+	assertProblems(t, problems,
+		"PROJECT.md:6: `## Layout and state` line's anchor main@3f2a91c names no repo, and the project has 2: write it as shop:main@3f2a91c if the fact is about shop",
+		"PROJECT.md:7: `## Layout and state` line has no <repo>:<branch>@<sha> anchor for one of the project's repos (shop:main@<sha>, api:release/2.x@<sha>)",
+		"PROJECT.md:9: `## How to work here` line has no <repo>:<branch>@<sha> anchor")
+	assertAnchors(t, anchors, []Anchor{
+		{3, "shop", "3f2a91c"}, {4, "api", "none"}, {5, "shop", "aaaaaaa"}, {5, "api", "bbbbbbb"},
+	})
+}
+
+// TestCheckProjectAnchorsNoRepo: with no repo there is nothing a repo-state
+// line can be anchored to, so every one is a problem, anchored or not.
+func TestCheckProjectAnchorsNoRepo(t *testing.T) {
+	if anchors, problems := CheckProject(ProjectTemplate("shop"), nil); len(anchors) != 0 || len(problems) != 0 {
+		t.Fatalf("a fresh PROJECT.md with no repo has anchors %v, problems %v", anchors, problems)
 	}
-	if len(got) != 4 ||
-		!strings.HasPrefix(got[0], "PROJECT.md:7: `## Layout and state` line has no main@<sha> anchor") ||
-		!strings.HasPrefix(got[1], "PROJECT.md:8: ") || !strings.HasPrefix(got[2], "PROJECT.md:9: ") ||
-		!strings.HasPrefix(got[3], "PROJECT.md:12: `## How to work here` line has no main@<sha> anchor") {
-		t.Fatalf("problems:\n%s", strings.Join(got, "\n"))
-	}
-	want := []Anchor{{5, "none"}, {6, "3f2a91c"}, {11, "3f2a91cdeadbeef"}}
-	if len(anchors) != len(want) {
-		t.Fatalf("anchors = %v, want %v", anchors, want)
-	}
-	for i := range want {
-		if anchors[i] != want[i] {
-			t.Errorf("anchor %d = %v, want %v", i, anchors[i], want[i])
-		}
+	doc := strings.Join([]string{
+		"# shop",
+		"## What this project is",
+		"- A storefront. (captain, 2026-09-17)",
+		"## Layout and state",
+		"- A Hugo site. (crews/k1/report.md, shop:main@3f2a91c)", // 5
+		"## How to work here",
+		"- make build (crews/k1/report.md, main@3f2a91c)", // 7
+	}, "\n")
+	anchors, problems := CheckProject(doc, nil)
+	msg := "line states repository state, but the project has no repo: ask the captain to add it (`mate project repo add <project> <repo-path>`), or remove the line"
+	assertProblems(t, problems,
+		"PROJECT.md:5: `## Layout and state` "+msg,
+		"PROJECT.md:7: `## How to work here` "+msg)
+	if len(anchors) != 0 {
+		t.Fatalf("anchors = %v, want none without a repo", anchors)
 	}
 }
 
@@ -276,5 +356,13 @@ func TestHeadersHaveTheirSections(t *testing.T) {
 		if !strings.Contains(ProjectTemplate("shop"), "\n## "+s+"\n") {
 			t.Errorf("PROJECT.md template lacks ## %s", s)
 		}
+	}
+	for _, s := range RepoStateSections {
+		if !strings.Contains(ProjectTemplate("shop"), "\n## "+s+"\n"+RepoStateComment+"\n") {
+			t.Errorf("PROJECT.md template's ## %s does not open with the anchor shape", s)
+		}
+	}
+	if !strings.Contains(RepoStateComment, "<repo>:<branch>@<sha>") {
+		t.Errorf("RepoStateComment = %q does not name the anchor shape", RepoStateComment)
 	}
 }

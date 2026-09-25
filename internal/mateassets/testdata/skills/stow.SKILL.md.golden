@@ -81,7 +81,7 @@ Decay advances only when a pass runs.
    If it does, record a one-line pointer to that owner instead of a copy, so the stowed note cannot go stale independently of its source.
 4. Route each finding by the table in section 2 of your manual; it is the source of truth for destinations, and this skill does not repeat it.
    Write a new captain preference with `/usr/local/bin/mate remember shop --captain --source <src> "<line>"` and a new lesson with `--lesson`, adding `--perishable "<expiry condition>"` when it has one.
-   Write a project fact into `/ws/.mate/projects/shop/PROJECT.md` yourself, with its source, and a repo-state fact with the `main@<sha>` head `project facts` printed (section 14).
+   Write a project fact into `/ws/.mate/projects/shop/PROJECT.md` yourself, with its source, and a repo-state fact with the `<repo>:<branch>@<sha>` anchor `project facts` printed for that repo (section 14).
    A rule the captain would want every Crew of this project to follow belongs in `/ws/.mate/projects/shop/CREW.md`, and a rule for every project in `/ws/.mate/WORKSPACE.md` or `/ws/.mate/CREW.md`: those files are the captain's, so propose the exact line to the captain in the receipt and never write it; until they add it, keep it under `## Lessons` and put it in the `## Build` of every brief it applies to.
    Knowledge about the project's code is never yours to write; a Crew records it in the repository's `AGENTS.md` through a ship.
 5. Read the destination before writing: inspect-then-update, never blind-append.

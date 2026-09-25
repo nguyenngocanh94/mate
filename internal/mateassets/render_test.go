@@ -18,8 +18,7 @@ func fixedParams() Params {
 	return Params{
 		ProjectName:      "shop",
 		WorkspaceRoot:    "/ws",
-		ProjectRepo:      "/ws/shop",
-		DefaultBranch:    "main",
+		Repos:            []RepoParams{{Name: "shop", Path: "/ws/shop", DefaultBranch: "main"}},
 		Mode:             "local-only",
 		Yolo:             false,
 		Harness:          "claude-code",

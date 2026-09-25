@@ -219,7 +219,7 @@ func TestMemoryCheckCLIReportsEveryRule(t *testing.T) {
 		"memory.md:6: aging entry last reinforced " + old + ", 30 days ago",
 		"memory.md:7: perishable entry last reinforced " + week + ", 7 days ago",
 		`memory.md:8: source "/private/tmp/x/report.md" is an absolute path outside the workspace`,
-		"PROJECT.md:4: `## Layout and state` line has no main@<sha> anchor",
+		"PROJECT.md:4: `## Layout and state` line has no shop:main@<sha> anchor",
 		"budget: ",
 		"mate: memory check: 7 problem(s) in shop's memory",
 	}
@@ -263,9 +263,9 @@ func TestMemoryCheckWarnsOnAnchorsOlderThanHead(t *testing.T) {
 	}
 	lines := strings.Split(strings.TrimRight(errw, "\n"), "\n")
 	want := []string{
-		"warning: PROJECT.md lines 3, 6 are anchored at main@" + first + ", and main has 2 newer commit(s); treat them as a hint until a report or hand-back confirms it",
-		"warning: PROJECT.md line 8 is anchored at main@abcdef0, and main's history does not contain abcdef0; treat it as a hint until a report or hand-back confirms it",
-		"warning: PROJECT.md line 7 is anchored at main@none, and main has 3 commit(s) since; treat it as a hint until a report or hand-back confirms it",
+		"warning: PROJECT.md lines 3, 6 are anchored at shop:main@" + first + ", and shop:main has 2 newer commit(s); treat them as a hint until a report or hand-back confirms it",
+		"warning: PROJECT.md line 8 is anchored at shop:main@abcdef0, and shop:main's history does not contain abcdef0; treat it as a hint until a report or hand-back confirms it",
+		"warning: PROJECT.md line 7 is anchored at shop:main@none, and shop:main has 3 commit(s) since; treat it as a hint until a report or hand-back confirms it",
 	}
 	got := map[string]bool{}
 	for _, l := range lines {
@@ -281,6 +281,63 @@ func TestMemoryCheckWarnsOnAnchorsOlderThanHead(t *testing.T) {
 	}
 	if !strings.Contains(out, "memory ok: 0 captain entries, 0 lesson(s), 5 anchored PROJECT.md line(s)") {
 		t.Fatalf("stdout = %q", out)
+	}
+}
+
+// TestMemoryCheckTwoReposComparesEachAnchorWithItsOwnRepo: with two repos
+// each anchor names its repo and is compared with that repo's head only;
+// a bare anchor no longer says which repo it is about and is a problem.
+func TestMemoryCheckTwoReposComparesEachAnchorWithItsOwnRepo(t *testing.T) {
+	w := twoRepoWorkspace(t)
+	shop := w.RepoDir("shop")
+	first := strings.TrimSpace(gitOut(t, shop, "rev-parse", "--short", "main"))
+	runGitOrFatal(t, shop, "commit", "--allow-empty", "-m", "two")
+	head := strings.TrimSpace(gitOut(t, shop, "rev-parse", "--short", "main"))
+	doc := strings.Join([]string{
+		"# shop",
+		"## Layout and state",
+		"- Web, recorded at head. (crews/k1/report.md, shop:main@" + head + ")",          // 3
+		"- Web, recorded before. (crews/k1/report.md, shop:main@" + first + ")",          // 4
+		"- API, still empty. (project facts, api:develop@none)",                          // 5
+		"- API, recorded at web's head by mistake. (crews/k2, api:develop@" + head + ")", // 6
+		"",
+	}, "\n")
+	writeMemoryFiles(t, w, memory.Header, doc)
+	code, out, errw := memoryCheckCLI(t, w)
+	if code != 0 {
+		t.Fatalf("exit %d\n%s%s", code, out, errw)
+	}
+	want := []string{
+		"warning: PROJECT.md line 4 is anchored at shop:main@" + first + ", and shop:main has 1 newer commit(s); treat it as a hint until a report or hand-back confirms it",
+		"warning: PROJECT.md line 6 is anchored at api:develop@" + head + ", and api:develop has no commit now; treat it as a hint until a report or hand-back confirms it",
+	}
+	if got := strings.Split(strings.TrimRight(errw, "\n"), "\n"); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("stderr:\n%s\nwant:\n%s", errw, strings.Join(want, "\n"))
+	}
+	if !strings.Contains(out, "memory ok: 0 captain entries, 0 lesson(s), 4 anchored PROJECT.md line(s)") {
+		t.Fatalf("stdout = %q", out)
+	}
+
+	writeMemoryFiles(t, w, memory.Header, "# shop\n\n## Layout and state\n- Bare. (crews/k1/report.md, main@"+head+")\n")
+	code, _, errw = memoryCheckCLI(t, w)
+	if code != 1 || !strings.Contains(errw, "PROJECT.md:4: `## Layout and state` line's anchor main@"+head+" names no repo, and the project has 2: write it as shop:main@"+head+" if the fact is about shop") {
+		t.Fatalf("a bare anchor with two repos: exit %d\n%s", code, errw)
+	}
+}
+
+// TestMemoryCheckNoRepo: a project without a repo can still be checked;
+// every repo-state line is a problem, and nothing is compared with git.
+func TestMemoryCheckNoRepo(t *testing.T) {
+	w := noRepoWorkspace(t)
+	writeMemoryFiles(t, w, memory.Header, memory.ProjectTemplate("shop"))
+	code, out, errw := memoryCheckCLI(t, w)
+	if code != 0 || errw != "" {
+		t.Fatalf("a fresh project with no repo: exit %d\n%s%s", code, out, errw)
+	}
+	writeMemoryFiles(t, w, memory.Header, "# shop\n\n## Layout and state\n- A Hugo site. (crews/k1/report.md, shop:main@3f2a91c)\n")
+	code, _, errw = memoryCheckCLI(t, w)
+	if code != 1 || !strings.HasPrefix(errw, "PROJECT.md:4: `## Layout and state` line states repository state, but the project has no repo: ask the captain to add it") {
+		t.Fatalf("exit %d\n%s", code, errw)
 	}
 }
 

@@ -17,7 +17,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
-	"github.com/nguyenngocanh94/mate/internal/facts"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -323,38 +322,27 @@ func inboxLine(w *store.Workspace, project string, e query.BoxEntry) string {
 // the digest is still worth reading.
 func recallFacts(ctx context.Context, w *store.Workspace, git gitx.Git, project string, cfg store.ProjectConfig) recallPart {
 	title := "Project facts (mate project facts " + project + ")"
-	// TODO(mvp.md task 41): one block per repo.
-	repoCfg, err := cfg.SoleRepo()
-	if err != nil {
-		return recallPart{2, title, fmt.Sprintf("project facts: %v\n", err)}
-	}
-	f, err := facts.Gather(ctx, git, project, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch)
-	if err != nil {
-		return recallPart{2, title, fmt.Sprintf("project facts failed: %v\n", err)}
-	}
-	return recallPart{2, title, strings.Join(f.Lines(), "\n") + "\n"}
+	lines, _ := projectFactsLines(ctx, w, git, project, cfg, true)
+	return recallPart{2, title, strings.Join(lines, "\n") + "\n"}
 }
 
-// recallProjectDoc is part 3: PROJECT.md, and which of its anchors the
-// default branch has moved past.
+// recallProjectDoc is part 3: PROJECT.md, and which of its anchors their
+// own repo's default branch has moved past.
 func recallProjectDoc(ctx context.Context, w *store.Workspace, git gitx.Git, project string, cfg store.ProjectConfig) (recallPart, error) {
 	body := framedFile(memory.ProjectFileName, w.ProjectDoc(project))
 	doc, err := readOptional(w.ProjectDoc(project))
 	if err != nil {
 		return recallPart{}, err
 	}
-	var warnings []string
-	if repoCfg, err := cfg.SoleRepo(); err != nil {
-		warnings = []string{fmt.Sprintf("warning: %s's anchors were not compared: %v", memory.ProjectFileName, err)}
-	} else {
-		anchors, _ := memory.CheckProject(doc, repoCfg.DefaultBranch)
-		warnings, err = anchorWarnings(ctx, git, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch, anchors)
+	anchors, _ := memory.CheckProject(doc, anchorRepos(cfg))
+	for _, r := range cfg.Repos {
+		warnings, err := anchorWarnings(ctx, git, w.RepoDir(r.Path), r, anchorsIn(anchors, r.Name))
 		if err != nil {
-			warnings = []string{fmt.Sprintf("warning: could not compare %s's anchors with %s: %v", memory.ProjectFileName, repoCfg.DefaultBranch, err)}
+			warnings = []string{fmt.Sprintf("warning: could not compare %s's anchors with %s:%s: %v", memory.ProjectFileName, r.Name, r.DefaultBranch, err)}
 		}
-	}
-	for _, line := range warnings {
-		body += line + "\n"
+		for _, line := range warnings {
+			body += line + "\n"
+		}
 	}
 	return recallPart{3, memory.ProjectFileName, body}, nil
 }
