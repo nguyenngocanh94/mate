@@ -100,6 +100,9 @@ type SpawnCrewRequest struct {
 	// to catch is exactly a scout brief that forgot that section - inferred,
 	// it would silently become a ship.
 	Scout bool
+	// Repo names the project repo the crew works in (`--repo`). Empty means
+	// the project's one repo; a project with several must be told which.
+	Repo string
 }
 
 // CrewResult is what a successful spawn established. Every field except the
@@ -115,7 +118,9 @@ type CrewResult struct {
 	Tab       string
 	Pane      string
 	SessionID string
-	Branch    string
+	// Repo is the name of the project repo the crew works in.
+	Repo   string
+	Branch string
 	// Worktree and BriefPath are absolute; the meta records the worktree
 	// relative to the workspace root.
 	Worktree   string
@@ -189,10 +194,9 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if err != nil {
 		return CrewResult{}, err
 	}
-	repoCfg, err := cfg.SoleRepo()
+	repoCfg, err := spawnRepo(cfg, project, req.Repo)
 	if err != nil {
-		return CrewResult{}, observability.WrapError(observability.CodeUsage,
-			"crew spawn refused, nothing was created", err)
+		return CrewResult{}, err
 	}
 	harnessKind := req.Harness
 	if harnessKind == "" {
@@ -233,19 +237,16 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	repo := w.RepoDir(repoCfg.Path)
 	branch := CrewBranchPrefix + crew
 	worktree := w.WorktreeDir(project, crew)
-	git := deps.git()
-	if err := checkWorktreePreconditions(ctx, git, repo, worktree, branch, repoCfg.DefaultBranch); err != nil {
-		return CrewResult{}, err
-	}
+	lease := WorktreeLease{Repo: repo, Path: worktree, Branch: branch, Base: repoCfg.DefaultBranch}
 
-	// 2. The worktree. From here on every failure is compensated.
-	if err := os.MkdirAll(w.WorktreesDir(), 0o755); err != nil {
+	// 2. The worktree. Acquire refuses before creating anything when its
+	// preconditions fail, and undoes itself when its isolation guard does;
+	// from here on every failure is compensated.
+	worktrees := deps.worktrees()
+	if err := worktrees.Acquire(ctx, lease); err != nil {
 		return CrewResult{}, err
 	}
-	if err := git.AddWorktree(ctx, repo, worktree, branch, repoCfg.DefaultBranch); err != nil {
-		return CrewResult{}, err
-	}
-	saga := &crewSaga{deps: deps, git: git, repo: repo, worktree: worktree, branch: branch}
+	saga := &crewSaga{deps: deps, git: deps.git(), worktrees: worktrees, lease: lease}
 	result, err := spawnInWorktree(ctx, w, deps, saga, crewPlan{
 		project:          project,
 		crew:             crew,
@@ -262,7 +263,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	})
 	if err != nil {
 		saga.compensate(ctx)
-		recordFailedSpawn(w, project, crew, harnessKind, task, branch, err)
+		recordFailedSpawn(w, project, crew, harnessKind, task, repoCfg.Name, branch, err)
 		return CrewResult{}, err
 	}
 	result.StaleMeta = staleMeta
@@ -284,7 +285,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 //
 // Its own failure is swallowed. The caller must see why the spawn was
 // refused, not why the bookkeeping afterwards was untidy.
-func recordFailedSpawn(w *store.Workspace, project, crew string, kind harness.Kind, task, branch string, cause error) {
+func recordFailedSpawn(w *store.Workspace, project, crew string, kind harness.Kind, task, repo, branch string, cause error) {
 	if _, err := os.Stat(w.CrewDir(project, crew)); err != nil {
 		return
 	}
@@ -292,6 +293,7 @@ func recordFailedSpawn(w *store.Workspace, project, crew string, kind harness.Ki
 		MetaTask:         task,
 		MetaHarness:      string(kind),
 		MetaBranch:       branch,
+		store.MetaRepo:   repo,
 		MetaState:        CrewStateFailed,
 		MetaFailedReason: oneLineReason(cause),
 	})
@@ -335,14 +337,6 @@ type crewPlan struct {
 // spawnInWorktree is everything a failure has to compensate for: the brief,
 // the tab, the agent, the startup settle, the brief delivery and the meta.
 func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *crewSaga, plan crewPlan) (CrewResult, error) {
-	// The tangle guard, before a single byte is written into the worktree:
-	// the new worktree must be its own top level and must not be the
-	// project's primary checkout. A `worktree add` that silently landed in
-	// the primary repo would let a crew commit on the user's own branch.
-	if err := assertIsolatedWorktree(ctx, saga.git, plan.repo, plan.worktree); err != nil {
-		return CrewResult{}, err
-	}
-
 	// 3. The files. brief.md is written before anything can fail in Herdr so
 	// that the compensated worktree still leaves the evidence behind.
 	briefPath := w.CrewBrief(plan.project, plan.crew)
@@ -471,6 +465,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		Tab:             tab.TabID,
 		Pane:            tab.PaneID,
 		SessionID:       sessionID,
+		Repo:            plan.repoCfg.Name,
 		Branch:          plan.branch,
 		Worktree:        plan.worktree,
 		BriefPath:       briefPath,
@@ -487,11 +482,12 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 // crewSaga records what a spawn has created so a failure can undo it in
 // reverse order.
 type crewSaga struct {
-	deps     Deps
-	git      gitx.Git
-	repo     string
-	worktree string
-	branch   string
+	deps Deps
+	// git runs the commands inside the acquired worktree (its local
+	// exclude file); worktrees and lease are how the worktree is given back.
+	git       gitx.Git
+	worktrees Worktrees
+	lease     WorktreeLease
 
 	session      runtime.SessionHandle
 	tab          runtime.TabHandle
@@ -516,11 +512,12 @@ func (s *crewSaga) compensate(ctx context.Context) {
 	if s.agentName != "" && s.session.Name != "" {
 		s.deps.Names.Release(s.session.Name, s.agentName)
 	}
-	// The worktree is removed before the branch: git refuses to delete a
-	// branch that a worktree still has checked out.
-	_ = s.git.RemoveWorktree(ctx, s.repo, s.worktree)
-	_ = os.RemoveAll(s.worktree)
-	_ = s.git.DeleteBranch(ctx, s.repo, s.branch)
+	// The worktree is released before the branch: git refuses to delete a
+	// branch that a worktree still has checked out. Each step runs even when
+	// the one before failed.
+	_ = s.worktrees.Release(ctx, s.lease, ReleaseParts{Worktree: true})
+	_ = os.RemoveAll(s.lease.Path)
+	_ = s.worktrees.Release(ctx, s.lease, ReleaseParts{Branch: true})
 }
 
 // refuseIfCrewLive re-asks Herdr about the agent name in `crews/<id>.meta`,

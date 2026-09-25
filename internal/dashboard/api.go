@@ -153,7 +153,7 @@ func (s *Server) handleTask(ctx context.Context, r *http.Request, env envelope) 
 	return TaskResponse{
 		envelope: env, Project: project, Crew: crew, Ledger: ledger,
 		Turns: turns, StatusLines: lines, Questions: questions,
-		Branch: s.branch(ctx, project, ledger.Branch),
+		Branch: s.branch(ctx, project, crew, ledger.Branch),
 	}, nil
 }
 
@@ -195,7 +195,7 @@ func (s *Server) handleDiff(ctx context.Context, r *http.Request, env envelope) 
 		return nil, err
 	}
 	out := DiffResponse{envelope: env, Project: project, Crew: crew, Branch: ledger.Branch}
-	branch := s.branch(ctx, project, ledger.Branch)
+	branch := s.branch(ctx, project, crew, ledger.Branch)
 	out.Exists = branch.Exists
 	if !branch.Exists {
 		out.Reason = branch.Reason
@@ -217,16 +217,16 @@ func (s *Server) handleDiff(ctx context.Context, r *http.Request, env envelope) 
 	return out, nil
 }
 
-// branch answers whether a crew's branch is still in the repo. With no
+// branch answers whether a crew's branch is still in its repo. With no
 // BranchExists seam it says so in Reason rather than claiming either way.
-func (s *Server) branch(ctx context.Context, project, name string) Branch {
+func (s *Server) branch(ctx context.Context, project, crew, name string) Branch {
 	if name == "" {
 		return Branch{Reason: "this crew recorded no branch"}
 	}
 	if s.deps.BranchExists == nil {
 		return Branch{Name: name, Reason: "this server was started without a git reader"}
 	}
-	exists, err := s.deps.BranchExists(ctx, project, name)
+	exists, err := s.deps.BranchExists(ctx, project, crew, name)
 	if err != nil {
 		return Branch{Name: name, Reason: err.Error()}
 	}

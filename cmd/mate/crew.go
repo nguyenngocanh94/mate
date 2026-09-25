@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,17 +31,18 @@ func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 // cmdCrewSpawn implements
-// `mate crew spawn <project> <id> --brief <file> [--scout] [--harness codex|claude] [--task "<one line>"]`.
+// `mate crew spawn <project> <id> --brief <file> [--repo <name>] [--scout] [--harness codex|claude] [--task "<one line>"]`.
 func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("crew spawn", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--scout] [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]`)
+		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--task "<one line>"]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
 	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the workspace default)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")
+	repoFlag := fs.String("repo", "", "the project repo the crew works in (required when the project has several)")
 	taskFlag := fs.String("task", "", "one line recorded as task= (default: the brief's first line)")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
@@ -53,7 +55,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 		fs.Usage()
 		return newUsageError("mate crew spawn: --brief is required")
 	}
-	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag, Scout: *scoutFlag}
+	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag, Scout: *scoutFlag, Repo: *repoFlag}
 	if *briefFlag == "-" {
 		text, err := spawn.ReadBriefStdin(stdin)
 		if err != nil {
@@ -75,6 +77,11 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 		return err
 	}
 	res, err := spawn.SpawnCrew(context.Background(), w, spawn.LiveDeps(), req)
+	if errors.Is(err, spawn.ErrRepoRefused) {
+		// Which repo a crew works in is the caller's argument to get right,
+		// so it exits 2 like any other bad argument.
+		return &usageError{err}
+	}
 	if err != nil {
 		return err
 	}
@@ -100,8 +107,8 @@ func writeCrewSpawnReport(stdout, stderr io.Writer, w *store.Workspace, res spaw
 	if res.DeliveryWarning != "" {
 		fmt.Fprintf(stderr, "warning: %s\nlast pane lines:\n%s\n", res.DeliveryWarning, res.PaneTail)
 	}
-	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s, branch %s, worktree %s)\n",
-		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, res.Branch, res.Worktree)
+	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s, repo %s, branch %s, worktree %s)\n",
+		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, res.Repo, res.Branch, res.Worktree)
 	fmt.Fprintf(stdout, "brief %s\nstatus %s\n", res.BriefPath, res.StatusPath)
 	printAutoTurnEnd(stdout, w, res.Project, autoSpawnLine(res.Crew))
 }

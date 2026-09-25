@@ -91,30 +91,32 @@ func cmdDashboard(args []string, stdout, stderr io.Writer) error {
 
 // dashboardDeps wires the two answers the database does not hold. Diff is
 // the CLI's own crewDiffText, so the page shows byte for byte what
-// `mate diff` prints; BranchExists is `internal/gitx` over the project's
-// primary checkout, which is where a branch outliving its worktree lives
-// (see crewDiffText's own note).
+// `mate diff` prints; BranchExists is `internal/gitx` over the primary
+// checkout of the crew's own repo, which is where a branch outliving its
+// worktree lives (see crewDiffText's own note).
 func dashboardDeps(w *store.Workspace) dashboard.Deps {
 	git := gitx.New()
 	return dashboard.Deps{
 		Diff: func(ctx context.Context, project, crew string) (string, error) {
 			return crewDiffText(ctx, w, git, project, crew, false)
 		},
-		BranchExists: func(ctx context.Context, project, branch string) (bool, error) {
-			// A crew branch lives in whichever of the project's repos the
-			// crew worked in; a project's repos never share a path, so at
-			// most one of them has it.
+		BranchExists: func(ctx context.Context, project, crew, branch string) (bool, error) {
+			// The crew's meta names its repo (docs/mvp.md M9); asking every
+			// repo of the project could find a same-named branch another
+			// crew of that id left in a different repo.
 			cfg, err := w.LoadProject(project)
 			if err != nil {
 				return false, err
 			}
-			for _, r := range cfg.Repos {
-				ok, err := git.BranchExists(ctx, w.RepoDir(r.Path), branch)
-				if err != nil || ok {
-					return ok, err
-				}
+			meta, err := w.ReadCrewMeta(project, crew)
+			if err != nil {
+				return false, err
 			}
-			return false, nil
+			repoCfg, err := cfg.CrewRepo(meta)
+			if err != nil {
+				return false, err
+			}
+			return git.BranchExists(ctx, w.RepoDir(repoCfg.Path), branch)
 		},
 	}
 }

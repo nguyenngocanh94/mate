@@ -30,8 +30,10 @@ type Deps struct {
 	// its own crewDiffText here so the page and the terminal can never
 	// disagree about what a branch contains.
 	Diff func(ctx context.Context, project, crew string) (string, error)
-	// BranchExists reports whether branch is still in the project's repo.
-	BranchExists func(ctx context.Context, project, branch string) (bool, error)
+	// BranchExists reports whether a crew's branch is still in the repo
+	// that crew works in; the crew is passed because a project may own
+	// several repos and only the crew's meta says which is its.
+	BranchExists func(ctx context.Context, project, crew, branch string) (bool, error)
 	// Now is the clock behind `generated_at`; tests freeze it.
 	Now func() time.Time
 }
