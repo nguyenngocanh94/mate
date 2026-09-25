@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/names"
 )
 
 // ErrNoRepo is returned when a project has no repo, or none by the asked name.
@@ -98,7 +99,7 @@ func (cfg ProjectConfig) CrewRepo(meta map[string]string) (RepoConfig, error) {
 // ValidateRepoName accepts the names a repo may have inside its project, the
 // same shape as a project name: `[a-z][a-z0-9-]{0,31}`.
 func ValidateRepoName(name string) error {
-	if !projectNamePattern.MatchString(name) {
+	if !names.ValidProject(name) {
 		return fmt.Errorf("store: invalid repo name %q: want [a-z][a-z0-9-]{0,31}", name)
 	}
 	return nil

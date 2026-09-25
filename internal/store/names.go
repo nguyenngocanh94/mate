@@ -3,19 +3,20 @@ package store
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/nguyenngocanh94/mate/internal/names"
 )
 
 var (
-	projectNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
-	crewIDPattern      = regexp.MustCompile(`^[a-z][a-z0-9]{1,15}$`)
-	metaKeyPattern     = regexp.MustCompile(`^[a-z_]+$`)
+	crewIDPattern  = regexp.MustCompile(`^[a-z][a-z0-9]{1,15}$`)
+	metaKeyPattern = regexp.MustCompile(`^[a-z_]+$`)
 )
 
 // ValidateProjectName accepts the names a project directory may have:
 // `[a-z][a-z0-9-]{0,31}`. Layout helpers assume a validated name; every method
 // that writes validates before touching the filesystem.
 func ValidateProjectName(name string) error {
-	if !projectNamePattern.MatchString(name) {
+	if !names.ValidProject(name) {
 		return fmt.Errorf("store: invalid project name %q: want [a-z][a-z0-9-]{0,31}", name)
 	}
 	return nil
