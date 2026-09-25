@@ -366,3 +366,23 @@ func TestNewProjectFormFieldsAreEditedIndependently(t *testing.T) {
 		t.Fatalf("typed repo field view does not offer the create key:\n%s", view)
 	}
 }
+
+// TestOverlayFrameRulesDoNotJoinAHiddenDivider: while an overlay owns the
+// main region the inspector's divider is not drawn, so the rules above and
+// below the body must not carry the ┬/┴ that would join it.
+func TestOverlayFrameRulesDoNotJoinAHiddenDivider(t *testing.T) {
+	for _, open := range []struct {
+		name string
+		key  string
+	}{{"new project form", "n"}, {"action menu", "a"}} {
+		m := loaded(t, sampleTree(), nil)
+		if view := renderFrame(t, m); !strings.Contains(view, "┬") {
+			t.Fatalf("baseline frame has no divider joint; the test proves nothing:\n%s", view)
+		}
+		m, _ = send(t, m, key(open.key))
+		view := renderFrame(t, m)
+		if strings.Contains(view, "┬") || strings.Contains(view, "┴") {
+			t.Fatalf("%s: rules join a divider the overlay hides:\n%s", open.name, view)
+		}
+	}
+}

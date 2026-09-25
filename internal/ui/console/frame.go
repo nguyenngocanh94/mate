@@ -56,9 +56,16 @@ func (m Model) render() string {
 
 // hasInspectorColumn reports whether this frame draws the inspector beside
 // the list: there is an inspector width, there is a snapshot to inspect,
-// and Detail has not taken the whole region instead.
+// and neither Detail nor an overlay has taken the whole region instead.
 func (m Model) hasInspectorColumn(l frameLayout) bool {
-	return l.split(m.phase == phaseReady && !m.detail)
+	return l.split(m.phase == phaseReady && !m.detail && !m.overlayOwnsRegion())
+}
+
+// overlayOwnsRegion reports whether a modal overlay fills the main region
+// (pushMainRegion), hiding the list/inspector split and its divider.
+func (m Model) overlayOwnsRegion() bool {
+	return m.failureDetail || m.diff.open ||
+		m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil
 }
 
 // ---------- line 0: header ----------
