@@ -1,0 +1,39 @@
+
+ ▐▛███▛█   Claude Code v2.1.282
+▝▜██████▀  Opus 5.5 with medium effort · Claude Team
+ ▝▝   ▝▝   /…/scratchpad/e2e/.mate/projects/plan/mate
+
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+❯ Try "edit <filepath> to..."
+─────────────────────────────────────────────────────────────────────────────────────────────
+  tokens: 0 | cost: $0.00 | ctx left: 100%
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

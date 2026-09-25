@@ -2,6 +2,7 @@ package harness
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
@@ -262,9 +263,16 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 			// The empty composer is the marker alone on its line. A shell
 			// prompt ending in the same glyph ("… main ❯ claude") and a
 			// highlighted option ("❯ No, exit") both carry text beside it.
+			// From 2.1.282 the empty composer also shows a dim suggestion
+			// after the marker; that shape counts only between the
+			// composer's two rules (claudeComposerSuggestion).
 			composer: func(lines []string) bool {
-				for _, l := range lines {
+				for i, l := range lines {
 					if strings.TrimSpace(l) == ClaudeComposerMarker {
+						return true
+					}
+					if i > 0 && i+1 < len(lines) && isRuleLine(lines[i-1]) && isRuleLine(lines[i+1]) &&
+						claudeComposerSuggestion.MatchString(strings.TrimSpace(l)) {
 						return true
 					}
 				}
@@ -275,6 +283,20 @@ func startupProfileFor(kind Kind) (startupProfile, error) {
 		return startupProfile{}, observability.NewError(observability.CodeUsage,
 			fmt.Sprintf("no measured startup-screen profile for harness %q; mate refuses to drive a pane it cannot read", kind))
 	}
+}
+
+// claudeComposerSuggestion is Claude 2.1.282's empty composer: the marker,
+// then the dim placeholder `Try "<example>"` (measured 2026-09-25,
+// testdata/startup/claude-2.1.282-ready.txt; the example changes between
+// launches). Nothing may follow the closing quote, so typed text that merely
+// starts with `Try "` is not mistaken for it.
+var claudeComposerSuggestion = regexp.MustCompile(`^` + ClaudeComposerMarker + `[\s\x{00a0}]+Try "[^"]*"$`)
+
+// isRuleLine reports whether a line is a horizontal rule: box-drawing '─'
+// only, which is how Claude frames its composer above and below.
+func isRuleLine(l string) bool {
+	t := strings.TrimSpace(l)
+	return t != "" && strings.Trim(t, "─") == ""
 }
 
 // optionLine reports whether a trimmed line is exactly one option label,

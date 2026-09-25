@@ -122,3 +122,13 @@ review lists two:
 
 Trusting writes `[hooks.state."<hooks.json>:session_start:0:0"] trusted_hash` into
 `$CODEX_HOME/config.toml`; the next launch with the same hook bytes draws no review.
+
+Captured 2026-09-25 the same way, against Claude Code 2.1.282 (auto-updated that
+morning), in a Mate directory of a scratch workspace. Unlike the lab captures above it
+ran with the operator's own Claude config, so its status line and plan name are theirs:
+
+- `claude-2.1.282-ready.txt` - the empty composer. 2.1.282 draws a dim suggestion in
+  it, `❯` NBSP `Try "edit <filepath> to..."`, where 2.1.270 drew `❯` NBSP alone; the
+  suggestion's wording changes between launches (`Try "refactor <filepath>"` was also
+  seen). Before the classifier knew this shape every Claude Mate start timed out with
+  `startup screen not recognised`.
