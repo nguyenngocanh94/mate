@@ -3,281 +3,159 @@ package console
 import (
 	"strings"
 	"testing"
-
-	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-// TestSelectionFocusAndStatusAreThreeDistinctDrawings is the rule the
-// design states outright: the three signals never share a drawing method.
-// The test asserts it the only way that matters - with colour stripped,
-// because a reader on a monochrome terminal must still see all three.
-func TestSelectionFocusAndStatusAreThreeDistinctDrawings(t *testing.T) {
-	p := plainPalette()
-	for _, g := range []glyphSet{unicodeGlyphs, asciiGlyphs} {
-		t.Run(g.Name, func(t *testing.T) {
-			selectedFocused := markerSpan(true, true, g, p).text
-			selectedUnfocused := markerSpan(true, false, g, p).text
-			unselected := markerSpan(false, true, g, p).text
-			header := markerSpan(false, false, g, p).text
+// bxLines is a rendered frame's lines.
+func bxLines(t *testing.T, m Model) []string {
+	t.Helper()
+	return strings.Split(renderFrame(t, m), "\n")
+}
 
-			if selectedFocused == selectedUnfocused {
-				t.Errorf("a selected row looks the same in a focused and an unfocused pane: %q", selectedFocused)
-			}
-			if selectedFocused == unselected || selectedUnfocused == unselected {
-				t.Errorf("selection is indistinguishable from no selection: %q / %q / %q", selectedFocused, selectedUnfocused, unselected)
-			}
-			if strings.TrimSpace(unselected) != "" || strings.TrimSpace(header) != "" {
-				t.Errorf("an unselected row and a column header must leave the marker cell blank: %q / %q", unselected, header)
-			}
-			// A column header is dim text on the same grid, and is never
-			// selectable - so it is drawn by its own constructor rather than
-			// by reusing a row's.
-			if got := columnHeaderSpan("STATUS", p); got.text != "STATUS" {
-				t.Errorf("columnHeaderSpan text = %q, want the header word itself", got.text)
-			}
-			for name, marker := range map[string]string{"selected+focused": selectedFocused, "selected+unfocused": selectedUnfocused, "unselected": unselected} {
-				if n := cells(marker); n != 1 {
-					t.Errorf("%s marker %q is %d cells, want exactly 1", name, marker, n)
-				}
-			}
-			// The marker plus its separating cell is the same width on every
-			// row, so columns line up whatever the selection does.
-			for _, sel := range []bool{true, false} {
-				for _, focused := range []bool{true, false} {
-					l := newLine().addSpans(rowPrefix(sel, focused, g, p)...)
-					if got := l.width(); got != 2 {
-						t.Errorf("rowPrefix(sel=%v, focused=%v) is %d cells, want 2", sel, focused, got)
-					}
-				}
-			}
-		})
+// bxLineWith is the first frame line containing s.
+func bxLineWith(t *testing.T, m Model, s string) string {
+	t.Helper()
+	for _, l := range bxLines(t, m) {
+		if strings.Contains(l, s) {
+			return l
+		}
+	}
+	t.Fatalf("no line contains %q:\n%s", s, renderFrame(t, m))
+	return ""
+}
+
+// Selection is the one-cell marker in col 0: ▌ in the focused pane, ▏ in
+// the others. Colour stripped, the marker alone carries it.
+func TestSelectionIsTheMarkerAndFocusMovesItsShape(t *testing.T) {
+	m, _, _ := bxPayments(t, 40, 36)
+	if l := bxLineWith(t, m, "👨‍💻 payments-api    "); !strings.HasPrefix(l, "▌ ") {
+		t.Fatalf("focused list's selected row = %q, want ▌ in col 0", l)
+	}
+	for _, l := range bxLines(t, m) {
+		if strings.Contains(l, "Add index") && !strings.HasPrefix(l, "  ") {
+			t.Fatalf("an unselected row carries a marker: %q", l)
+		}
+	}
+	m, _ = send(t, m, key("tab")) // detail
+	if l := bxLineWith(t, m, "👨‍💻 payments-api    "); !strings.HasPrefix(l, "▏ ") {
+		t.Fatalf("unfocused list's selected row = %q, want ▏", l)
+	}
+	if l := bxLineWith(t, m, "agent"); !strings.HasPrefix(l, "▌ agent") {
+		t.Fatalf("detail's cursor field = %q, want ▌ on it", l)
 	}
 }
 
-// TestSelectionDoesNotRestyleTheRowsOwnText: a failed row that happens to
-// be selected must still read as failed. The design puts selection in the
-// background and the marker precisely so status keeps its own colour.
-func TestSelectionDoesNotRestyleTheRowsOwnText(t *testing.T) {
-	p := ansiPalette()
-	status := statusSpan("failed", p)
-	unselected := newLine().addSpan(status).render(10)
-	selected := selectRow(newLine(), true, p).addSpan(status).render(10)
-	if unselected == selected {
-		t.Fatalf("a selected row is byte-identical to an unselected one")
-	}
-	if !strings.Contains(unselected, "failed") || !strings.Contains(selected, "failed") {
-		t.Fatalf("the status word did not survive selection: %q / %q", unselected, selected)
-	}
-	// The status keeps its own foreground on a selected row: two rows with
-	// the same text and different status hues still differ once selected.
-	// (Comparing against p.Red.Render(...) directly would not work - the
-	// selection background merges into the same SGR sequence.)
-	selRed := selectRow(newLine(), true, p).add("word", p.Red).render(10)
-	selPlain := selectRow(newLine(), true, p).add("word", p.Fg).render(10)
-	if selRed == selPlain {
-		t.Fatalf("selection flattened the status colour: both rendered %q", selRed)
-	}
-	// And the selection background reaches every blank cell, not just the
-	// glyphs, so the highlight covers the whole row width. Both the padding
-	// at the end and a gap in the middle: the two go through different code
-	// paths, and a gap that loses the background leaves a stripe across the
-	// selected row.
-	if strings.HasSuffix(selRed, "    ") {
-		t.Fatalf("the selected row's trailing padding carries no background: %q", selRed)
-	}
-	gapped := selectRow(newLine(), true, p).add("a", p.Fg).pad(3).add("b", p.Fg).render(10)
-	if strings.Contains(gapped, "   ") && !strings.Contains(gapped, "\x1b") {
-		t.Fatalf("the selected row's interior gap carries no background: %q", gapped)
-	}
-	if unstyledGap := "a" + strings.Repeat(" ", 3) + "b"; strings.Contains(gapped, unstyledGap) {
-		t.Fatalf("the selected row's interior gap was emitted unstyled: %q", gapped)
-	}
-}
-
-// TestPaneTitleCarriesFocusAsWellAsTheMarker: the marker is one cell and
-// easy to miss, so the focused pane's title is accent too - and exactly one
-// pane is accent at a time.
-func TestPaneTitleCarriesFocus(t *testing.T) {
-	p := ansiPalette()
-	focused := newLine().addSpan(paneTitleSpan("CREW", true, p)).render(8)
-	unfocused := newLine().addSpan(paneTitleSpan("CREW", false, p)).render(8)
-	if focused == unfocused {
-		t.Fatalf("a focused and an unfocused pane title render identically: %q", focused)
-	}
-}
-
-// TestOnlyOnePaneIsAccentAtATime: focus is which pane the keys move in, so
-// two accent panes would be a lie about where the next keystroke lands.
-func TestOnlyOnePaneIsAccentAtATime(t *testing.T) {
-	m := newFixture(t, sampleTree(), 160, 48, unicodeGlyphs)
+// In colour the selected row also sits on the sel background across the
+// whole width, and only that row does.
+func TestSelectionPaintsTheWholeRowAndOnlyThatRow(t *testing.T) {
+	m, _, _ := bxPayments(t, 40, 36)
 	m.p = ansiPalette()
-	for _, focus := range []pane{paneList, paneInspector} {
-		m.focus = focus
-		l := layout(m.w, m.h)
-		listTitle := m.listLines(l.List, l.Body)[0].render(l.List)
-		inspTitle := m.inspectorLines(l.Inspector, l.valueWidth(), l.Body, focus == paneInspector)[0].render(l.Inspector)
-		accent := m.p.Acc.Render("")
-		_ = accent
-		listAccent := strings.Contains(listTitle, m.p.Acc.Render("PROJECTS")[:5])
-		inspAccent := strings.Contains(inspTitle, m.p.Acc.Render("PROJECT")[:5])
-		if listAccent == inspAccent {
-			t.Fatalf("focus=%v: list accent=%v inspector accent=%v, want exactly one", focus, listAccent, inspAccent)
+	lines := strings.Split(m.View(), "\n")
+	bg := 0
+	for _, l := range lines {
+		if strings.Contains(l, "100m") || strings.Contains(l, ";100") {
+			bg++
+		}
+	}
+	if bg != 2 {
+		t.Fatalf("%d lines carry the selection background, want the Mate row's two", bg)
+	}
+}
+
+// Focus is the tinted title: the focused pane's rule title is acc and
+// bold, the others dim. Only one pane is tinted at a time.
+func TestFocusIsTheTintedTitle(t *testing.T) {
+	m, _, _ := bxPayments(t, 40, 36)
+	m.p = ansiPalette()
+	for _, f := range []pane{paneList, paneDetail, paneBox} {
+		m = m.setFocus(f)
+		p := m.plan()
+		tinted := 0
+		for _, sl := range p.slots {
+			rule := m.paneRule(sl.kind, p.w)
+			acc := false
+			for _, s := range rule.segs {
+				if s.t == tAcc {
+					acc = true
+				}
+			}
+			if acc {
+				tinted++
+				if bxSlotPane(sl.kind) != f {
+					t.Errorf("focus %v: the %v rule is tinted", f, sl.kind)
+				}
+			}
+		}
+		if tinted != 1 {
+			t.Errorf("focus %v: %d tinted titles, want 1", f, tinted)
 		}
 	}
 }
 
-// TestStatusIsAlwaysTheDomainWordNeverColourAlone. Every recorded status
-// prints its own value - "awaiting_review", not "Review" - and every status
-// remains distinguishable from every other with colour stripped.
-func TestStatusIsAlwaysTheDomainWordNeverColourAlone(t *testing.T) {
-	plain := plainPalette()
-	statuses := []string{
-		string(query.CrewSpawned), string(query.CrewWorking), string(query.CrewNeedsDecision),
-		string(query.CrewWaitMate), string(query.CrewBlocked),
-		string(query.CrewFinished), string(query.CrewFailed),
+func bxSlotPane(k slotKind) pane {
+	switch k {
+	case slotDetail:
+		return paneDetail
+	case slotBox:
+		return paneBox
 	}
-	seen := map[string]string{}
-	for _, s := range statuses {
-		got := statusSpan(s, plain)
-		if got.text != s {
-			t.Errorf("statusSpan(%q).text = %q, want the domain word itself", s, got.text)
-		}
-		if prev, dup := seen[got.text]; dup {
-			t.Errorf("statuses %q and %q render the same text %q", prev, s, got.text)
-		}
-		seen[got.text] = s
-	}
-	// working is not green: it is a recorded status, not proof that an
-	// agent is alive. Green is reserved for the one terminal state that
-	// says the task landed.
-	coloured := ansiPalette()
-	if statusStyle(string(query.CrewWorking), coloured).GetForeground() == coloured.Green.GetForeground() {
-		t.Errorf("working is drawn green; the design reserves green for finished")
-	}
-	for _, word := range []query.CrewStatus{query.CrewNeedsDecision, query.CrewWaitMate, query.CrewBlocked} {
-		if statusStyle(string(word), coloured).GetForeground() != coloured.Amber.GetForeground() {
-			t.Errorf("%s is not amber; it is a state somebody has to act on", word)
-		}
-	}
-	if statusStyle(string(query.CrewFailed), coloured).GetForeground() != coloured.Red.GetForeground() {
-		t.Errorf("failed is not red")
-	}
-	if statusStyle(string(query.CrewFinished), coloured).GetForeground() != coloured.Green.GetForeground() {
-		t.Errorf("finished is not green")
-	}
+	return paneList
 }
 
-// TestAttentionAndUnknownCarryTheirOwnLabels: "!" for attention and "?" for
-// unknown are labels, not icons, and they are what makes the signal survive
-// a monochrome terminal.
-func TestAttentionAndUnknownCarryTheirOwnLabels(t *testing.T) {
-	p := plainPalette()
-	if got := attentionSpan("review", p).text; got != "! review" {
-		t.Errorf("attentionSpan = %q, want %q", got, "! review")
-	}
-	if got := failureSpan("failed", p).text; got != "! failed" {
-		t.Errorf("failureSpan = %q, want %q", got, "! failed")
-	}
-	if got := unknownMarkSpan("binding", p).text; got != "? binding" {
-		t.Errorf("unknownMarkSpan = %q, want %q", got, "? binding")
-	}
-	coloured := ansiPalette()
-	if attentionSpan("rebase", coloured).style.GetForeground() == failureSpan("rebase", coloured).style.GetForeground() {
-		t.Errorf("attention and failure share a colour")
-	}
-}
-
-// TestTheAmberAndRedVocabulariesAreDisjoint is what actually keeps
-// attention and failure from being a colour-only distinction. Both are
-// drawn "! <word>", so the guarantee cannot live in the span constructors:
-// it lives in the vocabulary, where no status word is ever both. A reader
-// without colour sees "! failed" against "! review" - two words, not two
-// shades of the same one.
-func TestTheAmberAndRedVocabulariesAreDisjoint(t *testing.T) {
-	coloured := ansiPalette()
-	amber, red := map[string]bool{}, map[string]bool{}
-	for _, word := range []string{
-		string(query.CrewSpawned), string(query.CrewWorking), string(query.CrewNeedsDecision),
-		string(query.CrewWaitMate), string(query.CrewBlocked),
-		string(query.CrewFinished), string(query.CrewFailed),
-		string(query.MateCreated), string(query.MateStarting), string(query.MateStopping),
-		string(query.MateStopped), string(query.MateUnknown),
-		string(query.BindingReserved), string(query.BindingActive), string(query.BindingStale),
-		"none", "unknown", "missing", "present (clean)", "present (dirty)",
+// Status is a word, tinted only when it needs somebody.
+func TestStatusIsAWordTintedOnlyWhenItNeedsSomebody(t *testing.T) {
+	for word, want := range map[string]tok{
+		"running": tDim, "working": tDim, "stopped": tDim, "created": tDim, "spawned": tDim,
+		"needs-decision": tAmber, "wait-mate": tAmber, "blocked": tAmber, "unknown": tAmber, "no mate": tAmber,
+		"failed": tRed, "finished": tGreen,
 	} {
-		switch statusStyle(word, coloured).GetForeground() {
-		case coloured.Amber.GetForeground():
-			amber[word] = true
-		case coloured.Red.GetForeground():
-			red[word] = true
+		if got := statusTok(word); got != want {
+			t.Errorf("statusTok(%q) = %d, want %d", word, got, want)
 		}
 	}
-	if len(amber) == 0 || len(red) == 0 {
-		t.Fatalf("expected both vocabularies to be non-empty: amber=%v red=%v", amber, red)
-	}
-	for word := range amber {
-		if red[word] {
-			t.Errorf("%q is drawn both amber and red, so its state is carried by colour alone", word)
+	m, _, _ := bxPayments(t, 40, 36)
+	frame := renderFrame(t, m)
+	for _, w := range []string{"running", "working", "needs-decision"} {
+		if !strings.Contains(frame, w) {
+			t.Errorf("the status word %q is not on the frame", w)
 		}
-	}
-	// The design's token table names these two explicitly: a stale binding
-	// is amber, a missing worktree is red. Listing them above is not enough
-	// to catch either falling through to plain fg - only asserting their
-	// bucket membership is.
-	if !amber[string(query.BindingStale)] {
-		t.Errorf("%q is not in the amber vocabulary", query.BindingStale)
-	}
-	if !red["missing"] {
-		t.Errorf("%q is not in the red vocabulary", "missing")
 	}
 }
 
-// TestKnownAbsentAndUnknownAreThreeDifferentWords: Unknown means the read
-// failed and must never render as Absent or as an empty cell, and a Known
-// empty value must never collapse into either.
-func TestKnownAbsentAndUnknownAreThreeDifferentWords(t *testing.T) {
-	p := plainPalette()
-	g := unicodeGlyphs
-	text := func(spans []span) string {
-		var b strings.Builder
-		for _, s := range spans {
-			b.WriteString(s.text)
+// The one-line status column is at most seven cells.
+func TestShortStatusFitsItsColumn(t *testing.T) {
+	for word, want := range map[string]string{
+		"needs-decision": "decide", "wait-mate": "review", "finished": "done",
+		"starting": "start", "stopping": "stop", "running": "running", "unknown": "unknown",
+	} {
+		got := shortStatus(word)
+		if got != want || cells(got) > shortStatusWidth {
+			t.Errorf("shortStatus(%q) = %q, want %q within %d cells", word, got, want, shortStatusWidth)
 		}
-		return b.String()
 	}
-	known := text(availabilitySpans(query.Known, "/repos/x/.worktrees/c1", "", p.Fg, g, p))
-	knownEmpty := text(availabilitySpans(query.Known, "", "", p.Fg, g, p))
-	absent := text(availabilitySpans(query.Absent, "", "no worktree row", p.Dim, g, p))
-	unknown := text(availabilitySpans(query.Unknown, "", "lookup timed out (2s)", p.Dim, g, p))
+}
 
-	if known != "/repos/x/.worktrees/c1" {
-		t.Errorf("Known rendered %q, want the value itself", known)
-	}
-	for _, pair := range [][2]string{{knownEmpty, absent}, {knownEmpty, unknown}, {absent, unknown}} {
-		if pair[0] == pair[1] {
-			t.Errorf("two different availabilities render identically: %q", pair[0])
+// Attention is written out: ! plus a count, red when one of them failed,
+// amber otherwise; "no mate" and "unknown" are words, not colour.
+func TestAttentionIsWrittenOut(t *testing.T) {
+	m := newFixture(t, designTree(), 40, 36, unicodeGlyphs)
+	for _, tc := range []struct{ row, want string }{
+		{"docs-site", "!1"}, {"payments-api", "!2"}, {"search-indexer", "!1"},
+	} {
+		if l := bxLineWith(t, m, tc.row); !strings.Contains(l, tc.want) {
+			t.Errorf("%s row = %q, want %s", tc.row, l, tc.want)
 		}
 	}
-	if !strings.HasPrefix(absent, "none") {
-		t.Errorf("Absent rendered %q, want it to start with %q", absent, "none")
+	if l := bxLineWith(t, m, "─ acme"); !strings.Contains(l, "!4") {
+		t.Errorf("workspace rule = %q, want the workspace-wide !4", l)
 	}
-	if !strings.HasPrefix(unknown, "unknown") {
-		t.Errorf("Unknown rendered %q, want it to start with %q", unknown, "unknown")
+	if !strings.Contains(renderFrame(t, m), "no mate · 🤖 1") {
+		t.Errorf("docs-site does not say no mate in words:\n%s", renderFrame(t, m))
 	}
-	if !strings.Contains(unknown, "lookup timed out (2s)") {
-		t.Errorf("Unknown rendered %q, want it to carry why the read failed", unknown)
+	p := designPayments()
+	if _, failed := projectAttention(p); !failed || bangTok(failed) != tRed {
+		t.Error("payments-api has a failed crew; its !N must be red")
 	}
-	if strings.TrimSpace(knownEmpty) == "" {
-		t.Errorf("a Known empty value rendered as blank, which is how Absent would look")
-	}
-	// And Unknown is the only one that is amber.
-	coloured := ansiPalette()
-	unknownSpans := availabilitySpans(query.Unknown, "", "", coloured.Dim, g, coloured)
-	if unknownSpans[0].style.GetForeground() != coloured.Amber.GetForeground() {
-		t.Errorf("Unknown is not amber")
-	}
-	absentSpans := availabilitySpans(query.Absent, "", "", coloured.Dim, g, coloured)
-	if absentSpans[0].style.GetForeground() == coloured.Amber.GetForeground() {
-		t.Errorf("Absent is amber; it must be dim, or it reads as a failure")
+	if n, failed := projectAttention(designTree().Projects[3]); n != 1 || failed || bangTok(failed) != tAmber {
+		t.Errorf("docs-site attention = %d failed=%v, want an amber !1", n, failed)
 	}
 }

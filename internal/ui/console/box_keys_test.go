@@ -11,147 +11,188 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-// fixtureCrewID is the running crew of sampleTree: the one a box row can
-// actually open, because opening a crew goes through the same snapshot the
-// tree row would (box_keys.go's boxEntryCrewRow).
-const fixtureCrewID = "crew_01J9P6Q6W0E5V8XK2M4B8DT"
-
-// boxAsking is a one-item inbox: crew asked something and is waiting.
-func boxAsking(crew string) query.Field[query.BoxView] {
-	e := query.BoxEntry{
-		Seq: 0, At: time.Date(2026, 9, 10, 14, 1, 0, 0, time.UTC),
-		Kind: query.BoxStatus, Source: "crew", Target: "crew:" + crew, Crew: crew,
-		Verb: "needs-decision", Text: "pick A or B", Attention: true,
-		Resolve: testResolveLine(crew, "pick A or B"),
-	}
-	return query.KnownField(query.BoxView{
-		Entries: []query.BoxEntry{e}, Inbox: []query.BoxEntry{e},
-		Crews: 1, Awaiting: 1, LastAt: e.At,
-	})
-}
-
-// boxMateWedged is the daemon's own incident: an inbox item whose crew is
-// the literal "mate" (internal/autopilot/doc.go).
-func boxMateWedged() query.Field[query.BoxView] {
-	e := query.BoxEntry{
-		Seq: 0, At: time.Date(2026, 9, 10, 14, 4, 0, 0, time.UTC),
-		Kind: query.BoxIncident, Source: "observer", Crew: "mate",
-		Verb: "wedged", Text: "the composer has held unsent text for 6m",
-		Attention: true, Resolve: "resolve: incident wedged mate - the composer has held unsent text for 6m",
-	}
-	return query.KnownField(query.BoxView{
-		Entries: []query.BoxEntry{e}, Inbox: []query.BoxEntry{e},
-		Crews: 1, Awaiting: 1, LastAt: e.At,
-	})
-}
-
-// Where the box keys live, per focus zone (mvp.md task 15,
-// session_focus.go). The routing is the part a reader gets wrong at no cost
-// to the tests and at real cost to them: an `a` typed with the terminal
-// focused is a letter in the harness's composer, not an assign.
-//
-// The vocabulary itself is the 2026-09-19 decision: the box is a place to
-// act, not to read. Enter opens the pane of the crew the row names, `a`
-// hands the row to the Mate, `l` swaps the inbox for the whole log.
-
-// recordingAction captures what the Console asked its ActionFunc for.
-type recordingAction struct {
+// bxAction records every ActionFunc request.
+type bxAction struct {
 	reqs []ActionRequest
 	out  string
 	err  error
 }
 
-func (r *recordingAction) run(_ context.Context, req ActionRequest) (string, error) {
+func (r *bxAction) run(_ context.Context, req ActionRequest) (string, error) {
 	r.reqs = append(r.reqs, req)
 	return r.out, r.err
 }
 
-// TestProjectFrameBoxKeysAreBare is the other half of the rule: on the
-// project frame the Console owns the keyboard, so the keys need no prefix -
-// but only once Tab has focused the panel, because `a` and Enter already
-// mean something on the list.
-func TestProjectFrameBoxKeysAreBare(t *testing.T) {
-	action := &recordingAction{out: "delivered"}
-	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
-	m.action = action.run
-	m, _ = send(t, m, key("enter")) // into the project frame
-
-	// On the list, `a` is still the action menu and `r` still refreshes.
-	m, _ = send(t, m, key("a"))
-	if len(action.reqs) != 0 {
-		t.Fatalf("`a` on the list ran %+v; it opens the action menu there", action.reqs)
+// bxPayments is the design tree opened on payments-api at w x h, with an
+// action recorder and a stage spy.
+func bxPayments(t *testing.T, w, h int) (Model, *bxAction, *stageSpy) {
+	t.Helper()
+	act, spy := &bxAction{out: "done"}, &stageSpy{}
+	m := newFixture(t, designTree(), w, h, unicodeGlyphs)
+	m.action = act.run
+	m = m.WithStage(spy.fn)
+	for i := 0; i < 7; i++ {
+		m, _ = send(t, m, key("down"))
 	}
-	m, _ = send(t, m, key("esc"))
+	m, _ = send(t, m, key("enter"))
+	if m.cur().kind != frameProject || m.currentProject().ProjectID != "payments-api" {
+		t.Fatalf("setup: not on payments-api: %+v", m.cur())
+	}
+	return m, act, spy
+}
 
-	m, _ = send(t, m, key("tab")) // list -> inspector
-	m, _ = send(t, m, key("tab")) // inspector -> box
+// bxFocusBox tabs until the box has focus.
+func bxFocusBox(t *testing.T, m Model) Model {
+	t.Helper()
+	for i := 0; i < 4 && m.focus != paneBox; i++ {
+		m, _ = send(t, m, key("tab"))
+	}
 	if m.focus != paneBox {
-		t.Fatalf("focus = %v, want paneBox", m.focus)
+		t.Fatalf("setup: Tab never reached the box (focus %v)", m.focus)
 	}
-	// The panel draws the inbox, so its one row is already the
-	// needs-decision line - no stepping back past a message to reach it,
-	// which is the whole point of the filter.
-	if got := m.projectBoxSelection(); got != 0 {
-		t.Fatalf("panel selection = %d, want the single inbox item (0)", got)
-	}
+	return m
+}
+
+// bxMessage is a message entry: it holds no question.
+func bxMessage(at time.Time) query.BoxEntry {
+	return query.BoxEntry{Seq: 9, At: at, Kind: query.BoxMessage, Source: "user", Target: "mate", Text: "spawn a crew"}
+}
+
+func TestBoxAssignRunsResolveWithTheEntrysOwnLine(t *testing.T) {
+	m, act, _ := bxPayments(t, 40, 36)
+	m = bxFocusBox(t, m)
 	m, cmd := send(t, m, key("a"))
 	if cmd == nil {
-		t.Fatal("bare `a` on the focused panel issued no command")
+		t.Fatal("a on the box ran nothing")
 	}
-	if _, ok := cmd().(actionDoneMsg); !ok {
-		t.Fatalf("bare `a` produced %T, want actionDoneMsg", cmd())
+	m, _ = send(t, m, cmd())
+	if len(act.reqs) != 1 {
+		t.Fatalf("requests = %+v, want one", act.reqs)
 	}
-	if len(action.reqs) != 1 || action.reqs[0].Action != ActionResolve {
-		t.Fatalf("action requests = %+v, want one resolve", action.reqs)
-	}
-	if action.reqs[0].Target != "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ" || action.reqs[0].Crew != "k3" {
-		t.Errorf("assign request = %+v, want this project and crew k3", action.reqs[0])
+	got := act.reqs[0]
+	want := designPayments().Box.Value.Inbox[0]
+	if got.Action != ActionResolve || got.Target != "payments-api" || got.Crew != "k3" || got.Input != want.Resolve {
+		t.Fatalf("request = %+v, want resolve of k3 with %q", got, want.Resolve)
 	}
 }
 
-// TestProjectFrameBoxEnterOpensTheCrew: from the project frame there is no
-// stream to close, so Enter on a row goes straight to the same place Enter
-// on that crew's tree row goes.
-func TestProjectFrameBoxEnterOpensTheCrew(t *testing.T) {
-	tree := sampleTree()
-	tree.Projects[0].Box = boxAsking(fixtureCrewID)
-	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
-	spy := &stageSpy{}
-	m = m.WithStage(spy.fn)
-	m, _ = send(t, m, key("enter")) // into the project frame
-	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
-	if m.focus != paneBox {
-		t.Fatalf("focus = %v, want paneBox", m.focus)
+// A message holds no question: assign says so and sends nothing, rather
+// than doing nothing a reader would take for a lost key.
+func TestBoxAssignRefusesAMessageEntry(t *testing.T) {
+	tree := designTree()
+	p := &tree.Projects[7]
+	msg := bxMessage(time.Date(2026, 9, 10, 14, 0, 0, 0, time.UTC))
+	box := p.Box.Value
+	box.Entries = append(box.Entries, msg)
+	p.Box = query.KnownField(box)
+	act := &bxAction{}
+	m := newFixture(t, tree, 40, 36, unicodeGlyphs)
+	m.action = act.run
+	for i := 0; i < 7; i++ {
+		m, _ = send(t, m, key("down"))
 	}
-	e, ok := boxSelectedEntry(m.projectBoxList(), m.projectBoxSelection())
-	if !ok || e.Crew != fixtureCrewID {
-		t.Fatalf("setup: the panel's selected entry is %+v, want the fixture crew", e)
+	m, _ = send(t, m, key("enter"))
+	m = bxFocusBox(t, m)
+	m, _ = send(t, m, key("l")) // the whole log, messages included
+	items := m.boxItems()
+	if len(items) != 2 || items[0].e.Kind != query.BoxMessage {
+		t.Fatalf("setup: log = %+v, want the newer message first", items)
 	}
+	m, cmd := send(t, m, key("a"))
+	if cmd != nil || len(act.reqs) != 0 {
+		t.Fatalf("assigning a message reached ActionFunc: %+v", act.reqs)
+	}
+	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "holds no question") {
+		t.Fatalf("message = %+v, want the refusal naming why", m.msg)
+	}
+	if !strings.Contains(renderFrame(t, m), "Assign refused") {
+		t.Fatalf("the refusal is not on the frame:\n%s", renderFrame(t, m))
+	}
+}
 
+func TestBoxEnterShowsTheCrewInTheNextPane(t *testing.T) {
+	m, _, spy := bxPayments(t, 40, 36)
+	m = bxFocusBox(t, m)
 	_, cmd := send(t, m, key("enter"))
 	if cmd == nil {
-		t.Fatal("Enter on the panel showed nothing")
+		t.Fatal("Enter on the box showed nothing")
 	}
 	cmd()
-	if len(spy.calls) != 1 || spy.calls[0].Kind != StageCrew || spy.calls[0].ID != e.Crew {
-		t.Fatalf("stage calls after Enter = %+v, want crew %s", spy.calls, e.Crew)
+	if len(spy.calls) != 1 || spy.calls[0].Kind != StageCrew || spy.calls[0].ID != "k3" {
+		t.Fatalf("stage calls = %+v, want crew k3", spy.calls)
 	}
 }
 
-// TestProjectFrameBoxEnterRefusesACrewThatLeftTheSnapshot: a crew closed
-// since the last read has no pane to open, and the refusal says so on the
-// frame's own message line rather than opening nothing in silence.
-func TestProjectFrameBoxEnterRefusesACrewThatLeftTheSnapshot(t *testing.T) {
-	tree := sampleTree()
-	tree.Projects[0].Box = boxAsking(fixtureCrewID)
-	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
-	m, _ = send(t, m, key("enter"))
-	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyF2})
-	// The box still carries the crew's question; the crew itself is gone.
-	m.tree.Projects[0].Crews = nil
-	m, _ = send(t, m, key("enter"))
-
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "not in this snapshot") {
-		t.Fatalf("message = %+v, want a refusal saying the crew is gone", m.msg)
+// A crew closed since the last read has no pane: the refusal says so.
+func TestBoxEnterRefusesACrewThatLeftTheSnapshot(t *testing.T) {
+	m, _, spy := bxPayments(t, 40, 36)
+	m = bxFocusBox(t, m)
+	proj := &m.tree.Projects[7]
+	proj.Crews = proj.Crews[:1] // k3 is gone; its question is still in the box
+	m, cmd := send(t, m, key("enter"))
+	if cmd != nil || len(spy.calls) != 0 {
+		t.Fatalf("a gone crew reached the host: %+v", spy.calls)
 	}
+	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "not in this snapshot") {
+		t.Fatalf("message = %+v, want the refusal saying the crew is gone", m.msg)
+	}
+}
+
+func TestBoxEnterRefusesAnEntryThatNamesNoCrew(t *testing.T) {
+	m, _, spy := bxPayments(t, 40, 36)
+	m, _ = m.showBoxItem(boxItem{project: "payments-api", e: bxMessage(time.Now())})
+	if len(spy.calls) != 0 || !strings.Contains(m.msg.text, "names no crew") {
+		t.Fatalf("msg = %+v calls = %+v, want a refusal", m.msg, spy.calls)
+	}
+}
+
+// Selecting a box item moves the list selection to its crew, so detail
+// explains why it waits (design D).
+func TestBoxSelectionMovesTheListToTheCrew(t *testing.T) {
+	m, _, _ := bxPayments(t, 40, 36)
+	if r, _ := m.selectedRow(); r.kind != rowMate {
+		t.Fatalf("setup: selection %+v, want the Mate", r)
+	}
+	m = bxFocusBox(t, m)
+	m, _ = send(t, m, key("down")) // one item: stays on it, and the list follows
+	if r, _ := m.selectedRow(); r.kind != rowCrew || r.id != "k3" {
+		t.Fatalf("list selection after moving in the box = %+v, want crew k3", r)
+	}
+	if title, _ := m.detailTitle(); !strings.Contains(bxText(title), "Backfill ledger v2") {
+		t.Fatalf("detail title = %q, want the waiting crew", bxText(title))
+	}
+}
+
+// Box keys are live only while the box has focus: on the list, a and
+// Enter mean the list's own things.
+func TestBoxKeysNeedBoxFocus(t *testing.T) {
+	m, act, spy := bxPayments(t, 40, 36)
+	m, _ = send(t, m, key("a"))
+	if !m.actions || len(act.reqs) != 0 {
+		t.Fatalf("a on the list: actions=%v reqs=%+v, want the actions sheet and no assign", m.actions, act.reqs)
+	}
+	m, _ = send(t, m, key("esc"))
+	_, cmd := send(t, m, key("enter"))
+	cmd()
+	if len(spy.calls) != 1 || spy.calls[0].Kind != StageMate {
+		t.Fatalf("Enter on the list staged %+v, want the Mate", spy.calls)
+	}
+}
+
+func TestBoxEscHandsFocusBackToTheList(t *testing.T) {
+	m, _, _ := bxPayments(t, 40, 36)
+	m = bxFocusBox(t, m)
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.focus != paneList {
+		t.Fatalf("focus after Esc = %v, want the list", m.focus)
+	}
+}
+
+// bxText is a line's text, without tokens.
+func bxText(l gline) string {
+	var b strings.Builder
+	for _, s := range l.segs {
+		b.WriteString(s.text)
+	}
+	return b.String()
 }

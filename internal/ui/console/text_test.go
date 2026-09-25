@@ -12,7 +12,7 @@ func TestShortIDKeepsThePrefixAndBothEnds(t *testing.T) {
 		g              glyphSet
 	}{
 		{name: "crew id", in: "crew_01J9P6Q6W0E5V8XK2M4B8DT", want: "crew_01J9P6…B8DT", g: unicodeGlyphs},
-		{name: "crew id ascii", in: "crew_01J9P6Q6W0E5V8XK2M4B8DT", want: "crew_01J9P6..B8DT", g: asciiGlyphs},
+		{name: "crew id ascii", in: "crew_01J9P6Q6W0E5V8XK2M4B8DT", want: "crew_01J9P6~B8DT", g: asciiGlyphs},
 		{name: "task id", in: "task_01J9P2B4C6D8E0F2G4H6J8K0LM", want: "task_01J9P2…K0LM", g: unicodeGlyphs},
 		{name: "no prefix", in: "01J9P6Q6W0E5V8XK2M4B8DT", want: "01J9P6…B8DT", g: unicodeGlyphs},
 		{name: "already short", in: "crew_01J9", want: "crew_01J9", g: unicodeGlyphs},
@@ -244,42 +244,41 @@ func containsWhole(lines []string, want string) bool {
 	return false
 }
 
-// TestDropPriorityDropsWholeItemsInOrder: a note column that runs out of
-// room drops whole items, never half a word, and never reorders - the first
-// item that does not fit ends the line, so a short low-priority item cannot
-// take the place of the high-priority one that was dropped.
-func TestDropPriorityDropsWholeItemsInOrder(t *testing.T) {
-	items := []string{"! stale binding", "! failed", "retry of #1"}
-	const sep = " · "
+// TestWrapWordsBreaksAtSpacesAndNeverOverflows: detail values, box
+// questions and sheet descriptions wrap by words; a word wider than the
+// line is broken inside it rather than overflowing the pane.
+func TestWrapWordsBreaksAtSpacesAndNeverOverflows(t *testing.T) {
 	cases := []struct {
+		name string
+		in   string
 		w    int
 		want []string
 	}{
-		{w: 80, want: items},
-		{w: 27, want: []string{"! stale binding", "! failed"}},
-		{w: 26, want: []string{"! stale binding", "! failed"}}, // 15 + 3 + 8, exactly
-		{w: 25, want: []string{"! stale binding"}},
-		{w: 15, want: []string{"! stale binding"}},
-		{w: 14, want: []string{}},
-		{w: 0, want: []string{}},
+		{"fits", "plan ready", 20, []string{"plan ready"}},
+		{"breaks at spaces", "Run on the prod replica now?", 12, []string{"Run on the", "prod replica", "now?"}},
+		{"collapses runs of blanks", "a   b", 10, []string{"a b"}},
+		{"long word is cut", "abcdefghij", 4, []string{"abcd", "efgh", "ij"}},
+		{"empty", "   ", 10, nil},
 	}
 	for _, tc := range cases {
-		got := dropPriority(items, tc.w, sep)
-		if strings.Join(got, "|") != strings.Join(tc.want, "|") {
-			t.Fatalf("dropPriority(w=%d) = %q, want %q", tc.w, got, tc.want)
-		}
-		if joined := joinDropped(items, tc.w, sep); cells(joined) > tc.w {
-			t.Fatalf("joinDropped(w=%d) = %q, which is %d cells", tc.w, joined, cells(joined))
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got := wrapWords(tc.in, tc.w)
+			if fmt.Sprint(got) != fmt.Sprint(tc.want) {
+				t.Fatalf("wrapWords(%q, %d) = %q, want %q", tc.in, tc.w, got, tc.want)
+			}
+			for _, l := range got {
+				if cells(l) > tc.w {
+					t.Fatalf("line %q is %d cells, over %d", l, cells(l), tc.w)
+				}
+			}
+		})
 	}
 }
 
-// TestDropPriorityNeverPromotesALaterItem: the ordering is by urgency, so
-// dropping must stop at the first item that does not fit rather than
-// scanning on for something smaller.
-func TestDropPriorityNeverPromotesALaterItem(t *testing.T) {
-	got := dropPriority([]string{"a very long high priority item", "tiny"}, 10, " · ")
-	if len(got) != 0 {
-		t.Fatalf("dropPriority = %q, want nothing: the smaller item must not jump the queue", got)
+func TestWrapWordsCountsCellsNotRunes(t *testing.T) {
+	for _, l := range wrapWords("支払いの べき等性を 修正する 中中中中中中", 6) {
+		if cells(l) > 6 {
+			t.Fatalf("line %q is %d cells, over 6", l, cells(l))
+		}
 	}
 }

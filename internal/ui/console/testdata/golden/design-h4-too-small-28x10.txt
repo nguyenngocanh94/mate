@@ -1,0 +1,10 @@
+─ mate ─────────────────────
+                            
+  too small: 28×10          
+  needs 32×14 or more       
+                            
+  widen the split, or       
+  q    quit                 
+                            
+  next pane unchanged       
+                            

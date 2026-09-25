@@ -121,7 +121,7 @@ func TestTreeTickIssuesOneLoadAndReschedules(t *testing.T) {
 	tree := sampleTree()
 	tree.AsOf = goldenAsOf
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
+	m, tick := tickFixture(t, spy, 40, 36)
 	if spy.calls != 1 {
 		t.Fatalf("load calls after Init = %d, want 1", spy.calls)
 	}
@@ -152,7 +152,7 @@ func TestTreeTickIssuesOneLoadAndReschedules(t *testing.T) {
 func TestTreeTickDuringInFlightLoadDoesNotIssueASecond(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
+	m, tick := tickFixture(t, spy, 40, 36)
 
 	// A load is left outstanding, the way one is between being issued
 	// ('r', an action's own re-read, or a tick) and its treeLoadedMsg
@@ -172,12 +172,11 @@ func TestTreeTickDuringInFlightLoadDoesNotIssueASecond(t *testing.T) {
 }
 
 // TestStaleGenTreeTickIsIgnored: a tick whose gen no longer matches the
-// model's current one - the same defence session_mode.go's own ticks carry
-// - is dropped without issuing a load or rescheduling.
+// model's current one is dropped without issuing a load or rescheduling.
 func TestStaleGenTreeTickIsIgnored(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, _ := tickFixture(t, spy, 120, 36)
+	m, _ := tickFixture(t, spy, 40, 36)
 	callsBefore := spy.calls
 
 	m2, cmd := send(t, m, treeTickMsg{gen: m.treeGen + 1})
@@ -194,14 +193,13 @@ func TestStaleGenTreeTickIsIgnored(t *testing.T) {
 
 // TestBackgroundTickFailureShowsStaleAndKeepsTree: the failure path a
 // background tick takes is the same one 'r' already takes (onTreeLoaded),
-// but reached through the tick chain rather than a keystroke - the header
-// must say "stale" with the last successful read's own time, and the tree
-// on screen must be untouched.
+// reached through the tick chain - the list rule says "stale", the status
+// line names the last successful read's own time, and the tree stays.
 func TestBackgroundTickFailureShowsStaleAndKeepsTree(t *testing.T) {
 	tree := sampleTree()
 	tree.AsOf = goldenAsOf
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
+	m, tick := tickFixture(t, spy, 40, 36)
 
 	spy.err = errFake("database is locked")
 	m, _ = driveOneTick(t, m, tick, tree)
@@ -212,24 +210,38 @@ func TestBackgroundTickFailureShowsStaleAndKeepsTree(t *testing.T) {
 	if m.lastLoadErr == nil {
 		t.Fatal("lastLoadErr must be set after a failed background load")
 	}
-	header := strings.Split(renderFrame(t, m), "\n")[0]
-	want := "stale " + m.g.Dot + " " + goldenAsOf.Format("15:04:05") + " " + m.g.Dot + " database is locked"
-	if !strings.Contains(header, want) {
-		t.Fatalf("header after a failed background tick = %q, want it to contain %q", header, want)
+	lines := strings.Split(renderFrame(t, m), "\n")
+	if !strings.Contains(lines[0], "stale") {
+		t.Fatalf("list rule after a failed background tick = %q, want it to say stale", lines[0])
+	}
+	if !strings.Contains(m.msg.text, "database is locked") || !strings.Contains(m.msg.text, goldenAsOf.Format("15:04:05")) {
+		t.Fatalf("message after a failed background tick = %q, want the error and the last good read's time", m.msg.text)
+	}
+	if !strings.Contains(renderFrame(t, m), sampleTree().Projects[0].Name) {
+		t.Fatalf("the tree vanished on a failed background tick:\n%s", renderFrame(t, m))
 	}
 }
 
 // ---------- item 2: a background reload must not disturb the reader ----------
 
-// TestBackgroundTickPreservesListSelectionAndScroll: the reader has moved
-// down into the Completed group and scrolled the list; a tick landing
-// behind them must not move either.
+// TestBackgroundTickPreservesListSelectionAndScroll: the reader has
+// scrolled a long list and moved the selection; a tick landing behind them
+// must move neither.
 func TestBackgroundTickPreservesListSelectionAndScroll(t *testing.T) {
-	tree := crewTaskWithTwoCrews()
+	tree := designTree()
+	for i := 0; i < 20; i++ {
+		tree.Projects = append(tree.Projects, query.ProjectNode{
+			ProjectID: "zz-" + itoa(i), Name: "zz-" + itoa(i), Mate: absentMate("no mate"),
+		})
+	}
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 80, 24)
-	m, _ = send(t, m, key("enter")) // the payments-api Project
-	m, _ = send(t, m, key("down"))  // its running Crew
+	m, tick := tickFixture(t, spy, 40, 24)
+	for i := 0; i < 25; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	if m.cur().top == 0 {
+		t.Fatal("precondition: the list must have scrolled")
+	}
 
 	wantSelID := m.cur().selID
 	wantSel := m.cur().sel
@@ -243,21 +255,24 @@ func TestBackgroundTickPreservesListSelectionAndScroll(t *testing.T) {
 	}
 }
 
-// TestBackgroundTickPreservesFocusedZone: the reader tabbed focus onto the
-// inspector column; a tick must not send it back to the list.
-func TestBackgroundTickPreservesFocusedZone(t *testing.T) {
+// TestBackgroundTickPreservesFocusedPane: the reader tabbed into detail and
+// walked its fields; a tick must send neither focus nor cursor back.
+func TestBackgroundTickPreservesFocusedPane(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
-	m, _ = send(t, m, key("tab")) // focus the inspector column
-	if m.focus != paneInspector {
-		t.Fatal("precondition: want focus on the inspector")
+	m, tick := tickFixture(t, spy, 40, 36)
+	m, _ = send(t, m, key("enter")) // the Mate row
+	m, _ = send(t, m, key("tab"))   // detail
+	m, _ = send(t, m, key("down"))
+	m, _ = send(t, m, key("down"))
+	if m.focus != paneDetail || m.detailSel != 2 {
+		t.Fatalf("precondition: focus=%v detailSel=%d, want detail at field 2", m.focus, m.detailSel)
 	}
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
-	if m.focus != paneInspector {
-		t.Fatalf("focus after a background tick = %v, want it to stay on the inspector", m.focus)
+	if m.focus != paneDetail || m.detailSel != 2 {
+		t.Fatalf("after a background tick focus=%v detailSel=%d, want detail at field 2", m.focus, m.detailSel)
 	}
 }
 
@@ -267,13 +282,19 @@ func TestBackgroundTickPreservesFocusedZone(t *testing.T) {
 func TestBackgroundTickPreservesTheBoxSelection(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
+	m, tick := tickFixture(t, spy, 40, 36)
 	m, _ = send(t, m, key("enter")) // into the project frame
-	m.focus, m.boxSel, m.boxAll = paneBox, 0, true
+	m, _ = send(t, m, key("tab"))
+	m, _ = send(t, m, key("tab")) // the box
+	m, _ = send(t, m, key("l"))   // the whole log
+	m, _ = send(t, m, key("down"))
+	if m.focus != paneBox || m.boxSel != 1 || !m.boxAll {
+		t.Fatalf("precondition: box state focus %v sel %d all %v", m.focus, m.boxSel, m.boxAll)
+	}
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
-	if m.focus != paneBox || m.boxSel != 0 || !m.boxAll {
+	if m.focus != paneBox || m.boxSel != 1 || !m.boxAll {
 		t.Fatalf("box state after a background tick = focus %v sel %d all %v, want it unchanged",
 			m.focus, m.boxSel, m.boxAll)
 	}
@@ -285,13 +306,18 @@ func TestBackgroundTickPreservesTheBoxSelection(t *testing.T) {
 func TestBackgroundTickPreservesOpenConfirmPrompt(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
-	choice := actionChoice{action: ActionStop}
-	m.confirm = &actionConfirmation{choice: choice}
+	m, tick := tickFixture(t, spy, 40, 36)
+	m, _ = send(t, m, key("enter")) // the Mate row
+	m, _ = send(t, m, key("a"))
+	m, _ = send(t, m, key("x")) // Stop mate… asks first
+	if m.confirm == nil {
+		t.Fatal("precondition: want the stop confirmation open")
+	}
+	choice := m.confirm.choice
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
-	if m.confirm == nil || m.confirm.choice != choice {
+	if m.confirm == nil || m.confirm.choice.action != choice.action || m.confirm.key != "x" {
 		t.Fatalf("confirm prompt after a background tick = %+v, want it unchanged", m.confirm)
 	}
 }
@@ -302,8 +328,14 @@ func TestBackgroundTickPreservesOpenConfirmPrompt(t *testing.T) {
 func TestBackgroundTickPreservesAllToggle(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
-	m, tick := tickFixture(t, spy, 120, 36)
-	m.boxAll = true
+	m, tick := tickFixture(t, spy, 40, 36)
+	m, _ = send(t, m, key("enter"))
+	m, _ = send(t, m, key("tab"))
+	m, _ = send(t, m, key("tab"))
+	m, _ = send(t, m, key("l"))
+	if !m.boxAll {
+		t.Fatal("precondition: l must show the whole log")
+	}
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
@@ -311,3 +343,7 @@ func TestBackgroundTickPreservesAllToggle(t *testing.T) {
 		t.Fatal("the [all] toggle after a background tick = off, want it to stay on")
 	}
 }
+
+type errFake string
+
+func (e errFake) Error() string { return string(e) }

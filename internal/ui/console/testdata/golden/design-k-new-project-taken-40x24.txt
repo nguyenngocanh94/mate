@@ -1,0 +1,24 @@
+─ acme ──────────────────────────── !4 ─
+  auth-gateway                   running
+  billing-worker                 created
+  customer-notifications-dispat… running
+  docs-site                   !1 no mate
+  infra-terraform                running
+  ledger-recon                   stopped
+  mobile-app                     running
+▌ payments-api                !2 running
+  search-indexer              !1 unknown
+  ↓ 3 more                              
+─ new project ──────────────────── esc ─
+  name                                  
+▌ docs-site█                            
+    docs-site already exists            
+  repo · optional                       
+  path or git url                       
+    leave blank to add later            
+                                        
+  enter  create docs-site               
+         no mate is started             
+  tab    next field                     
+  esc    cancel                         
+→ next pane  👨‍💻 payments-api      ? keys

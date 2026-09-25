@@ -176,89 +176,40 @@ func wrapAfterSlash(s string, w int) []string {
 	return out
 }
 
-// wrapSpans is wrapAfterSlash for a styled value: it wraps the spans as
-// one string and hands back one span slice per line, so a value that
-// changes style part-way through - a status word followed by a dim reason,
-// an availability marker followed by why the read failed - keeps its
-// colours across the break.
-//
-// This is the inspector's wrap. The inspector never truncates a value, so
-// every styled field goes through here rather than through the line
-// primitive's own edge truncation.
-func wrapSpans(spans []span, w int) [][]span {
-	type cell struct {
-		r  rune
-		sp span
+// wrapWords breaks s into lines of at most w cells, at spaces where it
+// can and inside a word only when one word is wider than a line.
+func wrapWords(s string, w int) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
 	}
-	var cs []cell
-	for _, s := range spans {
-		for _, r := range s.text {
-			cs = append(cs, cell{r: r, sp: s})
-		}
+	if w <= 0 {
+		return []string{s}
 	}
-	if len(cs) == 0 {
-		return [][]span{nil}
-	}
-	var text []rune
-	for _, c := range cs {
-		text = append(text, c.r)
-	}
-	var out [][]span
-	i := 0
-	for _, chunk := range wrapAfterSlash(string(text), w) {
-		n := len([]rune(chunk))
-		// wrapAfterSlash drops the spaces it breaks at, so advance past any
-		// run of spaces before matching the next chunk.
-		for i < len(cs) && n > 0 && cs[i].r == ' ' && chunk != "" && []rune(chunk)[0] != ' ' {
-			i++
-		}
-		var lineSpans []span
-		for k := 0; k < n && i < len(cs); k++ {
-			c := cs[i]
-			i++
-			if last := len(lineSpans) - 1; last >= 0 && lineSpans[last].plain == c.sp.plain && sameStyle(lineSpans[last], c.sp) {
-				lineSpans[last].text += string(c.r)
-				continue
+	var out []string
+	cur := ""
+	for _, word := range strings.Fields(s) {
+		for cells(word) > w {
+			if cur != "" {
+				out = append(out, cur)
+				cur = ""
 			}
-			lineSpans = append(lineSpans, span{text: string(c.r), style: c.sp.style, plain: c.sp.plain})
+			head := cutCells(word, w)
+			out = append(out, head)
+			word = word[len(head):]
 		}
-		out = append(out, lineSpans)
+		switch {
+		case cur == "":
+			cur = word
+		case cells(cur)+1+cells(word) <= w:
+			cur += " " + word
+		default:
+			out = append(out, cur)
+			cur = word
+		}
 	}
-	if len(out) == 0 {
-		return [][]span{nil}
+	if cur != "" {
+		out = append(out, cur)
 	}
 	return out
-}
-
-// sameStyle reports whether two spans can be merged into one run. Styles
-// are compared by rendered effect rather than by field, which is the only
-// comparison lipgloss offers.
-func sameStyle(a, b span) bool {
-	return a.style.Render("x") == b.style.Render("x")
-}
-
-// dropPriority keeps the leading items that fit in w cells once joined by
-// sep, and drops the rest whole. Items must already be ordered by urgency:
-// the first item that does not fit ends the line, so a short low-priority
-// item never displaces a longer high-priority one that was dropped.
-func dropPriority(items []string, w int, sep string) []string {
-	kept := make([]string, 0, len(items))
-	used := 0
-	for _, it := range items {
-		need := cells(it)
-		if len(kept) > 0 {
-			need += cells(sep)
-		}
-		if used+need > w {
-			break
-		}
-		used += need
-		kept = append(kept, it)
-	}
-	return kept
-}
-
-// joinDropped is dropPriority plus the join, for the common case.
-func joinDropped(items []string, w int, sep string) string {
-	return strings.Join(dropPriority(items, w, sep), sep)
 }

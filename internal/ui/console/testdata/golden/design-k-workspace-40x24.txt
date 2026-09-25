@@ -1,0 +1,24 @@
+─ acme ──────────────────────────── !4 ─
+  auth-gateway                   running
+  billing-worker                 created
+  customer-notifications-dispat… running
+  docs-site                   !1 no mate
+  infra-terraform                running
+  ledger-recon                   stopped
+  mobile-app                     running
+▌ payments-api                !2 running
+  search-indexer              !1 unknown
+  shipping-rates                 running
+  ↓ 2 more                              
+─ payments-api ─────────────── project ─
+  mate      ✻ running · 38m             
+  crews     1 working · 1 decide        
+  completed 1                           
+  box       1 waiting on you            
+  mode      manual                      
+  repo      ~/src/payments-api          
+  last      status · 1m                 
+─ box ────────────────────────────── 1 ─
+  🤖 Backfill ledger v2       [assign]  
+     payments-api · decide · 6m         
+→ next pane  👨‍💻 payments-api      ? keys

@@ -1,0 +1,24 @@
+─ acme ───────────────────────── 0 ─
+                                    
+  No projects in acme yet.          
+                                    
+  A project is its repos, one mate  
+  and the crews it spawns.          
+                                    
+▌ n    New project…                 
+  r    Refresh                      
+  q    Quit                         
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+→ next pane · no host         ? keys

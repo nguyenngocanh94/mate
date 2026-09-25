@@ -159,7 +159,7 @@ func TestLiveConsoleDiffShowsACrewBranch(t *testing.T) {
 	// 5. The overlay is the only thing the Console does with that text: it
 	// renders every line it was given, so what the reader reads is what the
 	// command printed.
-	frame := console.RenderDiffOverlay(text, "k3", crewRes.Branch, 120, 36)
+	frame := console.RenderDiffOverlay(text, "k3", crewRes.Branch, 48, 36)
 	t.Logf("overlay:\n%s", strings.Join(frame, "\n"))
 	joined := strings.Join(frame, "\n")
 	for _, want := range []string{"diff", "k3", crewRes.Branch, "README.md"} {

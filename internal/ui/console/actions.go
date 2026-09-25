@@ -8,7 +8,6 @@ import (
 	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
@@ -32,75 +31,15 @@ type actionChoice struct {
 
 type actionConfirmation struct {
 	choice actionChoice
+	// key is the key that asked, and the only one that confirms; label is
+	// the entry's own words ("Stop mate…"), which the sheet asks back.
+	key, label string
 }
 
 type actionDoneMsg struct {
 	choice actionChoice
 	text   string
 	err    error
-}
-
-func (m Model) actionChoicesForSelected() []actionChoice {
-	unavailable := func(a Action, desc string) actionChoice {
-		return actionChoice{action: a, desc: "unavailable · " + desc}
-	}
-	selected, ok := m.selectedRow()
-	if !ok {
-		choices := []actionChoice{
-			unavailable(ActionStart, "no row selected"), unavailable(ActionStop, "no row selected"),
-			unavailable(ActionResume, "no row selected"), unavailable(ActionRepair, "no row selected"),
-			unavailable(ActionOnboard, "select a Project or the workspace"),
-		}
-		if m.cur().kind == frameWorkspace {
-			choices[4] = actionChoice{action: ActionOnboard, desc: "Add a Project to this workspace", enabled: true, req: ActionRequest{Action: ActionOnboard, TargetKind: "workspace"}}
-		}
-		return choices
-	}
-	return m.actionChoicesForRow(selected)
-}
-
-// actionChoicesForRow is the menu one row offers. It is its own function
-// because two surfaces ask for it: the list's `a`, which means the row
-// under the cursor, and the box zone's `o` (box_keys.go), which means the
-// pane the box belongs to - the Mate whose session is open is not
-// necessarily the row the tree's cursor is sitting on.
-func (m Model) actionChoicesForRow(selected row) []actionChoice {
-	choices := make([]actionChoice, 0, 8)
-	choices = append(choices, m.startChoice(selected), m.stopChoice(selected), m.resumeChoice(selected), m.repairChoice(selected), m.onboardChoice(selected))
-	// The Crew row's own entry (mvp.md task 21). It is appended only on a
-	// Crew row rather than listed as "unavailable · applies to a Crew"
-	// everywhere else, for the same reason the Mate's two recovery actions
-	// are appended only on a Mate row: a menu that names every action the
-	// Console has, on every row, is a menu of refusals.
-	if selected.kind == rowCrew {
-		choices = append(choices, m.diffChoice(selected))
-	}
-	// Capability is authored by the store-backed loader. The local builders above
-	// only supply row-specific wording and target identity; availability is
-	// replaced from the DTO so this surface cannot drift from other clients.
-	for i := range choices {
-		if available, reason, found := m.actionCapability(selected, choices[i]); found {
-			choices[i].enabled = available
-			if !available {
-				choices[i].desc = "unavailable · " + reason
-			}
-		}
-	}
-	// The Mate's two recovery actions. They are here rather than on the rail
-	// header (2026-09-19, session_focus.go): both are rare, both are about a
-	// Mate that is already misbehaving, and a menu is where a reader goes
-	// looking for something they do not do every day. The restart carries
-	// `dangerous`, so the menu's own confirmation stands in front of the one
-	// that stops a live agent.
-	if selected.kind == rowMate {
-		if project := m.currentProject().ProjectID; project != "" {
-			choices = append(choices, restartMateChoice(project), clearComposerChoice(project))
-		}
-	}
-	if c, ok := m.mergeChoice(selected); ok {
-		choices = append(choices, c)
-	}
-	return choices
 }
 
 // mergeChoice is the `merge` entry of a Crew row's menu (mvp.md task 22).
@@ -374,19 +313,6 @@ func (m Model) bindingForRow(r row) query.Field[query.BindingValue] {
 	return query.Field[query.BindingValue]{State: query.Unknown, Reason: "row is not a bindable entity"}
 }
 
-func (m Model) beginActions() Model {
-	m.actions = true
-	m.confirm = nil
-	m.actionInputMode = false
-	m.actionInput = ""
-	m.actionRepo, m.actionField = "", fieldName
-	m.actionChoices = m.actionChoicesForSelected()
-	m.actionRow, _ = m.selectedRow()
-	m.actionIndex = 0
-	m.msg = footerMsg{}
-	return m
-}
-
 // beginNewProject is the 'n' key: it opens the name input for a new
 // Project directly, without the action menu in between. Creating a Project
 // is the one thing a reader can do on a workspace that has none (ADR 0023
@@ -404,7 +330,7 @@ func (m Model) beginNewProject() Model {
 	}
 	m.actions = false
 	m.confirm = nil
-	m.actionChoices = nil
+	m.menu = nil
 	m.actionIndex = 0
 	m.pendingChoice = choice
 	m.actionInputMode = true
@@ -443,77 +369,9 @@ func (m Model) closeActions() Model {
 	m.pendingChoice = actionChoice{}
 	m.harnessPick = false
 	m.harnessIndex = 0
-	m.actionChoices = nil
+	m.menu = nil
 	m.actionIndex = 0
 	return m
-}
-
-func (m Model) selectedAction() (actionChoice, bool) {
-	if m.actionIndex < 0 || m.actionIndex >= len(m.actionChoices) {
-		return actionChoice{}, false
-	}
-	return m.actionChoices[m.actionIndex], true
-}
-
-func (m Model) handleActionEnter() (Model, tea.Cmd) {
-	choice, ok := m.selectedAction()
-	if !ok {
-		return m, nil
-	}
-	if !choice.enabled {
-		m.msg = errMsg("Action refused: " + strings.TrimPrefix(choice.desc, "unavailable · ") + " · nothing started")
-		return m, nil
-	}
-	if choice.action == ActionOnboard && choice.req.TargetKind == "workspace" {
-		m.actionInputMode = true
-		m.actionInput = ""
-		m.actionRepo, m.actionField = "", fieldName
-		m.pendingChoice = choice
-		return m, nil
-	}
-	if choice.dangerous {
-		m.confirm = &actionConfirmation{choice: choice}
-		return m, nil
-	}
-	return m.runAction(choice)
-}
-
-// onActionOverlayKey is the menu's and the confirmation's own keyboard. It
-// is one implementation because two surfaces route to it: onKey, on the
-// project frame, and the session view's box zone (session_mode.go), where
-// the overlay is drawn over the whole frame (view.go) and nothing behind it
-// may answer a key.
-func (m Model) onActionOverlayKey(key string) (Model, tea.Cmd) {
-	if m.confirm != nil {
-		switch key {
-		case "esc", "backspace":
-			m.confirm = nil
-			m.actions = true
-			return m, nil
-		case "enter":
-			choice := m.confirm.choice
-			m.confirm = nil
-			return m.runAction(choice)
-		}
-		return m, nil
-	}
-	switch key {
-	case "esc", "backspace":
-		return m.closeActions(), nil
-	case "up", "k":
-		if m.actionIndex > 0 {
-			m.actionIndex--
-		}
-		return m, nil
-	case "down", "j":
-		if m.actionIndex+1 < len(m.actionChoices) {
-			m.actionIndex++
-		}
-		return m, nil
-	case "enter":
-		return m.handleActionEnter()
-	}
-	return m, nil
 }
 
 // onboardField is one field of the new-project form: the Project's name,
@@ -571,6 +429,12 @@ func (m Model) onActionInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.msg = errMsg("Action refused: project name is required · nothing started")
 			return m, nil
 		}
+		// A name the store would refuse is not sent: the rule line under
+		// the field already says why, in amber (design K).
+		if why := m.newProjectNameProblem(strings.TrimSpace(m.actionInput)); why != "" {
+			m.actionField = fieldName
+			return m, nil
+		}
 		// Enter on the name moves on to the repo, so the common case is
 		// name, Enter, path, Enter - never a submit with the path unasked.
 		// Enter on an empty repo is the answer "no repo yet": the Project
@@ -624,9 +488,6 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 	m.actionRunningDesc = string(choice.action) + " " + actionObject(choice)
 	m.actionStartedAt = time.Now()
 	m.msg = m.runningLine(0)
-	if boxAction(choice.action) {
-		m.boxMsg = m.msg
-	}
 	// The context is a child of the program's own (baseCtx), not
 	// context.Background(): cancel is stored so quitting mid-action (see
 	// onKey's actionBusy branch) has a real signal to send the goroutine
@@ -650,9 +511,11 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 // carries the time spent, so a slow start reads as progress rather than a
 // hang.
 func (m Model) runningLine(elapsed time.Duration) footerMsg {
+	// The elapsed time leads: on a 40-column status line the object's name
+	// is what gets cut, never how long it has been running.
 	text := "Running " + m.actionRunningDesc + " " + m.g.Ellipsis
 	if elapsed >= time.Second {
-		text += " " + elapsed.Truncate(time.Second).String()
+		text = elapsed.Truncate(time.Second).String() + " " + m.g.Dot + " " + text
 	}
 	return infoMsg(text)
 }
@@ -678,7 +541,7 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.actionRunningDesc = ""
 	m.confirm = nil
 	m.actions = false
-	m.actionChoices = nil
+	m.menu = nil
 	// A diff's whole result is the overlay (diff.go): the text is a
 	// screenful, and the message line would show a truncated first line of
 	// it. A diff that *failed* still takes the message line - there is no
@@ -706,171 +569,10 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 		// the reader pressed a key on a line in the rail, and what they need
 		// back is whether that line reached the Mate and why not.
 		result = boxOutcome(msg, m.g)
-		m.boxMsg = result
 	}
 	m.actionAfterRead = &result
 	m.msg = result
 	return m.startLoad()
-}
-
-func (m Model) actionObjectDescription(c actionChoice) (string, string, string) {
-	object := c.req.Target
-	if object == "" {
-		object = "workspace"
-	}
-	scope := "Recorded state and the runtime resources named by this action."
-	effect := "The snapshot will be re-read after the application service returns."
-	switch c.req.Action {
-	case ActionStop:
-		scope = "The recorded runtime agent only; the Crew's worktree and branch are untouched."
-		effect = "The runtime binding is released only after the service confirms its outcome."
-	case ActionRepair:
-		scope = "The recorded binding/worktree metadata only; no live agent is assumed."
-		effect = "A stale binding may be cleared. Unknown state is never treated as proof of safe cleanup."
-	case ActionMerge:
-		object = c.req.Target + "/" + c.req.Crew
-		scope = "The Project's default branch in the primary repo, and this Crew's branch, worktree and pane."
-		effect = "A fast-forward only; anything else refuses and changes nothing. If it lands, the Crew is finished and its branch and worktree are removed."
-	}
-	return object, scope, effect
-}
-
-func (m Model) actionLines(w, h int) []*line {
-	if h <= 0 {
-		return nil
-	}
-	if m.confirm != nil {
-		return m.confirmationLines(w, h, m.confirm.choice)
-	}
-	if m.actionInputMode {
-		return m.onboardInputLines(w, h)
-	}
-	if m.harnessPick {
-		return m.harnessPickerLines(w, h)
-	}
-	out := []*line{newLine().pad(2).add("ACTIONS", m.p.Bold)}
-	// The row the choices were built for, which is not always the row under
-	// the list's cursor: the box zone's `o` builds the menu for the pane it
-	// belongs to (box_keys.go), and a title naming a different row would be
-	// naming something none of the entries act on.
-	if m.actionRow.id != "" {
-		out[0].add("  "+m.actionRow.id, m.p.Dim)
-	}
-	out = append(out, newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint))
-	for i, c := range m.actionChoices {
-		style := m.p.Fg
-		if i == m.actionIndex {
-			style = m.p.Bold
-		}
-		l := selectRow(newLine(), i == m.actionIndex, m.p).pad(2)
-		if i == m.actionIndex {
-			l.add(m.g.Selected+" ", m.p.Acc)
-		} else {
-			l.add("  ", m.p.Dim)
-		}
-		l.add(string(c.action), style).add("  ", m.p.Dim)
-		l.add(c.desc, m.p.Dim)
-		out = append(out, l)
-	}
-	out = append(out, newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint))
-	out = append(out, newLine().pad(2).add("↑↓ Move  Enter Run  Esc Close", m.p.Dim))
-	return out
-}
-
-// confirmLabelWidth is the confirmation overlay's own label column: "Object  ",
-// "Scope   " and "Effect  " are each 8 cells including their padding.
-const confirmLabelWidth = 8
-
-// confirmField renders one Object/Scope/Effect line, wrapping its value the
-// way the inspector wraps its own fields (seams.go's field/note) rather than
-// letting line.render cut it silently at the pane edge. Scope and Effect are
-// mandatory prose (the design's own rule), so losing their tail with no "…"
-// marker - the counter-review's B7, an 80-column Scope that lost its
-// "...are untouched" clause - is exactly what wrapping instead of cutting
-// prevents.
-func (m Model) confirmField(label, value string, style lipgloss.Style, w int) []*line {
-	valueWidth := maxInt(1, w-4-confirmLabelWidth)
-	wrapped := wrapAfterSlash(value, valueWidth)
-	out := []*line{newLine().pad(2).add(padRight(label, confirmLabelWidth), m.p.Dim).add(wrapped[0], style)}
-	for _, cont := range wrapped[1:] {
-		out = append(out, newLine().pad(2+confirmLabelWidth).add(cont, style))
-	}
-	return out
-}
-
-func (m Model) confirmationLines(w, h int, choice actionChoice) []*line {
-	object, scope, effect := m.actionObjectDescription(choice)
-	headline := "CONFIRM " + string(choice.action) + "?"
-	if choice.confirmPrompt != "" {
-		headline = choice.confirmPrompt
-	}
-	out := []*line{
-		newLine().pad(2).add(headline, m.p.Bold),
-		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
-	}
-	out = append(out, m.confirmField("Object", object, m.p.Fg, w)...)
-	out = append(out, m.confirmField("Scope", scope, m.p.Fg, w)...)
-	out = append(out, m.confirmField("Effect", effect, m.p.Amber, w)...)
-	out = append(out,
-		newLine(),
-		newLine().pad(2).add("Enter ", m.p.Fg).add(string(choice.action)+" "+object, m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
-	)
-	return fitLines(out, h)
-}
-
-func (m Model) onboardInputLines(w, h int) []*line {
-	field := func(f onboardField, label, value string) *line {
-		l := newLine().pad(2)
-		style := m.p.Dim
-		if m.actionField == f {
-			l.add(m.g.Selected+" ", m.p.Acc)
-			style = m.p.Fg
-			value += "_"
-		} else {
-			l.add("  ", m.p.Dim)
-		}
-		return l.add(padRight(label, onboardLabelWidth), m.p.Dim).add(value, style)
-	}
-	// The root gets a line of its own: a real workspace path is long, and
-	// after the sentence that introduces it, it would be the part cut off
-	// at the pane edge.
-	root := "the workspace root"
-	if ws := m.tree.Workspace; ws.IsKnown() && ws.Value.Root != "" {
-		root = ws.Value.Root
-	}
-	enter := m.onboardEnterLabel()
-	out := []*line{
-		newLine().pad(2).add("NEW PROJECT", m.p.Bold),
-		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
-		field(fieldName, "Name", m.actionInput),
-		field(fieldRepo, "Repo (optional)", m.actionRepo),
-		newLine(),
-		newLine().pad(2).add("Repo is a git repo root, absolute or relative to the workspace:", m.p.Dim),
-		newLine().pad(4).add(root, m.p.Fg),
-		newLine().pad(2).add("Leave it empty to create the Project with no repo; add repos later with `mate project repo add`.", m.p.Dim),
-		newLine().pad(2).add("Registers a Project, like `mate project add`; no runtime agent is started.", m.p.Dim),
-		newLine(),
-		newLine().pad(2).add("Enter ", m.p.Fg).add(enter, m.p.Dim).add("  Tab ", m.p.Fg).add("Switch field", m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
-	}
-	return fitLines(out, h)
-}
-
-// onboardLabelWidth fits the form's longest label, "Repo (optional)", plus
-// a gap.
-const onboardLabelWidth = 17
-
-// onboardEnterLabel is what Enter does in the new-project form right now,
-// for the key line: move on to the repo, create the Project with the typed
-// repo, or create it with none.
-func (m Model) onboardEnterLabel() string {
-	switch {
-	case strings.TrimSpace(m.actionRepo) != "":
-		return "Create project"
-	case m.actionField == fieldRepo:
-		return "Create without repo"
-	default:
-		return "Next"
-	}
 }
 
 // ---------- the Mate keys: s (create/start/resume) and h (change harness) ----------
@@ -973,29 +675,6 @@ func (m Model) mateStartChoice(r row, mate query.MateNode) actionChoice {
 	return c
 }
 
-// mateStartLabel is what the key line says 's' will do, and false when the
-// key has nothing to offer on this row. It follows the same choice the key
-// runs, so the label can never promise a different action than the keystroke
-// performs.
-func (m Model) mateStartLabel(r row) (string, bool) {
-	mate, ok := m.mateForRow(r)
-	if !ok {
-		return "", false
-	}
-	c := m.mateStartChoice(r, mate)
-	if !c.enabled {
-		return "", false
-	}
-	switch c.action {
-	case ActionOnboard:
-		return "Create mate", true
-	case ActionResume:
-		return "Resume mate", true
-	default:
-		return "Start mate", true
-	}
-}
-
 // beginHarnessPick opens the agent chooser for an already-built choice. Like
 // beginNewProject it leaves the menu closed, so Esc returns to the list
 // rather than a menu the reader never opened.
@@ -1003,7 +682,7 @@ func (m Model) beginHarnessPick(choice actionChoice) Model {
 	m.actions = false
 	m.confirm = nil
 	m.actionInputMode = false
-	m.actionChoices = nil
+	m.menu = nil
 	m.actionIndex = 0
 	m.pendingChoice = choice
 	m.harnessPick = true
@@ -1070,51 +749,6 @@ func (m Model) runPending(choice actionChoice) (Model, tea.Cmd) {
 		return m, nil
 	}
 	return m.runAction(choice)
-}
-
-func (m Model) harnessPickerLines(w, h int) []*line {
-	// TODO(task 10): a switch_harness pending choice retitled this
-	// "CHANGE HARNESS". Restarting a Mate under another harness is task
-	// 10's surface.
-	const title = "CHOOSE AN AGENT"
-	out := []*line{
-		newLine().pad(2).add(title, m.p.Bold),
-		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
-	}
-	for i, kind := range harnessOrder {
-		style := m.p.Fg
-		if i == m.harnessIndex {
-			style = m.p.Bold
-		}
-		l := selectRow(newLine(), i == m.harnessIndex, m.p).pad(2)
-		if i == m.harnessIndex {
-			l.add(m.g.Selected+" ", m.p.Acc)
-		} else {
-			l.add("  ", m.p.Dim)
-		}
-		l.add(string(kind), style)
-		if m.recordedHarness() == kind {
-			l.add("  ", m.p.Dim).add("current", m.p.Dim)
-		}
-		out = append(out, l)
-	}
-	out = append(out, newLine())
-	out = append(out, newLine().pad(2).add("The new Mate is created and started with this agent.", m.p.Dim))
-	out = append(out,
-		newLine(),
-		newLine().pad(2).add("Enter ", m.p.Fg).add("Use "+string(harnessOrder[m.harnessIndex]), m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
-	)
-	return fitLines(out, h)
-}
-
-// recordedHarness is the harness the selected Project's Mate records, or ""
-// when there is none or it could not be read - never a guess.
-func (m Model) recordedHarness() query.HarnessKind {
-	mate := m.currentProject().Mate
-	if !mate.Designated.IsKnown() {
-		return ""
-	}
-	return mate.Designated.Value.HarnessKind
 }
 
 // boxAction reports whether an action's outcome belongs on the rail's own

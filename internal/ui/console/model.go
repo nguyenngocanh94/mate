@@ -183,11 +183,11 @@ type pane int
 
 const (
 	paneList pane = iota
-	paneInspector
-	// paneBox is the project frame's message-box panel (box.go). It is only
-	// a legal focus while that panel is drawn; relayout sends focus back to
-	// the list as soon as it is not, the same rule paneInspector follows
-	// when the inspector column disappears.
+	// paneDetail is the selected row's object (pane_detail.go).
+	paneDetail
+	// paneBox is the box (pane_box.go). It is only a legal focus while the
+	// box is drawn; relayout sends focus back to the list as soon as it is
+	// not, the same rule paneDetail follows.
 	paneBox
 )
 
@@ -281,10 +281,14 @@ type Model struct {
 	// change the snapshot. A missing key is collapsed, which is the default
 	// view.
 	completedOpen map[string]bool
-	// inspTop is the inspector's scroll offset. The inspector body itself
-	// is a separate task's surface; the offset lives here because Tab, Esc
-	// and every selection change reset it.
-	inspTop int
+	// detailSel is the field under detail's cursor; every selection change
+	// resets it.
+	detailSel int
+	// keysOpen is `?`: the key list, until the next key.
+	keysOpen bool
+	// staged is what the next pane shows, as far as this Console knows: the
+	// last StageFunc call's target and outcome.
+	staged stagedPane
 
 	// diff is the open diff overlay (diff.go, mvp.md task 21): the text one
 	// ActionDiff returned, the crew and branch it names, and where the
@@ -298,22 +302,13 @@ type Model struct {
 	// for the Console's run only, and it defaults to off - the box exists to
 	// show what somebody still has to decide on, and a filter a reader has to
 	// re-apply on every start is a filter that is not the default.
-	boxAll bool
-	// boxMsg is the outcome of the last box action, kept apart from msg
-	// because the session frame gives it a row of its own: folding it into
-	// msg would let any unrelated Console message (a stream fallback notice,
-	// a refresh failure) steal a row from the agent's own terminal.
-	boxMsg footerMsg
-	// boxHover is the entry the mouse pointer is over, -1 for none. It is
-	// one field rather than one per surface because a pointer is in one
-	// place: only the surface under it ever reads it, and it is cleared the
-	// moment the pointer leaves a box.
-	boxHover      int
-	actions       bool
-	actionChoices []actionChoice
-	// actionRow is the row actionChoices were built for. It is kept because
-	// the menu can be opened for a row the list's cursor is not on (the box
-	// zone's `o`, box_keys.go), and the overlay's title names it.
+	boxAll  bool
+	actions bool
+	// menu is the open actions sheet (menu.go).
+	menu []menuEntry
+	// actionRow is the row the menu was built for. It is kept because the
+	// sheet can be opened for a row the list's cursor is not on (the box's
+	// `o`), and the sheet's title names it.
 	actionRow       row
 	actionIndex     int
 	confirm         *actionConfirmation
@@ -448,10 +443,9 @@ func New(load LoadFunc, action ...ActionFunc) Model {
 		focus:         paneList,
 		completedOpen: map[string]bool{},
 		// -1 is "follow the newest box entry".
-		boxSel:   -1,
-		boxHover: -1,
-		g:        glyphsFor(os.Getenv),
-		p:        defaultPalette(),
+		boxSel: -1,
+		g:      glyphsFor(os.Getenv),
+		p:      defaultPalette(),
 		// Init issues the first load immediately; this marks it in flight
 		// so a tick that fires before it resolves reschedules instead of
 		// starting a second, redundant load.
@@ -628,7 +622,7 @@ func (m Model) jumpToCrew(crewID string) (Model, bool) {
 			m = m.reconcileSelection()
 			m.focus = paneList
 			m.detail = false
-			m.inspTop = 0
+			m.detailSel = 0
 			m.msg = footerMsg{}
 			return m, true
 		}
@@ -668,17 +662,18 @@ func (m Model) selectedRow() (row, bool) {
 // below the minimum and growing it back returns to the same place, because
 // the too-small screen is a rendering decision and not a state transition.
 func (m Model) relayout() Model {
-	l := m.listLayout()
-	if l.Inspector > 0 && m.detail {
+	p := m.plan()
+	if _, ok := p.slot(slotDetail); !ok && m.focus == paneDetail && !m.detail {
+		m.focus = paneList
+	}
+	if _, ok := p.slot(slotBox); !ok && m.focus == paneBox {
+		// Focus names a pane the keys act on, and a pane that is not drawn
+		// is not an answer to that.
+		m.focus = paneList
+	}
+	if m.h >= stackRows {
+		// Tab swaps detail in for the list only below 20 rows.
 		m.detail = false
-	}
-	if l.Inspector == 0 && m.focus == paneInspector {
-		m.focus = paneList
-	}
-	if _, panel := m.boxRegion(layout(m.w, m.h)); !panel && m.focus == paneBox {
-		// Same rule as the inspector's above: focus names a pane the keys act
-		// on, and a pane that is not drawn is not an answer to that.
-		m.focus = paneList
 	}
 	f := m.cur()
 	rows := m.currentRows()
@@ -688,7 +683,8 @@ func (m Model) relayout() Model {
 	} else {
 		f.selID = ""
 	}
-	f.top = clampTop(f.top, f.sel, len(rows), l.listRows())
+	m = m.setCur(f)
+	f.top = m.listTop(m.plan())
 	return m.setCur(f)
 }
 
@@ -745,7 +741,7 @@ func (m Model) reconcileSelection() Model {
 	}
 	m.stack = kept
 	if len(m.stack) == 0 || m.stack[len(m.stack)-1].selID != prevSelID {
-		m.inspTop = 0
+		m.detailSel = 0
 	}
 	return m.relayout()
 }
@@ -805,15 +801,13 @@ func (m Model) moveSelection(delta int) Model {
 	if len(rows) == 0 {
 		return m
 	}
-	l := m.listLayout()
 	f := m.cur()
 	f.sel = clampInt(f.sel+delta, 0, len(rows)-1)
 	f.selID = rows[f.sel].id
-	f.top = clampTop(f.top, f.sel, len(rows), l.listRows())
 	m = m.setCur(f)
-	m.inspTop = 0
+	m.detailSel = 0
 	m.msg = footerMsg{}
-	return m
+	return m.relayout()
 }
 
 // clampTop resolves the scroll offset: never past the end of the list, and

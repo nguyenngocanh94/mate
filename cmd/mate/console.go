@@ -118,6 +118,8 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	model := console.New(load, consoleAction(ws, deps)).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, h)).
+		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
+		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
 		WithClipboard(func(seq []byte) {
 			// One write per sequence: the renderer also writes this file
 			// from its own goroutine, one frame per write, so a single
@@ -125,13 +127,10 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 			_, _ = stdoutFile.Write(seq)
 		})
 
-	// tea.WithMouseAllMotion is a Program-level terminal mode, so it is on
-	// for the Console's whole run. All motion, not cell motion: cell motion
-	// reports a move only while a button is held, and the box needs to know
-	// which entry the pointer is over before the reader presses anything, so
-	// that entry can show its [assign] button.
+	// Cell motion, not all motion: the Console answers presses and the
+	// wheel, and nothing in it follows a bare pointer.
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx),
-		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseAllMotion())
+		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseCellMotion())
 	final, err := program.Run()
 	if err != nil {
 		return fmt.Errorf("console exited with an error: %w", err)

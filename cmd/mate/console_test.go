@@ -41,22 +41,23 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 
 	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws) }
 	m := console.New(load, nil)
-	model, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 36})
+	// The Console is the left ~20% of the captain's terminal: 40 columns.
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 36})
 	model, _ = model.Update(m.Init()())
 	frame := model.View()
 
 	if got := len(strings.Split(frame, "\n")); got != 36 {
 		t.Fatalf("frame has %d lines, want 36:\n%s", got, frame)
 	}
-	for _, want := range []string{"mate console", "PROJECTS  2", "shop", "blog", "! no mate"} {
+	for _, want := range []string{"shop", "blog", "!2", "→ next pane"} {
 		if !strings.Contains(frame, want) {
 			t.Fatalf("gallery does not show %q:\n%s", want, frame)
 		}
 	}
 	// Neither project has a Mate yet, and the gallery must say so rather
-	// than leaving the MATE column blank.
-	if strings.Count(frame, "! no mate") != 2 {
-		t.Fatalf("want both projects marked as having no Mate:\n%s", frame)
+	// than leaving the Mate's status blank.
+	if strings.Count(frame, "no mate") != 3 {
+		t.Fatalf("want both rows and the selected project's detail to say no mate:\n%s", frame)
 	}
 }
 

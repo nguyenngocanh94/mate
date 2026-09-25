@@ -2,105 +2,83 @@ package console
 
 import "strings"
 
-// glyphSet is the drawing alphabet. Two sets exist: box-drawing Unicode,
-// and an ASCII fallback for a terminal whose locale is not UTF-8. There is
-// no third tier - no Nerd Font glyph and no emoji appears in either set,
-// because both would render as a replacement box on a plain terminal while
-// still occupying the cells the layout counted on.
+// glyphSet is the drawing alphabet. Every glyph but the kind marks is one
+// cell; Mate and Crew are exactly two, whatever alphabet draws them, so a
+// name always starts at column 5 (design I, "Row anatomy").
 type glyphSet struct {
-	// Name is "unicode" or "ascii"; golden fixtures are keyed by it.
 	Name string
 
-	HRule   string // horizontal rule
-	VRule   string // the inspector's divider column
-	TeeDown string // rule above the body, joining the divider
-	TeeUp   string // rule below the body, joining the divider
-
+	HRule     string // pane rules
 	Selected  string // selected row, focused pane
 	Unfocused string // selected row, unfocused pane
+	Collapsed string // a closed group (Completed)
+	Expanded  string // an open group
+	Cursor    string // the text cursor in a sheet's input field
 
 	Crumb    string // breadcrumb separator
 	Ellipsis string // truncation marker
-	Up       string // "n more above" indicator
-	Down     string // "n more below" indicator
+	Up       string // "n more above"
+	Down     string // "n more below"
 	UpDown   string // the key-line name for the movement keys
 	Dot      string // inline separator between items
-	Back     string // the "leave this view" arrow on a clickable label
-	Arrow    string // the "hand this to" arrow on a clickable label
+	Arrow    string // the status line's "next pane" arrow
+	Bang     string // the attention mark
 
-	// Transcript glyphs. The Console does not draw a transcript itself
-	// (that surface belongs to the harness after attach), but the set
-	// carries them so nothing has to invent an ASCII fallback later.
-	Bullet string // turn marker
-	Elbow  string // tool result continuation
-	Spark  string // the running line
-	Cycle  string // mode indicator
-
-	CornerTL, CornerTR, CornerBL, CornerBR string // rounded box corners
+	// Mate and Crew are the kind marks, two cells each (kinds.go).
+	Mate, Crew string
+	// Claude and Codex are the harness icons, one cell each (icons.go).
+	Claude, Codex string
 }
 
 var unicodeGlyphs = glyphSet{
 	Name:      "unicode",
 	HRule:     "─",
-	VRule:     "│",
-	TeeDown:   "┬",
-	TeeUp:     "┴",
 	Selected:  "▌",
 	Unfocused: "▏",
+	Collapsed: "▸",
+	Expanded:  "▾",
+	Cursor:    "█",
 	Crumb:     "›",
 	Ellipsis:  "…",
 	Up:        "↑",
 	Down:      "↓",
 	UpDown:    "↑↓",
 	Dot:       "·",
-	Back:      "←",
 	Arrow:     "→",
-	Bullet:    "⏺",
-	Elbow:     "⎟",
-	Spark:     "✻",
-	Cycle:     "⏵⏵",
-	CornerTL:  "╭",
-	CornerTR:  "╮",
-	CornerBL:  "╰",
-	CornerBR:  "╯",
+	Bang:      "!",
+	Mate:      "👨‍💻",
+	Crew:      "🤖",
+	Claude:    "✻",
+	Codex:     "⌬",
 }
 
+// asciiGlyphs is design I's fallback table, one cell each ("9 ASCII
+// fallback"), with the kind marks padded to their two cells.
 var asciiGlyphs = glyphSet{
 	Name:      "ascii",
 	HRule:     "-",
-	VRule:     "|",
-	TeeDown:   "+",
-	TeeUp:     "+",
 	Selected:  ">",
 	Unfocused: ":",
+	Collapsed: "+",
+	Expanded:  "-",
+	Cursor:    "_",
 	Crumb:     ">",
-	Ellipsis:  "..",
+	Ellipsis:  "~",
 	Up:        "^",
 	Down:      "v",
-	UpDown:    "j/k",
+	UpDown:    "^v",
 	Dot:       ".",
-	Back:      "<-",
-	Arrow:     "->",
-	Bullet:    "*",
-	Elbow:     "\\_",
-	Spark:     "*",
-	Cycle:     ">>",
-	CornerTL:  "+",
-	CornerTR:  "+",
-	CornerBL:  "+",
-	CornerBR:  "+",
+	Arrow:     ">",
+	Bang:      "!",
+	Mate:      "@ ",
+	Crew:      "o ",
+	Claude:    "*",
+	Codex:     "#",
 }
 
-// glyphsFor picks the set from the environment. This is the only place the
-// package reads the environment.
-//
-//	MATE_ASCII truthy  -> ASCII, whatever the locale says
-//	MATE_ASCII falsy   -> Unicode, whatever the locale says (the escape
-//	                      hatch for a terminal that draws box glyphs fine
-//	                      but reports a C locale)
-//	MATE_ASCII unset   -> the locale decides: UTF-8 gets Unicode, anything
-//	                      else - including an unset locale, which is the C
-//	                      locale - gets ASCII.
+// glyphsFor picks the alphabet from the environment - the only place this
+// package reads it. MATE_ASCII forces either alphabet; otherwise a UTF-8
+// locale gets Unicode.
 func glyphsFor(getenv func(string) string) glyphSet {
 	switch strings.ToLower(strings.TrimSpace(getenv("MATE_ASCII"))) {
 	case "1", "true", "yes", "on":
@@ -114,9 +92,8 @@ func glyphsFor(getenv func(string) string) glyphSet {
 	return asciiGlyphs
 }
 
-// localeIsUTF8 reads the POSIX locale precedence: LC_ALL overrides
-// LC_CTYPE, which overrides LANG. The first one that is set decides; an
-// unset chain is the C locale, which is not UTF-8.
+// localeIsUTF8 reads the POSIX locale precedence: the first of LC_ALL,
+// LC_CTYPE and LANG that is set decides.
 func localeIsUTF8(getenv func(string) string) bool {
 	for _, key := range []string{"LC_ALL", "LC_CTYPE", "LANG"} {
 		v := strings.TrimSpace(getenv(key))

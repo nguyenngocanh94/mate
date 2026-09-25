@@ -39,8 +39,11 @@ func TestEnterOnMateStagesItAndStaysOnTheTree(t *testing.T) {
 	if len(m.stack) != before {
 		t.Fatalf("stack changed across a stage: %d -> %d", before, len(m.stack))
 	}
-	if !strings.Contains(m.msg.text, "in the next pane") || m.msg.tone != toneOK {
-		t.Fatalf("message = %+v, want the stage confirmation", m.msg)
+	if m.staged.name != "payments-api" || m.staged.err != "" {
+		t.Fatalf("staged = %+v, want the payments-api Mate", m.staged)
+	}
+	if frame := renderFrame(t, m); !strings.Contains(frame, "next pane  "+unicodeGlyphs.Mate+" payments-api") {
+		t.Fatalf("the status line does not say what the next pane shows:\n%s", frame)
 	}
 }
 
@@ -57,13 +60,25 @@ func TestEnterOnCrewStagesItByCrewID(t *testing.T) {
 	}
 }
 
-func TestAStageFailureIsSaidOnTheMessageLine(t *testing.T) {
+func TestAStageFailureIsSaidOnTheStatusLineAndRRetries(t *testing.T) {
 	spy := &stageSpy{err: errors.New("the pane to the right is not mate's stage")}
 	m := projectFrame(t, sampleTree()).WithStage(spy.fn)
 	m, cmd := send(t, m, key("enter"))
 	m, _ = send(t, m, cmd())
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "not mate's stage") {
-		t.Fatalf("message = %+v, want the host's refusal", m.msg)
+	if !strings.Contains(m.staged.err, "not mate's stage") {
+		t.Fatalf("staged = %+v, want the host's refusal", m.staged)
+	}
+	if frame := renderFrame(t, m); !strings.Contains(frame, "failed: the pane") || !strings.Contains(frame, "r retry") {
+		t.Fatalf("the status line does not carry the failure and r:\n%s", frame)
+	}
+	spy.err = nil
+	m, cmd = send(t, m, key("r"))
+	if cmd == nil {
+		t.Fatal("r after a failed stage did not retry it")
+	}
+	m, _ = send(t, m, cmd())
+	if len(spy.calls) != 2 || spy.calls[1] != spy.calls[0] || m.staged.err != "" {
+		t.Fatalf("retry calls = %+v staged = %+v, want the same target again, now shown", spy.calls, m.staged)
 	}
 }
 
@@ -83,8 +98,9 @@ func TestEnterWithoutAHostSaysThereIsNoNextPane(t *testing.T) {
 func TestAStaleBindingIsRefusedBeforeTheHostIsAsked(t *testing.T) {
 	spy := &stageSpy{}
 	m := toFailedAttempt(t, loaded(t, sampleTree(), nil)).WithStage(spy.fn)
-	if !strings.Contains(renderFrame(t, m), "Show in next pane (unavailable)") {
-		t.Fatalf("the key line did not mark the show unavailable:\n%s", renderFrame(t, m))
+	sheet, _ := send(t, m, key("a"))
+	if e := sheet.menu[0]; e.kind != entryShow || e.enabled || !strings.Contains(e.reason, "stale") {
+		t.Fatalf("the actions sheet does not mark the show unavailable up front: %+v", e)
 	}
 	m, cmd := send(t, m, key("enter"))
 	if cmd != nil || len(spy.calls) != 0 {

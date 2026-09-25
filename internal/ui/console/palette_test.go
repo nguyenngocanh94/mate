@@ -1,102 +1,75 @@
 package console
 
 import (
+	"strings"
 	"testing"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
-// TestPaletteUsesTheDocumentedANSIIndices is the contract half of
-// design/mate-tui.css: the oklch values there are previews of one theme,
-// but the index mapping is what the Console promises. The literals below
-// are written out rather than read from paletteANSI, so this test can
-// actually disagree with the production table.
-func TestPaletteUsesTheDocumentedANSIIndices(t *testing.T) {
-	p := defaultPalette()
-	cases := []struct {
-		token string
-		style lipgloss.Style
-		index uint
-	}{
-		{"fg", p.Fg, 15},
-		{"fg (bold)", p.Bold, 15},
-		{"dim", p.Dim, 7},
-		{"faint", p.Faint, 8},
-		{"rule", p.Rule, 8},
-		{"acc", p.Acc, 14},
-		{"amber", p.Amber, 11},
-		{"red", p.Red, 9},
-		{"green", p.Green, 10},
-	}
-	for _, tc := range cases {
-		if got := tc.style.GetForeground(); got != lipgloss.ANSIColor(tc.index) {
-			t.Errorf("%s foreground = %v, want ANSI %d", tc.token, got, tc.index)
-		}
-	}
-	if got := p.SelBG; got != lipgloss.ANSIColor(8) {
-		t.Errorf("bg-sel = %v, want ANSI 8", got)
-	}
-	if !p.Bold.GetBold() {
-		t.Errorf("the bold token is not bold")
-	}
-}
-
-// TestNoColourExistsOnlyAtTruecolor: every token is an ANSI index, so a
-// 16-colour terminal draws the same hierarchy a truecolor one does. If a
-// token ever gains a truecolor-only value, the layout stops surviving a
-// plain terminal and this test says so.
-func TestNoColourExistsOnlyAtTruecolor(t *testing.T) {
-	p := defaultPalette()
-	for token, style := range map[string]lipgloss.Style{
-		"fg": p.Fg, "dim": p.Dim, "faint": p.Faint, "rule": p.Rule,
-		"acc": p.Acc, "amber": p.Amber, "red": p.Red, "green": p.Green,
+// TestTokensUseTheDocumentedANSIIndices is design I's token table: dim 7,
+// faint 8, acc 14 bold, amber 11, red 9, green 10, sel-bg background 8.
+func TestTokensUseTheDocumentedANSIIndices(t *testing.T) {
+	p := ansiPalette()
+	for tk, want := range map[tok]string{
+		tDim: "37", tFaint: "90", tAcc: "96", tAmber: "93", tRed: "91", tGreen: "92",
 	} {
-		if _, ok := style.GetForeground().(lipgloss.ANSIColor); !ok {
-			t.Errorf("%s foreground is %T, want lipgloss.ANSIColor", token, style.GetForeground())
+		got := p.paint("x", tk, false)
+		if !strings.Contains(got, want) {
+			t.Errorf("token %d renders %q, want SGR %s", tk, got, want)
 		}
 	}
-	if _, ok := p.SelBG.(lipgloss.ANSIColor); !ok {
-		t.Errorf("bg-sel is %T, want lipgloss.ANSIColor", p.SelBG)
+	if got := p.paint("x", tAcc, false); !strings.Contains(got, "1;") && !strings.Contains(got, ";1") && !strings.Contains(got, "[1m") {
+		t.Errorf("acc renders %q, want bold", got)
+	}
+	if got := p.paint("x", tDim, true); !strings.Contains(got, "100") {
+		t.Errorf("a selected segment renders %q, want background 8 (SGR 100)", got)
 	}
 }
 
-// TestPaletteKeepsTheLightnessRamp: hierarchy is carried by lightness, so
-// the three text tiers must be three different indices - a palette where
-// fg and dim collapse to the same colour has no hierarchy left, whatever
-// theme the terminal supplies.
-func TestPaletteKeepsTheLightnessRamp(t *testing.T) {
-	p := defaultPalette()
-	fg, dim, faint := p.Fg.GetForeground(), p.Dim.GetForeground(), p.Faint.GetForeground()
-	if fg == dim || dim == faint || fg == faint {
-		t.Fatalf("the text ramp collapsed: fg=%v dim=%v faint=%v", fg, dim, faint)
-	}
-	// One accent, and it is not one of the status hues: the accent means
-	// focus and selection, never a state.
-	acc := p.Acc.GetForeground()
-	for token, style := range map[string]lipgloss.Style{"amber": p.Amber, "red": p.Red, "green": p.Green} {
-		if acc == style.GetForeground() {
-			t.Fatalf("the accent shares a colour with %s; focus and status would be indistinguishable", token)
+// TestFgIsTheTerminalsOwnForeground: many light themes map 15 close to
+// white, so fg is drawn as the default foreground (SGR 39), never an index.
+func TestFgIsTheTerminalsOwnForeground(t *testing.T) {
+	p := ansiPalette()
+	for _, tk := range []tok{tFg, tBold} {
+		got := p.paint("x", tk, false)
+		for _, sgr := range []string{"97", "37", "38;5"} {
+			if strings.Contains(got, "["+sgr) || strings.Contains(got, ";"+sgr) {
+				t.Errorf("token %d renders %q: fg must carry no foreground colour", tk, got)
+			}
 		}
 	}
 }
 
-// TestPlainPaletteEmitsNoEscapes: golden fixtures are rendered with it, so
-// it must produce literal text - and nothing in the package may depend on
-// colour to be legible.
+// TestLiftRuleStepsTintsUpOnTheSelection: on a sel-bg row faint becomes
+// dim and dim becomes fg, because index 8 on index 8 would vanish.
+func TestLiftRuleStepsTintsUpOnTheSelection(t *testing.T) {
+	for in, want := range map[tok]tok{tFaint: tDim, tDim: tFg, tFg: tFg, tAcc: tAcc, tAmber: tAmber, tRed: tRed} {
+		if got := lift(in); got != want {
+			t.Errorf("lift(%d) = %d, want %d", in, got, want)
+		}
+	}
+	p := ansiPalette()
+	if got := p.paint("x", tFaint, true); strings.Contains(got, "90") {
+		t.Errorf("faint on the selection renders %q, still index 8", got)
+	}
+	if got := p.paint("x", tFaint, true); !strings.Contains(got, "37") {
+		t.Errorf("faint on the selection renders %q, want it lifted to dim (7)", got)
+	}
+	if got := p.paint("x", tDim, true); strings.Contains(got, "[37") || strings.Contains(got, ";37") {
+		t.Errorf("dim on the selection renders %q, want it lifted to fg", got)
+	}
+}
+
 func TestPlainPaletteEmitsNoEscapes(t *testing.T) {
 	p := plainPalette()
-	for token, style := range map[string]lipgloss.Style{
-		"fg": p.Fg, "bold": p.Bold, "dim": p.Dim, "faint": p.Faint, "rule": p.Rule,
-		"acc": p.Acc, "amber": p.Amber, "red": p.Red, "green": p.Green,
-	} {
-		if got := style.Render("x"); got != "x" {
-			t.Errorf("plain %s rendered %q, want %q", token, got, "x")
+	for tk := tFg; tk <= tBold; tk++ {
+		for _, sel := range []bool{false, true} {
+			if got := p.paint("x", tk, sel); got != "x" {
+				t.Errorf("plain token %d sel=%v renders %q", tk, sel, got)
+			}
 		}
 	}
-	if p.SelBG != nil {
-		t.Errorf("plain SelBG = %v, want nil so a selected row carries no background", p.SelBG)
-	}
-	if got := selectRow(newLine(), true, p).add("row", p.Fg).render(6); got != "row   " {
-		t.Errorf("plain selected row rendered %q, want %q", got, "row   ")
+	frame := newFixture(t, designTree(), 40, 36, unicodeGlyphs).View()
+	if strings.Contains(frame, "\x1b") {
+		t.Fatal("a plain-palette frame contains an escape")
 	}
 }

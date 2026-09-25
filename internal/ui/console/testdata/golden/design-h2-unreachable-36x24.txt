@@ -1,0 +1,24 @@
+─ mate ───────────────────────── ! ─
+                                    
+  can't read the workspace          
+                                    
+  got   herdr agent list: exit 127 ·
+        not found                   
+                                    
+  mate reads the workspace's        
+  .mate/ records; nothing below is  
+  live until that read works.       
+                                    
+▌ r    Retry now                    
+  q    Quit                         
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+! Snapshot read failed        ? keys

@@ -144,13 +144,13 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 	// crew's own text is not on the row any more; the row opens its pane).
 	// Asserting on the DTO instead would pass while the rail showed a row
 	// cut at "need…".
-	rail := console.RenderInboxRail(query.LoadBox(w, "shop"), -1, 54, 12)
+	rail := console.RenderBox("shop", query.LoadBox(w, "shop"), 40, 12)
 	t.Logf("rail:\n%s", strings.Join(rail, "\n"))
 	joined := strings.Join(strings.Fields(strings.Join(rail, " ")), " ")
 	if !strings.Contains(joined, "1 waiting") {
 		t.Fatalf("the rail header does not say \"1 waiting\":\n%s", strings.Join(rail, "\n"))
 	}
-	for _, want := range []string{ask.Crew, "needs an answer"} {
+	for _, want := range []string{ask.Crew, "decide", "[assign]"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("the rail row does not say %q:\n%s", want, strings.Join(rail, "\n"))
 		}
@@ -199,7 +199,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 	if len(box.Value.Entries) < 4 {
 		t.Fatalf("the merged log holds %d entries; the filter must not shrink the record", len(box.Value.Entries))
 	}
-	empty := console.RenderInboxRail(box, -1, 54, 6)
+	empty := console.RenderBox("shop", box, 40, 6)
 	t.Logf("rail after the answer:\n%s", strings.Join(empty, "\n"))
 	if !strings.Contains(strings.Join(empty, " "), "nothing waiting") {
 		t.Fatalf("the emptied rail does not say so:\n%s", strings.Join(empty, "\n"))

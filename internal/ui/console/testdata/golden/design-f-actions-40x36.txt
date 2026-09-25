@@ -1,0 +1,36 @@
+─ acme › payments-api ───────────── !2 ─
+▌ 👨‍💻 payments-api                       
+     ✻ running                          
+  🤖 Add index to orders.created_at     
+     ⌬ working                          
+  🤖 Backfill ledger v2             !   
+     ✻ needs-decision                   
+  ▸ Completed (1)           ! 1 failed  
+─ 👨‍💻 payments-api ──────────────────────
+  agent    payments-api.mate            
+  harness  ✻ claude                     
+  status   running · 38m                
+  repo     ~/src/payments-api           
+  crews    2 live · 1 completed         
+  tokens   182k                         
+  mode     manual                       
+  blocked  no · 1 crew waits on you     
+  last     status · 1m                  
+                                        
+                                        
+                                        
+─ actions · 👨‍💻 payments-api ────── esc ─
+▌ enter  Show in next pane              
+  ·      Start mate    recorded running 
+  x      Stop mate…             confirm 
+  R      Restart mate…          confirm 
+  ·      Mode → auto          not wired 
+  C      Clear composer                 
+  ·      Copy agent id     no clipboard 
+                                        
+  Tells the host to run herdr agent     
+  attach payments-api.mate in the next  
+  pane. mate stays on this tree;        
+  nothing opens here.                   
+→ next pane  👨‍💻 payments-api            
+ ↑↓ move  enter run  or its key  esc    

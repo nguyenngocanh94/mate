@@ -1,29 +1,30 @@
 package console
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-// warning is a small constructor for the table below, keeping each case to
-// one line.
+// The status line (design I, "6"): what the next pane shows, or the last
+// thing that happened when there is something to say.
+
 func warning(field, rowLabel, reason string) query.FieldWarning {
 	return query.FieldWarning{Field: field, Row: query.RowRef{Label: rowLabel}, Reason: reason}
 }
 
-// TestWarningsFooterMsgNamesCountFieldRowAndReason is the standing
-// unknown-field line, built only from query.FieldWarning: never invented
-// wording, correct singular/plural, and the first warning's own field, row
-// and reason when there is more than one.
+// The standing unknown-field line is built only from query.FieldWarning:
+// correct singular/plural, and the first warning's own field, row, reason.
 func TestWarningsFooterMsgNamesCountFieldRowAndReason(t *testing.T) {
 	cases := []struct {
 		name     string
 		warnings []query.FieldWarning
 		want     footerMsg
 	}{
-		{name: "none", warnings: nil, want: footerMsg{}},
+		{name: "none", want: footerMsg{}},
 		{
 			name:     "one",
 			warnings: []query.FieldWarning{warning("worktree", "attempt 2", "lookup timed out (2s)")},
@@ -37,161 +38,148 @@ func TestWarningsFooterMsgNamesCountFieldRowAndReason(t *testing.T) {
 			},
 			want: unknownMsg("2 fields unknown; first: worktree of attempt 2 (lookup timed out (2s))"),
 		},
-		{
-			name: "three",
-			warnings: []query.FieldWarning{
-				warning("binding", "mate of payments-api", "timeout"),
-				warning("worktree", "attempt 2", "lookup timed out (2s)"),
-				warning("last event", "attempt 1", "store closed"),
-			},
-			want: unknownMsg("3 fields unknown; first: binding of mate of payments-api (timeout)"),
-		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := warningsFooterMsg(tc.warnings); got != tc.want {
-				t.Fatalf("warningsFooterMsg(%+v) = %+v, want %+v", tc.warnings, got, tc.want)
+				t.Fatalf("warningsFooterMsg = %+v, want %+v", got, tc.want)
 			}
 		})
 	}
 }
 
-// TestFooterMessageExplicitMessageWinsOverWarnings: an action's own message
-// (attach refused, retry, detach) always takes the line over the standing
-// warning - the design's "cho tới khi có message khác" (until there is
-// another message).
+// An explicit message wins over the standing warning, and clearing it
+// brings the warning back rather than leaving the line blank.
 func TestFooterMessageExplicitMessageWinsOverWarnings(t *testing.T) {
 	tree := sampleTree()
 	tree.Warnings = []query.FieldWarning{warning("worktree", "attempt 2", "lookup timed out (2s)")}
-	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
-
+	m := newFixture(t, tree, 40, 36, unicodeGlyphs)
 	if got := m.footerMessage(); got.tone != toneUnknown {
-		t.Fatalf("with no explicit message the footer must fall back to the warning, got %+v", got)
+		t.Fatalf("with no explicit message the line must fall back to the warning, got %+v", got)
 	}
-
-	m.msg = errMsg("Attach refused: binding stale")
+	if !strings.Contains(renderFrame(t, m), "? 1 field unknown") {
+		t.Fatalf("the warning is not on the status line with its ? mark:\n%s", renderFrame(t, m))
+	}
+	m.msg = errMsg("Show refused: binding stale")
 	if got := m.footerMessage(); got != m.msg {
-		t.Fatalf("an explicit message must win over the standing warning: got %+v, want %+v", got, m.msg)
+		t.Fatalf("an explicit message must win: got %+v", got)
 	}
-
-	// Clearing the explicit message (as every navigation key does, see
-	// update.go) must bring the warning back rather than leaving the line
-	// blank - the field is still Unknown until a refresh resolves it.
 	m.msg = footerMsg{}
 	if got := m.footerMessage(); got.tone != toneUnknown {
-		t.Fatalf("after the explicit message is cleared the warning must reappear, got %+v", got)
+		t.Fatalf("after the message clears the warning must reappear, got %+v", got)
 	}
 }
 
-// TestFooterMessageIgnoresWarningsBeforeTheFirstLoad: Warnings belongs to a
-// completed read (query.Snapshot). Before phaseReady there is no snapshot to
-// have warned about, whatever the zero-valued tree happens to carry.
-func TestFooterMessageIgnoresWarningsBeforeTheFirstLoad(t *testing.T) {
-	tree := sampleTree()
-	tree.Warnings = []query.FieldWarning{warning("worktree", "attempt 2", "lookup timed out (2s)")}
-	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
-	m.phase, m.hasLoaded = phaseLoading, false
+// With nothing to say, the status line says what the next pane shows.
+func TestStatusLineSaysNothingIsShownBeforeTheFirstStage(t *testing.T) {
+	m := newFixture(t, sampleTree(), 40, 36, unicodeGlyphs).WithStage(func(_ context.Context, _ StageTarget) error { return nil })
 	if got := m.footerMessage(); got != (footerMsg{}) {
-		t.Fatalf("a loading screen must not show a warning line, got %+v", got)
+		t.Fatalf("with no message and no warnings the message must be blank, got %+v", got)
+	}
+	if !strings.Contains(renderFrame(t, m), "→ next pane · nothing shown") {
+		t.Fatalf("status line before any stage:\n%s", renderFrame(t, m))
 	}
 }
 
-// TestFooterMessageBlankWithNoWarnings: the common case, asserted directly
-// rather than only implied by the other tests above.
-func TestFooterMessageBlankWithNoWarnings(t *testing.T) {
-	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
-	if got := m.footerMessage(); got != (footerMsg{}) {
-		t.Fatalf("with no explicit message and no warnings the footer must be blank, got %+v", got)
+// Without a host there is no next pane, and the line says so.
+func TestStatusLineSaysThereIsNoHost(t *testing.T) {
+	m := newFixture(t, sampleTree(), 40, 36, unicodeGlyphs)
+	if !strings.Contains(renderFrame(t, m), "→ next pane · no host") {
+		t.Fatalf("status line without a StageFunc:\n%s", renderFrame(t, m))
 	}
 }
 
-// TestKeyLineNeverAdvertisesAnInertKey: an empty list has no selected row, so
-// Enter (open/attach) and Tab (inspector/Detail toggle for the selected row)
-// must both be gone from the key line rather than promising an action Enter
-// or Tab cannot perform. q, r and (once there is somewhere to go back to)
-// Esc remain, since those never depend on a selection.
-func TestKeyLineNeverAdvertisesAnInertKey(t *testing.T) {
-	m := newFixture(t, query.Snapshot{WorkspaceID: "ws_acme"}, 120, 36, unicodeGlyphs)
-	if _, ok := m.selectedRow(); ok {
-		t.Fatalf("precondition: an empty workspace must have no selected row")
-	}
-	line := m.keysLine(layout(120, 36)).render(120)
-	for _, dead := range []string{"Enter", "Tab"} {
-		if strings.Contains(line, dead) {
-			t.Fatalf("key line %q advertises %q with nothing selected to act on", line, dead)
+// A successful stage names what the next pane now shows; a failure turns
+// the line red with r to retry, and r stages the same target again.
+func TestStatusLineFollowsTheStageAndRRetriesAFailure(t *testing.T) {
+	calls := 0
+	fail := true
+	stage := func(_ context.Context, _ StageTarget) error {
+		calls++
+		if fail {
+			return errors.New("no pane")
 		}
+		return nil
 	}
-	for _, live := range []string{"r Refresh", "q Quit"} {
-		if !strings.Contains(line, live) {
-			t.Fatalf("key line %q dropped the always-live hint %q", line, live)
-		}
+	m := projectFrame(t, sampleTree()).WithStage(stage)
+	m, cmd := send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("Enter on the Mate did not ask the host")
+	}
+	m, _ = send(t, m, cmd())
+	frame := renderFrame(t, m)
+	if !strings.Contains(frame, "→ next pane · failed: no pane") || !strings.Contains(frame, "r retry") {
+		t.Fatalf("status line after a failed stage:\n%s", frame)
 	}
 
-	// Once something is selected, Enter comes back; Tab only comes back
-	// once there is somewhere for it to go (an inspector column, or - below
-	// 100 columns - Detail), neither of which this empty tree has past the
-	// Workspace level, so it is not asserted "on" here.
+	fail = false
+	m, cmd = send(t, m, key("r"))
+	if cmd == nil {
+		t.Fatal("r after a failed stage must retry it")
+	}
+	m, _ = send(t, m, cmd())
+	if calls != 2 {
+		t.Fatalf("stage calls = %d, want 2", calls)
+	}
+	if !strings.Contains(renderFrame(t, m), "→ next pane  👨‍💻 payments-api") {
+		t.Fatalf("status line after a successful retry:\n%s", renderFrame(t, m))
+	}
+	m, cmd = send(t, m, key("r"))
+	if cmd == nil || !m.treeLoadInFlight {
+		t.Fatal("once the stage succeeded, r is a refresh again")
+	}
+}
+
+// A crew on stage is named by its task.
+func TestStatusLineNamesAStagedCrewByItsTask(t *testing.T) {
+	// query.Load sets every crew's ProjectID (load.go); sampleTree leaves
+	// it out.
 	tree := sampleTree()
-	withRow := newFixture(t, tree, 120, 36, unicodeGlyphs)
-	if _, ok := withRow.selectedRow(); !ok {
-		t.Fatalf("precondition: sampleTree's Workspace level must have a selected row")
+	for i := range tree.Projects[0].Crews {
+		tree.Projects[0].Crews[i].ProjectID = tree.Projects[0].ProjectID
 	}
-	if line := withRow.keysLine(layout(120, 36)).render(120); !strings.Contains(line, "Enter") {
-		t.Fatalf("key line %q dropped Enter with a row selected", line)
-	}
-}
-
-// TestKeyLineDropsOnlyAsManyOptionalHintsAsItMustIsThePolicy: the key line
-// is the only place some keys are ever named, so narrowing it must cost the
-// reader the least it can. Dropping every optional hint as a group loses
-// hints the line still had room for - which is what adding "n New project"
-// exposed: an 80-column workspace lost "a Actions", the gateway to every
-// other action, with 7 cells to spare.
-func TestKeyLineDropsOnlyAsManyOptionalHintsAsItMustIsThePolicy(t *testing.T) {
-	m := newFixture(t, sampleTree(), 80, 24, unicodeGlyphs)
-	line := m.keysLine(layout(80, 24))
-	rendered := line.render(80)
-	if line.width() > 80 {
-		t.Fatalf("key line is %d cells at 80 columns:\n%s", line.width(), rendered)
-	}
-	for _, want := range []string{"a Actions", "n New project", "Enter Open project", "r Refresh", "q Quit"} {
-		if !strings.Contains(rendered, want) {
-			t.Fatalf("80-column key line dropped %q with room to spare:\n%s", want, rendered)
-		}
-	}
-	// Tab is the one that had to go: it is optional and last.
-	if strings.Contains(rendered, "Tab ") {
-		t.Fatalf("80-column key line kept every hint; the fixture no longer exercises dropping:\n%s", rendered)
+	m := toRunningAttempt(t, loaded(t, tree, nil)).WithStage(func(_ context.Context, _ StageTarget) error { return nil })
+	m, cmd := send(t, m, key("enter"))
+	m, _ = send(t, m, cmd())
+	if !strings.Contains(renderFrame(t, m), "→ next pane  🤖 Add idempotency-key") {
+		t.Fatalf("status line after staging the crew:\n%s", renderFrame(t, m))
 	}
 }
 
-func TestDropLastOptionalHintRemovesOneAtATimeFromTheEnd(t *testing.T) {
-	hints := []keyHint{
-		{key: "a", desc: "Actions", optional: true},
-		{key: "Enter", desc: "Open project"},
-		{key: "Tab", desc: "Detail", optional: true},
-		{key: "q", desc: "Quit"},
+// A short frame ends its status line in "? keys", and ? shows the key list
+// until the next key.
+func TestShortFrameOffersTheKeyList(t *testing.T) {
+	m := newFixture(t, sampleTree(), 40, 24, unicodeGlyphs)
+	lines := strings.Split(renderFrame(t, m), "\n")
+	if !strings.HasSuffix(strings.TrimRight(lines[len(lines)-1], " "), "? keys") {
+		t.Fatalf("status line at 24 rows = %q, want it to end in ? keys", lines[len(lines)-1])
 	}
-	next, ok := dropLastOptional(hints)
-	if !ok {
-		t.Fatal("dropLastOptional found no optional hint to drop")
+	m, _ = send(t, m, key("?"))
+	if !strings.Contains(renderFrame(t, m), "─ keys ") {
+		t.Fatalf("? did not open the key list:\n%s", renderFrame(t, m))
 	}
-	if got := keysOf(next); got != "a,Enter,q" {
-		t.Fatalf("after one drop = %s, want the last optional gone", got)
-	}
-	next, ok = dropLastOptional(next)
-	if !ok || keysOf(next) != "Enter,q" {
-		t.Fatalf("after two drops = %s ok=%v, want only the required hints", keysOf(next), ok)
-	}
-	if _, ok := dropLastOptional(next); ok {
-		t.Fatal("dropLastOptional reported a drop with no optional hints left")
+	m, _ = send(t, m, key("j"))
+	if m.keysOpen || m.cur().sel != 0 {
+		t.Fatalf("the next key must close the list and do nothing else: open=%v sel=%d", m.keysOpen, m.cur().sel)
 	}
 }
 
-func keysOf(hints []keyHint) string {
-	out := make([]string, 0, len(hints))
-	for _, h := range hints {
-		out = append(out, h.key)
+// A tall frame's key line names the keys of the pane that has the keyboard.
+func TestKeyLineFollowsFocus(t *testing.T) {
+	m := projectFrame(t, sampleTree())
+	last := func(m Model) string {
+		lines := strings.Split(renderFrame(t, m), "\n")
+		return lines[len(lines)-1]
 	}
-	return strings.Join(out, ",")
+	if l := last(m); !strings.Contains(l, "enter show") || !strings.Contains(l, "a act") {
+		t.Fatalf("list key line = %q", l)
+	}
+	m, _ = send(t, m, key("tab"))
+	if l := last(m); !strings.Contains(l, "y copy") || !strings.Contains(l, "esc list") {
+		t.Fatalf("detail key line = %q", l)
+	}
+	m, _ = send(t, m, key("tab"))
+	if l := last(m); !strings.Contains(l, "a assign") {
+		t.Fatalf("box key line = %q", l)
+	}
 }

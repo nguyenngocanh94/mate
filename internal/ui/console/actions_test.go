@@ -11,47 +11,101 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-func TestDangerousActionRequiresConfirmationBeforeRunner(t *testing.T) {
-	calls := 0
-	var got ActionRequest
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(_ context.Context, req ActionRequest) (string, error) {
-			calls++
-			got = req
-			return "stop confirmed", nil
-		})
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
-	m = toRunningAttempt(t, m)
-	m, _ = send(t, m, key("a"))
-	m, _ = send(t, m, key("down")) // stop is the second menu item
-	if m.actionIndex != 1 {
-		t.Fatalf("action index = %d, want stop entry", m.actionIndex)
+// The actions sheet (design F) and the confirm sheet (design G), as the
+// ActionFunc sees them: dangerous actions never run without their own key
+// pressed twice, refusals never reach the runner, and a failure reads
+// differently from a refusal.
+
+// actRunner builds a model on tree whose ActionFunc records every request
+// and answers with reply and err.
+func actRunner(t *testing.T, tree query.Snapshot, reply string, err error) (Model, *[]ActionRequest) {
+	t.Helper()
+	got := &[]ActionRequest{}
+	m := loaded(t, tree, nil)
+	m.action = func(_ context.Context, req ActionRequest) (string, error) {
+		*got = append(*got, req)
+		return reply, err
 	}
-	m, cmd := send(t, m, key("enter"))
-	if cmd != nil || m.confirm == nil {
-		t.Fatalf("dangerous action must open confirmation without running: cmd=%v confirm=%+v", cmd, m.confirm)
-	}
-	if calls != 0 {
-		t.Fatalf("runner called before confirmation: %d", calls)
-	}
-	view := renderFrame(t, m)
-	for _, want := range []string{"CONFIRM stop?", "Object", "Scope", "Effect", "Enter stop"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("confirmation view missing %q:\n%s", want, view)
+	return m, got
+}
+
+// actEntry is the open sheet's entry with key k.
+func actEntry(t *testing.T, m Model, k string) menuEntry {
+	t.Helper()
+	for _, e := range m.menu {
+		if e.key == k {
+			return e
 		}
 	}
+	t.Fatalf("the actions sheet has no %q entry: %+v", k, m.menu)
+	return menuEntry{}
+}
+
+// actFlat collapses a frame into one line of words, for "does it still
+// say X" checks that must not care where a sentence wrapped.
+func actFlat(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+func TestDangerousActionAsksBeforeTheRunnerAndEnterCancels(t *testing.T) {
+	m, got := actRunner(t, sampleTree(), "stop confirmed", nil)
+	m = toRunningAttempt(t, m)
+	m, _ = send(t, m, key("a"))
+	if !m.actions || actEntry(t, m, "x").label != "Stop crew…" {
+		t.Fatalf("a did not open the crew's sheet with its stop entry: %+v", m.menu)
+	}
+	m, cmd := send(t, m, key("x"))
+	if cmd != nil || m.confirm == nil || len(*got) != 0 {
+		t.Fatalf("x must open the confirmation without running: cmd=%v confirm=%v calls=%d", cmd != nil, m.confirm != nil, len(*got))
+	}
+	view := renderFrame(t, m)
+	for _, want := range []string{"stop crew?", "object", "scope", "effect", "cancel", "x      stop crew"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("confirmation missing %q:\n%s", want, view)
+		}
+	}
+	// Enter is the safe default: it cancels.
 	m, cmd = send(t, m, key("enter"))
-	if cmd == nil || calls != 0 {
-		t.Fatalf("confirmation should queue runner: cmd=%v calls=%d", cmd, calls)
+	if cmd != nil || m.confirm != nil || len(*got) != 0 {
+		t.Fatalf("Enter on the confirmation ran or stayed: cmd=%v confirm=%v calls=%d", cmd != nil, m.confirm != nil, len(*got))
+	}
+
+	m, _ = send(t, m, key("a"))
+	m, _ = send(t, m, key("x"))
+	m, cmd = send(t, m, key("x"))
+	if cmd == nil || len(*got) != 0 {
+		t.Fatalf("the asking key should queue the runner: cmd=%v calls=%d", cmd != nil, len(*got))
 	}
 	m, _ = send(t, m, cmd())
-	if calls != 1 || got.Action != ActionStop || got.TargetKind != "crew" {
-		t.Fatalf("runner request = %+v calls=%d", got, calls)
+	if len(*got) != 1 || (*got)[0].Action != ActionStop || (*got)[0].TargetKind != "crew" {
+		t.Fatalf("runner requests = %+v, want one crew stop", *got)
 	}
 	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "stop completed") {
 		t.Fatalf("success message = %+v", m.msg)
+	}
+}
+
+func TestOnlyTheAskingKeyConfirmsAndEscGoesBackToTheSheet(t *testing.T) {
+	m, got := actRunner(t, sampleTree(), "", nil)
+	m = toRunningAttempt(t, m)
+	m, _ = send(t, m, key("a"))
+	// Arrows and Enter reach the same entry the key does.
+	m, _ = send(t, m, key("down"))
+	if m.menu[m.actionIndex].key != "x" {
+		t.Fatalf("second entry = %+v, want stop", m.menu[m.actionIndex])
+	}
+	m, _ = send(t, m, key("enter"))
+	if m.confirm == nil || m.confirm.key != "x" {
+		t.Fatalf("Enter on stop did not ask with x: %+v", m.confirm)
+	}
+	for _, k := range []string{"y", "p", "s", "M"} {
+		var cmd tea.Cmd
+		m, cmd = send(t, m, key(k))
+		if cmd != nil || m.confirm == nil || len(*got) != 0 {
+			t.Fatalf("%q confirmed a stop that x asked for: cmd=%v confirm=%v calls=%d", k, cmd != nil, m.confirm != nil, len(*got))
+		}
+	}
+	m, cmd := send(t, m, key("esc"))
+	if cmd != nil || m.confirm != nil || !m.actions || len(*got) != 0 {
+		t.Fatalf("Esc must return to the sheet: cmd=%v confirm=%v sheet=%v calls=%d", cmd != nil, m.confirm != nil, m.actions, len(*got))
 	}
 }
 
@@ -77,55 +131,37 @@ func TestProjectRowStartDispatchesForEmptyAndPopulatedProjects(t *testing.T) {
 				{Action: "resume", Available: false, Reason: "Mate is recorded created"},
 				{Action: "onboard", Available: false, Reason: "this Project already has a Mate"},
 			}
-
-			calls := 0
-			var got ActionRequest
-			m := loaded(t, tree, nil)
-			// loaded() uses a read-only model; install the action runner on it
-			// so this follows the same workspace -> Project-row path as the
-			// real Console.
-			m.action = func(_ context.Context, req ActionRequest) (string, error) {
-				calls++
-				got = req
-				return "started", nil
-			}
-			m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
+			m, got := actRunner(t, tree, "started", nil)
 			m, _ = send(t, m, key("a"))
-			start := m.actionChoices[0]
-			if !start.enabled || start.action != ActionStart || start.req.TargetKind != "mate" {
-				t.Fatalf("Project-row start choice = %+v, want enabled Mate target", start)
+			if e := actEntry(t, m, "s"); !e.enabled || e.label != "Start mate" {
+				t.Fatalf("Project-row start entry = %+v, want an enabled Start mate", e)
 			}
-			m, cmd := send(t, m, key("enter"))
+			m, cmd := send(t, m, key("s"))
 			if cmd == nil {
 				t.Fatal("enabled Project-row start did not dispatch")
 			}
 			m, _ = send(t, m, cmd())
-			if calls != 1 || got.Action != ActionStart || got.Target != tree.Projects[0].ProjectID || got.TargetKind != "mate" {
-				t.Fatalf("start request = %+v calls=%d, want one Mate start for the Project", got, calls)
+			if len(*got) != 1 || (*got)[0].Action != ActionStart || (*got)[0].Target != tree.Projects[0].ProjectID || (*got)[0].TargetKind != "mate" {
+				t.Fatalf("start requests = %+v, want one Mate start for the Project", *got)
 			}
 		})
 	}
 }
 
-// TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty pins the one path
-// off an empty workspace (ADR 0023 dropped the default Project, so this is
-// now the only door): "a" -> onboard -> type a name -> enter must create a
-// Project via ActionRequest{Action: ActionOnboard, TargetKind: "workspace"},
-// both when the workspace has no Projects at all (no row is selected, so
-// selectedRow returns false) and when it already has one and a Project row
-// is selected (onboardChoice keys off the current *frame*, frameWorkspace,
-// not off which row is selected - selecting an existing Project must not
-// hijack "onboard" into "start this Project's Mate").
-func TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
+// The workspace-level new project is the one door off an empty workspace
+// (ADR 0023). Selecting an existing Project must not turn it into "start
+// this Project's Mate": the sheet's n entry keys off the frame, not the row.
+func TestWorkspaceNewProjectAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		projects []query.ProjectNode
+		open     []string
 	}{
-		{name: "empty-workspace"},
+		{name: "empty-workspace", open: []string{"n"}},
 		{name: "existing-project-selected", projects: []query.ProjectNode{{
 			ProjectID: "prj_existing", Name: "existing",
 			Mate: absentMate("this project has no designated Mate"),
-		}}},
+		}}, open: []string{"a", "n"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := query.Snapshot{
@@ -133,202 +169,181 @@ func TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 				Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme", Root: "/work/acme"}),
 				Projects:    tc.projects,
 			}
-			calls := 0
-			var got ActionRequest
-			m := New(func(context.Context) (query.Snapshot, error) { return tree, nil },
-				func(_ context.Context, req ActionRequest) (string, error) {
-					calls++
-					got = req
-					return "created prj_new", nil
-				})
-			m.p = plainPalette()
-			m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-			m, _ = send(t, m, m.Init()())
-
-			m, _ = send(t, m, key("a"))
-			onboard := m.actionChoices[len(m.actionChoices)-1]
-			if !onboard.enabled || onboard.action != ActionOnboard || onboard.req.TargetKind != "workspace" {
-				t.Fatalf("onboard choice = %+v, want an enabled workspace-level onboard", onboard)
+			m, got := actRunner(t, tree, "created prj_new", nil)
+			var cmd tea.Cmd
+			for _, k := range tc.open {
+				m, cmd = send(t, m, key(k))
 			}
-			m.actionIndex = len(m.actionChoices) - 1
-			m, cmd := send(t, m, key("enter"))
 			if cmd != nil || !m.actionInputMode {
-				t.Fatalf("onboard at workspace level must open the name prompt, not dispatch immediately: cmd=%v inputMode=%v", cmd, m.actionInputMode)
+				t.Fatalf("new project must open the name field, not dispatch: cmd=%v input=%v", cmd != nil, m.actionInputMode)
 			}
-			for _, r := range "new-project" {
-				m, _ = send(t, m, key(string(r)))
-			}
+			m = actType(t, m, "new-project")
 			m, _ = send(t, m, key("enter")) // on to the repo field
-			for _, r := range "new-project" {
-				m, _ = send(t, m, key(string(r)))
-			}
+			m = actType(t, m, "new-project")
 			m, cmd = send(t, m, key("enter"))
 			if cmd == nil {
-				t.Fatal("submitting the project name did not dispatch the runner")
+				t.Fatal("submitting the project did not dispatch the runner")
 			}
 			m, _ = send(t, m, cmd())
-			if calls != 1 || got.Action != ActionOnboard || got.TargetKind != "workspace" || got.Input != "new-project" || got.Repo != "new-project" {
-				t.Fatalf("onboard request = %+v calls=%d, want a workspace-level create with the typed name", got, calls)
+			if len(*got) != 1 || (*got)[0].Action != ActionOnboard || (*got)[0].TargetKind != "workspace" ||
+				(*got)[0].Input != "new-project" || (*got)[0].Repo != "new-project" {
+				t.Fatalf("onboard requests = %+v, want one workspace-level create with the typed name", *got)
 			}
 		})
 	}
 }
 
-func TestUnavailableActionIsRefusalAndDoesNotRun(t *testing.T) {
-	calls := 0
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(context.Context, ActionRequest) (string, error) {
-			calls++
-			return "", errors.New("must not run")
-		})
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
+// An entry that cannot run stays in its place, says why on its own row,
+// and pressing it does nothing - the runner is never reached.
+func TestUnavailableEntryStaysInPlaceAndDoesNotRun(t *testing.T) {
+	m, got := actRunner(t, sampleTree(), "", errors.New("must not run"))
 	m = toRunningAttempt(t, m)
 	m, _ = send(t, m, key("a"))
-	// Repair is unavailable for the active Crew, so move to it.
-	for i := 0; i < 3; i++ {
+	repair := actEntry(t, m, "p")
+	if repair.enabled || repair.reason == "" {
+		t.Fatalf("repair on an active binding = %+v, want disabled with a reason", repair)
+	}
+	// The third crew entry is repair: drawn with · in the key column and
+	// its reason on the right.
+	view := renderFrame(t, m)
+	if !strings.Contains(view, "·      Repair binding…") || !strings.Contains(view, "no recorded") {
+		t.Fatalf("the disabled entry is not drawn in place with · and its reason:\n%s", view)
+	}
+	for _, k := range []string{"p"} {
+		var cmd tea.Cmd
+		m, cmd = send(t, m, key(k))
+		if cmd != nil || len(*got) != 0 || m.confirm != nil {
+			t.Fatalf("unavailable %s ran: cmd=%v calls=%d confirm=%v", k, cmd != nil, len(*got), m.confirm != nil)
+		}
+	}
+	// Enter on it does nothing either.
+	for m.menu[m.actionIndex].key != "p" {
 		m, _ = send(t, m, key("down"))
 	}
 	m, cmd := send(t, m, key("enter"))
-	if cmd != nil || calls != 0 {
-		t.Fatalf("unavailable action ran: cmd=%v calls=%d", cmd, calls)
-	}
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "nothing started") {
-		t.Fatalf("refusal message = %+v", m.msg)
+	if cmd != nil || len(*got) != 0 || m.confirm != nil || !m.actions {
+		t.Fatalf("Enter on a disabled entry acted: cmd=%v calls=%d confirm=%v sheet=%v", cmd != nil, len(*got), m.confirm != nil, m.actions)
 	}
 }
 
-func TestConfirmationFrameSanitizesHostileRecordedIdentity(t *testing.T) {
-	tree := hostileTree()
-	tree.Projects[0].Crews[0].CrewID = "crew_\n修正\x1b[31m\x85"
-	tree.Projects[0].Crews[0].Binding = query.KnownField(query.BindingValue{Status: query.BindingStale})
-	m := loaded(t, tree, nil)
-	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // its first Crew
-	m, _ = send(t, m, key("a"))
-	m.actionIndex = 3 // repair; the first hostile Crew is needs_repair
-	m, _ = send(t, m, key("enter"))
-	if m.confirm == nil {
-		t.Fatalf("repair for hostile needs_repair Crew did not ask for confirmation")
-	}
-	for _, size := range [][2]int{{120, 36}, {80, 24}, {60, 16}} {
-		m, _ = send(t, m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		frame := renderFrame(t, m)
-		assertFrameShape(t, frame, size[0], size[1])
-		assertNoRawControlChars(t, frame)
-		if !strings.Contains(frame, "CONFIRM repair?") || !strings.Contains(frame, "Object") {
-			t.Fatalf("confirmation payload was not rendered at %dx%d:\n%s", size[0], size[1], frame)
-		}
-		if strings.Contains(frame, "\nsecond") || strings.Contains(frame, "\x1b") {
-			t.Fatalf("confirmation leaked hostile control text:\n%s", frame)
-		}
-	}
-}
-
-// TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding: an
-// Unknown binding read must not be reported as the established fact "no
-// stale binding is recorded" - that fact was never read, only the read
-// itself failed.
-func TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding(t *testing.T) {
+// An Unknown binding read must not be reported as the established fact "no
+// stale binding is recorded": the read failed, and the reason says so.
+func TestRepairEntryWithUnknownBindingSaysTheReadIsUnknown(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Crews = []query.CrewNode{
 		{CrewID: "crew_target", Status: query.CrewWorking, Binding: query.UnknownField[query.BindingValue]("binding lookup timed out (2s)")},
 	}
 	m := loaded(t, tree, nil)
-	m, _ = send(t, m, key("enter")) // the one Project
+	m, _ = send(t, m, key("enter")) // the Project
 	m, _ = send(t, m, key("down"))  // its one Crew
 	m, _ = send(t, m, key("a"))
-	repair := m.actionChoices[3]
-	if repair.action != ActionRepair {
-		t.Fatalf("menu index 3 = %+v, want repair", repair)
-	}
+	repair := actEntry(t, m, "p")
 	if repair.enabled {
 		t.Fatalf("repair with an unknown binding = %+v, want refused", repair)
 	}
-	if strings.Contains(repair.desc, "no stale binding is recorded") {
-		t.Fatalf("repair desc = %q, asserts a fact the failed read never established", repair.desc)
+	for _, s := range []string{repair.reason, repair.about} {
+		if strings.Contains(s, "no stale binding is recorded") {
+			t.Fatalf("repair says %q, a fact the failed read never established", s)
+		}
 	}
-	if !strings.Contains(repair.desc, "unknown") {
-		t.Fatalf("repair desc = %q, want it to say the binding read is unknown", repair.desc)
+	if !strings.Contains(repair.reason, "unknown") {
+		t.Fatalf("repair reason = %q, want it to say the binding read is unknown", repair.reason)
+	}
+	// The right column cuts a long reason; its head says what went wrong.
+	if view := renderFrame(t, m); !strings.Contains(view, "·      Repair binding…  binding is u") {
+		t.Fatalf("the sheet does not show why repair is refused:\n%s", view)
 	}
 }
 
 func TestActionFailureIsNotReportedAsRefusal(t *testing.T) {
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(context.Context, ActionRequest) (string, error) {
-			return "application service diagnostics: refused by runtime", errors.New("runtime unavailable")
-		})
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
+	m, _ := actRunner(t, sampleTree(), "application service diagnostics: refused by runtime", errors.New("runtime unavailable"))
 	m = toRunningAttempt(t, m)
 	m, _ = send(t, m, key("a"))
-	m.actionIndex = 1 // active Crew stop; confirmation is required first
-	m, _ = send(t, m, key("enter"))
-	m, cmd := send(t, m, key("enter"))
+	m, _ = send(t, m, key("x"))
+	m, cmd := send(t, m, key("x"))
 	if cmd == nil {
-		t.Fatal("confirmed action did not queue service")
+		t.Fatal("confirmed action did not queue the service")
 	}
 	m, _ = send(t, m, cmd())
 	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "Action failed") || strings.Contains(m.msg.text, "nothing started") {
-		t.Fatalf("action failure = %+v, want attempted failure distinct from refusal", m.msg)
+		t.Fatalf("action failure = %+v, want an attempted failure distinct from a refusal", m.msg)
+	}
+	if view := renderFrame(t, m); !strings.Contains(view, "! Action failed") {
+		t.Fatalf("the status line does not carry the failure:\n%s", view)
 	}
 }
 
-// TestTheMateRowMenuCarriesTheRecoveryActions: restarting a Mate and
-// clearing its composer left the session rail's header on 2026-09-19 and
-// live here now, on the row they act on. The menu is where a reader looks
-// for something they do not do every day, and the restart keeps the
-// confirmation every dangerous action on this frame gets.
-func TestTheMateRowMenuCarriesTheRecoveryActions(t *testing.T) {
-	var got []ActionRequest
-	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
-	m.action = func(_ context.Context, req ActionRequest) (string, error) {
-		got = append(got, req)
-		return "restarted", nil
-	}
-	m, _ = send(t, m, key("enter")) // into the project frame; the Mate row is first
+// Restarting a Mate and clearing its composer live on the Mate row's sheet;
+// the restart keeps the confirmation every dangerous action gets.
+func TestTheMateRowSheetCarriesTheRecoveryActions(t *testing.T) {
+	m, got := actRunner(t, sampleTree(), "restarted", nil)
+	m, _ = send(t, m, key("enter")) // the Project; the Mate row is first
 	if r, ok := m.selectedRow(); !ok || r.kind != rowMate {
 		t.Fatalf("setup: selected row = %+v, want the Mate row", r)
 	}
 	m, _ = send(t, m, key("a"))
 	view := renderFrame(t, m)
-	for _, want := range []string{string(ActionRestartMate), string(ActionClearComposer)} {
+	for _, want := range []string{"Restart mate…", "Clear composer"} {
 		if !strings.Contains(view, want) {
-			t.Fatalf("the Mate row's menu does not offer %q:\n%s", want, view)
+			t.Fatalf("the Mate row's sheet does not offer %q:\n%s", want, view)
 		}
 	}
-
-	m = selectMenuAction(t, m, ActionRestartMate)
-	m, cmd := send(t, m, key("enter"))
+	if e := actEntry(t, m, "R"); !e.enabled || !e.confirms() {
+		t.Fatalf("restart entry = %+v, want enabled and confirming", e)
+	}
+	m, cmd := send(t, m, key("R"))
 	if cmd != nil || m.confirm == nil {
 		t.Fatalf("restart ran without its confirmation (cmd=%v confirm=%v)", cmd != nil, m.confirm != nil)
 	}
-	m, cmd = send(t, m, key("enter"))
+	if !strings.Contains(renderFrame(t, m), "restart mate?") {
+		t.Fatalf("the confirmation does not ask to restart:\n%s", renderFrame(t, m))
+	}
+	m, cmd = send(t, m, key("R"))
 	if cmd == nil {
 		t.Fatal("the answered confirmation ran nothing")
 	}
 	m, _ = send(t, m, cmd())
-	if len(got) != 1 || got[0].Action != ActionRestartMate || got[0].Target != m.currentProject().ProjectID {
-		t.Fatalf("requests = %+v, want one restart of the open project", got)
+	if len(*got) != 1 || (*got)[0].Action != ActionRestartMate || (*got)[0].Target != m.currentProject().ProjectID {
+		t.Fatalf("requests = %+v, want one restart of the open project", *got)
 	}
 }
 
-// TestACrewRowMenuHasNoMateRecoveryActions: the two entries are the Mate's,
-// and a menu that offered them on a crew would be offering to restart
+// Those two entries are the Mate's; on a crew they would offer to restart
 // something the row does not name.
-func TestACrewRowMenuHasNoMateRecoveryActions(t *testing.T) {
-	m := newFixture(t, sampleTree(), 120, 36, unicodeGlyphs)
-	m, _ = send(t, m, key("enter"))
-	m, _ = send(t, m, key("down")) // onto the first crew row
-	r, ok := m.selectedRow()
-	if !ok || r.kind != rowCrew {
-		t.Fatalf("setup: selected row = %+v, want a crew row", r)
-	}
-	for _, c := range m.actionChoicesForRow(r) {
-		if c.action == ActionRestartMate || c.action == ActionClearComposer {
-			t.Fatalf("a crew row's menu offers %s", c.action)
+func TestACrewRowSheetHasNoMateRecoveryActions(t *testing.T) {
+	m := toRunningAttempt(t, loaded(t, sampleTree(), nil))
+	m, _ = send(t, m, key("a"))
+	for _, e := range m.menu {
+		if e.choice.action == ActionRestartMate || e.choice.action == ActionClearComposer || e.key == "R" || e.key == "C" {
+			t.Fatalf("a crew row's sheet offers %+v", e)
 		}
+	}
+}
+
+// Each kind has one fixed order, so muscle memory holds across objects.
+func TestTheSheetOrderIsFixedPerKind(t *testing.T) {
+	keys := func(m Model) string {
+		var ks []string
+		for _, e := range m.menu {
+			ks = append(ks, e.key)
+		}
+		return strings.Join(ks, " ")
+	}
+	m := loaded(t, sampleTree(), nil)
+	m, _ = send(t, m, key("a"))
+	if got := keys(m); got != "enter s m n" {
+		t.Fatalf("project row sheet = %q", got)
+	}
+	m, _ = send(t, m, key("esc"))
+	m, _ = send(t, m, key("enter"))
+	m, _ = send(t, m, key("a"))
+	if got := keys(m); got != "enter s x R m C y" {
+		t.Fatalf("mate row sheet = %q", got)
+	}
+	m, _ = send(t, m, key("esc"))
+	m, _ = send(t, m, key("down"))
+	m, _ = send(t, m, key("a"))
+	if got := keys(m); got != "enter x p M d y" {
+		t.Fatalf("crew row sheet = %q", got)
 	}
 }

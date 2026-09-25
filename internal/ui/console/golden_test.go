@@ -353,10 +353,11 @@ func sampleTree() query.Snapshot {
 				}),
 				Crews: []query.CrewNode{
 					{
-						CrewID: "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
-						RepoID: "payments-api",
-						Task:   "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
-						Status: query.CrewFailed,
+						CrewID:    "crew_01J9P4Q5R6S7T8U9V0W1X2A7CS",
+						ProjectID: "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ",
+						RepoID:    "payments-api",
+						Task:      "Fix webhook idempotency so retried Stripe deliveries do not double-charge",
+						Status:    query.CrewFailed,
 						// `failed` is terminal, so this row lives in the
 						// Completed group (mvp.md section 4b).
 						Closed:      true,
@@ -387,6 +388,7 @@ func sampleTree() query.Snapshot {
 					},
 					{
 						CrewID:      "crew_01J9P6Q6W0E5V8XK2M4B8DT",
+						ProjectID:   "proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ",
 						RepoID:      "payments-api",
 						Task:        "Add idempotency-key index",
 						Status:      query.CrewWorking,
@@ -511,4 +513,25 @@ func testStatusPath(crew string) string {
 
 func testResolveLine(crew, question string) string {
 	return query.BoxResolveLine("payments-api", crew, question, testStatusPath(crew))
+}
+
+func loaded(t *testing.T, tree query.Snapshot, err error) Model {
+	t.Helper()
+	tree.AsOf = goldenAsOf
+	m := New(func(context.Context) (query.Snapshot, error) { return tree, err })
+	m.g = unicodeGlyphs
+	m.p = plainPalette()
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
+	m, _ = send(t, m, m.Init()())
+	return m
+}
+
+func projectFrame(t *testing.T, tree query.Snapshot) Model {
+	t.Helper()
+	m := loaded(t, tree, nil)
+	m, _ = send(t, m, key("enter"))
+	if r, ok := m.selectedRow(); !ok || r.kind != rowMate {
+		t.Fatalf("expected the Mate row selected, got %+v ok=%v", r, ok)
+	}
+	return m
 }

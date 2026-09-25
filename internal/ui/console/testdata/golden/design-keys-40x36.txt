@@ -1,0 +1,36 @@
+─ acme › payments-api ───────────── !2 ─
+▌ 👨‍💻 payments-api                       
+     ✻ running                          
+  🤖 Add index to orders.created_at     
+     ⌬ working                          
+  🤖 Backfill ledger v2             !   
+     ✻ needs-decision                   
+  ▸ Completed (1)           ! 1 failed  
+─ 👨‍💻 payments-api ──────────────────────
+  agent    payments-api.mate            
+  harness  ✻ claude                     
+  status   running · 38m                
+  repo     ~/src/payments-api           
+  crews    2 live · 1 completed         
+  tokens   182k                         
+  mode     manual                       
+─ keys ─────────────────────── any key ─
+  ↑ ↓         move; fields in detail    
+  enter       show in next pane         
+  a           actions                   
+  tab         next pane                 
+  esc         back to the list          
+  n           new project               
+  s           start the mate            
+  m           flip its mode             
+  y           copy                      
+  l           box: whole log            
+  r           refresh                   
+  q           quit                      
+  click       same as enter             
+  click rule  focus that pane           
+  [assign]    hand to the mate          
+  wheel       scroll that pane          
+  shift+drag  select text               
+→ next pane  👨‍💻 payments-api            
+ any key closes                         

@@ -12,35 +12,16 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
-// loaded builds a sized, loaded model - or a failed one, when err is
-// non-nil. 120x36 is the middle breakpoint: an inspector column exists, so
-// both panes are exercised.
-//
-// tree.AsOf is pinned to goldenAsOf, like newFixture: the header's "As of"
-// reads Snapshot.AsOf directly, so this is where every test's read time is
-// fixed.
-func loaded(t *testing.T, tree query.Snapshot, err error) Model {
-	t.Helper()
-	tree.AsOf = goldenAsOf
-	m := New(func(context.Context) (query.Snapshot, error) { return tree, err })
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
-	return m
-}
-
 func TestInitStartsLoadingAndSaysSo(t *testing.T) {
 	m := New(func(context.Context) (query.Snapshot, error) { return query.Snapshot{}, nil })
 	if m.phase != phaseLoading {
 		t.Fatalf("phase = %v, want phaseLoading", m.phase)
 	}
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
+	m.p = plainPalette()
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
 	view := renderFrame(t, m)
-	if !strings.Contains(view, "Loading snapshot") {
-		t.Fatalf("loading view = %q, want a loading message", view)
-	}
-	if strings.Contains(view, "As of") {
-		t.Fatalf("loading view claims an as-of time before any read completed:\n%s", view)
+	if !strings.Contains(view, "reading the workspace") {
+		t.Fatalf("loading view does not say it is reading:\n%s", view)
 	}
 }
 
@@ -50,33 +31,40 @@ func TestTreeLoadFailurePinsFailedPhaseNotBlank(t *testing.T) {
 		t.Fatalf("phase = %v, want phaseFailed", m.phase)
 	}
 	view := renderFrame(t, m)
-	if !strings.Contains(view, "db unreachable") {
-		t.Fatalf("error view = %q, want the failure reason", view)
+	for _, want := range []string{"can't read the workspace", "db unreachable", "Retry now"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("error view missing %q:\n%s", want, view)
+		}
 	}
-	if !strings.Contains(view, "r retries") || !strings.Contains(view, "Retry") {
-		t.Fatalf("error view = %q, want a retry hint in the body and on the key line", view)
+	m, cmd := send(t, m, key("r"))
+	if cmd == nil {
+		t.Fatal("r on the error screen must retry the read")
 	}
-	if strings.Contains(view, "As of") {
-		t.Fatalf("a failed read must not claim an as-of time:\n%s", view)
+	if !m.treeLoadInFlight {
+		t.Fatal("the retry must mark a load in flight")
 	}
 }
 
 func TestEmptyWorkspaceRendersEmptyStateNotBlank(t *testing.T) {
-	m := loaded(t, query.Snapshot{WorkspaceID: "ws_1"}, nil)
+	tree := query.Snapshot{WorkspaceID: "ws_1", Workspace: query.KnownField(query.WorkspaceValue{Name: "acme"})}
+	m := loaded(t, tree, nil)
 	view := renderFrame(t, m)
-	if !strings.Contains(view, "No projects recorded") {
-		t.Fatalf("view = %q, want an explicit empty-Projects message", view)
+	for _, want := range []string{"No projects in acme yet.", "New project", "Refresh"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("empty view missing %q:\n%s", want, view)
+		}
 	}
-	if !strings.Contains(view, "0 projects") {
-		t.Fatalf("view = %q, want the breadcrumb count to say zero", view)
+	if first := strings.Split(view, "\n")[0]; !strings.Contains(first, " 0 ") {
+		t.Fatalf("the list rule must count zero projects, got %q", first)
+	}
+	m, _ = send(t, m, key("n"))
+	if !m.actionInputMode {
+		t.Fatal("n on the empty workspace must open the new-project sheet")
 	}
 }
 
 func TestNavigationDrillsInAndBackOutRestoringSelection(t *testing.T) {
 	m := loaded(t, sampleTree(), nil)
-
-	// Move onto the second Project, drill in, come back: the frame below
-	// kept its own selection, so there is nothing to restore.
 	m, _ = send(t, m, key("down"))
 	if got := m.cur().sel; got != 1 {
 		t.Fatalf("sel = %d, want 1", got)
@@ -90,66 +78,48 @@ func TestNavigationDrillsInAndBackOutRestoringSelection(t *testing.T) {
 		t.Fatalf("frame = %+v, want the Workspace with sel 1", m.cur())
 	}
 
-	// Into the first Project, past the Mate row onto its first Crew, then
-	// back out again.
 	m, _ = send(t, m, key("up"))
 	m, _ = send(t, m, key("enter"))
-	if m.cur().kind != frameProject {
-		t.Fatalf("frame = %+v, want a Project frame", m.cur())
-	}
 	rows := m.currentRows()
 	if len(rows) != 3 || rows[0].kind != rowMate || rows[1].kind != rowCrew || rows[2].kind != rowCompletedGroup {
 		t.Fatalf("project rows = %+v, want the Mate row, one Crew and the Completed group", rows)
 	}
-	m, _ = send(t, m, key("down")) // off the Mate row, onto the active Crew
-	r, ok := m.selectedRow()
-	if !ok || r.kind != rowCrew {
-		t.Fatalf("selected row = %+v (ok=%v), want the first Crew row", r, ok)
+	m, _ = send(t, m, key("down"))
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew {
+		t.Fatalf("selected row = %+v (ok=%v), want the Crew row", r, ok)
 	}
+	m, _ = send(t, m, key("esc"))
 	m, _ = send(t, m, key("esc"))
 	if m.cur().kind != frameWorkspace || len(m.stack) != 1 {
 		t.Fatalf("Esc at the root changed the stack: %+v", m.stack)
 	}
 }
 
-// TestRefreshKeepsSelectionByIdentityNotIndex is N9 sharpened by the
-// stack: preserving an index across a refresh is not enough. A Project
-// inserted above the selection would keep the index and move the reader
-// onto a different row; re-finding by selID keeps them on the row they
-// were looking at.
+// Preserving an index across a refresh is not enough: a Project inserted
+// above the selection would move the reader onto a different row.
 func TestRefreshKeepsSelectionByIdentityNotIndex(t *testing.T) {
 	tree := sampleTree()
 	m := loaded(t, tree, nil)
-	m, _ = send(t, m, key("down")) // the second Project
+	m, _ = send(t, m, key("down"))
 	wantID := m.cur().selID
 	if wantID != tree.Projects[1].ProjectID {
 		t.Fatalf("precondition: selID = %q, want the second Project", wantID)
 	}
-
-	inserted := query.Snapshot{WorkspaceID: tree.WorkspaceID}
+	inserted := query.Snapshot{WorkspaceID: tree.WorkspaceID, Workspace: tree.Workspace}
 	inserted.Projects = append(inserted.Projects,
 		query.ProjectNode{ProjectID: "proj_new", Name: "brand-new", Mate: absentMate("this project has no designated Mate")})
 	inserted.Projects = append(inserted.Projects, tree.Projects...)
 
 	m, _ = send(t, m, treeLoadedMsg{tree: inserted})
-	if m.cur().selID != wantID {
-		t.Fatalf("selID after a refresh that inserted a row above = %q, want %q", m.cur().selID, wantID)
-	}
-	if m.cur().sel != 2 {
-		t.Fatalf("sel = %d, want 2 - the row moved down, so the index must follow it", m.cur().sel)
+	if m.cur().selID != wantID || m.cur().sel != 2 {
+		t.Fatalf("frame after an insert above = %+v, want selID %q at index 2", m.cur(), wantID)
 	}
 }
 
-// TestRefreshClampsWhenTheSelectedRowIsGone: falling back to the same index
-// lands on the nearest surviving neighbour, which is where a reader expects
-// to be, and never past the end of a shorter list.
 func TestRefreshClampsWhenTheSelectedRowIsGone(t *testing.T) {
 	full := sampleTree()
 	m := loaded(t, full, nil)
 	m, _ = send(t, m, key("down"))
-	if m.cur().sel != 1 {
-		t.Fatalf("precondition: sel = %d, want 1", m.cur().sel)
-	}
 	shrunk := query.Snapshot{WorkspaceID: full.WorkspaceID, Projects: full.Projects[:1]}
 	m, _ = send(t, m, treeLoadedMsg{tree: shrunk})
 	if m.cur().sel != 0 || m.cur().selID != full.Projects[0].ProjectID {
@@ -157,21 +127,16 @@ func TestRefreshClampsWhenTheSelectedRowIsGone(t *testing.T) {
 	}
 }
 
-// TestRefreshDropsFramesWhoseEntityIsGone: a Project the refresh no longer
-// reports must not leave the reader inside an empty frame that says nothing
-// about why it is empty. The stack unwinds to the deepest level that still
-// resolves.
+// A Project the refresh no longer reports must not leave the reader inside
+// an empty frame: the stack unwinds to the deepest level that resolves.
 func TestRefreshDropsFramesWhoseEntityIsGone(t *testing.T) {
 	full := sampleTree()
 	m := loaded(t, full, nil)
-	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("down"))  // its active Crew
-	if len(m.stack) != 2 {
-		t.Fatalf("precondition: stack depth %d, want 2", len(m.stack))
-	}
+	m, _ = send(t, m, key("enter"))
+	m, _ = send(t, m, key("down"))
 
 	withoutCrew := sampleTree()
-	withoutCrew.Projects[0].Crews = withoutCrew.Projects[0].Crews[1:]
+	withoutCrew.Projects[0].Crews = withoutCrew.Projects[0].Crews[:1]
 	m, _ = send(t, m, treeLoadedMsg{tree: withoutCrew})
 	if len(m.stack) != 2 || m.cur().kind != frameProject {
 		t.Fatalf("stack = %+v, want it still on the Project frame", m.stack)
@@ -184,14 +149,12 @@ func TestRefreshDropsFramesWhoseEntityIsGone(t *testing.T) {
 	}
 }
 
-// TestRefreshUpdatesAsOf: the header's honesty depends on it. There is no
-// UI-owned clock - the header reads Snapshot.AsOf straight from whatever
-// LoadFunc returns - so this test's own load closure returns a later
-// snapshot on the second call rather than injecting a clock into the model.
-func TestRefreshUpdatesAsOf(t *testing.T) {
+// There is no UI-owned clock: ages are measured against Snapshot.AsOf, so
+// a refresh that returns a later read moves them.
+func TestRefreshUpdatesAsOfAndTheAgesMeasuredFromIt(t *testing.T) {
 	tree := sampleTree()
 	tree.AsOf = goldenAsOf
-	later := goldenAsOf.Add(90 * time.Second)
+	later := goldenAsOf.Add(time.Hour)
 	calls := 0
 	m := New(func(context.Context) (query.Snapshot, error) {
 		calls++
@@ -199,115 +162,88 @@ func TestRefreshUpdatesAsOf(t *testing.T) {
 			tree.AsOf = later
 		}
 		return tree, nil
-	}, nil)
+	})
 	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
 	m, _ = send(t, m, m.Init()())
-	if m.tree.AsOf != goldenAsOf {
-		t.Fatalf("AsOf = %v, want the first read's snapshot time", m.tree.AsOf)
+	m, _ = send(t, m, key("enter")) // the Mate row: bound since 09:14:02
+	if !strings.Contains(renderFrame(t, m), "running · 4h") {
+		t.Fatalf("the Mate's age at the first read is not 4h:\n%s", renderFrame(t, m))
 	}
 	m, cmd := send(t, m, key("r"))
 	if cmd == nil {
-		t.Fatalf("r must re-read")
+		t.Fatal("r must re-read")
 	}
 	m, _ = send(t, m, cmd())
 	if m.tree.AsOf != later {
 		t.Fatalf("AsOf after a refresh = %v, want %v", m.tree.AsOf, later)
 	}
-	if !strings.Contains(renderFrame(t, m), "live "+m.g.Dot+" "+later.Format("15:04:05")) {
-		t.Fatalf("header does not show the new read time")
+	if !strings.Contains(renderFrame(t, m), "running · 5h") {
+		t.Fatalf("the Mate's age did not follow the new read:\n%s", renderFrame(t, m))
 	}
 }
 
-// TestTabSwitchesFocusWithAnInspectorAndOpensDetailWithout is the design's
-// one new interaction, and the reason focus and Detail are separate fields:
-// at 120 columns the inspector is beside the list, so Tab moves focus; at
-// 80 there is nowhere to put it, so Tab covers the main region instead.
-func TestTabSwitchesFocusWithAnInspectorAndOpensDetailWithout(t *testing.T) {
-	m := loaded(t, sampleTree(), nil)
-	m, _ = send(t, m, key("tab"))
-	if m.focus != paneInspector || m.detail {
-		t.Fatalf("focus=%v detail=%v at 120 cols, want the inspector focused and no Detail", m.focus, m.detail)
+// Tab cycles focus through the panes that are drawn - list, detail, box -
+// and the focused pane's rule title is the one that moves.
+func TestTabCyclesListDetailBox(t *testing.T) {
+	m := projectFrame(t, sampleTree())
+	want := []pane{paneDetail, paneBox, paneList}
+	for _, w := range want {
+		m, _ = send(t, m, key("tab"))
+		if m.focus != w {
+			t.Fatalf("focus = %v, want %v", m.focus, w)
+		}
 	}
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.focus != paneBox {
+		t.Fatalf("shift+tab from the list = %v, want the box", m.focus)
+	}
+}
+
+// A frame without a box has no box to Tab to.
+func TestTabSkipsAPaneThatIsNotDrawn(t *testing.T) {
+	tree := sampleTree()
+	tree.Projects[0].Box = query.KnownField(query.BoxView{})
+	m := projectFrame(t, tree)
+	m, _ = send(t, m, key("tab"))
 	m, _ = send(t, m, key("tab"))
 	if m.focus != paneList {
-		t.Fatalf("focus = %v, want Tab to come back to the list", m.focus)
+		t.Fatalf("focus after two Tabs with no box = %v, want the list again", m.focus)
 	}
+}
 
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
+// Below 20 rows there is no room to stack: Tab swaps detail in for the
+// list, and growing the split back puts the stack back.
+func TestBelowTwentyRowsTabSwapsDetailInForTheList(t *testing.T) {
+	m := projectFrame(t, sampleTree())
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 16})
 	m, _ = send(t, m, key("tab"))
-	if !m.detail || m.focus != paneList {
-		t.Fatalf("focus=%v detail=%v at 80 cols, want Detail open over the main region", m.focus, m.detail)
+	if m.focus != paneDetail || !m.detail {
+		t.Fatalf("focus=%v detail=%v at 40x16, want detail swapped in", m.focus, m.detail)
 	}
-	if !strings.Contains(renderFrame(t, m), "Detail view") {
-		t.Fatalf("breadcrumb does not say the reader is in Detail")
+	p := m.plan()
+	if _, ok := p.slot(slotList); ok {
+		t.Fatalf("the list is still drawn with detail swapped in: %+v", p.slots)
 	}
+	if !strings.Contains(renderFrame(t, m), "agent") {
+		t.Fatalf("the swapped-in detail does not show the Mate's fields:\n%s", renderFrame(t, m))
+	}
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
+	if m.detail {
+		t.Fatal("growing past 20 rows must restore the stack")
+	}
+	if _, ok := m.plan().slot(slotList); !ok {
+		t.Fatal("the list is not drawn after growing back")
+	}
+}
+
+// Esc leaves the detail pane before it leaves the level.
+func TestEscLeavesDetailBeforeGoingUpALevel(t *testing.T) {
+	m := projectFrame(t, sampleTree())
+	m, _ = send(t, m, key("tab"))
 	m, _ = send(t, m, key("esc"))
-	if m.detail {
-		t.Fatalf("Esc did not close Detail")
-	}
-}
-
-// TestShrinkingBelowTheInspectorBreakpointResetsFocusToTheList: focus names
-// the pane the arrow keys act on, and paneInspector stops being a legal
-// answer once the inspector column disappears. Left set, the arrow keys
-// scroll a pane that is not drawn, no pane renders as accent, and the key
-// line describes a Scroll behaviour the screen no longer has.
-func TestShrinkingBelowTheInspectorBreakpointResetsFocusToTheList(t *testing.T) {
-	m := loaded(t, sampleTree(), nil) // 120x36: has an inspector column
-	m, _ = send(t, m, key("tab"))
-	if m.focus != paneInspector {
-		t.Fatalf("precondition: the inspector is not focused")
-	}
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	if m.focus != paneList {
-		t.Fatalf("focus = %v after shrinking below the inspector breakpoint, want the list", m.focus)
-	}
-	if m.detail {
-		t.Fatalf("Detail opened on its own after the resize; only Tab should open it")
-	}
-	// The arrow keys must land back on the list's own selection, not on the
-	// stranded inspector's scroll offset.
-	before := m.cur().sel
-	m, _ = send(t, m, key("down"))
-	if m.cur().sel == before {
-		t.Fatalf("down did not move the list selection after the resize; it is still routed to the inspector")
-	}
-	if m.inspTop != 0 {
-		t.Fatalf("inspTop = %d, want the scroll offset untouched by a list move", m.inspTop)
-	}
-}
-
-// TestGrowingPastTheInspectorBreakpointClosesDetail: Detail is what stands
-// in for the inspector below 100 columns. Left set at a width that has a
-// real inspector column, the body would be full-width Detail under a rule
-// drawn with a tee - a frame the chrome contract does not describe.
-func TestGrowingPastTheInspectorBreakpointClosesDetail(t *testing.T) {
-	m := loaded(t, sampleTree(), nil)
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m, _ = send(t, m, key("tab"))
-	if !m.detail {
-		t.Fatalf("precondition: Detail is not open")
-	}
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 160, Height: 48})
-	if m.detail {
-		t.Fatalf("Detail survived a resize to a width that has its own inspector column")
-	}
-	renderFrame(t, m)
-}
-
-// TestEscLeavesTheInspectorBeforeGoingUpALevel: Esc unwinds one step at a
-// time, in the order the reader built them.
-func TestEscLeavesTheInspectorBeforeGoingUpALevel(t *testing.T) {
-	m := loaded(t, sampleTree(), nil)
-	m, _ = send(t, m, key("enter")) // Project
-	m, _ = send(t, m, key("tab"))   // focus the inspector
-	m, _ = send(t, m, key("esc"))
-	if m.focus != paneList {
-		t.Fatalf("focus = %v, want the list", m.focus)
-	}
-	if len(m.stack) != 2 {
-		t.Fatalf("Esc left the level as well as the inspector: stack %+v", m.stack)
+	if m.focus != paneList || len(m.stack) != 2 {
+		t.Fatalf("focus=%v stack=%d after Esc in detail, want the list on the same level", m.focus, len(m.stack))
 	}
 	m, _ = send(t, m, key("esc"))
 	if len(m.stack) != 1 {
@@ -315,62 +251,38 @@ func TestEscLeavesTheInspectorBeforeGoingUpALevel(t *testing.T) {
 	}
 }
 
-// TestSelectionStaysVisibleAfterPagingAndShrinking is the scroll half of
-// relayout: whatever the body height becomes, the selected row is inside
-// the window that gets drawn.
+// Whatever the frame's size becomes, the selected row is drawn, and the
+// rows cut off above and below are counted.
 func TestSelectionStaysVisibleAfterPagingAndShrinking(t *testing.T) {
 	tree := query.Snapshot{WorkspaceID: "ws_1"}
 	for i := 0; i < 60; i++ {
 		tree.Projects = append(tree.Projects, query.ProjectNode{
-			ProjectID: "proj_" + strings.Repeat("x", i%3) + itoa(i),
+			ProjectID: "proj_" + itoa(i),
 			Name:      "project-" + itoa(i),
 			Mate:      absentMate("this project has no designated Mate"),
 		})
 	}
 	m := loaded(t, tree, nil)
-	for _, size := range []tea.WindowSizeMsg{{Width: 120, Height: 36}, {Width: 160, Height: 48}, {Width: 80, Height: 20}, {Width: 120, Height: 17}} {
+	for _, size := range []tea.WindowSizeMsg{{Width: 40, Height: 36}, {Width: 48, Height: 48}, {Width: 40, Height: 20}, {Width: 36, Height: 16}} {
 		m, _ = send(t, m, size)
 		for _, k := range []string{"pgdn", "pgdn", "down", "down", "pgup", "up"} {
 			m, _ = send(t, m, key(k))
-			l := layout(m.w, m.h)
-			f := m.cur()
-			top := clampTop(f.top, f.sel, len(m.currentRows()), l.listRows())
-			if f.sel < top || f.sel >= top+l.listRows() {
-				t.Fatalf("at %dx%d after %q: sel %d outside the visible window [%d,%d)", m.w, m.h, k, f.sel, top, top+l.listRows())
-			}
 			frame := renderFrame(t, m)
-			sel := m.currentRows()[f.sel]
-			want := sel.id
-			if proj, ok := m.projectByID(sel.id); ok {
-				want = proj.Name
+			want := tree.Projects[m.cur().sel].Name
+			if !strings.Contains(frame, want+" ") {
+				t.Fatalf("at %dx%d after %q the selected %s is not on screen:\n%s", m.w, m.h, k, want, frame)
 			}
-			if !strings.Contains(frame, want) {
-				t.Fatalf("at %dx%d after %q the selected row is not on screen:\n%s", m.w, m.h, k, frame)
+			if m.cur().sel > 0 && !strings.Contains(frame, "↑ ") {
+				t.Fatalf("at %dx%d after %q rows above the window are not counted:\n%s", m.w, m.h, k, frame)
 			}
 		}
 	}
 }
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-	return string(b)
-}
-
-// TestAFailedRefreshKeepsTheSnapshotAndSaysSo: the error screen states
-// "no earlier snapshot is loaded", which is true of a first load and false
-// of a refresh. Throwing away a usable picture over a transient read would
-// also be worse for the reader than an unchanged one whose age the header
-// already states.
+// A failed refresh keeps the snapshot on screen and says so: the rows stay,
+// the list rule says stale, and the status line says what failed.
 func TestAFailedRefreshKeepsTheSnapshotAndSaysSo(t *testing.T) {
 	m := loaded(t, sampleTree(), nil)
-	before := renderFrame(t, m)
 	m, _ = send(t, m, key("down"))
 	wantSel := m.cur().selID
 
@@ -379,49 +291,45 @@ func TestAFailedRefreshKeepsTheSnapshotAndSaysSo(t *testing.T) {
 		t.Fatalf("phase = %v, want phaseReady: a failed refresh is not a failed load", m.phase)
 	}
 	if m.cur().selID != wantSel {
-		t.Fatalf("selID = %q, want %q: a failed refresh must not move the selection", m.cur().selID, wantSel)
+		t.Fatalf("selID = %q, want %q", m.cur().selID, wantSel)
 	}
 	if m.tree.AsOf != goldenAsOf {
-		t.Fatalf("AsOf = %v, want it unchanged: nothing was read", m.tree.AsOf)
+		t.Fatalf("AsOf = %v, want it unchanged", m.tree.AsOf)
+	}
+	if !strings.Contains(m.msg.text, "database is locked") || !strings.Contains(m.msg.text, goldenAsOf.Format("15:04:05")) {
+		t.Fatalf("message = %q, want the failure and the time still on screen", m.msg.text)
 	}
 	view := renderFrame(t, m)
-	if !strings.Contains(view, "Refresh failed") || !strings.Contains(view, "database is locked") {
-		t.Fatalf("view = %q, want the failed refresh on the message line", view)
+	lines := strings.Split(view, "\n")
+	if !strings.Contains(lines[0], "stale") {
+		t.Fatalf("list rule = %q, want it to say stale", lines[0])
 	}
-	if !strings.Contains(view, "still showing the snapshot from "+goldenAsOf.Format("15:04:05")) {
-		t.Fatalf("view = %q, want it to say what is still on screen", view)
+	if !strings.Contains(view, "Refresh failed") {
+		t.Fatalf("status line does not say the refresh failed:\n%s", view)
 	}
-	if strings.Contains(view, "No earlier snapshot is loaded") {
-		t.Fatalf("a failed refresh rendered the first-load error page:\n%s", view)
+	if strings.Contains(view, "can't read the workspace") {
+		t.Fatalf("a failed refresh rendered the first-load error screen:\n%s", view)
 	}
-	// And the rows are still there.
 	for _, p := range sampleTree().Projects {
 		if !strings.Contains(view, p.Name) {
 			t.Fatalf("the Project %q vanished on a failed refresh:\n%s", p.Name, view)
 		}
-	}
-	if before == view {
-		t.Fatalf("the failed refresh left no trace at all on the frame")
 	}
 }
 
 func TestQuitStopsTheProgram(t *testing.T) {
 	m := loaded(t, sampleTree(), nil)
 	m, cmd := send(t, m, key("q"))
-	if !m.Quitting() {
-		t.Fatalf("q did not set quitting")
-	}
-	if cmd == nil {
-		t.Fatalf("q must return tea.Quit")
+	if !m.Quitting() || cmd == nil {
+		t.Fatalf("q: quitting=%v cmd=%v, want both", m.Quitting(), cmd != nil)
 	}
 	if m.View() != "" {
 		t.Fatalf("quitting view = %q, want empty", m.View())
 	}
 }
 
-// TestViewIsEmptyBeforeTheFirstSizeMessage: every size comes from
-// tea.WindowSizeMsg, so there is nothing to draw until one arrives - and
-// nothing is drawn, rather than a frame at a guessed size.
+// Every size comes from tea.WindowSizeMsg: nothing is drawn until one
+// arrives.
 func TestViewIsEmptyBeforeTheFirstSizeMessage(t *testing.T) {
 	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil })
 	if got := m.View(); got != "" {
@@ -433,24 +341,41 @@ func TestViewIsEmptyBeforeTheFirstSizeMessage(t *testing.T) {
 	}
 }
 
-// TestOneUnreadableFieldDoesNotTakeTheWholeScreenToAnErrorPage: phase and
-// query.FieldState are different axes. A crew whose worktree read failed
-// still renders its row, its status and everything else that did read.
+// One unreadable field does not take the whole screen to an error page:
+// the crew still renders its status, and the unreadable binding says
+// unknown in detail.
 func TestOneUnreadableFieldDoesNotTakeTheWholeScreenToAnErrorPage(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Crews[0].Worktree = query.UnknownField[query.WorktreeValue]("worktree lookup failed")
-	tree.Projects[0].Crews[0].AgentName = query.UnknownField[string]("binding lookup failed")
 	tree.Projects[0].Crews[0].Binding = query.UnknownField[query.BindingValue]("binding lookup failed")
 	m := loaded(t, tree, nil)
 	if m.phase != phaseReady {
-		t.Fatalf("phase = %v, want phaseReady: one field is not a read failure", m.phase)
+		t.Fatalf("phase = %v, want phaseReady", m.phase)
 	}
 	m = toFailedAttempt(t, m)
 	view := renderFrame(t, m)
 	if !strings.Contains(view, string(query.CrewFailed)) {
-		t.Fatalf("view = %q, want the recorded status of a crew whose other fields failed to read", view)
+		t.Fatalf("view does not show the recorded status:\n%s", view)
 	}
 	if !strings.Contains(view, "unknown") {
-		t.Fatalf("view = %q, want the unreadable fields marked unknown", view)
+		t.Fatalf("view does not mark the unreadable binding unknown:\n%s", view)
+	}
+}
+
+// Too small draws the too-small screen and nothing else, and answers only q.
+func TestTooSmallAnswersOnlyQ(t *testing.T) {
+	m := loaded(t, sampleTree(), nil)
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 28, Height: 10})
+	view := renderFrame(t, m)
+	if !strings.Contains(view, "too small: 28×10") || !strings.Contains(view, "needs 32×14") {
+		t.Fatalf("too-small view:\n%s", view)
+	}
+	before := m.cur()
+	m, _ = send(t, m, key("down"))
+	if m.cur() != before {
+		t.Fatalf("a key moved the selection on the too-small screen: %+v -> %+v", before, m.cur())
+	}
+	if _, cmd := send(t, m, key("q")); cmd == nil {
+		t.Fatal("q must still quit on the too-small screen")
 	}
 }

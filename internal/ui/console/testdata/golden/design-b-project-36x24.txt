@@ -1,0 +1,24 @@
+─ acme › payments-api ───────── !2 ─
+▌ 👨‍💻 payments-api            running
+  🤖 Add index to orders.…   working
+  🤖 Backfill ledger v2    ! decide 
+  ▸ Completed (1)          ! failed 
+─ 👨‍💻 payments-api ──────────────────
+  agent    payments-api.mate        
+  harness  ✻ claude                 
+  status   running · 38m            
+  repo     ~/src/payments-api       
+  crews    2 live · 1 completed     
+  tokens   182k                     
+  mode     manual                   
+  blocked  no · 1 crew waits on you 
+  last     status · 1m              
+                                    
+                                    
+                                    
+                                    
+                                    
+─ box ────────────────────────── 1 ─
+  🤖 Backfill ledger v2   [assign]  
+     k3 · decide · 6m               
+→ next pane  👨‍💻 payments-api  ? keys

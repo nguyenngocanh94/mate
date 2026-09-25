@@ -1,118 +1,228 @@
 package console
 
-// The layout engine. Every size the Console draws with comes from
-// tea.WindowSizeMsg through Model.w/Model.h and this function; nothing in
-// the package asks the terminal how big it is (cmd/mate/console.go already
-// refuses a non-terminal before the program starts, and asking again here
-// would answer for the process rather than for this invocation).
+// The layout engine (design I, "3 Chrome" and "5 Panes"). mate is the left
+// ~20% pane of the captain's terminal: 32 to 48 columns, one stack of panes
+// top to bottom - list, detail, box - never side by side, and a footer.
+// Sizes come from tea.WindowSizeMsg through Model.w/Model.h and nowhere
+// else. plan is the one function that places the panes; the renderer and
+// the mouse hit tests both read it, so a click resolves against the frame
+// that was drawn.
 const (
-	// minCols and minRows are the smallest frame the six-line chrome plus a
-	// usable main region fits into. Below either, the Console draws the
-	// too-small screen and answers only q.
-	minCols = 60
-	minRows = 16
-
-	// chromeRows is the fixed six-line frame: header, breadcrumb, rule,
-	// ... , rule, message, keys. The main region is exactly h - chromeRows.
-	chromeRows = 6
-
-	// frameBodyTop is the first frame row of the main region: the header,
-	// the breadcrumb and the rule above it (frame.go's render).
-	frameBodyTop = 3
-
-	// inspectorWide/inspectorNarrow are the two inspector widths. 50 is
-	// chosen so the value column is 31 cells: comfortable headroom over any
-	// id mate actually generates (internal/domain/id.go: prefix_ plus 16 hex
-	// characters, 21 cells for "crew_" - this codebase does not generate
-	// ULIDs), so an id never splits across two lines at the narrower
-	// breakpoint.
-	inspectorWide   = 60
-	inspectorNarrow = 50
-
-	// labelWidth is the inspector's label column: 16 cells of dim label,
-	// one blank, then the value; continuation lines indent past both.
-	labelWidth = 16
+	// minCols and minRows: below either, the too-small screen and nothing
+	// else (design H4).
+	minCols = 32
+	minRows = 14
+	// tinyCols: under this the too-small screen is one line.
+	tinyCols = 20
+	// tallRows: at 30 rows and more every row is two lines and the key line
+	// shows; below, rows are one line and the status line ends in "? keys".
+	tallRows = 30
+	// stackRows: below 20 rows there is no room to stack list and detail,
+	// so Tab swaps the detail in place of the list.
+	stackRows = 20
+	// wideCols: at 48 columns a row's status moves up to line 1 and line 2
+	// gains the agent id and age (design J).
+	wideCols = 48
+	// comfortableRows: from here the box shows its top item in full even
+	// when it is not focused (design J).
+	comfortableRows = 44
+	// boxFocusDetailRows: a focused box leaves detail its first 8 rows,
+	// rule included (design D).
+	boxFocusDetailRows = 8
 )
 
-// frameLayout is the geometry of one frame. Body and the pane widths are
-// only meaningful when TooSmall is false; the too-small screen has no
-// panes and no main region.
-type frameLayout struct {
-	Cols, Rows int
-	// Inspector is 0 when the frame has a single main region (60-99 cols),
-	// where Tab opens Detail over that region instead of splitting it.
-	Inspector int
-	// List is the main region's width: the full frame when there is no
-	// inspector, otherwise everything left of the divider column.
-	List int
-	// Body is the main region's height, h - chromeRows.
-	Body     int
-	TooSmall bool
+// slotKind is what a region of the frame holds.
+type slotKind int
+
+const (
+	slotList slotKind = iota
+	slotDetail
+	slotBox
+	slotSheet
+)
+
+// slot is one pane: its rule on row top, its body below, h rows in all.
+type slot struct {
+	kind   slotKind
+	top, h int
 }
 
-// layout resolves the design's breakpoints for a w x h terminal.
-//
-//	>= 140 cols: list + inspector of 60 (value column 41)
-//	100-139:     list + inspector of 50 (value column 31)
-//	60-99:       one main region; Tab opens Detail over it
-//	< 60 cols or < 16 rows: the too-small screen
-func layout(w, h int) frameLayout {
-	l := frameLayout{Cols: w, Rows: h, Body: h - chromeRows}
-	l.TooSmall = w < minCols || h < minRows
+// body is the pane's first row under its rule, and how many rows follow.
+func (s slot) body() (top, h int) { return s.top + 1, s.h - 1 }
+
+// framePlan is one frame's geometry.
+type framePlan struct {
+	w, h     int
+	tooSmall bool
+	tall     bool
+	wide     bool
+	// footer is the rows under the panes: the status line, and the key line
+	// when the frame is tall.
+	footer int
+	slots  []slot
+}
+
+func (p framePlan) slot(k slotKind) (slot, bool) {
+	for _, s := range p.slots {
+		if s.kind == k {
+			return s, true
+		}
+	}
+	return slot{}, false
+}
+
+// statusRow is the status line's frame row.
+func (p framePlan) statusRow() int { return p.h - p.footer }
+
+// sizeClass is the part of the plan that depends on the window alone.
+func sizeClass(w, h int) framePlan {
+	p := framePlan{w: w, h: h}
+	p.tooSmall = w < minCols || h < minRows
+	p.tall = h >= tallRows
+	p.wide = w >= wideCols
+	p.footer = 1
+	if p.tall {
+		p.footer = 2
+	}
+	return p
+}
+
+// plan places the panes for the model's current state.
+func (m Model) plan() framePlan {
+	p := sizeClass(m.w, m.h)
+	if p.tooSmall || m.phase != phaseReady {
+		return p
+	}
+	body := m.h - p.footer
+	need := m.paneNeeds(p)
+	if m.h < stackRows {
+		p.slots = m.planUnstacked(p, body, need)
+	} else {
+		p.slots = m.planStacked(p, body, need)
+	}
+	return p
+}
+
+// paneNeeds is each pane's natural height, rule included; 0 for a pane the
+// frame does not draw.
+type paneNeeds struct {
+	list, detail, box, sheet int
+}
+
+func (m Model) paneNeeds(p framePlan) paneNeeds {
+	n := paneNeeds{list: 1 + m.listNeed(p)}
+	if m.hasDetail() {
+		n.detail = 1 + len(m.detailLines(p))
+	}
+	if s := m.sheetOpen(); s != sheetNone {
+		n.sheet = 1 + len(m.sheetLines(p))
+	} else if items := m.boxItems(); len(items) > 0 {
+		n.box = 1 + len(m.boxLines(p, m.boxMode(p)).lines)
+	}
+	return n
+}
+
+// planStacked is the 20-row-and-taller stack. The lower pane (the box, or
+// a sheet in its place) takes its natural height first, capped so the list
+// keeps room for its selected row; the list then takes what its content
+// needs, but at least half of the rest when it has that much; detail fills
+// what is left. A focused box inverts the last two: detail keeps its first
+// 8 rows and the box grows (design D).
+func (m Model) planStacked(p framePlan, body int, need paneNeeds) []slot {
+	listFloor := minInt(need.list, maxInt(3, body/3))
+	lower, lowerKind := need.box, slotBox
+	if need.sheet > 0 {
+		lower, lowerKind = need.sheet, slotSheet
+	}
+	lower = minInt(lower, max0(body-listFloor))
+
+	var listH, detailH int
 	switch {
-	case w >= 140:
-		l.Inspector = inspectorWide
-	case w >= 100:
-		l.Inspector = inspectorNarrow
+	case lowerKind == slotSheet:
+		// A sheet keeps the list whole when it can - the sheet acts on the
+		// selected row, and the rows around it are its context - and
+		// detail takes what is left, if that is a pane's worth.
+		rest := body - lower
+		listH = m.usedListRows(p, minInt(need.list, rest))
+		detailH = rest - listH
+		if need.detail == 0 || detailH < 2 {
+			listH, detailH = rest, 0
+		}
+	case lowerKind == slotBox && m.focus == paneBox && need.box > 0:
+		detailH = minInt(need.detail, boxFocusDetailRows)
+		listH = minInt(need.list, maxInt(listFloor, body-detailH-minInt(need.box, 4)))
+		listH = m.usedListRows(p, listH)
+		detailH = minInt(detailH, max0(body-listH-2))
+		lower = body - listH - detailH
+	default:
+		rest := body - lower
+		listMin := minInt(need.list, (rest+1)/2)
+		detailH = minInt(need.detail, max0(rest-listMin))
+		listH = m.usedListRows(p, minInt(need.list, rest-detailH))
+		detailH = 0
+		if need.detail > 0 {
+			detailH = rest - listH
+		}
+		if need.detail == 0 || detailH < 2 {
+			// No detail pane: the list keeps the rows, and whatever its
+			// content does not use stays blank under it.
+			listH, detailH = rest, 0
+		}
 	}
-	l.List = w
-	if l.Inspector > 0 {
-		// One cell for the divider the horizontal rules tee into.
-		l.List = w - l.Inspector - 1
+	out := make([]slot, 0, 3)
+	top := 0
+	add := func(k slotKind, h int) {
+		if h <= 0 {
+			return
+		}
+		out = append(out, slot{kind: k, top: top, h: h})
+		top += h
 	}
-	return l
+	add(slotList, listH)
+	add(slotDetail, detailH)
+	if lower > 1 {
+		add(lowerKind, lower)
+	}
+	return out
 }
 
-// split reports whether this frame draws two panes: an inspector column
-// exists and the main region is not given over to a full-width view
-// (Detail, or a loading/error screen that has no rows to inspect).
-func (l frameLayout) split(hasInspector bool) bool {
-	return !l.TooSmall && l.Inspector > 0 && hasInspector
-}
-
-// valueWidth is the inspector's value column: the pane minus one leading
-// space, the 16-cell label, the blank between label and value, and one
-// trailing space. 41 cells at 140+, 31 at 100-139.
-func (l frameLayout) valueWidth() int {
-	if l.Inspector <= 0 {
-		return 0
+// planUnstacked is under 20 rows: one main pane - the list, or detail when
+// Tab swapped it in - with a sheet or the box under it when there is room.
+func (m Model) planUnstacked(p framePlan, body int, need paneNeeds) []slot {
+	main := slotList
+	if m.detail && need.detail > 0 {
+		main = slotDetail
 	}
-	return l.Inspector - labelWidth - 3
-}
-
-// detailValueWidth is valueWidth for Detail, which takes the whole main
-// region and so has no fixed pane width of its own.
-func (l frameLayout) detailValueWidth() int {
-	return l.Cols - labelWidth - 3
-}
-
-// listRows is how many rows the list pane can show: the main region minus
-// the one line the pane title and its column headers share. The list's
-// scroll offset is clamped against this rather than against Body, so the
-// selection the model keeps visible is the selection the pane actually
-// draws.
-func (l frameLayout) listRows() int {
-	if l.Body <= 1 {
-		return 0
+	lower, lowerKind := need.box, slotBox
+	if need.sheet > 0 {
+		lower, lowerKind = need.sheet, slotSheet
 	}
-	return l.Body - 1
+	const mainFloor = 3
+	lower = minInt(lower, max0(body-mainFloor))
+	if lowerKind == slotBox {
+		// The box stays compact here: its rule and one item.
+		lower = minInt(lower, 3)
+	}
+	out := []slot{{kind: main, top: 0, h: body - lower}}
+	if lower > 1 {
+		out = append(out, slot{kind: lowerKind, top: body - lower, h: lower})
+	}
+	return out
 }
 
-// page is how far PgUp/PgDn moves: a screenful less the three lines of
-// overlap that keep the reader's place in a long list.
-func (l frameLayout) page() int {
-	if l.Body-3 < 1 {
-		return 1
+// usedListRows is how many rows the list pane actually fills at most h
+// rows, rule included: items are drawn whole, so a windowed list can leave
+// a row unused, and that row belongs to the pane under it.
+func (m Model) usedListRows(p framePlan, h int) int {
+	if h <= 1 {
+		return h
 	}
-	return l.Body - 3
+	return 1 + len(m.listBody(p, h-1).lines)
+}
+
+// hasDetail reports whether the frame has an object to detail: the
+// selected row, on either level.
+func (m Model) hasDetail() bool {
+	_, ok := m.selectedRow()
+	return ok
 }

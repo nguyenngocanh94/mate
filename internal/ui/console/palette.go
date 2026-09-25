@@ -2,97 +2,92 @@ package console
 
 import "github.com/charmbracelet/lipgloss"
 
-// The palette: the ten tokens of design/mate-tui.css as lipgloss styles.
-//
-// Every token is an ANSI index and nothing else. That file says so itself -
-// "a real terminal substitutes its own theme, so only the index mapping is
-// a contract" - and its oklch values are previews of one theme, not values
-// the Console is entitled to impose. Three consequences, all deliberate:
-//
-//   - No colour exists only at truecolor. A 16-colour terminal and a
-//     truecolor one draw the same hierarchy, so the layout survives either,
-//     which is the property the design asked for.
-//   - The hierarchy travels as indices: bright white (15) over white (7)
-//     over bright black (8). A user who has themed those three keeps their
-//     own ramp instead of having ours painted over it.
-//   - rule and faint both map to index 8 and are indistinguishable on a
-//     16-colour terminal. That is the CSS's own mapping, kept rather than
-//     "improved", because faint is decoration only - nothing readable
-//     depends on telling the two apart.
-//
-// bg is in the table below for completeness but is never painted: the token
-// is described as the terminal background, so the Console leaves it to the
-// terminal. The design is a dark-background design; on a light terminal the
-// user's own theme decides what index 15 and index 7 look like.
-var paletteANSI = map[string]uint{
-	"bg":     0,  // black - the terminal's own background, never painted
-	"bg-sel": 8,  // bright black - selected row background
-	"rule":   8,  // bright black - box-drawing rules
-	"fg":     15, // bright white - primary text, values, key names
-	"dim":    7,  // white - labels, column headers, key descriptions
-	"faint":  8,  // bright black - non-text decoration only
-	"acc":    14, // bright cyan - focus and selection, nothing else
-	"amber":  11, // bright yellow - needs attention, unknown
-	"red":    9,  // bright red - failed, missing, errors
-	"green":  10, // bright green - succeeded, confirmations
+// tok is a design token (design I, "1 Tokens"). Every segment the Console
+// draws carries one, never a raw colour, so the lift rule below can be
+// applied in one place.
+type tok uint8
+
+const (
+	tFg    tok = iota // names, values, key glyphs: the terminal's own foreground (SGR 39)
+	tDim              // labels, line 2, key labels: ANSI 7
+	tFaint            // rules, unavailable actions, "…": ANSI 8
+	tAcc              // focused pane title and marker: ANSI 14, bold
+	tAmber            // attention, unknown, review: ANSI 11
+	tRed              // failed, error, the destructive verb: ANSI 9
+	tGreen            // succeeded: ANSI 10
+	tBold             // the terminal's own foreground, bold
+)
+
+// ansiOf is each token's ANSI index; tFg and tBold have none, because a
+// light theme that maps 15 close to white would erase every name drawn in
+// it ("Light terminals" in design I).
+var ansiOf = map[tok]uint{
+	tDim:   7,
+	tFaint: 8,
+	tAcc:   14,
+	tAmber: 11,
+	tRed:   9,
+	tGreen: 10,
 }
 
-// palette is the drawing styles for one frame. A Model carries one, so a
-// test can render with plainPalette and diff readable text.
+// selBG is the selected row's background: ANSI 8 across the whole width.
+const selBG = 8
+
+// palette maps tokens to styles, twice: as drawn, and lifted for a row on
+// the selection background.
 type palette struct {
-	Fg    lipgloss.Style
-	Bold  lipgloss.Style
-	Dim   lipgloss.Style
-	Faint lipgloss.Style
-	Rule  lipgloss.Style
-	Acc   lipgloss.Style
-	Amber lipgloss.Style
-	Red   lipgloss.Style
-	Green lipgloss.Style
-
-	// Sel is the selected row's fill: background bg-sel, no foreground of
-	// its own, built on the same renderer as every other token so a padded
-	// cell carries the same background a glyph does (see line.background).
-	Sel lipgloss.Style
-	// SelBG is that background on its own, for a caller that layers it
-	// under a span's own style. nil in plainPalette.
-	SelBG lipgloss.TerminalColor
+	plain  bool
+	normal map[tok]lipgloss.Style
+	lifted map[tok]lipgloss.Style
+	sel    lipgloss.Style
 }
 
-// defaultPalette builds the palette on lipgloss's default renderer, which
-// resolves the colour profile from the terminal the program is drawing on.
 func defaultPalette() palette { return paletteFor(lipgloss.DefaultRenderer()) }
 
-// paletteFor builds the palette on an explicit renderer. Production uses
-// the default one; a test that asserts colour uses a renderer with a pinned
-// profile, so the assertion does not depend on whether `go test` happened
-// to inherit a terminal.
 func paletteFor(r *lipgloss.Renderer) palette {
-	fg := func(token string) lipgloss.Style {
-		return r.NewStyle().Foreground(lipgloss.ANSIColor(paletteANSI[token]))
+	base := func(t tok) lipgloss.Style {
+		s := r.NewStyle()
+		if n, ok := ansiOf[t]; ok {
+			s = s.Foreground(lipgloss.ANSIColor(n))
+		}
+		if t == tAcc || t == tBold {
+			s = s.Bold(true)
+		}
+		return s
 	}
-	return palette{
-		Fg:    fg("fg"),
-		Bold:  fg("fg").Bold(true),
-		Dim:   fg("dim"),
-		Faint: fg("faint"),
-		Rule:  fg("rule"),
-		Acc:   fg("acc"),
-		Amber: fg("amber"),
-		Red:   fg("red"),
-		Green: fg("green"),
-		Sel:   r.NewStyle().Background(lipgloss.ANSIColor(paletteANSI["bg-sel"])),
-		SelBG: lipgloss.ANSIColor(paletteANSI["bg-sel"]),
+	p := palette{normal: map[tok]lipgloss.Style{}, lifted: map[tok]lipgloss.Style{}}
+	bg := lipgloss.ANSIColor(selBG)
+	for t := tFg; t <= tBold; t++ {
+		p.normal[t] = base(t)
+		p.lifted[t] = base(lift(t)).Background(bg)
 	}
+	p.sel = r.NewStyle().Background(bg)
+	return p
 }
 
-// plainPalette draws no colour at all: every token is the zero style and
-// selection carries no background. Golden fixtures are rendered with it so
-// a diff shows the frame rather than escape sequences - which is also why
-// no signal in this package may be carried by colour alone. If a state is
-// only distinguishable in defaultPalette, it is invisible in a fixture, and
-// that is the bug the rule exists to prevent.
-func plainPalette() palette {
-	s := lipgloss.NewStyle()
-	return palette{Fg: s, Bold: s, Dim: s, Faint: s, Rule: s, Acc: s, Amber: s, Red: s, Green: s, Sel: s}
+// lift is design I's lift rule: on a sel-bg row every tint steps up once,
+// faint to dim and dim to fg, because index 8 text on an index 8
+// background would otherwise vanish.
+func lift(t tok) tok {
+	switch t {
+	case tFaint:
+		return tDim
+	case tDim:
+		return tFg
+	}
+	return t
+}
+
+// plainPalette draws no colour at all: the fixtures' palette, so a signal
+// carried only by colour is invisible in them (doc.go).
+func plainPalette() palette { return palette{plain: true} }
+
+func (p palette) style(t tok, selected bool) (lipgloss.Style, bool) {
+	if p.plain {
+		return lipgloss.Style{}, false
+	}
+	if selected {
+		return p.lifted[t], true
+	}
+	return p.normal[t], true
 }

@@ -196,9 +196,9 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 		t.Fatalf("[assign] outcome = %q, want it queued behind the Mate's turn\nmate pane:\n%s", out, mateTail())
 	}
 	row := assignedRow(t, w)
-	rail := strings.Join(console.RenderInboxRail(query.LoadBox(w, "shop"), -1, 54, 8), "\n")
+	rail := strings.Join(console.RenderBox("shop", query.LoadBox(w, "shop"), 40, 8), "\n")
 	t.Logf("rail while queued:\n%s", rail)
-	if row.Assigned.State != query.BoxAssignQueued || !strings.Contains(rail, "needs an answer · assigned, queued") {
+	if row.Assigned.State != query.BoxAssignQueued || !strings.Contains(rail, "queued") {
 		t.Fatalf("inbox row = %+v, want it assigned, queued", row)
 	}
 
@@ -209,13 +209,13 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 
 	// 6. Still in the inbox, now saying when it was handed over.
 	box := query.LoadBox(w, "shop")
-	rail = strings.Join(console.RenderInboxRail(box, -1, 54, 8), "\n")
+	rail = strings.Join(console.RenderBox("shop", box, 40, 8), "\n")
 	t.Logf("rail right after the send:\n%s", rail)
 	switch {
 	case box.IsKnown() && len(box.Value.Inbox) == 1:
 		row = box.Value.Inbox[0]
 		if row.Assigned.State != query.BoxAssignSent ||
-			!strings.Contains(rail, "needs an answer · assigned "+item.SentAt.UTC().Format("15:04")) {
+			!strings.Contains(rail, "sent "+item.SentAt.UTC().Format("15:04")) {
 			t.Fatalf("inbox row = %+v, want it assigned %s", row, item.SentAt.UTC().Format("15:04"))
 		}
 	case mateAnswered(t, w, "k3"):

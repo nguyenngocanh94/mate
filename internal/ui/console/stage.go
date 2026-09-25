@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -213,27 +214,63 @@ func (m Model) beginStage(target StageTarget) (Model, tea.Cmd) {
 		m.msg = errMsg("no next pane: run mate console inside WezTerm or Ghostty")
 		return m, nil
 	}
-	m.msg = infoMsg("Opening " + label + " in the next pane" + m.g.Ellipsis)
+	m.msg = infoMsg(m.g.Arrow + " next pane " + m.g.Dot + " opening " + label + m.g.Ellipsis)
 	fn := m.stage
 	ctx := m.baseCtx()
 	return m, func() tea.Msg {
-		err := fn(ctx, target)
-		return stageDoneMsg{err: err, label: label}
+		return stageDoneMsg{err: fn(ctx, target), target: target}
 	}
 }
 
 type stageDoneMsg struct {
-	err   error
-	label string
+	err    error
+	target StageTarget
 }
 
+// stagedPane is what the next pane shows, as the status line says it.
+type stagedPane struct {
+	kind   StageTargetKind
+	name   string
+	target StageTarget
+	// err is the last stage's failure, in a few words; r retries it.
+	err string
+}
+
+// onStageDone records what the next pane shows now. A failure keeps the
+// target, so r can try again.
 func (m Model) onStageDone(msg stageDoneMsg) Model {
+	m.msg = footerMsg{}
 	if msg.err != nil {
-		m.msg = errMsg(msg.err.Error())
+		m.staged = stagedPane{kind: msg.target.Kind, target: msg.target, err: oneLine(msg.err.Error())}
 		return m
 	}
-	m.msg = okMsg("Showing " + msg.label + " in the next pane")
+	m.staged = stagedPane{kind: msg.target.Kind, name: m.stagedName(msg.target), target: msg.target}
 	return m
+}
+
+// stagedName is how the status line names a staged agent: the Mate by its
+// Project, a Crew by its task.
+func (m Model) stagedName(t StageTarget) string {
+	p, ok := m.projectByID(t.ProjectID)
+	if !ok {
+		return stageLabel(t)
+	}
+	if t.Kind == StageMate {
+		return p.Name
+	}
+	for _, c := range p.Crews {
+		if c.CrewID == t.ID {
+			if task := strings.TrimSpace(oneLine(c.Task)); task != "" {
+				return task
+			}
+		}
+	}
+	return shortID(t.ID, m.g)
+}
+
+// retryStage is r while the last stage failed: the same target again.
+func (m Model) retryStage() (Model, tea.Cmd) {
+	return m.beginStage(m.staged.target)
 }
 
 // clipboardSequence is OSC 52's clipboard write for text.

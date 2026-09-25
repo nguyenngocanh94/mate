@@ -69,7 +69,7 @@ func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {
 			}
 			for _, forbidden := range forbiddenImports {
 				if path == forbidden || strings.HasPrefix(path, forbidden+"/") {
-					t.Errorf("%s imports %s; the Console must reach state only through LoadFunc and attach only through AttachCmdFunc (see doc.go)", e.Name(), path)
+					t.Errorf("%s imports %s; the Console must reach state only through LoadFunc and reach the host only through StageFunc (see doc.go)", e.Name(), path)
 				}
 			}
 			if strings.Contains(strings.ToLower(path), "herdr") {

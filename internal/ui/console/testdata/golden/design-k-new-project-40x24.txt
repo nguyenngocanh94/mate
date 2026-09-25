@@ -1,0 +1,24 @@
+─ acme ──────────────────────────── !4 ─
+  auth-gateway                   running
+  billing-worker                 created
+  customer-notifications-dispat… running
+  docs-site                   !1 no mate
+  infra-terraform                running
+  ledger-recon                   stopped
+  mobile-app                     running
+▌ payments-api                !2 running
+  ↓ 4 more                              
+─ new project ──────────────────── esc ─
+  name                                  
+▌ ledger-audit█                         
+    a-z 0-9 -, starts with a letter,    
+    at most 32, unique                  
+  repo · optional                       
+  path or git url                       
+    leave blank to add later            
+                                        
+  enter  create ledger-audit            
+         no mate is started             
+  tab    next field                     
+  esc    cancel                         
+→ next pane  👨‍💻 payments-api      ? keys
