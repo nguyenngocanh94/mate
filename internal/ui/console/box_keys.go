@@ -42,62 +42,6 @@ import (
 // crew's pane is navigation, and it takes the same path Enter on that
 // crew's tree row takes (update.go's onEnter).
 
-// boxOutcomeLine draws the last box action's result inside the rail, which
-// is where a session frame has to put it: unlike the project frame, the
-// session frame is not built from frame.go's six-line chrome and so has no
-// message line at all. The tone prefixes ("!", "?") are frame.go's own, so
-// the two surfaces read the same way with colour stripped.
-func boxOutcomeLine(msg footerMsg, g glyphSet, p palette, w int) *line {
-	prefix, style := "", p.Fg
-	switch msg.tone {
-	case toneError:
-		prefix, style = "! ", p.Red
-	case toneWarn:
-		prefix, style = "! ", p.Amber
-	case toneUnknown:
-		prefix, style = "? ", p.Amber
-	case toneOK:
-		style = p.Green
-	}
-	return newLine().add(" "+prefix+msg.text, style).cut(w, g)
-}
-
-// sessionBoxList is the box the session rail is showing - the inbox, or the
-// whole log while `[all]` is on - and whether there is a row to act on.
-func (m Model) sessionBoxList() (boxList, bool) {
-	if m.sess.target.Kind != SessionTargetMate {
-		return boxList{}, false
-	}
-	b := boxList{field: m.sess.snapshot.Box, all: m.boxAll}
-	return b, b.known() && len(b.rows()) > 0
-}
-
-// sessionRailState assembles what the renderer needs from the flow. The
-// selection is resolved here rather than stored resolved, so "follow the
-// newest" (-1) keeps following as a crew appends.
-func (m Model) sessionRailState() boxRail {
-	b, _ := m.sessionBoxList()
-	sel := m.sess.boxSel
-	if sel < 0 {
-		sel = boxDefaultSelection(b)
-	} else if n := len(b.rows()); n > 0 {
-		sel = clampInt(sel, 0, n-1)
-	}
-	hover := -1
-	if m.sess.zone == zoneBox {
-		hover = m.boxHover
-	}
-	return boxRail{
-		all:     m.boxAll,
-		sel:     sel,
-		hover:   hover,
-		zone:    m.sess.zone,
-		railW:   m.railWidth,
-		outcome: m.boxMsg,
-		copied:  m.sess.copied,
-	}
-}
-
 // ---------- the recovery actions ----------
 //
 // Restarting a Mate and clearing its composer are entries in the Actions
@@ -129,41 +73,6 @@ func clearComposerChoice(project string) actionChoice {
 	}
 }
 
-// onSessionBoxKey handles one key aimed at the session rail. The third
-// return says whether the key was consumed; false means the caller's own
-// handling (the composer, or the PTY) still applies.
-func (m Model) onSessionBoxKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.String() {
-	case "l":
-		return m.toggleBoxAll(), nil, true
-	case "o":
-		return m.beginBoxActions(), nil, true
-	}
-	b, ok := m.sessionBoxList()
-	if !ok {
-		return m, nil, false
-	}
-	rail := m.sessionRailState()
-	n := len(b.rows())
-	switch msg.String() {
-	case "j", "down":
-		m.sess.boxSel = clampInt(rail.sel+1, 0, n-1)
-		m.boxMsg = footerMsg{}
-		return m, nil, true
-	case "k", "up":
-		m.sess.boxSel = clampInt(rail.sel-1, 0, n-1)
-		m.boxMsg = footerMsg{}
-		return m, nil, true
-	case "enter":
-		model, cmd := m.openBoxEntryFromSession(b, rail.sel)
-		return model, cmd, true
-	case "a":
-		model, cmd := m.beginBoxAssign(m.sess.target.ProjectID, b, rail.sel)
-		return model, cmd, true
-	}
-	return m, nil, false
-}
-
 // toggleBoxAll flips between the header's two filters, from the `l` key;
 // setBoxAll is the same move from a click on one of the labels, which names
 // the filter it wants rather than asking for the other one.
@@ -177,7 +86,7 @@ func (m Model) toggleBoxAll() Model { return m.setBoxAll(!m.boxAll) }
 
 func (m Model) setBoxAll(all bool) Model {
 	m.boxAll = all
-	m.sess.boxSel, m.boxSel = -1, -1
+	m.boxSel = -1
 	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	return m
 }
@@ -203,19 +112,9 @@ func (m Model) beginBoxActions() Model {
 	return m
 }
 
-// boxActionsRow is the row `o` acts on: the crew or Mate whose session is
-// open, and the project's Mate on the project frame, where the box panel
+// boxActionsRow is the row `o` acts on: the project's Mate, since the box
 // sits under the Mate's own project.
 func (m Model) boxActionsRow() (row, bool) {
-	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
-		switch m.sess.target.Kind {
-		case SessionTargetCrew:
-			return row{kind: rowCrew, id: m.sess.target.ID}, true
-		case SessionTargetMate:
-			return row{kind: rowMate, id: mateRowID(m.currentProject().Mate)}, true
-		}
-		return row{}, false
-	}
 	if m.cur().kind != frameProject {
 		return row{}, false
 	}
@@ -283,11 +182,9 @@ func (m Model) boxEntryCrewRow(e query.BoxEntry) (row, string, bool) {
 	return row{kind: rowCrew, id: crew}, crew, true
 }
 
-// openBoxCrew is what Enter and a click on a row body both end in: the same
-// thing Enter on that crew's tree row does (update.go's onEnter) - clear the
-// open-failure chain, take the embedded session view when it is available,
-// and otherwise hand over to `mate attach` with its own refusal wording.
-// One implementation, so the box cannot open a pane the tree would refuse.
+// openBoxCrew is what Enter and a click on a row body both end in: the
+// same thing Enter on that crew's tree row does (update.go's onEnter), so
+// the box cannot show a pane the tree would refuse.
 func (m Model) openBoxCrew(e query.BoxEntry) (Model, tea.Cmd) {
 	r, crew, ok := m.boxEntryCrewRow(e)
 	if !ok {
@@ -296,14 +193,7 @@ func (m Model) openBoxCrew(e query.BoxEntry) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
-	m = m.clearOpenFailures()
-	if target, ok := m.sessionAvailableFor(r); ok {
-		if m.stage != nil {
-			return m.beginStage(target)
-		}
-		return m.beginSession(r, target)
-	}
-	return m.beginAttach(r)
+	return m.stageRow(r)
 }
 
 // boxOpenRefusal is the one line an entry with nowhere to go leaves behind.
@@ -313,64 +203,6 @@ func boxOpenRefusal(crew string, g glyphSet) string {
 	}
 	return "Open refused: crew " + crew + " is not in this snapshot; it was closed " +
 		g.Dot + " nothing was opened"
-}
-
-// openBoxEntryFromSession is Enter (and a click) on a rail row while a
-// session view is already open. Two PTY streams must never be open at once,
-// so this never opens the crew's session directly: it ends the current one
-// and leaves a pending open on the Model, which is started from where the
-// close completes (update.go's sessionStreamClosedMsg/sessionCloseSentMsg
-// cases). An entry naming the target already on screen opens nothing at
-// all - it moves focus to the terminal, which is the pane the reader was
-// asking to look at.
-func (m Model) openBoxEntryFromSession(b boxList, sel int) (Model, tea.Cmd) {
-	e, ok := boxSelectedEntry(b, sel)
-	if !ok {
-		return m, nil
-	}
-	if _, crew, ok := m.boxEntryCrewRow(e); !ok {
-		m.boxMsg = errMsg(boxOpenRefusal(crew, m.g))
-		return m, nil
-	}
-	if m.sessionTargetIsCrew(e.Crew) {
-		m.sess.zone = zoneTerminal
-		m.boxHover = -1
-		m.boxMsg = footerMsg{}
-		return m, nil
-	}
-	model, cmd := m.endSession()
-	model.pendingBoxOpen = e
-	if cmd == nil {
-		// Nothing to wait for: snapshot mode with no closer wired has no
-		// stream to close, so the open happens on this keystroke.
-		return model.startPendingBoxOpen()
-	}
-	return model, cmd
-}
-
-// sessionTargetIsCrew reports whether the open session view is already
-// showing the pane this entry names.
-func (m Model) sessionTargetIsCrew(crew string) bool {
-	switch m.sess.target.Kind {
-	case SessionTargetMate:
-		return crew == "mate"
-	case SessionTargetCrew:
-		return crew == m.sess.target.ID
-	}
-	return false
-}
-
-// startPendingBoxOpen opens the crew a row asked for once the session that
-// was on screen has actually closed. A refusal lands on the project frame -
-// which is where the closed session left the reader - with the refusal on
-// its message line, rather than on nothing at all.
-func (m Model) startPendingBoxOpen() (Model, tea.Cmd) {
-	e, pending := m.pendingBoxOpen, m.pendingBoxOpen.Crew != ""
-	m.pendingBoxOpen = query.BoxEntry{}
-	if !pending {
-		return m, nil
-	}
-	return m.openBoxCrew(e)
 }
 
 // ---------- the project frame's box panel ----------

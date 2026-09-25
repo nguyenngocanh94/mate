@@ -683,11 +683,7 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	// screenful, and the message line would show a truncated first line of
 	// it. A diff that *failed* still takes the message line - there is no
 	// overlay to put a refusal in, and an empty frame would read as success.
-	//
-	// The session view has no body region to draw an overlay into (view.go),
-	// so an ActionDiff that somehow arrived from there is answered the
-	// ordinary way rather than opening a surface nothing would render.
-	if msg.choice.action == ActionDiff && msg.err == nil && m.sess.phase == sessionIdle {
+	if msg.choice.action == ActionDiff && msg.err == nil {
 		// Nothing is re-read: a diff changes no recorded state, so asking
 		// the loader again would only be a chance to drop the overlay.
 		return m.openDiff(msg.choice.req.Crew, m.diffBranch(msg.choice.req.Crew), msg.text), nil
@@ -714,14 +710,7 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	}
 	m.actionAfterRead = &result
 	m.msg = result
-	// A box action changes exactly what the box shows: an assign records a
-	// line to the Mate, and the Mate's own answer then drops the item by
-	// rule 2 of the inbox on a later read. Waiting for the ordinary
-	// one-second metadata tick would leave the answered item under the
-	// reader's cursor long enough for them to act on it twice, so the
-	// session's own box is re-read now.
-	m, load := m.startLoad()
-	return m, tea.Batch(load, m.sessionBoxRefreshCmd())
+	return m.startLoad()
 }
 
 func (m Model) actionObjectDescription(c actionChoice) (string, string, string) {

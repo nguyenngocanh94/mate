@@ -112,19 +112,8 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 	delivery.Start(ctx)
 	defer delivery.Stop()
 
-	size := console.StreamSize(console.SessionTargetMate, 120, 36)
-	snap, err := query.Load(ctx, w)
-	if err != nil {
-		t.Fatalf("query.Load: %v", err)
-	}
-	channel, err := consoleSessionStream(w, rt)(ctx, console.SessionTarget{
-		Kind:        console.SessionTargetMate,
-		ID:          snap.Projects[0].Mate.Designated.Value.MateID,
-		ProjectID:   "shop",
-		HarnessKind: query.HarnessClaude,
-		AgentName:   snap.Projects[0].Mate.AgentName.Value,
-		Mode:        snap.Projects[0].Mode,
-	}, size)
+	size := runtime.TerminalSize{Cols: 96, Rows: 36}
+	channel, err := openMateStream(ctx, w, rt, "shop", size)
 	if err != nil {
 		t.Fatalf("open the Mate's session stream: %v", err)
 	}

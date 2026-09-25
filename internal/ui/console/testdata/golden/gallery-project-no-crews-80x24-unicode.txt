@@ -21,4 +21,4 @@
  BOX  unknown                                                                   
 ────────────────────────────────────────────────────────────────────────────────
                                                                                 
- ↑↓ Move  s Resume mate  Enter Attach mate (n/a)  Esc Back  r Refresh  q Quit   
+ s Resume mate  Enter Show in next pane (n/a)  Esc Back  r Refresh  q Quit      

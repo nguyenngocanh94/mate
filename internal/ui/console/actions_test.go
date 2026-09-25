@@ -14,7 +14,7 @@ import (
 func TestDangerousActionRequiresConfirmationBeforeRunner(t *testing.T) {
 	calls := 0
 	var got ActionRequest
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil,
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
 		func(_ context.Context, req ActionRequest) (string, error) {
 			calls++
 			got = req
@@ -135,7 +135,7 @@ func TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 			}
 			calls := 0
 			var got ActionRequest
-			m := New(func(context.Context) (query.Snapshot, error) { return tree, nil }, nil,
+			m := New(func(context.Context) (query.Snapshot, error) { return tree, nil },
 				func(_ context.Context, req ActionRequest) (string, error) {
 					calls++
 					got = req
@@ -176,7 +176,7 @@ func TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 
 func TestUnavailableActionIsRefusalAndDoesNotRun(t *testing.T) {
 	calls := 0
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil,
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
 		func(context.Context, ActionRequest) (string, error) {
 			calls++
 			return "", errors.New("must not run")
@@ -255,7 +255,7 @@ func TestRepairMenuEntryWithUnknownBindingIsNotReportedAsNoStaleBinding(t *testi
 }
 
 func TestActionFailureIsNotReportedAsRefusal(t *testing.T) {
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil,
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
 		func(context.Context, ActionRequest) (string, error) {
 			return "application service diagnostics: refused by runtime", errors.New("runtime unavailable")
 		})

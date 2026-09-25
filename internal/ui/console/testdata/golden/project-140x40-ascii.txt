@@ -37,4 +37,4 @@
 :! 14:01  k3  needs an answer                                                                                                       [assign]
 --------------------------------------------------------------------------------------------------------------------------------------------
                                                                                                                                             
- j/k Move  a Actions  m Mode  Enter Attach mate  Esc Back  Tab Inspector/Box  r Refresh  q Quit                                             
+ j/k Move  a Actions  m Mode  Enter Show in next pane  Esc Back  Tab Inspector/Box  r Refresh  q Quit                                       

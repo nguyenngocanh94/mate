@@ -64,7 +64,7 @@ func (m Model) hasInspectorColumn(l frameLayout) bool {
 // overlayOwnsRegion reports whether a modal overlay fills the main region
 // (pushMainRegion), hiding the list/inspector split and its divider.
 func (m Model) overlayOwnsRegion() bool {
-	return m.failureDetail || m.diff.open ||
+	return m.diff.open ||
 		m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil
 }
 
@@ -259,13 +259,6 @@ func (m Model) pushBody(s *screen, l frameLayout) {
 // them, with no knowledge of anything drawn below it.
 func (m Model) pushMainRegion(s *screen, l frameLayout) {
 	if l.Body <= 0 {
-		return
-	}
-	// The failure detail overlay ('e') owns the main region while it is open.
-	// It is checked before the other modals because onKey gives it the
-	// keyboard first, so none of them can be open at the same time as it.
-	if m.failureDetail {
-		pushAll(s, fitLines(m.openFailureDetail(l), l.Body))
 		return
 	}
 	// The diff overlay (diff.go, mvp.md task 21) owns the main region the

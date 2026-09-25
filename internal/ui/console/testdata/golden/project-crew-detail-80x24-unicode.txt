@@ -21,4 +21,4 @@
   ↓ 6 more                                                                      
 ────────────────────────────────────────────────────────────────────────────────
                                                                                 
- ↑↓ Scroll  a Actions  Enter Attach crew  Esc Back to list  r Refresh  q Quit   
+ ↑↓ Scroll  Enter Show in next pane  Esc Back to list  r Refresh  q Quit        

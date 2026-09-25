@@ -45,7 +45,7 @@ func blockingAction(started chan<- context.Context, release <-chan struct{}) Act
 // ActionFunc here blocks) to actually invoke the ActionFunc.
 func confirmAndRunStop(t *testing.T, action ActionFunc) (Model, tea.Cmd) {
 	t.Helper()
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil, action)
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, action)
 	m.p = plainPalette()
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m, _ = send(t, m, m.Init()())
@@ -133,7 +133,7 @@ func TestActionRunsUnderAContextThatWithContextControls(t *testing.T) {
 	type ctxKey struct{}
 	base := context.WithValue(context.Background(), ctxKey{}, "program-owned")
 	seen := make(chan context.Context, 1)
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil,
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
 		func(ctx context.Context, _ ActionRequest) (string, error) {
 			seen <- ctx
 			return "", nil

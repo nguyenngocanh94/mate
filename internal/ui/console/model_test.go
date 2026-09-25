@@ -3,7 +3,6 @@ package console
 import (
 	"context"
 	"errors"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +22,7 @@ import (
 func loaded(t *testing.T, tree query.Snapshot, err error) Model {
 	t.Helper()
 	tree.AsOf = goldenAsOf
-	m := New(func(context.Context) (query.Snapshot, error) { return tree, err }, nil)
+	m := New(func(context.Context) (query.Snapshot, error) { return tree, err })
 	m.p = plainPalette()
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	m, _ = send(t, m, m.Init()())
@@ -31,7 +30,7 @@ func loaded(t *testing.T, tree query.Snapshot, err error) Model {
 }
 
 func TestInitStartsLoadingAndSaysSo(t *testing.T) {
-	m := New(func(context.Context) (query.Snapshot, error) { return query.Snapshot{}, nil }, nil)
+	m := New(func(context.Context) (query.Snapshot, error) { return query.Snapshot{}, nil })
 	if m.phase != phaseLoading {
 		t.Fatalf("phase = %v, want phaseLoading", m.phase)
 	}
@@ -110,142 +109,6 @@ func TestNavigationDrillsInAndBackOutRestoringSelection(t *testing.T) {
 	m, _ = send(t, m, key("esc"))
 	if m.cur().kind != frameWorkspace || len(m.stack) != 1 {
 		t.Fatalf("Esc at the root changed the stack: %+v", m.stack)
-	}
-}
-
-func TestEnterOnMateRowBuildsAttachCommandForMateID(t *testing.T) {
-	var got string
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(target string) *exec.Cmd { got = target; return exec.Command("true") })
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
-	m, _ = send(t, m, key("enter")) // into the first Project; the Mate row is selected
-	_, cmd := send(t, m, key("enter"))
-	if cmd == nil {
-		t.Fatalf("expected an attach Cmd for the Mate row")
-	}
-	if want := sampleTree().Projects[0].Mate.Designated.Value.MateID; got != want {
-		t.Fatalf("attach target = %q, want %q", got, want)
-	}
-}
-
-func TestEnterOnCrewRowAttachesByCrewID(t *testing.T) {
-	var got string
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(target string) *exec.Cmd { got = target; return exec.Command("true") })
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
-	m = toRunningAttempt(t, m)
-	_, cmd := send(t, m, key("enter"))
-	if cmd == nil {
-		t.Fatalf("expected an attach Cmd for the Crew row")
-	}
-	cmd()
-	if want := sampleTree().Projects[0].Crews[1].CrewID; got != want {
-		t.Fatalf("attach target = %q, want %q", got, want)
-	}
-}
-
-// TestEnterOnAStaleBindingIsRefusedBeforeAnySubprocess: a stale binding
-// means mate could not confirm the agent stopped (ADR 0027) and `mate
-// attach` refuses it outright, so the Console must not announce an attach
-// it knows will fail - and must not spawn anything.
-func TestEnterOnAStaleBindingIsRefusedBeforeAnySubprocess(t *testing.T) {
-	spawned := 0
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil },
-		func(string) *exec.Cmd { spawned++; return exec.Command("true") })
-	m.p = plainPalette()
-	m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m, _ = send(t, m, m.Init()())
-	m = toFailedAttempt(t, m)
-	m, cmd := send(t, m, key("enter"))
-	if cmd != nil {
-		t.Fatalf("a refused attach returned a Cmd")
-	}
-	if spawned != 0 {
-		t.Fatalf("a refused attach built %d subprocesses, want 0", spawned)
-	}
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "stale") {
-		t.Fatalf("message = %+v, want a red refusal naming the stale binding", m.msg)
-	}
-	if view := renderFrame(t, m); !strings.Contains(view, "Attach refused") {
-		t.Fatalf("view = %q, want the refusal on the message line", view)
-	}
-}
-
-// TestFooterSaysAttachIsUnavailableBeforeTheKeystroke: the refusal above is
-// also visible up front, so Enter is not a trap.
-func TestFooterSaysAttachIsUnavailableBeforeTheKeystroke(t *testing.T) {
-	m := loaded(t, sampleTree(), nil)
-	m = toFailedAttempt(t, m)
-	view := renderFrame(t, m)
-	if !strings.Contains(view, "Attach crew (unavailable)") {
-		t.Fatalf("view = %q, want the key line to mark the attach unavailable", view)
-	}
-	m, _ = send(t, m, key("up"))
-	m, _ = send(t, m, key("up")) // the running Crew, above the Completed group
-	view = renderFrame(t, m)
-	if !strings.Contains(view, "Attach crew") || strings.Contains(view, "Attach crew (unavailable)") {
-		t.Fatalf("view = %q, want a plain attach hint for an active binding", view)
-	}
-}
-
-func TestAttachFinishedSetsMessageAndRereadsWithoutMovingTheStack(t *testing.T) {
-	m := loaded(t, sampleTree(), nil)
-	m, _ = send(t, m, key("enter"))
-	before := m.stack
-	m, cmd := send(t, m, AttachFinishedMsg{Err: errors.New("herdr attach exited 1")})
-	if len(m.stack) != len(before) || m.cur().id != before[len(before)-1].id {
-		t.Fatalf("stack changed across an attach result: %+v -> %+v", before, m.stack)
-	}
-	if cmd == nil {
-		t.Fatalf("returning from an attach must re-read the snapshot once")
-	}
-	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "herdr attach exited 1") {
-		t.Fatalf("message = %+v, want the attach error", m.msg)
-	}
-
-	m, _ = send(t, m, AttachFinishedMsg{})
-	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "not stopped") {
-		t.Fatalf("message = %+v, want a clean-detach message that says the agent was not stopped", m.msg)
-	}
-}
-
-// TestAttachReturnRendersTheFreshRecordedMateStatus pins the lifecycle
-// boundary behind the Project screen. The return read supplies a changed
-// SQLite status, and the renderer must show that recorded value; it must not
-// retain the old row or infer state from the attach process returning.
-func TestAttachReturnRendersTheFreshRecordedMateStatus(t *testing.T) {
-	fresh := sampleTree()
-	fresh.Projects[0].Mate.Designated.Value.Status = query.MateStopped
-	fresh.Projects[0].Mate.Binding = query.AbsentField[query.BindingValue]("the Mate was stopped and its binding released")
-	spy := &attachSpy{tree: func(n int) (query.Snapshot, error) {
-		if n > 1 {
-			fresh.AsOf = goldenAsOf.Add(time.Minute)
-			return fresh, nil
-		}
-		tree := sampleTree()
-		tree.AsOf = goldenAsOf
-		return tree, nil
-	}}
-	m := attachFixture(t, spy, 120, 36, unicodeGlyphs)
-	m, _ = send(t, m, key("enter"))
-	if r, ok := m.selectedRow(); !ok || r.kind != rowMate {
-		t.Fatalf("selected row = %+v (ok=%v), want the Mate", r, ok)
-	}
-	m, _ = send(t, m, key("enter"))
-	m, cmd := send(t, m, AttachFinishedMsg{})
-	if cmd == nil {
-		t.Fatal("attach return did not schedule its one re-read")
-	}
-	m, _ = send(t, m, cmd())
-	if got := m.currentProject().Mate.Designated.Value.Status; got != query.MateStopped {
-		t.Fatalf("Mate status after re-read = %q, want the fresh recorded stopped status", got)
-	}
-	if view := renderFrame(t, m); !strings.Contains(view, "stopped") {
-		t.Fatalf("Project screen does not render the fresh recorded status:\n%s", view)
 	}
 }
 
@@ -542,49 +405,6 @@ func TestAFailedRefreshKeepsTheSnapshotAndSaysSo(t *testing.T) {
 	}
 }
 
-// TestAMateThatIsNotRunningRefusesAttachFromTheSnapshotAlone: a Mate
-// recorded created or stopped has no session, and the snapshot is enough to
-// know it - so Enter explains instead of spawning a subprocess that would
-// fail.
-func TestAMateThatIsNotRunningRefusesAttachFromTheSnapshotAlone(t *testing.T) {
-	for _, tc := range []struct {
-		status      query.MateStatus
-		wantRefusal bool
-	}{
-		{query.MateCreated, true},
-		{query.MateStopped, true},
-		{query.MateRunning, false},
-		{query.MateStarting, false},
-		{query.MateUnknown, false}, // holds the active slot; the subprocess decides
-	} {
-		tree := sampleTree()
-		tree.Projects[0].Mate.Designated.Value.Status = tc.status
-		spawned := 0
-		m := New(func(context.Context) (query.Snapshot, error) { return tree, nil },
-			func(string) *exec.Cmd { spawned++; return exec.Command("true") })
-		m.p = plainPalette()
-		m, _ = send(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-		m, _ = send(t, m, m.Init()())
-		m, _ = send(t, m, key("enter")) // the Project; its Mate row is selected
-		m, cmd := send(t, m, key("enter"))
-		if tc.wantRefusal {
-			if cmd != nil || spawned != 0 {
-				t.Errorf("%s: attach was attempted", tc.status)
-			}
-			if !strings.Contains(m.msg.text, string(tc.status)) {
-				t.Errorf("%s: refusal = %q, want it to name the recorded status", tc.status, m.msg.text)
-			}
-			if !strings.Contains(renderFrame(t, m), "Attach mate (unavailable)") {
-				t.Errorf("%s: the key line did not mark the attach unavailable up front", tc.status)
-			}
-			continue
-		}
-		if cmd == nil {
-			t.Errorf("%s: attach was refused", tc.status)
-		}
-	}
-}
-
 func TestQuitStopsTheProgram(t *testing.T) {
 	m := loaded(t, sampleTree(), nil)
 	m, cmd := send(t, m, key("q"))
@@ -603,7 +423,7 @@ func TestQuitStopsTheProgram(t *testing.T) {
 // tea.WindowSizeMsg, so there is nothing to draw until one arrives - and
 // nothing is drawn, rather than a frame at a guessed size.
 func TestViewIsEmptyBeforeTheFirstSizeMessage(t *testing.T) {
-	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil)
+	m := New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil })
 	if got := m.View(); got != "" {
 		t.Fatalf("View before any size message = %q, want empty", got)
 	}

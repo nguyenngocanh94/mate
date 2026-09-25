@@ -40,7 +40,7 @@ func (s *tickLoadSpy) load(context.Context) (query.Snapshot, error) {
 // first load - the chain's own first tick.
 func tickFixture(t *testing.T, spy *tickLoadSpy, w, h int) (Model, tea.Cmd) {
 	t.Helper()
-	m := New(spy.load, nil)
+	m := New(spy.load)
 	m.g = unicodeGlyphs
 	m.p = plainPalette()
 	m.treeTickIntervalOverride = time.Millisecond
@@ -296,23 +296,18 @@ func TestBackgroundTickPreservesOpenConfirmPrompt(t *testing.T) {
 	}
 }
 
-// TestBackgroundTickPreservesAllToggleAndRailWidth: the box's [all] filter
-// and a dragged rail width are reader-chosen settings for the Console's
-// whole run (box_keys.go, model.go's own doc comments); a tick must not
-// reset either.
-func TestBackgroundTickPreservesAllToggleAndRailWidth(t *testing.T) {
+// TestBackgroundTickPreservesAllToggle: the box's [all] filter is a
+// reader-chosen setting for the Console's whole run; a tick must not reset
+// it.
+func TestBackgroundTickPreservesAllToggle(t *testing.T) {
 	tree := sampleTree()
 	spy := &tickLoadSpy{tree: tree}
 	m, tick := tickFixture(t, spy, 120, 36)
 	m.boxAll = true
-	m.railWidth = 47
 
 	m, _ = driveOneTick(t, m, tick, tree)
 
 	if !m.boxAll {
 		t.Fatal("the [all] toggle after a background tick = off, want it to stay on")
-	}
-	if m.railWidth != 47 {
-		t.Fatalf("railWidth after a background tick = %d, want 47 preserved", m.railWidth)
 	}
 }

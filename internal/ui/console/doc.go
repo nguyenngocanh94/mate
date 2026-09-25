@@ -1,22 +1,18 @@
 // Package console is the G6 Console: a Bubble Tea model that renders the
-// Workspace -> Project -> {Mate, Task -> Crew} navigation tree and opens the
-// Agent View by default for resolvable live sessions. Stream mode is the
-// primary path; the snapshot reader and then `mate attach` remain fallbacks.
+// Workspace -> Project -> {Mate, Crew} navigation tree and acts on it. It is
+// a controller only. An agent's own terminal is never drawn here: Enter on a
+// Mate or Crew row asks the host terminal (Ghostty, WezTerm) to show
+// `herdr agent attach` in the next pane (docs/mvp.md M10), and the Console
+// stays on the tree.
 //
-// This package must never import internal/persistence or internal/runtime,
-// and must never call Herdr. It only knows internal/query's read types and
-// caller-supplied seams: LoadFunc (how to re-read the tree),
-// AttachCmdFunc (how to build the `mate attach <target>` subprocess),
-// ActionFunc (how to invoke application services for start/stop/resume/retry/
-// repair/discard/onboard), and the three session-mode ports from ADR 0025
-// (session.go) - SessionReader (snapshot fallback), SessionPrompt (send
-// composer input), SessionClose (release the snapshot controller),
-// SessionStreamFactory (open the primary PTY stream),
-// SessionMetadataReader (refresh status/runtime/inbox side channels), and
-// StageFunc (host-pane attach, docs/mvp.md M10). The
-// CLI layer in cmd/mate is the only place those
-// seams are built, which is where the persistence/runtime access actually
-// happens (G6 gate, see
+// This package must never import internal/persistence, internal/runtime or
+// internal/host, and must never call Herdr. It only knows internal/query's
+// read types and caller-supplied seams: LoadFunc (how to re-read the tree),
+// ActionFunc (how to invoke application services for start/stop/resume/
+// retry/repair/discard/onboard), StageFunc (stage.go: show an agent in the
+// next pane) and ClipboardFunc (OSC 52 for y). The CLI layer in cmd/mate is
+// the only place those seams are built, which is where the persistence,
+// runtime and host access actually happens (G6 gate, see
 // docs/phase1/roadmap.md's G6 section and internal/query/types.go).
 // boundary_test.go enforces that rather than trusting this paragraph.
 //
@@ -63,57 +59,13 @@
 // refusal says that nothing started, while a failure says the service was
 // attempted and includes its diagnostics.
 //
-// # The attach lifecycle
+// # Show in next pane
 //
-// attach.go owns Enter on a Mate or Crew row and everything that follows.
-// Its two facts never render alike:
-//
-//	Attach refused: <what the snapshot says> - nothing started
-//	Attach failed:  <taxonomy>, mate attach exit <n>
-//
-// A refusal is decided from the snapshot alone - a Mate's binding read
-// exactly like a Crew's - so nothing is started for an attach that cannot
-// happen. A failure means `mate attach` ran (or could not be started) and
-// says what its exit establishes: the child's coded envelope when the
-// hand-over's private result channel is available, or the code/class where
-// only the exit remains (usage, runtime_unavailable, target_blocked,
-// needs_repair; or shared exits 1, 10, 31). Neither ever implies the agent is
-// alive or dead.
-//
-// The hand-over is announced, then handed over, then taken back:
-//
-//	Enter -> announce -> AttachHandedOverMsg ->
-//	tea.Exec(handoverNotice{`mate attach <target>`}) -> AttachFinishedMsg ->
-//	exactly one re-read -> the same task, the same row, re-found by id
-//
-// The announcement the reader is guaranteed to see is not a frame. In the
-// pinned Bubble Tea 1.2.4 no frame can be: tea.Sequence orders messages and
-// not renderer flushes, and ReleaseTerminal discards the alt screen every
-// frame was drawn on. So the guarantee is a line handoverNotice writes to
-// the terminal Bubble Tea has just released, immediately before the child
-// starts - see handover.go for the mechanism and the evidence. The
-// announcing frame is kept as the model state that ignores stray keys and
-// as a gallery state; it is not the promise.
-//
-// While the terminal is leaving or gone the Console ignores keys (they were
-// aimed at the agent session) except q, and its key line names the child's
-// own detach - Ctrl+b then q, which does not stop the agent. That is
-// Herdr's binding inside the subprocess (runtime.DetachKey), not a Console
-// key: it is the only Ctrl+b left anywhere here, and it is named because
-// the reader needs it to get out of somebody else's UI.
-//
-// # The session view's two focus zones
-//
-// The embedded session view has no prefix at all. It has two focus zones -
-// the box (the left rail) and the terminal (the agent's PTY) - and exactly
-// one owns the keyboard: the focused zone's border is drawn in the accent
-// colour, the frame's single bottom hint line names only that zone's keys,
-// a click moves focus, and F2 toggles it. Under terminal focus every key,
-// including q, Esc and Ctrl+C, is encoded and written to the PTY; under box
-// focus nothing reaches it. session_focus.go owns the model and the frame
-// geometry, session_mouse.go the hit tests. The Ctrl+b prefix this view
-// used to carry is gone: a prefix is a mode with no indicator, and a
-// mis-typed one delivered the key after it into the Mate's own composer.
+// stage.go owns Enter on a Mate or Crew row, from the list, the box or a
+// click. A refusal is decided from the snapshot alone - a Mate's binding
+// read exactly like a Crew's - so the host is never asked to show what
+// cannot be shown. A failure means the StageFunc ran and says what the host
+// answered. Without a StageFunc there is no next pane, and Enter says so.
 //
 // # The golden-frame harness
 //

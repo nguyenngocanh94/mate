@@ -760,7 +760,7 @@ func inspectorColumn(t *testing.T, frame string, l frameLayout) string {
 // cannot draw box glyphs gets the ASCII frame without anyone passing a flag.
 func TestNewPicksTheGlyphSetFromTheEnvironment(t *testing.T) {
 	build := func() Model {
-		return New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil }, nil)
+		return New(func(context.Context) (query.Snapshot, error) { return sampleTree(), nil })
 	}
 	t.Setenv("LC_ALL", "en_US.UTF-8")
 	t.Setenv("LC_CTYPE", "")

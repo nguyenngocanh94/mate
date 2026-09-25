@@ -135,28 +135,11 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 		t.Fatalf("inbox item = %+v, want the needs-decision question", ask)
 	}
 
-	// 3. The Console's stream, at the geometry stream mode gives a Mate
-	// inside a 120x36 console. The width is asserted rather than assumed:
-	// opening the PTY at the console's own 120 columns would measure a pane
-	// no reader ever has, and that is exactly how this debt stayed hidden.
-	size := console.StreamSize(console.SessionTargetMate, 120, 36)
-	t.Logf("a 120x36 console gives the Mate a %dx%d pane", size.Cols, size.Rows)
-	if size.Cols >= 120 {
-		t.Fatalf("stream size = %+v; a Mate's pane is narrower than the console it sits in", size)
-	}
-	snap, err := query.Load(ctx, w)
-	if err != nil {
-		t.Fatalf("query.Load: %v", err)
-	}
-	target := console.SessionTarget{
-		Kind:        console.SessionTargetMate,
-		ID:          snap.Projects[0].Mate.Designated.Value.MateID,
-		ProjectID:   "shop",
-		HarnessKind: query.HarnessClaude,
-		AgentName:   snap.Projects[0].Mate.AgentName.Value,
-		Mode:        snap.Projects[0].Mode,
-	}
-	channel, err := consoleSessionStream(w, rt)(ctx, target, size)
+	// 3. The Mate attached in a pane narrower than a whole terminal, the way
+	// the host's next pane shows it beside a 40-column console. The width
+	// is deliberate: the assign path must not depend on the pane being wide.
+	size := runtime.TerminalSize{Cols: 96, Rows: 36}
+	channel, err := openMateStream(ctx, w, rt, "shop", size)
 	if err != nil {
 		t.Fatalf("open the Mate's session stream: %v", err)
 	}
@@ -239,7 +222,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 // waitForStreamComposer reads an open session stream until Claude's composer
 // glyph arrives, which is what says the PTY is up and the agent has redrawn
 // itself at the size the stream asked for.
-func waitForStreamComposer(t *testing.T, ctx context.Context, channel console.SessionChannel, within time.Duration) {
+func waitForStreamComposer(t *testing.T, ctx context.Context, channel runtime.SessionChannel, within time.Duration) {
 	t.Helper()
 	var seen strings.Builder
 	deadline := time.Now().Add(within)
@@ -256,4 +239,15 @@ func waitForStreamComposer(t *testing.T, ctx context.Context, channel console.Se
 			t.Fatalf("stream read: %v", readErr)
 		}
 	}
+}
+
+// openMateStream attaches a raw terminal stream to a project's Mate at
+// size, resolving the Herdr identity from its meta the way the host stage
+// does (stageRef).
+func openMateStream(ctx context.Context, w *store.Workspace, rt runtime.SessionStream, project string, size runtime.TerminalSize) (runtime.SessionChannel, error) {
+	ref, err := stageRef(w, console.StageTarget{Kind: console.StageMate, ProjectID: project})
+	if err != nil {
+		return nil, err
+	}
+	return rt.Open(ctx, ref, size)
 }

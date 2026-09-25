@@ -3,7 +3,6 @@ package console
 import (
 	"context"
 	"os"
-	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,12 +19,6 @@ import (
 // exactly what the last successful read said, never a guess at what
 // changed since.
 type LoadFunc func(context.Context) (query.Snapshot, error)
-
-// AttachCmdFunc builds the *exec.Cmd that runs `mate attach <target>`. The
-// Console runs it through tea.Exec, wrapped in a handoverNotice, which
-// releases the terminal to the child and restores the Console's own render
-// loop when it exits - Herdr's own UI is never drawn by this process.
-type AttachCmdFunc func(target string) *exec.Cmd
 
 // Action identifies a Console action. The UI owns only the interaction and
 // passes the request to the CLI/application bridge; it never imports either
@@ -228,41 +221,12 @@ func unknownMsg(text string) footerMsg { return footerMsg{tone: toneUnknown, tex
 // Model is the Console's Bubble Tea model. Zero value is not usable; build
 // one with New.
 type Model struct {
-	load      LoadFunc
-	attachCmd AttachCmdFunc
-	action    ActionFunc
+	load   LoadFunc
+	action ActionFunc
 
-	// sessionReader, sessionPrompt and sessionClose are the ADR 0025 snapshot
-	// ports, built by cmd/mate's bridge from internal/query,
-	// internal/application and runtime.Adapter - this package never reaches
-	// those directly. A nil sessionReader is a test-only configuration:
-	// cmd/mate always wires the ports (console.go's handleConsole, which
-	// treats runtimeAdapter's error branch as a test seam), so in production
-	// Enter on a Mate/Crew row always tries the Agent View first. Without
-	// the ports it takes the classic tea.Exec hand-off (attach.go)
-	// exclusively, which is what internal/ui/console's own fixtures build.
-	sessionReader SessionReader
-	sessionPrompt SessionPrompt
-	sessionClose  SessionClose
-	// sessionStream is the primary Agent View transport. It is a Console
-	// boundary closure; cmd/mate adapts runtime.SessionStream into it.
-	sessionStream SessionStreamFactory
-	// sessionMetadata refreshes status/runtime/inbox without touching the
-	// terminal buffer or calling the snapshot transcript path.
-	sessionMetadata SessionMetadataReader
-	// sessionStream and sessionMetadata are the ADR 0026 primary transport and
-	// slow side-channel ports. The stream controller state lives in sess.
-	sess sessionFlow
-	// stage, when set, is the host-pane attach (docs/mvp.md M10). Enter and
-	// a click on a Mate/Crew row call it and stay on the tree; they do not
-	// open the embedded session view.
+	// stage is the host-pane attach (docs/mvp.md M10). Enter and a click on
+	// a Mate/Crew row call it and stay on the tree. nil means no host pane.
 	stage StageFunc
-	// sessionPollIntervalOverride lets tests replace the real 300-500ms
-	// poll cadence (session_mode.go's pollInterval) so they do not have to
-	// block on it to exercise the tick chain. Zero (every production
-	// Console) means the real interval.
-	sessionPollIntervalOverride time.Duration
-
 	// w and h come from tea.WindowSizeMsg and from nowhere else. Before the
 	// first size message they are 0 and View renders nothing, rather than
 	// guessing a size and drawing a frame the terminal never asked for.
@@ -322,38 +286,12 @@ type Model struct {
 	// and every selection change reset it.
 	inspTop int
 
-	// att is the attach lifecycle: whether the terminal is here, leaving or
-	// gone, and what the last hand-over came back as. attach.go owns every
-	// transition of it.
-	att attachFlow
-
-	// openFailures is every step that failed opening the last session, oldest
-	// first (session_failure.go). It lives on the Model rather than in
-	// sessionFlow, which is reset at exactly the fallback boundaries that
-	// would otherwise discard an earlier cause - so a stream failure followed
-	// by a snapshot failure followed by an attach failure stays a chain of
-	// three. It is cleared only when the reader deliberately opens a session.
-	openFailures []sessionFailure
-	// failureDetail is the re-openable detail overlay ('e'): the whole chain
-	// in the main region, which is where the summary line's abbreviations are
-	// expanded. failureTop is its scroll offset.
-	failureDetail bool
-	failureTop    int
-
 	// diff is the open diff overlay (diff.go, mvp.md task 21): the text one
 	// ActionDiff returned, the crew and branch it names, and where the
 	// reader has scrolled to. Its zero value is closed.
 	diff diffFlow
 
-	// pendingBoxOpen is the inbox entry whose crew the reader asked to open
-	// from inside a session view (box_keys.go). The open cannot happen on
-	// the keystroke: the session already on screen owns a PTY stream, and
-	// two of those must never be open at once, so the entry waits here until
-	// that stream reports itself closed (update.go). Its zero value - an
-	// entry naming no crew - means nothing is pending.
-	pendingBoxOpen query.BoxEntry
-	// boxSel is the project frame's own box-panel selection, the panel's
-	// counterpart to sessionFlow.boxSel; -1 follows the newest entry.
+	// boxSel is the box selection; -1 follows the newest entry.
 	boxSel int
 	// boxAll is the `[all]` toggle: draw the whole merged log instead of the
 	// inbox, on every box surface at once. It is a debugging view, it lives
@@ -370,18 +308,7 @@ type Model struct {
 	// one field rather than one per surface because a pointer is in one
 	// place: only the surface under it ever reads it, and it is cleared the
 	// moment the pointer leaves a box.
-	boxHover int
-	// railWidth is the column the reader has dragged the session view's
-	// splitter to, 0 until they do. It persists for the Console's run - a
-	// split that snapped back to the default on every re-entry would be a
-	// setting the reader has to make again every time.
-	railWidth int
-	// draggingSplit is true between the press on the splitter and its
-	// release: mouse motion in between moves the split, wherever the
-	// pointer happens to be, the way a real drag behaves once it has been
-	// grabbed.
-	draggingSplit bool
-
+	boxHover      int
 	actions       bool
 	actionChoices []actionChoice
 	// actionRow is the row actionChoices were built for. It is kept because
@@ -421,7 +348,7 @@ type Model struct {
 	// (AbandonedActionDone) so the process waits for the action's own
 	// cleanup instead of exiting under it.
 	actionDone chan struct{}
-	// clipboard is WithClipboard's writer; nil drops agent copies.
+	// clipboard is WithClipboard's writer; nil means y has nowhere to copy.
 	clipboard ClipboardFunc
 	// actionStartedAt is when the in-flight action began; the refresh tick
 	// shows the time since then on the running line (runningLine).
@@ -467,38 +394,14 @@ func (m Model) WithContext(ctx context.Context) Model {
 // terminal the Console is drawn on.
 type ClipboardFunc func(seq []byte)
 
-// WithClipboard attaches the real terminal's clipboard. An agent's own copy
-// (OSC 52 in its PTY output) is handed to it; without one (tests, a
-// read-only Console) the copy is dropped, as it was before.
+// WithClipboard attaches the real terminal's clipboard, which y writes to.
 func (m Model) WithClipboard(fn ClipboardFunc) Model {
 	m.clipboard = fn
 	return m
 }
 
-// WithSession attaches the ADR 0025 session-mode ports. A nil reader (the
-// zero value, when WithSession is never called) keeps the Console on the
-// classic hand-off exclusively.
-func (m Model) WithSession(reader SessionReader, prompt SessionPrompt, closeFn SessionClose) Model {
-	m.sessionReader = reader
-	m.sessionPrompt = prompt
-	m.sessionClose = closeFn
-	return m
-}
-
-// WithSessionStream makes the PTY-backed stream the primary Agent View
-// controller. A nil factory preserves the existing snapshot controller,
-// which remains the documented fallback and is useful to callers whose
-// runtime does not provide interactive streams.
-func (m Model) WithSessionStream(factory SessionStreamFactory, metadata ...SessionMetadataReader) Model {
-	m.sessionStream = factory
-	if len(metadata) > 0 {
-		m.sessionMetadata = metadata[0]
-	}
-	return m
-}
-
-// WithStage installs the host-pane attach. A nil function leaves Enter on
-// the embedded session view (or the classic hand-off).
+// WithStage installs the host-pane attach. A nil function means there is
+// no host pane, and Enter says so rather than showing anything here.
 func (m Model) WithStage(fn StageFunc) Model {
 	m.stage = fn
 	return m
@@ -530,26 +433,23 @@ func (m Model) AbandonedActionDone() <-chan struct{} {
 	return m.actionDone
 }
 
-// New builds the initial Console model. load and attachCmd must be non-nil
-// in production; both are exercised directly by tests with fakes.
-func New(load LoadFunc, attachCmd AttachCmdFunc, action ...ActionFunc) Model {
+// New builds the initial Console model. load must be non-nil in
+// production; tests pass fakes.
+func New(load LoadFunc, action ...ActionFunc) Model {
 	var run ActionFunc
 	if len(action) > 0 {
 		run = action[0]
 	}
 	return Model{
 		load:          load,
-		attachCmd:     attachCmd,
 		action:        run,
 		phase:         phaseLoading,
 		stack:         []frame{{kind: frameWorkspace}},
 		focus:         paneList,
 		completedOpen: map[string]bool{},
-		// -1 is "follow the newest box entry" on both box surfaces; see
-		// sessionFlow.boxSel.
+		// -1 is "follow the newest box entry".
 		boxSel:   -1,
 		boxHover: -1,
-		sess:     sessionFlow{boxSel: -1},
 		g:        glyphsFor(os.Getenv),
 		p:        defaultPalette(),
 		// Init issues the first load immediately; this marks it in flight
@@ -580,13 +480,6 @@ func (m Model) Quitting() bool { return m.quitting }
 type treeLoadedMsg struct {
 	tree query.Snapshot
 	err  error
-}
-
-// AttachFinishedMsg is sent after the `mate attach` subprocess started by
-// tea.Exec returns - exported so cmd/mate's wiring and tests can recognize
-// it without reaching into package internals.
-type AttachFinishedMsg struct {
-	Err error
 }
 
 func loadCmd(load LoadFunc) tea.Cmd {

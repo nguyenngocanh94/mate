@@ -35,7 +35,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -105,7 +104,6 @@ func newFixture(t *testing.T, tree query.Snapshot, w, h int, g glyphSet) Model {
 	tree.AsOf = goldenAsOf
 	m := New(
 		func(context.Context) (query.Snapshot, error) { return tree, nil },
-		func(string) *exec.Cmd { return exec.Command("true") },
 	)
 	m.g = g
 	m.p = plainPalette()
@@ -120,7 +118,6 @@ func newFailedFixture(t *testing.T, err error, w, h int, g glyphSet) Model {
 	t.Helper()
 	m := New(
 		func(context.Context) (query.Snapshot, error) { return query.Snapshot{}, err },
-		func(string) *exec.Cmd { return exec.Command("true") },
 	)
 	m.g = g
 	m.p = plainPalette()
@@ -476,4 +473,42 @@ func sampleBox() query.Field[query.BoxView] {
 		}},
 		Crews: 1, Awaiting: 1, LastAt: at(14, 2),
 	})
+}
+
+// toRunningAttempt walks to the second Crew of sampleTree's first Project:
+// the one whose binding is recorded active, and so the one row in the
+// fixture the host may be asked to show.
+func toRunningAttempt(t *testing.T, m Model) Model {
+	t.Helper()
+	m, _ = send(t, m, key("enter")) // the payments-api Project
+	m, _ = send(t, m, key("down"))  // its Crews: the running one is first; the failed one sits in Completed
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != sampleTree().Projects[0].Crews[1].CrewID {
+		t.Fatalf("selected row = %+v (ok=%v), want the running Crew", r, ok)
+	}
+	return m
+}
+
+// toFailedAttempt walks to sampleTree's first Crew, which is recorded
+// failed and so lives in the Completed group until revealed.
+func toFailedAttempt(t *testing.T, m Model) Model {
+	t.Helper()
+	failedID := sampleTree().Projects[0].Crews[0].CrewID
+	var ok bool
+	m, ok = m.jumpToCrew(failedID)
+	if !ok {
+		t.Fatal("jumpToCrew failed to locate the finished Crew")
+	}
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != failedID {
+		t.Fatalf("selected row = %+v (ok=%v), want the failed Crew attempt", r, ok)
+	}
+	return m
+}
+
+// testStatusPath is the status file a pinned resolve line names.
+func testStatusPath(crew string) string {
+	return "/Users/dev/work/acme/.mate/projects/payments-api/crews/" + crew + ".status"
+}
+
+func testResolveLine(crew, question string) string {
+	return query.BoxResolveLine("payments-api", crew, question, testStatusPath(crew))
 }

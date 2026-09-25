@@ -205,204 +205,6 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 }
 
-// TestConsoleSessionStreamRefusesAStoppedMateWithTheStoppedState: a project
-// whose `mate.meta` names no agent has nothing to stream. The factory must
-// say so in the words the reader can act on - the stopped state and the key
-// that starts it - rather than letting a PTY be opened against a pane
-// nobody owns and reporting whatever Herdr says about it.
-func TestConsoleSessionStreamRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
-	w, _ := consoleFixture(t, "shop")
-	factory := consoleSessionStream(w, runtime.NewFakeSessionStream())
-	if factory == nil {
-		t.Fatal("a non-nil transport produced no factory")
-	}
-	target := console.SessionTarget{Kind: console.SessionTargetMate, ID: "mate:shop", ProjectID: "shop"}
-
-	// No meta at all.
-	channel, err := factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
-	if channel != nil {
-		t.Fatal("a stopped Mate handed back a channel")
-	}
-	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "press s") {
-		t.Fatalf("error = %v, want the stopped state and the key that starts it", err)
-	}
-
-	// A meta left behind by a stop: harness and session id survive, agent
-	// and pane do not. That is still the stopped state, not a transport
-	// failure.
-	if err := w.WriteMateMeta("shop", map[string]string{
-		spawn.MetaHarness:   "claude",
-		spawn.MetaSession:   w.Session(),
-		spawn.MetaSessionID: "11111111-2222-3333-4444-555555555555",
-		spawn.MetaStoppedAt: "2026-09-17T10:00:00Z",
-	}); err != nil {
-		t.Fatalf("WriteMateMeta: %v", err)
-	}
-	channel, err = factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
-	if channel != nil {
-		t.Fatal("a stopped Mate handed back a channel")
-	}
-	if err == nil || !strings.Contains(err.Error(), "stopped") {
-		t.Fatalf("error = %v, want the stopped state", err)
-	}
-}
-
-// TestConsoleSessionMetadataReportsRecordedAndObservedSeparately: the
-// metadata reader never reads the pane and never rewrites the meta. It
-// reports the lifecycle state `mate status` established and, separately,
-// whether Herdr still has the agent.
-func TestConsoleSessionMetadataReportsRecordedAndObservedSeparately(t *testing.T) {
-	w, deps := consoleFixture(t, "shop")
-	ctx := context.Background()
-	if _, err := consoleAction(w, deps)(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
-		t.Fatalf("start: %v", err)
-	}
-	target := console.SessionTarget{Kind: console.SessionTargetMate, ID: "mate:shop", ProjectID: "shop"}
-
-	snap, err := consoleSessionMetadata(w, deps)(ctx, target)
-	if err != nil {
-		t.Fatalf("metadata: %v", err)
-	}
-	if snap.RecordedStatus.State != query.Known || snap.RecordedStatus.Value != string(spawn.StateRunning) {
-		t.Fatalf("recorded status = %+v, want a known running", snap.RecordedStatus)
-	}
-	if snap.Runtime.Status != query.Known {
-		t.Fatalf("runtime = %+v, want the live agent observed", snap.Runtime)
-	}
-	if snap.Transcript.Raw != "" || len(snap.Transcript.Entries) != 0 {
-		t.Fatal("the metadata reader produced transcript content; the PTY is the only source of the live frame")
-	}
-
-	if _, err := consoleAction(w, deps)(ctx, console.ActionRequest{
-		Action: console.ActionStop, Target: "shop", TargetKind: "mate"}); err != nil {
-		t.Fatalf("stop: %v", err)
-	}
-	snap, err = consoleSessionMetadata(w, deps)(ctx, target)
-	if err != nil {
-		t.Fatalf("metadata after stop: %v", err)
-	}
-	if snap.Runtime.Status != query.Absent {
-		t.Fatalf("runtime after stop = %+v, want absent", snap.Runtime)
-	}
-}
-
-// TestConsoleSessionStreamOpensACrewFromItsMeta is the wiring the user hit
-// on 2026-09-18: Enter on a crew row reached the fallback with "Crews
-// arrive in task 11" long after task 11 had shipped, and the fallback
-// (`mate attach`) does not exist, so the crew's terminal could not be
-// looked at at all. The factory must resolve a crew exactly like a Mate:
-// out of `crews/<id>.meta`, into the Herdr agent it names.
-func TestConsoleSessionStreamOpensACrewFromItsMeta(t *testing.T) {
-	w, deps := consoleFixture(t, "shop")
-	res := spawnFakeCrew(t, w, deps, "shop", "k3")
-	stream := runtime.NewFakeSessionStream()
-	ref := runtime.AgentSessionRef{HerdrSession: w.Session(), AgentName: res.Agent}
-	if err := stream.Seed(ref, []byte("› ")); err != nil {
-		t.Fatalf("seed: %v", err)
-	}
-	factory := consoleSessionStream(w, stream)
-	target := console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k3", ProjectID: "shop"}
-
-	channel, err := factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
-	if err != nil {
-		t.Fatalf("open a running crew: %v", err)
-	}
-	if channel == nil {
-		t.Fatal("a running crew handed back no channel")
-	}
-	if len(stream.OpenCalls) != 1 || stream.OpenCalls[0] != ref {
-		t.Fatalf("opened %v, want exactly the crew's own agent %v", stream.OpenCalls, ref)
-	}
-	_ = channel.Close(context.Background())
-
-	// Torn down: the record stays, the agent and pane are gone, and the
-	// factory says stopped rather than opening a PTY against nothing.
-	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true); err != nil {
-		t.Fatalf("StopCrew: %v", err)
-	}
-	channel, err = factory(context.Background(), target, console.TerminalSize{Cols: 120, Rows: 36})
-	if channel != nil {
-		t.Fatal("a stopped crew handed back a channel")
-	}
-	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "k3") {
-		t.Fatalf("error = %v, want the stopped state naming the crew", err)
-	}
-	if len(stream.OpenCalls) != 1 {
-		t.Fatalf("the stopped crew still reached the transport: %v", stream.OpenCalls)
-	}
-}
-
-// TestConsoleSessionMetadataFollowsACrewStatusFile: a crew's recorded
-// status is its declared state, resolved in the order of mvp.md section 4b,
-// not `mate status`'s vocabulary; whether Herdr still has the agent is
-// reported separately, and a closed crew reads `finished` or `failed`
-// whatever it last said.
-func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
-	w, deps := consoleFixture(t, "shop")
-	ctx := context.Background()
-	spawnFakeCrew(t, w, deps, "shop", "k3")
-	target := console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k3", ProjectID: "shop"}
-	read := consoleSessionMetadata(w, deps)
-
-	snap, err := read(ctx, target)
-	if err != nil {
-		t.Fatalf("metadata: %v", err)
-	}
-	if snap.RecordedStatus.Value != string(query.CrewSpawned) {
-		t.Fatalf("recorded before any status line = %+v, want spawned", snap.RecordedStatus)
-	}
-	if snap.Runtime.Status != query.Known {
-		t.Fatalf("runtime = %+v, want the live agent observed", snap.Runtime)
-	}
-	if snap.Transcript.Raw != "" || len(snap.Transcript.Entries) != 0 {
-		t.Fatal("the metadata reader produced transcript content; the PTY is the only source of the live frame")
-	}
-
-	if err := w.AppendStatus("shop", "k3", "needs-decision: pick A or B"); err != nil {
-		t.Fatalf("AppendStatus: %v", err)
-	}
-	snap, err = read(ctx, target)
-	if err != nil {
-		t.Fatalf("metadata after a status line: %v", err)
-	}
-	if snap.RecordedStatus.Value != "needs-decision" {
-		t.Fatalf("recorded = %+v, want the crew's own last verb", snap.RecordedStatus)
-	}
-	if snap.Box.State != query.Known || len(snap.Box.Value.Inbox) != 1 {
-		t.Fatalf("box = %+v, want the question in the inbox", snap.Box)
-	}
-
-	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
-		t.Fatalf("StopCrew: %v", err)
-	}
-	snap, err = read(ctx, target)
-	if err != nil {
-		t.Fatalf("metadata after stop: %v", err)
-	}
-	if snap.RecordedStatus.Value != string(query.CrewFailed) {
-		t.Fatalf("recorded after a --discard stop = %+v, want failed: the terminal state outranks the crew's last verb", snap.RecordedStatus)
-	}
-	if snap.Runtime.Status != query.Absent {
-		t.Fatalf("runtime after stop = %+v, want absent", snap.Runtime)
-	}
-
-	// A second crew torn down before it wrote anything: `failed`, because
-	// --discard threw the work away, and never `spawned`, which promises a
-	// start that is not coming.
-	spawnFakeCrew(t, w, deps, "shop", "k4")
-	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k4", true); err != nil {
-		t.Fatalf("StopCrew k4: %v", err)
-	}
-	snap, err = read(ctx, console.SessionTarget{Kind: console.SessionTargetCrew, ID: "k4", ProjectID: "shop"})
-	if err != nil {
-		t.Fatalf("metadata k4: %v", err)
-	}
-	if snap.RecordedStatus.Value != string(query.CrewFailed) {
-		t.Fatalf("recorded for a silent discarded crew = %+v, want failed", snap.RecordedStatus)
-	}
-}
-
 type recordingHost struct {
 	targets []host.StageTarget
 }
@@ -427,7 +229,7 @@ func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	if fn == nil {
 		t.Fatal("consoleStage on a Host is nil")
 	}
-	err := fn(context.Background(), console.SessionTarget{Kind: console.SessionTargetMate, ProjectID: "shop"})
+	err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"})
 	if err != nil {
 		t.Fatalf("stage: %v", err)
 	}
@@ -447,5 +249,67 @@ func TestConsoleStageNilHostIsNil(t *testing.T) {
 	w, _ := consoleFixture(t, "shop")
 	if consoleStage(w, nil) != nil {
 		t.Fatal("consoleStage(nil) must be nil")
+	}
+}
+
+// TestConsoleStageRefusesAStoppedMateWithTheStoppedState: a project whose
+// `mate.meta` names no agent has nothing to show. The refusal names the
+// stopped state and the key that starts it, and the host is never asked.
+func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	rec := &recordingHost{}
+	fn := consoleStage(w, rec)
+	target := console.StageTarget{Kind: console.StageMate, ID: "mate:shop", ProjectID: "shop"}
+
+	// No meta at all.
+	err := fn(context.Background(), target)
+	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "press s") {
+		t.Fatalf("error = %v, want the stopped state and the key that starts it", err)
+	}
+
+	// A meta left behind by a stop: harness and session id survive, agent
+	// and pane do not. That is still the stopped state.
+	if err := w.WriteMateMeta("shop", map[string]string{
+		spawn.MetaHarness:   "claude",
+		spawn.MetaSession:   w.Session(),
+		spawn.MetaSessionID: "11111111-2222-3333-4444-555555555555",
+		spawn.MetaStoppedAt: "2026-09-17T10:00:00Z",
+	}); err != nil {
+		t.Fatalf("WriteMateMeta: %v", err)
+	}
+	if err := fn(context.Background(), target); err == nil || !strings.Contains(err.Error(), "stopped") {
+		t.Fatalf("error = %v, want the stopped state", err)
+	}
+	if len(rec.targets) != 0 {
+		t.Fatalf("a stopped Mate reached the host: %+v", rec.targets)
+	}
+}
+
+// TestConsoleStageShowsACrewFromItsMeta: a crew resolves exactly like a
+// Mate, out of `crews/<id>.meta`, into the Herdr agent it names; once torn
+// down it is refused as stopped without reaching the host.
+func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	res := spawnFakeCrew(t, w, deps, "shop", "k3")
+	rec := &recordingHost{}
+	fn := consoleStage(w, rec)
+	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
+
+	if err := fn(context.Background(), target); err != nil {
+		t.Fatalf("show a running crew: %v", err)
+	}
+	if len(rec.targets) != 1 || rec.targets[0].AgentName != res.Agent || rec.targets[0].Session != w.Session() {
+		t.Fatalf("staged %+v, want exactly the crew's own agent %s", rec.targets, res.Agent)
+	}
+
+	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true); err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	err := fn(context.Background(), target)
+	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "k3") {
+		t.Fatalf("error = %v, want the stopped state naming the crew", err)
+	}
+	if len(rec.targets) != 1 {
+		t.Fatalf("the stopped crew still reached the host: %+v", rec.targets)
 	}
 }

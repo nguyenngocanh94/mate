@@ -33,7 +33,7 @@ import (
 func sizedFixture(t *testing.T, tree query.Snapshot, w, h int) Model {
 	t.Helper()
 	tree.AsOf = goldenAsOf
-	m := New(func(context.Context) (query.Snapshot, error) { return tree, nil }, nil)
+	m := New(func(context.Context) (query.Snapshot, error) { return tree, nil })
 	m.g = unicodeGlyphs
 	m.p = plainPalette()
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: w, Height: h})

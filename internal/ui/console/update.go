@@ -1,8 +1,6 @@
 package console
 
 import (
-	"context"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -11,23 +9,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		m = m.relayout()
-		if m.sess.stream != nil && m.sess.phase == sessionActive {
-			size := streamTerminalSize(m.sess.target.Kind, m.w, m.h,
-				sessionStreamReservedLines(m.sess.snapshot, m.sess.target.Kind, m.w, m.boxAll), m.railWidth)
-			m.sess.terminal.Resize(size.Cols, size.Rows)
-			return m, sessionStreamResizeCmd(m.baseCtx(), m.sess.stream, size, m.sess.gen)
-		}
-		return m, nil
+		return m.relayout(), nil
 	case treeLoadedMsg:
-		// attachReadNote runs after onTreeLoaded so that, on the one read
-		// that follows a hand-over, what happened to the attach is what the
-		// message line says (attach.go).
-		m = m.onTreeLoaded(msg).attachReadNote(msg.err)
+		m = m.onTreeLoaded(msg)
 		// The auto-refresh chain starts here, once, on the first
 		// treeLoadedMsg the Console ever sees - see Init's own comment for
 		// why not there directly. Every later treeLoadedMsg (a manual 'r',
-		// an attach return, an action's own re-read, or the chain's own
+		// an action's own re-read, or the chain's own
 		// tick) finds treeTickStarted already true and this is a no-op.
 		if !m.treeTickStarted {
 			m.treeTickStarted = true
@@ -36,36 +24,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case treeTickMsg:
 		return m.onTreeTick(msg)
-	case AttachHandedOverMsg:
-		return m.onAttachHandedOver()
-	case AttachFinishedMsg:
-		return m.onAttachFinished(msg)
 	case actionDoneMsg:
 		return m.onActionDone(msg)
-	case sessionSnapshotMsg:
-		return m.onSessionSnapshot(msg)
-	case sessionStreamOpenedMsg:
-		return m.onSessionStreamOpened(msg)
-	case sessionStreamChunkMsg:
-		return m.onSessionStreamChunk(msg)
-	case sessionStreamMetadataTickMsg:
-		return m.onSessionStreamMetadataTick(msg)
-	case sessionStreamMetadataMsg:
-		return m.onSessionStreamMetadata(msg)
-	case sessionStreamResizedMsg:
-		return m.onSessionStreamResized(msg), nil
-	case sessionStreamClosedMsg:
-		// The close is also where a box row's "open that crew" lands: the
-		// stream the reader was looking at has to be gone before another one
-		// is opened, or two PTYs are live at once (box_keys.go).
-		return m.onSessionStreamClosed(msg)
-	case sessionTickMsg:
-		return m.onSessionTick(msg)
-	case sessionPromptSentMsg:
-		return m.onSessionPromptSent(msg), nil
-	case sessionCloseSentMsg:
-		// Snapshot mode's own close, and the other half of the pending open.
-		return m.startPendingBoxOpen()
 	case stageDoneMsg:
 		return m.onStageDone(msg), nil
 	case tea.KeyMsg:
@@ -128,25 +88,7 @@ func (m Model) onTreeLoaded(msg treeLoadedMsg) Model {
 		return m.applyActionAfterRead()
 	}
 	m = m.reconcileSelection()
-	return m.refreshSessionMode().applyActionAfterRead()
-}
-
-// refreshSessionMode re-reads the open session's communication mode off the
-// snapshot that just landed. The session view keeps its own target while it
-// is open - session mode never touches the navigation stack - so without
-// this the header would keep naming the mode the target carried at entry,
-// which is exactly the value the `m` key just changed.
-func (m Model) refreshSessionMode() Model {
-	if m.sess.target.ProjectID == "" {
-		return m
-	}
-	p, ok := m.projectByID(m.sess.target.ProjectID)
-	if !ok {
-		return m
-	}
-	m.sess.target.Mode = p.Mode
-	m.sess.snapshot.Target.Mode = p.Mode
-	return m
+	return m.applyActionAfterRead()
 }
 
 // startLoad issues a tree load and marks it in flight, whether it was asked
@@ -199,22 +141,6 @@ func (m Model) applyActionAfterRead() Model {
 
 func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	// Stream mode with the terminal zone focused owns the whole keyboard:
-	// Esc and Ctrl+C are forwarded to the agent's PTY instead of leaving
-	// session mode or quitting the Console (session-view-contract.md, "Esc
-	// semantics invert" / "Ctrl+C ... second key that inverts"). This check
-	// must run before the Ctrl+C-quits branch below, or a real terminal
-	// program's own Ctrl+C handling (a shell's job control, an editor's own
-	// binding) would never reach it.
-	//
-	// With the box zone focused nothing reaches the PTY at all, so Ctrl+C
-	// means what it means everywhere else in the Console - quit - and falls
-	// through to the branch below. It is the one way out that does not
-	// depend on remembering which zone has focus.
-	if m.sess.phase == sessionActive && m.sess.stream != nil &&
-		!(key == "ctrl+c" && m.sess.zone == zoneBox && !m.actions && m.confirm == nil) {
-		return m.onSessionStreamKey(msg)
-	}
 	// q always quits, at every size and in every phase, and never stops an
 	// agent by itself - but while an action's ActionFunc is running in the
 	// background (actionBusy), Bubble Tea 1.2.4 cannot cancel that goroutine
@@ -227,67 +153,16 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// whose name contains a q ("queue-service", "sqlite-tools") can be typed
 	// at all, because the Console exits on the first letter. Esc leaves that
 	// input, and ctrl+c - the terminal's own interrupt, not a character -
-	// still quits from inside it. (A stream-mode Ctrl+C never reaches this
-	// branch at all: the check above already routed it to the agent.)
+	// still quits from inside it.
 	// The diff overlay is the third exception, for the same reason a pager
 	// is: it is a full-region reader, and q is how every pager closes one.
 	// Ctrl+C still quits from inside it, and the key line says so (seams.go).
-	if key == "ctrl+c" || (key == "q" && !m.actionInputMode && !m.diff.open &&
-		m.sess.phase != sessionActive && m.sess.phase != sessionOpening && m.sess.phase != sessionFallback) {
-		if key == "ctrl+c" && (m.sess.phase == sessionActive || m.sess.phase == sessionOpening || m.sess.phase == sessionFallback) {
-			// Bubble Tea stops processing after tea.Quit; reap the stream here
-			// so Ctrl+C cannot leave an attach child behind.
-			if m.sess.openCancel != nil {
-				m.sess.openCancel()
-			}
-			if m.sess.stream != nil {
-				_ = m.sess.stream.close(context.Background())
-			}
-			m.sess = sessionFlow{boxSel: -1, gen: m.sess.gen + 1}
-			m.quitting = true
-			return m, tea.Quit
-		}
+	if key == "ctrl+c" || (key == "q" && !m.actionInputMode && !m.diff.open) {
 		if m.actionBusy {
 			return m.onBusyQuit(), tea.Quit
 		}
 		m.quitting = true
 		return m, tea.Quit
-	}
-	if m.sess.phase == sessionFallback && m.sess.terminal != nil {
-		// A failed stream keeps its last terminal frame on screen while the
-		// snapshot fallback's own entry read is in flight (beginStreamFallback:
-		// m.sess.stream is already nil, but m.sess.terminal is deliberately
-		// kept so the frame does not flash away and back). RenderStreamSessionFrame
-		// draws no composer for that frame - stream mode never gets one, per
-		// the captain's ruling - so a key typed here has nothing visible to
-		// land in; onSessionKey would append it to a composer nothing shows,
-		// and Enter would silently submit it once the snapshot lands. Drop
-		// every key until the fallback read resolves and the frame becomes a
-		// real (composer-bearing) snapshot frame - typically one poll
-		// round-trip, not a state a reader lingers in.
-		return m, nil
-	}
-	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
-		// The composer owns the keyboard: a printable "q" is a character
-		// to type, not the Console's quit key (mirroring actionInputMode's
-		// own exception above). Esc under box focus is session mode's own way
-		// out (session_mode.go); nothing here reaches the navigation
-		// keys below until the reader leaves. (m.sess.stream != nil here is
-		// unreachable - the check at the top of this function already
-		// handled that case - so this is always the snapshot composer, and
-		// m.sess.terminal is nil here too - the branch above already
-		// handled a still-visible dead stream frame.)
-		return m.onSessionKey(msg)
-	}
-	if m.sess.phase == sessionOpening || m.sess.phase == sessionClosing {
-		return m, nil
-	}
-	if m.attachHoldsTerminal() {
-		// The subprocess owns the terminal (attach.go). Anything that
-		// reached us was aimed at the agent session, so it moves nothing
-		// here; q above is the one exception, because a reader must always
-		// be able to leave.
-		return m, nil
 	}
 	l := m.listLayout()
 	if l.TooSmall {
@@ -295,12 +170,6 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// a selection nobody can see would silently change where the reader
 		// lands when the window grows back.
 		return m, nil
-	}
-	if m.failureDetail {
-		// The failure detail overlay is modal: only its own scroll/close keys
-		// are honoured (q and ctrl+c already ran above), so no key here can
-		// move the list behind it.
-		return m.onFailureDetailKey(key, l), nil
 	}
 	if m.diff.open {
 		// The diff overlay is modal for the same reason (diff.go): a key
@@ -361,21 +230,6 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key {
 	case "a":
 		return m.beginActions(), nil
-	case "e":
-		// The re-openable failure detail (session_failure.go). Only offered
-		// when the chain is non-empty; a key that does nothing is
-		// indistinguishable from a lost key, so it is not advertised then
-		// either (actionHints).
-		if len(m.openFailures) == 0 {
-			return m, nil
-		}
-		m.failureDetail = true
-		m.failureTop = 0
-		// The summary stays: this key is how a reader sees *more* of a
-		// failure, so it must not be what removes the only sign on the frame
-		// that anything failed (the counter-review's N2 - pressing 'e' and
-		// then Esc left the frame saying nothing happened).
-		return m, nil
 	case "n":
 		return m.beginNewProject(), nil
 	case "s":
@@ -412,16 +266,13 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // onMouse routes a mouse event to the surface it landed on
-// (session_mouse.go). Mouse reporting is enabled Program-wide
+// (box_mouse.go). Mouse reporting is enabled Program-wide
 // (tea.WithMouseAllMotion, cmd/mate/console.go), so an event can reach the
 // Console at any time; every branch below resolves it against the geometry
 // of the frame that is actually drawn, and an event on a frame with nothing
 // clickable on it does nothing at all.
 func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.sess.phase == sessionActive || m.sess.phase == sessionFallback {
-		return m.onSessionMouse(msg)
-	}
-	if m.sess.phase != sessionIdle || m.attachHoldsTerminal() || m.phase != phaseReady {
+	if m.phase != phaseReady {
 		return m, nil
 	}
 	if l := m.listLayout(); l.TooSmall {
@@ -527,9 +378,8 @@ func (m Model) onDown(n int) Model {
 	return m.moveSelection(n)
 }
 
-// onEnter opens the next level for a Project or Task row, and asks to
-// attach for a Mate or Crew row. A refusal is decided from the snapshot
-// before any subprocess starts (see attachRefusal).
+// onEnter opens a Project row, toggles the Completed group, and shows a
+// Mate or Crew row in the next pane (stageRow).
 func (m Model) onEnter() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -547,18 +397,7 @@ func (m Model) onEnter() (tea.Model, tea.Cmd) {
 		m.inspTop = 0
 		return m.relayout(), nil
 	case rowMate, rowCrew:
-		// A deliberate session open starts a new failure chain: the fallback
-		// steps inside this open append to it (recordOpenFailure), but an
-		// earlier attempt's failures must not be mixed into this one's
-		// summary. This is the only place the chain is cleared.
-		m = m.clearOpenFailures()
-		if target, ok := m.sessionAvailableFor(r); ok {
-			if m.stage != nil {
-				return m.beginStage(target)
-			}
-			return m.beginSession(r, target)
-		}
-		return m.beginAttach(r)
+		return m.stageRow(r)
 	default:
 		return m, nil
 	}
@@ -569,8 +408,6 @@ func (m Model) open(f frame) Model {
 	m.msg = footerMsg{}
 	m.focus = paneList
 	m.detail = false
-	m.failureDetail = false
-	m.failureTop = 0
 	m.diff = diffFlow{}
 	m.inspTop = 0
 	return m.push(f).relayout()

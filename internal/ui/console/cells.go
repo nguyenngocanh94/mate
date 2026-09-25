@@ -324,3 +324,10 @@ func fitCells(s string, w int) string {
 		return s + strings.Repeat(" ", w-n)
 	}
 }
+
+func max0(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
+}

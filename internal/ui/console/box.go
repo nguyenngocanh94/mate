@@ -408,7 +408,7 @@ func (m Model) boxRegion(l frameLayout) (height int, panel bool) {
 	switch {
 	case m.cur().kind != frameProject, l.TooSmall, l.Body <= 0:
 		return 0, false
-	case m.phase != phaseReady, m.detail, m.failureDetail:
+	case m.phase != phaseReady, m.detail:
 		return 0, false
 	case m.actions, m.actionInputMode, m.harnessPick, m.confirm != nil:
 		return 0, false

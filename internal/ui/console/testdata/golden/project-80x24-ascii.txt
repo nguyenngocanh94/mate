@@ -21,4 +21,4 @@
  BOX  1 waiting . 4 entries . 1 crew . last 14:02:00                            
 --------------------------------------------------------------------------------
                                                                                 
- j/k Move  a Actions  m Mode  Enter Attach mate  Esc Back  r Refresh  q Quit    
+ j/k Move  a Actions  Enter Show in next pane  Esc Back  r Refresh  q Quit      

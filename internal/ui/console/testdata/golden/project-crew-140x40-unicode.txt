@@ -37,4 +37,4 @@
 ▏! 14:01  k3  needs an answer                                                                                                       [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                                                                                                                             
- ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                                              
+ ↑↓ Move  a Actions  m Mode  Enter Show in next pane  Esc Back  Tab Inspector/Box  r Refresh  q Quit                                        

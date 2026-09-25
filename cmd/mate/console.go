@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -110,19 +109,14 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		// same way.
 		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
 	}
-	var stream runtime.SessionStream
-	if s, ok := deps.Runtime.(runtime.SessionStream); ok {
-		stream = s
-	}
 	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv})
 	if split && h != nil {
 		if _, err := h.EnsureSplit(ctx); err != nil {
 			fmt.Fprintf(stderr, "mate console: %s\n", err)
 		}
 	}
-	model := console.New(load, notWiredAttachCmd, consoleAction(ws, deps)).
+	model := console.New(load, consoleAction(ws, deps)).
 		WithContext(ctx).
-		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps)).
 		WithStage(consoleStage(ws, h)).
 		WithClipboard(func(seq []byte) {
 			// One write per sequence: the renderer also writes this file
@@ -133,12 +127,9 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 
 	// tea.WithMouseAllMotion is a Program-level terminal mode, so it is on
 	// for the Console's whole run. All motion, not cell motion: cell motion
-	// reports a move only while a button is held, and the box rail needs to
-	// know which entry the pointer is over before the reader presses
-	// anything, so that entry can show its action buttons. The cost that
-	// argued for cell motion - a PTY write per idle pointer cell - is paid
-	// off in console.Model.onSessionPaneMouse instead, which drops bare
-	// motion rather than forwarding it.
+	// reports a move only while a button is held, and the box needs to know
+	// which entry the pointer is over before the reader presses anything, so
+	// that entry can show its [assign] button.
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx),
 		tea.WithInput(stdinFile), tea.WithOutput(stdoutFile), tea.WithMouseAllMotion())
 	final, err := program.Run()
@@ -153,14 +144,6 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	}
 	return nil
 }
-
-// notWiredAttachCmd is the AttachCmdFunc seam before task 09. It returns nil
-// rather than a command that would appear to work: the Console renders a nil
-// command as "attach could not be built", which is the truth today.
-//
-// TODO(task 09): build `mate attach <target>` here once the session view
-// is wired to a real pane.
-func notWiredAttachCmd(string) *exec.Cmd { return nil }
 
 // consoleTerminalFiles requires the caller's own stdout to be a real
 // *os.File, which an in-process test harness writing to a bytes.Buffer is

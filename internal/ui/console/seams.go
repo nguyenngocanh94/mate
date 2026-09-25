@@ -681,11 +681,6 @@ func warningsFooterMsg(warnings []query.FieldWarning) footerMsg {
 // and an attach that would be refused says so here rather than only after
 // the keystroke.
 func (m Model) keyHints(l frameLayout) []keyHint {
-	// While the terminal is leaving or gone, the keys the reader has are the
-	// child's, not the Console's (attach.go).
-	if hints, ok := m.attachKeyHints(); ok {
-		return hints
-	}
 	// The diff overlay owns the keyboard before anything else on the frame
 	// does (update.go), including the box zone, so its keys are named first.
 	// q is Close here, not Quit: the overlay is a pager, and Ctrl+C is the
@@ -710,16 +705,6 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 			{key: "o", desc: "Actions", optional: true},
 			{key: "F2", desc: "List", optional: true},
 			{key: "Esc", desc: "List", sacrifice: keyBack},
-			{key: "q", desc: "Quit", sacrifice: keyQuit},
-		}
-	}
-	// The failure detail overlay owns the keyboard while it is open: its keys
-	// are scroll and close, and q still quits (handled before any of this, in
-	// onKey). Nothing here advertises a key that the overlay would swallow.
-	if m.failureDetail {
-		return []keyHint{
-			{key: m.g.UpDown, desc: "Scroll", sacrifice: keyMovement},
-			{key: "Esc", desc: "Close", sacrifice: keyBack},
 			{key: "q", desc: "Quit", sacrifice: keyQuit},
 		}
 	}
@@ -779,15 +764,6 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 func (m Model) actionHints() []keyHint {
 	out := make([]keyHint, 0, 8)
 	out = append(out, keyHint{key: "a", desc: "Actions", optional: true, sacrifice: keyAction})
-	// 'e' opens the re-openable failure detail (session_failure.go) after a
-	// session failed to open. It is offered early and dropped late: the cause
-	// of a failed open is the most useful thing on the line when there is one,
-	// and its absence (no failures recorded) is the only case it is not
-	// offered at all. Optional, so a narrow frame still yields it before the
-	// keys a reader needs to move and get out.
-	if len(m.openFailures) > 0 {
-		out = append(out, keyHint{key: "e", desc: "Details", optional: true, sacrifice: keyAction})
-	}
 	// 'n' is offered only where it works. At the Workspace it is the one
 	// action available on a workspace with no Projects, so it is not
 	// optional: dropping it would leave that reader with no key that does
@@ -855,29 +831,11 @@ func (m Model) enterLabel(r row) string {
 		}
 		return "Show completed"
 	}
-	// A Mate/Crew row. Enter opens the embedded Agent View whenever it is
-	// available - the same sessionAvailableFor predicate onEnter uses - and
-	// only then falls back to the classic hand-off, with the snapshot's
-	// refusal suffix, when it is not. Saying "Attach" unconditionally would
-	// advertise the hand-off panel the Agent View replaced, which is exactly
-	// the confusion issue #60 was.
-	if _, ok := m.sessionAvailableFor(r); ok {
-		if m.stage != nil {
-			return "Show in next pane"
-		}
-		return "Open agent view"
+	// A Mate/Crew row: the same stageTargetAvailable predicate onEnter
+	// uses, so the key line never offers what Enter would refuse.
+	if _, ok := m.stageTargetAvailable(r); ok {
+		return "Show in next pane"
 	}
-	if r.kind == rowMate {
-		return "Attach mate" + unavailableSuffix(m.attachRefusal(r))
-	}
-	return "Attach crew" + unavailableSuffix(m.attachRefusal(r))
+	_, refused := m.stageRefusal(r)
+	return "Show in next pane" + unavailableSuffix("", refused)
 }
-
-// ---------- attach ----------
-//
-// The attach lifecycle is attach.go's: attachRefusal (the refusal decided
-// from the snapshot), beginAttach, the hand-over and the return, and the
-// failure taxonomy. keyHints above calls attachKeyHints for the key line
-// while the terminal is handed over, and enterLabel calls sessionAvailableFor
-// (falling back to attachRefusal for its suffix) so Enter is not a trap.
-// Nothing else in this file knows about attach.

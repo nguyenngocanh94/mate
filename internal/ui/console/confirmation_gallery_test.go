@@ -121,7 +121,7 @@ func hostileStopConfirm(t *testing.T, w, h int) Model {
 	t.Helper()
 	tree := hostileTree()
 	tree.Projects[0].Crews[2].CrewID = "crew_\u0085修正\x1b[31mtail‼️more"
-	m := New(func(context.Context) (query.Snapshot, error) { tree.AsOf = goldenAsOf; return tree, nil }, nil)
+	m := New(func(context.Context) (query.Snapshot, error) { tree.AsOf = goldenAsOf; return tree, nil })
 	m.p = plainPalette()
 	m.g = unicodeGlyphs
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: w, Height: h})
