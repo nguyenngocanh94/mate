@@ -77,6 +77,9 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	// all reads as manual, which is the mode that sends nothing.
 	p := ProjectNode{ProjectID: ref.Name, Name: ref.Name, Mode: ModeFor(ws.Auto(ref.Name))}
 
+	// A Project with no repo is a Known empty list, not an Absent field: a
+	// project may be created before it has one (docs/mvp.md M9), and the
+	// read that says so succeeded.
 	cfg, err := ws.LoadProject(ref.Name)
 	switch {
 	case err != nil:
@@ -87,7 +90,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 			repos = append(repos, RepoValue{
 				RepoID:        r.Name,
 				DisplayName:   r.Name,
-				Path:          ws.RepoDir(r.Path),
+				Path:          r.Path,
 				DefaultBranch: r.DefaultBranch,
 			})
 		}
@@ -382,19 +385,23 @@ func lastStatusVerb(ws *store.Workspace, project, id string, w *warnings, row Ro
 }
 
 // crewRepo is the repo a crew's meta names. A meta written before M9 names
-// none and belongs to the project's sole repo; with several repos there is
-// no answer, and the field says so rather than guessing.
+// none and belongs to the project's sole repo; with no repo or several
+// there is no answer, and the field says so rather than guessing.
 func crewRepo(repos Field[[]RepoValue], named string) (string, Field[RepoValue]) {
-	if named == "" {
-		if repos.State == Known && len(repos.Value) == 1 {
-			return repos.Value[0].RepoID, KnownField(repos.Value[0])
-		}
-		if repos.State == Known {
-			return "", UnknownField[RepoValue]("the crew's meta names no repo and the project does not have exactly one")
-		}
+	if named != "" {
+		return named, repoFor(repos, named)
+	}
+	if repos.State != Known {
 		return "", repoFor(repos, "")
 	}
-	return named, repoFor(repos, named)
+	switch n := len(repos.Value); n {
+	case 1:
+		return repos.Value[0].RepoID, KnownField(repos.Value[0])
+	case 0:
+		return "", UnknownField[RepoValue]("the crew's meta names no repo and the project has none")
+	default:
+		return "", UnknownField[RepoValue](fmt.Sprintf("the crew's meta names no repo and the project has %d", n))
+	}
 }
 
 func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {
@@ -405,7 +412,7 @@ func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {
 				return KnownField(r)
 			}
 		}
-		return AbsentField[RepoValue]("no repo named " + repoID + " is registered in this project")
+		return AbsentField[RepoValue]("the crew's meta names repo " + repoID + ", which is not registered in this project")
 	case Absent:
 		return AbsentField[RepoValue](repos.Reason)
 	default:

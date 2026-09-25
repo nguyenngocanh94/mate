@@ -240,10 +240,18 @@ const (
 	ComposerUnknown CrewComposer = "unknown"
 )
 
-// RepoValue is one registered repo as the inspector renders it.
+// RepoValue is one of a Project's registered repos (project.yaml's
+// `repos:`, docs/mvp.md M9) as the inspector renders it.
 type RepoValue struct {
-	RepoID        string
-	DisplayName   string
+	// RepoID is the repo's name inside its Project - the name a crew's
+	// `repo=` meta key and `crew spawn --repo` use. Repo names are unique
+	// only inside one Project.
+	RepoID      string
+	DisplayName string
+	// Path is the repo's path relative to the workspace root, as
+	// project.yaml records it; the store refuses a repo outside the
+	// workspace, so it is never absolute. Snapshot.Workspace carries the
+	// root for a reader that needs the absolute path.
 	Path          string
 	DefaultBranch string
 }
