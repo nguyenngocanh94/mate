@@ -197,9 +197,10 @@ func consoleHarness(kind query.HarnessKind) (harness.Kind, error) {
 }
 
 // addProjectAction is the Console's new-project form: the same registration
-// `mate project add <name> <repo>` performs, with the repo path resolved
+// `mate project add <name> [<repo>]` performs, with the repo path resolved
 // against the workspace root rather than a shell's working directory, since
-// the Console has no cwd the reader chose.
+// the Console has no cwd the reader chose. An empty repo registers a
+// Project with no repo yet (docs/mvp.md M9).
 //
 // It registers through a freshly opened Workspace rather than the shared
 // one: the snapshot loader re-reads workspace.yaml into that one on every
@@ -210,12 +211,15 @@ func addProjectAction(ws *store.Workspace, req console.ActionRequest) (string, e
 	if name == "" {
 		return "", observability.NewError(observability.CodeUsage, "project name is required")
 	}
-	if repo == "" {
-		return "", observability.NewError(observability.CodeUsage, "repo path is required")
-	}
 	fresh, err := store.Open(ws.Root())
 	if err != nil {
 		return "", err
+	}
+	if repo == "" {
+		if _, err := addProject(fresh, name, projectAddOptions{}); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Project %s added with no repo yet; add one with `mate project repo add %s <path>`", name, name), nil
 	}
 	absRepo := repo
 	if !filepath.IsAbs(absRepo) {

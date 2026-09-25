@@ -8,14 +8,14 @@
                                                                      │                                                  
                                                                      │ Mate             mate-payments-api · claude ·    
                                                                      │                  running                         
-                                                                     │ Repos            1                               
-                                                                     │                  payments-api · main             
-                                                                     │                    repos/payments-api            
+                                                                     │ Repos            2                               
+                                                                     │                  web · main                      
+                                                                     │                    repos/payments-web            
+                                                                     │                  api · develop                   
+                                                                     │                    services/payments-api         
                                                                      │ Crews            2 · 1 crew needs attention      
                                                                      │                                                  
                                                                      │ Last event       13:41:05  crew.started          
-                                                                     │                                                  
-                                                                     │                                                  
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  

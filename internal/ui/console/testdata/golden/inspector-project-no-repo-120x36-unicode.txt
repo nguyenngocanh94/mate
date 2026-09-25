@@ -2,20 +2,20 @@
  ws_acme                                                                                         Workspace · 2 projects 
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   PROJECTS  2           MATE                    CREWS  ATTENTION     │ PROJECT                                          
-▌ payments-api          claude · running        2      ! 1 crew      │                                                  
-  ledger-worker         none                    0      ! no mate     │ ID               proj_01J9M1F8K2Q7C4H6N0R3V5T8YZ 
-                                                                     │ Name             payments-api                    
+  payments-api          claude · running        2      ! 1 crew      │                                                  
+▌ ledger-worker         none                    0      ! no mate     │ ID               proj_01J9M4H7K9L1M3N5P7Q9R1S3TU 
+                                                                     │ Name             ledger-worker                   
                                                                      │                                                  
-                                                                     │ Mate             mate-payments-api · claude ·    
-                                                                     │                  running                         
-                                                                     │ Repos            1                               
-                                                                     │                  payments-api · main             
-                                                                     │                    repos/payments-api            
-                                                                     │ Crews            2 · 1 crew needs attention      
+                                                                     │ Mate             none assigned · this project    
+                                                                     │                  has no designated Mate          
+                                                                     │ Repos            none yet · a crew needs one     
+                                                                     │                  add one with                    
+                                                                     │                  mate project repo add           
+                                                                     │                    ledger-worker <path>          
+                                                                     │ Crews            0                               
                                                                      │                                                  
-                                                                     │ Last event       13:41:05  crew.started          
-                                                                     │                                                  
-                                                                     │                                                  
+                                                                     │ Last event       none · this project has no      
+                                                                     │                  designated Mate                 
                                                                      │                                                  
                                                                      │                                                  
                                                                      │                                                  

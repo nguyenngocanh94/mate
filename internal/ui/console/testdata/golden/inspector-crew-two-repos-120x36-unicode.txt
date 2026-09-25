@@ -16,13 +16,13 @@
                                                                      │                  01J9P6Q6 · pane p-7c1e          
                                                                      │ Bound since      13:41:05                        
                                                                      │                                                  
-                                                                     │ Repo             payments-api  repos/            
-                                                                     │                  payments-api                    
+                                                                     │ Repo             api  services/payments-api      
                                                                      │ Branch           mate/01J9P6Q6                   
                                                                      │ Worktree         /Users/dev/work/acme/           
                                                                      │                  .worktrees/                     
                                                                      │                  payments-api-crew_01J9P6Q6W0E5V 
-                                                                     │  ↓ 10 more                                       
+                                                                     │                  8XK2M4B8DT                      
+                                                                     │  ↓ 9 more                                        
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  BOX                                                                                                          1 waiting 
                                                                                                                         
@@ -32,5 +32,5 @@
                                                                                                                         
 ▏! 14:01  k3  needs an answer                                                                                   [assign]
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- crew-payments-api-2 owns this terminal · Console idle until it returns                                                 
- Ctrl+b q Detach; does not stop the agent                                                                               
+                                                                                                                        
+ ↑↓ Move  a Actions  m Mode  Enter Attach crew  Esc Back  Tab Inspector/Box  r Refresh  q Quit                          

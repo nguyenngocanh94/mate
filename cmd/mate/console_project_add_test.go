@@ -51,8 +51,8 @@ func TestConsoleNewProjectRegistersTheRepoItWasGiven(t *testing.T) {
 }
 
 // TestConsoleNewProjectRefusalsMatchTheCLI: the Console runs the same checks
-// as `mate project add`, so a path that is not a git work tree root, or no
-// path at all, is refused and nothing is registered.
+// as `mate project add`, so a path that is not a git work tree root, or
+// does not exist, is refused and nothing is registered.
 func TestConsoleNewProjectRefusalsMatchTheCLI(t *testing.T) {
 	w, deps := consoleFixture(t, "alpha")
 	plain := filepath.Join(w.Root(), "plain")
@@ -60,7 +60,6 @@ func TestConsoleNewProjectRefusalsMatchTheCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ repo, want string }{
-		{"", "repo path is required"},
 		{"plain", "not a git repository"},
 		{"missing", "no such file"},
 	} {
@@ -77,5 +76,37 @@ func TestConsoleNewProjectRefusalsMatchTheCLI(t *testing.T) {
 	}
 	if _, ok := fresh.Project("gamma"); ok {
 		t.Fatal("a refused onboard still registered gamma")
+	}
+}
+
+// TestConsoleNewProjectWithoutARepo: the form's repo is optional (docs/mvp.md
+// M9). An empty one registers a Project with no repo, PROJECT.md included,
+// and the result line says how to add one.
+func TestConsoleNewProjectWithoutARepo(t *testing.T) {
+	w, deps := consoleFixture(t, "alpha")
+	line, err := consoleAction(w, deps)(context.Background(), console.ActionRequest{
+		Action: console.ActionOnboard, TargetKind: "workspace", Input: "beta", Repo: "  ",
+	})
+	if err != nil {
+		t.Fatalf("workspace onboard without a repo: %v", err)
+	}
+	for _, want := range []string{"beta", "no repo yet", "mate project repo add beta"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("result line = %q, want it to contain %q", line, want)
+		}
+	}
+	fresh, err := store.Open(w.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := fresh.LoadProject("beta")
+	if err != nil {
+		t.Fatalf("beta not registered on disk: %v", err)
+	}
+	if len(cfg.Repos) != 0 {
+		t.Fatalf("beta repos = %+v, want none", cfg.Repos)
+	}
+	if _, err := os.Stat(fresh.ProjectDoc("beta")); err != nil {
+		t.Fatalf("PROJECT.md not seeded: %v", err)
 	}
 }

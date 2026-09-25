@@ -8,8 +8,8 @@
                                                                                                    |                                                            
                                                                                                    | Mate             mate-payments-api . claude . running      
                                                                                                    | Repos            1                                         
-                                                                                                   |                  payments-api  /Users/dev/work/acme/       
-                                                                                                   |                  repos/payments-api  main                  
+                                                                                                   |                  payments-api . main                       
+                                                                                                   |                    repos/payments-api                      
                                                                                                    | Crews            2 . 1 crew needs attention                
                                                                                                    |                                                            
                                                                                                    | Last event       13:41:05  crew.started                    

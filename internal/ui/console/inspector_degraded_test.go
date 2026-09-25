@@ -30,10 +30,10 @@ func galleryRepairTree() query.Snapshot {
 		Status:      query.CrewWorking,
 		HarnessKind: query.HarnessCodex,
 		Repo: query.KnownField(query.RepoValue{
-			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-			Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
+			RepoID: "payments-api", DisplayName: "payments-api",
+			Path: "repos/payments-api", DefaultBranch: "main",
 		}),
-		RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+		RepoID: "payments-api",
 		Worktree: query.KnownField(query.WorktreeValue{
 			Path:   "/Users/dev/work/acme/repos/payments-api/.worktrees/crew_01J9P4Q5R6S7T8U9V0W1X2A7CS/a1",
 			Branch: "mate/upgrade-database-adapter/a1",
@@ -60,10 +60,10 @@ func galleryAbsentTree() query.Snapshot {
 		Status:      query.CrewWaitMate,
 		HarnessKind: query.HarnessClaude,
 		Repo: query.KnownField(query.RepoValue{
-			RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH", DisplayName: "payments-api",
-			Path: "/Users/dev/work/acme/repos/payments-api", DefaultBranch: "main",
+			RepoID: "payments-api", DisplayName: "payments-api",
+			Path: "repos/payments-api", DefaultBranch: "main",
 		}),
-		RepoID: "repo_01J9M1E7K1V6B3G8Z2F5S0R9TH",
+		RepoID: "payments-api",
 		Worktree: query.KnownField(query.WorktreeValue{
 			Path:   "/Users/dev/work/acme/repos/payments-api/.worktrees/crew_01J9P8R2S3T4U5V6W7X8Y9Z0AB/a1",
 			Branch: "crew/task_1/attempt-1",

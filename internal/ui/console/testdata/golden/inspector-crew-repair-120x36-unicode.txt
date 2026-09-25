@@ -13,8 +13,8 @@
                                                                      │ Binding          none · no runtime binding is    
                                                                      │                  held for this attempt           
                                                                      │                                                  
-                                                                     │ Repo             payments-api                    
-                                                                     │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH 
+                                                                     │ Repo             payments-api  repos/            
+                                                                     │                  payments-api                    
                                                                      │ Branch           mate/upgrade-database-adapter/  
                                                                      │                  a1                              
                                                                      │ Worktree         /Users/dev/work/acme/repos/     

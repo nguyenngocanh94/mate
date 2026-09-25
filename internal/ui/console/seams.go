@@ -137,18 +137,43 @@ func (m Model) projectFields(r row, valueWidth int) []*line {
 	out = append(out, m.textField("Name", p.Name, m.p.Fg, valueWidth)...)
 	out = append(out, newLine())
 	out = append(out, m.field("Mate", mateSummarySpans(p.Mate, m.g, m.p), valueWidth)...)
-	out = append(out, m.field("Repos", m.availSpans(p.Repos.State, fmt.Sprint(len(p.Repos.Value)), p.Repos.Reason, m.p.Fg), valueWidth)...)
-	if p.Repos.State == query.Known {
-		for _, repo := range p.Repos.Value {
-			out = append(out, m.note([]span{
-				{text: repo.DisplayName, style: m.p.Fg},
-				{text: "  " + repo.Path + "  " + repo.DefaultBranch, style: m.p.Dim},
-			}, valueWidth)...)
-		}
-	}
+	out = append(out, m.projectRepoLines(p, valueWidth)...)
 	out = append(out, m.field("Crews", crewsCountSpans(p, m.g, m.p), valueWidth)...)
 	out = append(out, newLine())
 	out = append(out, m.field("Last event", m.eventSpans(p.Mate.LastEvent), valueWidth)...)
+	return out
+}
+
+// projectRepoLines is the Project block's Repos field: the count, then per
+// repo its name and default branch on one line and its workspace-relative
+// path indented under it - short enough to stay on one line where the
+// absolute path wrapped mid-word. A Project with no repo (docs/mvp.md M9:
+// a project may start without one) says so in amber, since no crew can be
+// spawned until it has one, and names the command that adds one.
+func (m Model) projectRepoLines(p query.ProjectNode, valueWidth int) []*line {
+	if p.Repos.State != query.Known {
+		return m.field("Repos", m.availSpans(p.Repos.State, "", p.Repos.Reason, m.p.Fg), valueWidth)
+	}
+	if len(p.Repos.Value) == 0 {
+		out := m.field("Repos", []span{{text: "none yet", style: m.p.Amber}, {text: " " + m.g.Dot + " a crew needs one", style: m.p.Dim}}, valueWidth)
+		out = append(out, m.note([]span{{text: "add one with", style: m.p.Dim}}, valueWidth)...)
+		// The command breaks after its verb when it does not fit, never
+		// leaving "<path>" stranded on a line of its own.
+		cmd, args := "mate project repo add", p.Name+" <path>"
+		if cells(cmd+" "+args) <= valueWidth {
+			return append(out, m.note([]span{{text: cmd + " " + args, style: m.p.Fg}}, valueWidth)...)
+		}
+		out = append(out, m.note([]span{{text: cmd, style: m.p.Fg}}, valueWidth)...)
+		return append(out, m.note([]span{{text: "  " + args, style: m.p.Fg}}, valueWidth)...)
+	}
+	out := m.field("Repos", []span{{text: fmt.Sprint(len(p.Repos.Value)), style: m.p.Fg}}, valueWidth)
+	for _, repo := range p.Repos.Value {
+		out = append(out, m.note([]span{
+			{text: repo.DisplayName, style: m.p.Fg},
+			{text: " " + m.g.Dot + " " + repo.DefaultBranch, style: m.p.Dim},
+		}, valueWidth)...)
+		out = append(out, m.note([]span{{text: "  " + repo.Path, style: m.p.Dim}}, valueWidth)...)
+	}
 	return out
 }
 
@@ -276,8 +301,8 @@ func attentionFieldSpans(f query.Field[query.Attention], g glyphSet, p palette) 
 // ---------- inspector: Crew ----------
 
 // crewFields: identity (ID and the one-line Task it was spawned for), then
-// Recorded status, Harness, Agent and the full Binding block, then Repo/Repo
-// ID/Branch/Worktree/Worktree status (Branch and Worktree share Worktree's
+// Recorded status, Harness, Agent and the full Binding block, then
+// Repo/Branch/Worktree/Worktree status (Branch and Worktree share Worktree's
 // own Field, per query.WorktreeValue's own doc: they come from one read),
 // then Last event and Reason.
 func (m Model) crewFields(r row, valueWidth int) []*line {
@@ -294,8 +319,7 @@ func (m Model) crewFields(r row, valueWidth int) []*line {
 	out = append(out, m.field("Agent", m.availSpans(c.AgentName.State, c.AgentName.Value, c.AgentName.Reason, m.p.Fg), valueWidth)...)
 	out = append(out, m.bindingBlock(c.Binding, valueWidth)...)
 	out = append(out, newLine())
-	out = append(out, m.field("Repo", m.repoSpans(c.Repo, false), valueWidth)...)
-	out = append(out, m.textField("Repo ID", c.RepoID, m.p.Fg, valueWidth)...)
+	out = append(out, m.field("Repo", m.repoSpans(c.Repo), valueWidth)...)
 	out = append(out, m.field("Branch", m.availSpans(c.Worktree.State, c.Worktree.Value.Branch, c.Worktree.Reason, m.p.Fg), valueWidth)...)
 	out = append(out, m.field("Worktree", m.availSpans(c.Worktree.State, c.Worktree.Value.Path, c.Worktree.Reason, m.p.Fg), valueWidth)...)
 	worktreeStatus := worktreeStatusWord(c.Worktree.Value.Status)
@@ -340,15 +364,16 @@ func (m Model) availSpans(state query.FieldState, value, reason string, style li
 	return spans
 }
 
-// repoSpans renders a Field[query.RepoValue]: the display name, with its
-// path folded in dim when withPath (the Task block shows it; the Crew
-// block does not, since the Crew's own worktree path is more specific).
-func (m Model) repoSpans(f query.Field[query.RepoValue], withPath bool) []span {
+// repoSpans renders a Crew's Field[query.RepoValue]: the repo's name with
+// its workspace-relative path in dim - which of the Project's repos the
+// crew works in (docs/mvp.md M9: exactly one). The name is the repo's id
+// inside the Project, so there is no separate id line.
+func (m Model) repoSpans(f query.Field[query.RepoValue]) []span {
 	if f.State != query.Known {
 		return m.availSpans(f.State, "", f.Reason, m.p.Fg)
 	}
 	out := []span{{text: f.Value.DisplayName, style: m.p.Fg}}
-	if withPath && f.Value.Path != "" {
+	if f.Value.Path != "" {
 		out = append(out, span{text: "  " + f.Value.Path, style: m.p.Dim})
 	}
 	return out
