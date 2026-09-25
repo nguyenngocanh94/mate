@@ -35,6 +35,28 @@ func withRunner(m Model, reply string, err error) (Model, *[]ActionRequest) {
 	return m, got
 }
 
+// typeText sends each rune of text as its own key press.
+func typeText(t *testing.T, m Model, text string) Model {
+	t.Helper()
+	for _, r := range text {
+		m, _ = send(t, m, key(string(r)))
+	}
+	return m
+}
+
+// fillRepo moves from the typed name to the repo field and types path.
+func fillRepo(t *testing.T, m Model, path string) Model {
+	t.Helper()
+	m, cmd := send(t, m, key("enter"))
+	if cmd != nil {
+		t.Fatalf("enter on the name dispatched before a repo was given: %v", cmd)
+	}
+	if m.actionField != fieldRepo {
+		t.Fatalf("enter on the name left the cursor on field %d, want the repo", m.actionField)
+	}
+	return typeText(t, m, path)
+}
+
 func TestNewProjectKeyOpensTheNameInputDirectly(t *testing.T) {
 	m := loaded(t, emptyWorkspaceTree(), nil)
 	m, cmd := send(t, m, key("n"))
@@ -48,7 +70,7 @@ func TestNewProjectKeyOpensTheNameInputDirectly(t *testing.T) {
 		t.Fatal("n opened the action menu; it is meant to skip it")
 	}
 	view := renderFrame(t, m)
-	for _, want := range []string{"NEW PROJECT", "Name", "Enter Create project", "Esc Cancel"} {
+	for _, want := range []string{"NEW PROJECT", "Name", "Repo", "Enter Next", "Tab Switch field", "Esc Cancel"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("new-project input view missing %q:\n%s", want, view)
 		}
@@ -66,6 +88,7 @@ func TestNewProjectKeyTypesANameAndDispatchesOnboardOnce(t *testing.T) {
 	if m.actionInput != "payments-api" {
 		t.Fatalf("typed name = %q, want payments-api", m.actionInput)
 	}
+	m = fillRepo(t, m, "services/payments")
 	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
 		t.Fatal("enter on a typed name did not dispatch onboard")
@@ -75,8 +98,8 @@ func TestNewProjectKeyTypesANameAndDispatchesOnboardOnce(t *testing.T) {
 		t.Fatalf("runner calls = %d, want exactly one", len(*got))
 	}
 	req := (*got)[0]
-	if req.Action != ActionOnboard || req.TargetKind != "workspace" || req.Input != "payments-api" {
-		t.Fatalf("onboard request = %+v, want a workspace onboard carrying the typed name", req)
+	if req.Action != ActionOnboard || req.TargetKind != "workspace" || req.Input != "payments-api" || req.Repo != "services/payments" {
+		t.Fatalf("onboard request = %+v, want a workspace onboard carrying the typed name and repo", req)
 	}
 	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "created proj_1") {
 		t.Fatalf("result message = %+v, want the service's own reply", m.msg)
@@ -204,9 +227,8 @@ func TestWorkspaceOnboardIsNotRefusedByASelectedProjectsOwnMate(t *testing.T) {
 	if !m.actionInputMode {
 		t.Fatal("n was refused at a Workspace whose selected Project already has a Mate")
 	}
-	for _, r := range "ledger" {
-		m, _ = send(t, m, key(string(r)))
-	}
+	m = typeText(t, m, "ledger")
+	m = fillRepo(t, m, "ledger")
 	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
 		t.Fatal("enter did not dispatch the new Project")
@@ -264,6 +286,7 @@ func TestNewProjectNameCanContainQ(t *testing.T) {
 	if !strings.Contains(view, "Ctrl+C Quit") {
 		t.Fatalf("key line does not name a way out of the name input:\n%s", view)
 	}
+	m = fillRepo(t, m, "queue")
 	m, cmd := send(t, m, key("enter"))
 	if cmd == nil {
 		t.Fatal("enter did not dispatch")
@@ -280,5 +303,66 @@ func TestCtrlCStillQuitsFromTheNewProjectInput(t *testing.T) {
 	m, cmd := send(t, m, tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd == nil || !m.quitting {
 		t.Fatalf("ctrl+c from the name input did not quit: cmd=%v quitting=%v", cmd, m.quitting)
+	}
+}
+
+// TestNewProjectFormSendsNoRepoWhenTheRepoIsLeftEmpty: the repo is
+// optional (docs/mvp.md M9). Name, Enter, Enter creates the Project with no
+// repo - the request carries none - and the key line says so before the
+// second Enter.
+func TestNewProjectFormSendsNoRepoWhenTheRepoIsLeftEmpty(t *testing.T) {
+	m, got := withRunner(loaded(t, emptyWorkspaceTree(), nil), "Project ledger added with no repo yet", nil)
+	m, _ = send(t, m, key("n"))
+	m = typeText(t, m, "ledger")
+	m = fillRepo(t, m, "  ")
+	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create without repo") {
+		t.Fatalf("an empty repo field does not say Enter creates the Project without one:\n%s", view)
+	}
+	m, cmd := send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("enter on an empty repo did not dispatch")
+	}
+	m, _ = send(t, m, cmd())
+	if len(*got) != 1 {
+		t.Fatalf("runner calls = %d, want exactly one", len(*got))
+	}
+	req := (*got)[0]
+	if req.Action != ActionOnboard || req.TargetKind != "workspace" || req.Input != "ledger" || req.Repo != "" {
+		t.Fatalf("onboard request = %+v, want a workspace onboard for ledger with no repo", req)
+	}
+	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "no repo yet") {
+		t.Fatalf("result message = %+v, want the service's own reply", m.msg)
+	}
+}
+
+// TestNewProjectFormFieldsAreEditedIndependently pins the two-field editing:
+// Tab switches, typing and Backspace touch only the focused field, and
+// Backspace on an empty repo steps back into the name instead of closing.
+func TestNewProjectFormFieldsAreEditedIndependently(t *testing.T) {
+	m := loaded(t, emptyWorkspaceTree(), nil)
+	m, _ = send(t, m, key("n"))
+	m = typeText(t, m, "led")
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyTab})
+	m = typeText(t, m, "ab")
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.actionInput != "led" || m.actionRepo != "a" {
+		t.Fatalf("fields = name %q repo %q, want led and a", m.actionInput, m.actionRepo)
+	}
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyBackspace})
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyBackspace})
+	if !m.actionInputMode || m.actionField != fieldName || m.actionInput != "led" {
+		t.Fatalf("backspace on an empty repo: input=%v field=%d name=%q, want back on the kept name",
+			m.actionInputMode, m.actionField, m.actionInput)
+	}
+	if view := renderFrame(t, m); !strings.Contains(view, "relative to the workspace:") || !strings.Contains(view, "    /Users/dev/work/acme") {
+		t.Fatalf("form view does not name the root a relative repo resolves against:\n%s", view)
+	}
+	m, _ = send(t, m, tea.KeyMsg{Type: tea.KeyTab})
+	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create without repo") {
+		t.Fatalf("empty repo field view does not offer to create without a repo:\n%s", view)
+	}
+	m = typeText(t, m, "ledger")
+	if view := renderFrame(t, m); !strings.Contains(view, "Enter Create project") {
+		t.Fatalf("typed repo field view does not offer the create key:\n%s", view)
 	}
 }

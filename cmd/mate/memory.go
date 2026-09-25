@@ -255,7 +255,7 @@ func memoryCheck(ctx context.Context, w *store.Workspace, git gitx.Git, project 
 	if err != nil {
 		return rep, err
 	}
-	anchors, projectProblems := memory.CheckProject(doc, cfg.DefaultBranch)
+	anchors, projectProblems := memory.CheckProject(doc, anchorRepos(cfg))
 	rep.Anchored = len(anchors)
 	for _, p := range append(problems, projectProblems...) {
 		rep.Problems = append(rep.Problems, p.String())
@@ -266,17 +266,47 @@ func memoryCheck(ctx context.Context, w *store.Workspace, git gitx.Git, project 
 	if rep.Budget.Over() {
 		rep.Problems = append(rep.Problems, rep.Budget.OverLine())
 	}
-	rep.Warnings, err = anchorWarnings(ctx, git, w.RepoDir(cfg.Repo), cfg.DefaultBranch, anchors)
-	return rep, err
+	for _, r := range cfg.Repos {
+		warnings, err := anchorWarnings(ctx, git, w.RepoDir(r.Path), r, anchorsIn(anchors, r.Name))
+		if err != nil {
+			return rep, fmt.Errorf("comparing %s's anchors with repo %s: %w", memory.ProjectFileName, r.Name, err)
+		}
+		rep.Warnings = append(rep.Warnings, warnings...)
+	}
+	return rep, nil
 }
 
-// anchorWarnings says which PROJECT.md anchors are older than the branch's
-// head. An old anchor is not an error: the fact may still hold, and only a
-// Crew can say. It is a hint that the line is a hint.
-func anchorWarnings(ctx context.Context, git gitx.Git, repo, branch string, anchors []memory.Anchor) ([]string, error) {
+// anchorRepos are the repos a PROJECT.md anchor may name, in the
+// project's order.
+func anchorRepos(cfg store.ProjectConfig) []memory.Repo {
+	out := make([]memory.Repo, 0, len(cfg.Repos))
+	for _, r := range cfg.Repos {
+		out = append(out, memory.Repo{Name: r.Name, Branch: r.DefaultBranch})
+	}
+	return out
+}
+
+// anchorsIn are the anchors that name repo.
+func anchorsIn(anchors []memory.Anchor, repo string) []memory.Anchor {
+	var out []memory.Anchor
+	for _, a := range anchors {
+		if a.Repo == repo {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// anchorWarnings says which PROJECT.md anchors on one repo are older than
+// its default branch's head; repo is that repository's directory. An old
+// anchor is not an error: the fact may still hold, and only a Crew can say.
+// It is a hint that the line is a hint.
+func anchorWarnings(ctx context.Context, git gitx.Git, repo string, r store.RepoConfig, anchors []memory.Anchor) ([]string, error) {
 	if len(anchors) == 0 {
 		return nil, nil
 	}
+	branch := r.DefaultBranch
+	label := r.Name + ":" + branch
 	ref := "refs/heads/" + branch
 	hasHead, err := git.RevisionExists(ctx, repo, ref)
 	if err != nil {
@@ -304,26 +334,26 @@ func anchorWarnings(ctx context.Context, git gitx.Git, repo, branch string, anch
 		case sha == memory.NoCommit && !hasHead, hasHead && sha != memory.NoCommit && strings.HasPrefix(head, sha):
 			continue
 		case !hasHead:
-			why = fmt.Sprintf("%s has no commit now", branch)
+			why = fmt.Sprintf("%s has no commit now", label)
 		case sha == memory.NoCommit:
 			n, err := git.CommitCount(ctx, repo, ref)
 			if err != nil {
 				return nil, err
 			}
-			why = fmt.Sprintf("%s has %d commit(s) since", branch, n)
+			why = fmt.Sprintf("%s has %d commit(s) since", label, n)
 		default:
 			n, err := git.CommitCount(ctx, repo, sha+".."+ref)
 			switch {
 			case err != nil:
-				why = fmt.Sprintf("%s's history does not contain %s", branch, sha)
+				why = fmt.Sprintf("%s's history does not contain %s", label, sha)
 			case n == 0:
-				why = fmt.Sprintf("%s is not %s's head", sha, branch)
+				why = fmt.Sprintf("%s is not %s's head", sha, label)
 			default:
-				why = fmt.Sprintf("%s has %d newer commit(s)", branch, n)
+				why = fmt.Sprintf("%s has %d newer commit(s)", label, n)
 			}
 		}
 		out = append(out, fmt.Sprintf("warning: %s %s anchored at %s@%s, and %s; treat %s as a hint until a report or hand-back confirms it",
-			memory.ProjectFileName, lineList(bySHA[sha]), branch, sha, why, itThem(len(bySHA[sha]))))
+			memory.ProjectFileName, lineList(bySHA[sha]), label, sha, why, itThem(len(bySHA[sha]))))
 	}
 	return out, nil
 }

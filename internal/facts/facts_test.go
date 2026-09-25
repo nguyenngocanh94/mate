@@ -73,14 +73,14 @@ func newRepo(t *testing.T) string {
 func TestGatherOnAnEmptyRepository(t *testing.T) {
 	repo := newRepo(t)
 	rec := &recorder{}
-	f, err := Gather(context.Background(), gitx.Git{Runner: rec}, "shop", repo, "main")
+	f, err := Gather(context.Background(), gitx.Git{Runner: rec}, "shop", "web", repo, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		"shop: repo " + repo + ", default branch main",
+		"shop: repo web at " + repo + ", default branch main",
 		"commits: 0 (main has no commit yet)",
-		"head: none",
+		"head: none (anchor web:main@none)",
 		"tree: empty",
 		"note: names and counts from the committed tree of main only; no file was opened, and uncommitted changes in the checkout are not seen",
 	}
@@ -119,7 +119,7 @@ func TestGatherOnAPopulatedRepository(t *testing.T) {
 	gitCmd(t, repo, "commit", "-q", "--allow-empty", "-m", "two")
 
 	rec := &recorder{}
-	f, err := Gather(context.Background(), gitx.Git{Runner: rec}, "shop", repo, "main")
+	f, err := Gather(context.Background(), gitx.Git{Runner: rec}, "shop", "web", repo, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestGatherOnAPopulatedRepository(t *testing.T) {
 		t.Fatalf("Head = %q, want git's own short name of main %q", f.Head, head)
 	}
 	for _, want := range []string{
-		"commits: 2 on main\nhead: " + head,
+		"shop: repo web at " + repo + ", default branch main\ncommits: 2 on main\nhead: " + head + " (anchor web:main@" + head + ")",
 		"tree: 11 file(s)",
 		`top level: AGENTS.md Makefile README.md go.mod main.go "my notes.txt" vendor/ web/`,
 		"build/test files: Makefile go.mod web/package.json web/vite.config.ts",
@@ -143,4 +143,22 @@ func TestGatherOnAPopulatedRepository(t *testing.T) {
 		t.Fatalf("facts printed file content or the working tree:\n%s", got)
 	}
 	assertNoContentRead(t, rec)
+}
+
+// TestNoRepoLines: a project without a repo has no facts, only the line
+// that says so and how one is added (docs/mvp.md M9).
+func TestNoRepoLines(t *testing.T) {
+	want := "repos: none\nhint: project shop has no repo yet, so no crew can be spawned; add one with `mate project repo add shop <repo-path>`"
+	if got := strings.Join(NoRepoLines("shop"), "\n"); got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestAnchorSpelling(t *testing.T) {
+	if got := Anchor("api", "release/1.x", ""); got != "api:release/1.x@none" {
+		t.Fatalf("Anchor with no head = %q", got)
+	}
+	if got := Anchor("api", "main", "3f2a91c"); got != "api:main@3f2a91c" {
+		t.Fatalf("Anchor = %q", got)
+	}
 }

@@ -56,7 +56,7 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 	}
 	liveGit(t, repo, "add", "README.md")
 	liveGit(t, repo, "commit", "-m", "init")
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	base := liveGitOut(t, repo, "rev-parse", "main")

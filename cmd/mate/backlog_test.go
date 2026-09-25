@@ -31,7 +31,7 @@ func backlogFixtureWorkspace(t *testing.T) (*store.Workspace, time.Time) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 
@@ -198,7 +198,7 @@ func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("blog", store.ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 

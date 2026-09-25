@@ -118,7 +118,7 @@ func newWorkspace(t *testing.T) *store.Workspace {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w

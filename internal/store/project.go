@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,10 +19,9 @@ var ErrNoProject = errors.New("store: no such project")
 
 // ProjectConfig is `projects/<name>/project.yaml`.
 type ProjectConfig struct {
-	// Repo is the repository path relative to the workspace root.
-	Repo string `yaml:"repo"`
-	// DefaultBranch is the branch crew worktrees branch from.
-	DefaultBranch string `yaml:"default_branch"`
+	// Repos are the git repositories the project owns, zero or more
+	// (docs/mvp.md M9). A crew works in exactly one of them.
+	Repos []RepoConfig `yaml:"repos"`
 	// Mode is `local-only` in the MVP; no other value is accepted.
 	Mode string `yaml:"mode"`
 	// Yolo lets Mate merge without asking the user.
@@ -57,9 +58,10 @@ type BudgetConfig struct {
 	ProjectUSD float64 `yaml:"project_usd,omitempty"`
 }
 
-// AddProject registers a project: it normalises the repository path, creates
-// `projects/<name>/` with the `mate/` and `crews/` directories, writes
-// project.yaml and appends the project to workspace.yaml.
+// AddProject registers a project: it normalises its repos (possibly none),
+// refuses a repo another project owns, creates `projects/<name>/` with the
+// `mate/` and `crews/` directories, writes project.yaml and appends the
+// project to workspace.yaml.
 func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if err := ValidateProjectName(name); err != nil {
 		return err
@@ -69,6 +71,9 @@ func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	}
 	normalised, err := w.normaliseProject(cfg)
 	if err != nil {
+		return err
+	}
+	if err := w.checkReposUnclaimed(name, normalised.Repos); err != nil {
 		return err
 	}
 	for _, dir := range []string{w.ProjectDir(name), w.MateDir(name), w.CrewsDir(name)} {
@@ -82,7 +87,7 @@ func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if err := w.seedOnce(w.ProjectCrewDoc(name), projectCrewDocSeed(name)); err != nil {
 		return err
 	}
-	w.cfg.Projects = append(w.cfg.Projects, ProjectRef{Name: name, Repo: normalised.Repo})
+	w.cfg.Projects = append(w.cfg.Projects, ProjectRef{Name: name})
 	if err := w.SaveConfig(); err != nil {
 		return err
 	}
@@ -115,17 +120,60 @@ func (w *Workspace) LoadProject(name string) (ProjectConfig, error) {
 		}
 		return ProjectConfig{}, err
 	}
-	var cfg ProjectConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	var file projectFile
+	if err := yaml.Unmarshal(data, &file); err != nil {
 		return ProjectConfig{}, fmt.Errorf("store: %s: %w", path, err)
 	}
-	if cfg.DefaultBranch == "" {
-		cfg.DefaultBranch = DefaultBranch
+	cfg := file.ProjectConfig
+	if file.LegacyRepo != "" && len(cfg.Repos) == 0 {
+		cfg.Repos = []RepoConfig{{
+			Name: DefaultRepoName(file.LegacyRepo), Path: file.LegacyRepo, DefaultBranch: file.LegacyDefaultBranch,
+		}}
+	}
+	for i := range cfg.Repos {
+		if cfg.Repos[i].DefaultBranch == "" {
+			cfg.Repos[i].DefaultBranch = DefaultBranch
+		}
 	}
 	if cfg.Mode == "" {
 		cfg.Mode = ModeLocalOnly
 	}
 	return cfg, nil
+}
+
+// projectFile is project.yaml as read: the current shape plus the one-repo
+// fields every project.yaml had before M9, which LoadProject turns into a
+// one-entry Repos and SaveProject never writes again.
+type projectFile struct {
+	ProjectConfig       `yaml:",inline"`
+	LegacyRepo          string `yaml:"repo"`
+	LegacyDefaultBranch string `yaml:"default_branch"`
+}
+
+// CrewIDs are the ids with a `.meta` under the project's `crews/`, sorted. A
+// file whose name is not a valid crew id is ignored rather than reported:
+// `crews/` is a directory the user can also put things in.
+func (w *Workspace) CrewIDs(project string) ([]string, error) {
+	if err := ValidateProjectName(project); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(w.CrewsDir(project))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var ids []string
+	for _, e := range entries {
+		id, ok := strings.CutSuffix(e.Name(), ".meta")
+		if !ok || ValidateCrewID(id) != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 // SaveProject writes `projects/<name>/project.yaml` atomically.
@@ -144,24 +192,20 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 	return w.writeFile(w.ProjectFile(name), data, 0o644)
 }
 
-// normaliseProject fills the defaults and checks the fields: the repository
-// must be inside the workspace and outside `.mate/`, and the mode must be
-// the one the MVP supports.
+// normaliseProject fills the defaults and checks the fields: the repos per
+// normaliseRepos, and the mode must be the one the MVP supports.
 func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
-	if cfg.DefaultBranch == "" {
-		cfg.DefaultBranch = DefaultBranch
-	}
 	if cfg.Mode == "" {
 		cfg.Mode = ModeLocalOnly
 	}
 	if cfg.Mode != ModeLocalOnly {
 		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: the MVP supports only %q", cfg.Mode, ModeLocalOnly)
 	}
-	repo, err := w.RelRepo(cfg.Repo)
+	repos, err := w.normaliseRepos(cfg.Repos)
 	if err != nil {
 		return ProjectConfig{}, err
 	}
-	cfg.Repo = repo
+	cfg.Repos = repos
 	return cfg, nil
 }
 

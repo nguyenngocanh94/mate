@@ -49,7 +49,7 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -96,7 +96,7 @@ func TestCrewListStateColumnShowsTheDeclaredState(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +229,7 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship it", "agent": "crew-k1", "pane": "w1:p2"}); err != nil {

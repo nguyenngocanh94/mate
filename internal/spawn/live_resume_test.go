@@ -44,7 +44,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 	liveGit(t, repo, "config", "user.email", "mate-test@example.com")
 	liveGit(t, repo, "config", "user.name", "mate test")
 	liveGit(t, repo, "commit", "--allow-empty", "-m", "init")
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 

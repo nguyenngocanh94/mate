@@ -47,11 +47,6 @@ func (p *pass) ingestGit(ctx context.Context) error {
 		// commits; nothing is concluded and the next pass asks again.
 		return nil //nolint:nilerr
 	}
-	repo := p.ing.ws.RepoDir(cfg.Repo)
-	base := cfg.DefaultBranch
-	if base == "" {
-		base = "main"
-	}
 	git := p.ing.deps.git()
 
 	for _, crew := range p.crews {
@@ -59,6 +54,13 @@ func (p *pass) ingestGit(ctx context.Context) error {
 		if branch == "" {
 			continue
 		}
+		// Each crew's commits are in the repo it worked in (docs/mvp.md
+		// M9). A crew whose repo cannot be resolved has nothing to read.
+		repoCfg, err := cfg.CrewRepo(crew.Meta)
+		if err != nil {
+			continue
+		}
+		repo, base := p.ing.ws.RepoDir(repoCfg.Path), repoCfg.DefaultBranch
 		exists, err := git.BranchExists(ctx, repo, branch)
 		if err != nil {
 			continue

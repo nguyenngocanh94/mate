@@ -207,7 +207,7 @@ func TestInspectorScrollIndicatorsAtBothEndsAndInTheMiddle(t *testing.T) {
 		t.Fatalf("long content at the top, want a downward indicator:\n%s", body)
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		m, _ = send(t, m, key("down"))
 	}
 	body = bodyLines(t, renderFrame(t, m))

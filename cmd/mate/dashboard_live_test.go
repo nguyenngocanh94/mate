@@ -61,7 +61,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 	}
 	runGitOrFatal(t, repo, "add", "README.md")
 	runGitOrFatal(t, repo, "commit", "-m", "add README")
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 

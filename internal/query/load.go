@@ -77,17 +77,24 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	// all reads as manual, which is the mode that sends nothing.
 	p := ProjectNode{ProjectID: ref.Name, Name: ref.Name, Mode: ModeFor(ws.Auto(ref.Name))}
 
+	// A Project with no repo is a Known empty list, not an Absent field: a
+	// project may be created before it has one (docs/mvp.md M9), and the
+	// read that says so succeeded.
 	cfg, err := ws.LoadProject(ref.Name)
 	switch {
 	case err != nil:
 		p.Repos = note(w, UnknownField[[]RepoValue](readFailureReason(err)), "repos", row)
 	default:
-		p.Repos = KnownField([]RepoValue{{
-			RepoID:        ref.Name,
-			DisplayName:   filepath.Base(cfg.Repo),
-			Path:          filepath.Join(ws.Root(), cfg.Repo),
-			DefaultBranch: cfg.DefaultBranch,
-		}})
+		repos := make([]RepoValue, 0, len(cfg.Repos))
+		for _, r := range cfg.Repos {
+			repos = append(repos, RepoValue{
+				RepoID:        r.Name,
+				DisplayName:   r.Name,
+				Path:          r.Path,
+				DefaultBranch: r.DefaultBranch,
+			})
+		}
+		p.Repos = KnownField(repos)
 	}
 
 	p.Mate = loadMate(ws, ref.Name, w)
@@ -282,8 +289,9 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 	c := CrewNode{
 		CrewID:    id,
 		ProjectID: project,
-		RepoID:    project,
-		Repo:      repoFor(repos, project),
+		// The repo is the one the meta names; until the meta is read it
+		// is unknown, and an unreadable meta leaves it that way.
+		Repo:      UnknownField[RepoValue]("crews/" + id + ".meta could not be read"),
 		LastEvent: AbsentField[EventValue]("mate records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
 		// This package reads files; an observation comes from Herdr. A
@@ -311,6 +319,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		return c
 	}
 
+	c.RepoID, c.Repo = crewRepo(repos, meta[store.MetaRepo])
 	c.Task = meta["task"]
 	if kind, err := ParseHarnessKind(meta["harness"]); err == nil {
 		c.HarnessKind = kind
@@ -375,6 +384,26 @@ func lastStatusVerb(ws *store.Workspace, project, id string, w *warnings, row Ro
 	return string(verb)
 }
 
+// crewRepo is the repo a crew's meta names. A meta written before M9 names
+// none and belongs to the project's sole repo; with no repo or several
+// there is no answer, and the field says so rather than guessing.
+func crewRepo(repos Field[[]RepoValue], named string) (string, Field[RepoValue]) {
+	if named != "" {
+		return named, repoFor(repos, named)
+	}
+	if repos.State != Known {
+		return "", repoFor(repos, "")
+	}
+	switch n := len(repos.Value); n {
+	case 1:
+		return repos.Value[0].RepoID, KnownField(repos.Value[0])
+	case 0:
+		return "", UnknownField[RepoValue]("the crew's meta names no repo and the project has none")
+	default:
+		return "", UnknownField[RepoValue](fmt.Sprintf("the crew's meta names no repo and the project has %d", n))
+	}
+}
+
 func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {
 	switch repos.State {
 	case Known:
@@ -383,7 +412,7 @@ func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {
 				return KnownField(r)
 			}
 		}
-		return AbsentField[RepoValue]("no repo named " + repoID + " is registered in this project")
+		return AbsentField[RepoValue]("the crew's meta names repo " + repoID + ", which is not registered in this project")
 	case Absent:
 		return AbsentField[RepoValue](repos.Reason)
 	default:

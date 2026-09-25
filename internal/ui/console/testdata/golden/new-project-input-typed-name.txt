@@ -3,15 +3,15 @@
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   NEW PROJECT                                                                                                           
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
-  Name    sqlite-queue_                                                                                                 
-  Create a Project record; no runtime agent is started.                                                                 
+  ▌ Name             sqlite-queue_                                                                                      
+    Repo (optional)                                                                                                     
                                                                                                                         
-  Enter Create project  Esc Cancel                                                                                      
+  Repo is a git repo root, absolute or relative to the workspace:                                                       
+    /Users/dev/work/acme                                                                                                
+  Leave it empty to create the Project with no repo; add repos later with `mate project repo add`.                      
+  Registers a Project, like `mate project add`; no runtime agent is started.                                            
                                                                                                                         
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
+  Enter Next  Tab Switch field  Esc Cancel                                                                              
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -33,4 +33,4 @@
                                                                                                                         
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
- Enter Create project  Esc Cancel  Ctrl+C Quit                                                                          
+ Enter Next  Tab Switch field  Esc Cancel  Ctrl+C Quit                                                                  

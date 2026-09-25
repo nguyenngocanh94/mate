@@ -32,7 +32,7 @@ func mergeCLIWorkspace(t *testing.T) (*store.Workspace, string) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func TestCmdProjectYoloFlipsTheFlagAndSaysWhenAMateLearnsIt(t *testing.T) {
 	}
 
 	// Other fields of project.yaml survive the rewrite.
-	if cfg.Repo != "shop" || cfg.DefaultBranch != "main" || cfg.Mode != store.ModeLocalOnly {
+	if len(cfg.Repos) != 1 || cfg.Repos[0].Path != "shop" || cfg.Repos[0].DefaultBranch != "main" || cfg.Mode != store.ModeLocalOnly {
 		t.Fatalf("project.yaml after two flips = %+v", cfg)
 	}
 }

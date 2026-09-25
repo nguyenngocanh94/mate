@@ -158,12 +158,16 @@ func TestWorkspaceOnboardAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 			for _, r := range "new-project" {
 				m, _ = send(t, m, key(string(r)))
 			}
+			m, _ = send(t, m, key("enter")) // on to the repo field
+			for _, r := range "new-project" {
+				m, _ = send(t, m, key(string(r)))
+			}
 			m, cmd = send(t, m, key("enter"))
 			if cmd == nil {
 				t.Fatal("submitting the project name did not dispatch the runner")
 			}
 			m, _ = send(t, m, cmd())
-			if calls != 1 || got.Action != ActionOnboard || got.TargetKind != "workspace" || got.Input != "new-project" {
+			if calls != 1 || got.Action != ActionOnboard || got.TargetKind != "workspace" || got.Input != "new-project" || got.Repo != "new-project" {
 				t.Fatalf("onboard request = %+v calls=%d, want a workspace-level create with the typed name", got, calls)
 			}
 		})

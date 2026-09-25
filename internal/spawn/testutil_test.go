@@ -28,7 +28,7 @@ func newWorkspace(t *testing.T, project string) *store.Workspace {
 		t.Fatal(err)
 	}
 	gitInit(t, repo)
-	if err := w.AddProject(project, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w

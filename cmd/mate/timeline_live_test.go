@@ -58,7 +58,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 		"pages/checkout-classic.html": "<h1>Classic checkout</h1>\n",
 		"pages/checkout-express.html": "<h1>Express checkout</h1>\n",
 	})
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: shop, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: shop, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject shop: %v", err)
 	}
 	shopBefore := strings.TrimSpace(gitOut(t, shop, "rev-parse", "main"))

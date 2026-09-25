@@ -66,7 +66,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	repo := filepath.Join(root, fixtureProject)
 	initRepo(t, repo)
-	if err := ws.AddProject(fixtureProject, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := ws.AddProject(fixtureProject, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	if ws, err = store.Open(root); err != nil {
@@ -148,7 +148,7 @@ func newFixture(t *testing.T) *fixture {
 			Diff: func(context.Context, string, string) (string, error) {
 				return "0d2d20d docs: add Buy link\n", nil
 			},
-			BranchExists: func(_ context.Context, _, branch string) (bool, error) {
+			BranchExists: func(_ context.Context, _, _, branch string) (bool, error) {
 				return branch == fixtureBranch, nil
 			},
 		},

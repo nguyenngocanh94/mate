@@ -98,7 +98,7 @@ func isDir(path string) bool {
 // cmdProject dispatches `mate project <add|list|remove>`.
 func cmdProject(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate project <add|list|remove|yolo|facts> ...")
+		return newUsageError("usage: mate project <add|list|remove|repo|yolo|facts> ...")
 	}
 	switch args[0] {
 	case "facts":
@@ -109,6 +109,8 @@ func cmdProject(args []string, stdout, stderr io.Writer) error {
 		return cmdProjectList(args[1:], stdout, stderr)
 	case "remove":
 		return cmdProjectRemove(args[1:], stdout, stderr)
+	case "repo":
+		return cmdProjectRepo(args[1:], stdout, stderr)
 	case "yolo":
 		return cmdProjectYolo(args[1:], stdout, stderr)
 	default:

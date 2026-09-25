@@ -134,7 +134,7 @@ func TestRecallPrintsSection12Point5InOrder(t *testing.T) {
 		"commits: 2 on main", "head: ",
 		// 3: PROJECT.md framed, then the stale anchor.
 		"----- begin PROJECT.md (", "- A landing page for the ESP32 kit.", "----- end PROJECT.md -----",
-		"warning: PROJECT.md line 7 is anchored at main@"+first+", and main has 1 newer commit(s)",
+		"warning: PROJECT.md line 7 is anchored at shop:main@"+first+", and shop:main has 1 newer commit(s)",
 		// 4: backlog without Done, then the mismatches.
 		"----- begin backlog.md (", "## Held for the captain", `- k3, asked 2026-09-19: "red or blue?"`,
 		"----- end backlog.md (## Done: 2 entries not shown) -----",
@@ -293,6 +293,61 @@ func TestRecallTimelineHints(t *testing.T) {
 		if strings.Contains(part8, gone) {
 			t.Errorf("part 8 printed %q", gone)
 		}
+	}
+}
+
+// recallPartBody returns part n's body, from its heading to the next.
+func recallPartBody(t *testing.T, out string, n int) string {
+	t.Helper()
+	start := strings.Index(out, fmt.Sprintf("== %d. ", n))
+	if start < 0 {
+		t.Fatalf("no part %d in:\n%s", n, out)
+	}
+	body := out[start:]
+	if end := strings.Index(body[1:], "\n== "); end >= 0 {
+		body = body[:end+1]
+	}
+	return body
+}
+
+// TestRecallNoRepo: a project without a repo still recalls; part 2 says it
+// has none, part 3 compares nothing, and part 7 reports the repo-state
+// line that nothing can anchor.
+func TestRecallNoRepo(t *testing.T) {
+	w := noRepoWorkspace(t)
+	writeFixture(t, w.ProjectDoc("shop"), "# shop\n\n## Layout and state\n- A Hugo site. (crews/k1/report.md, shop:main@3f2a91c)\n")
+	out := recallText(t, w, time.Now(), recallOptions{})
+	part2 := recallPartBody(t, out, 2)
+	if !strings.Contains(part2, "\nrepos: none\nhint: project shop has no repo yet") {
+		t.Errorf("part 2 does not say the project has no repo:\n%s", part2)
+	}
+	if part3 := recallPartBody(t, out, 3); strings.Contains(part3, "warning:") {
+		t.Errorf("part 3 compared anchors with no repo:\n%s", part3)
+	}
+	if part7 := recallPartBody(t, out, 7); !strings.Contains(part7, "PROJECT.md:4: `## Layout and state` line states repository state, but the project has no repo") {
+		t.Errorf("part 7 does not report the unanchorable line:\n%s", part7)
+	}
+}
+
+// TestRecallTwoRepos: part 2 is one facts block per repo, and part 3 warns
+// about each anchor against its own repo's head.
+func TestRecallTwoRepos(t *testing.T) {
+	w := twoRepoWorkspace(t)
+	shop := w.RepoDir("shop")
+	first := strings.TrimSpace(gitOutput(t, shop, "rev-parse", "--short", "main"))
+	runGitOrFatal(t, shop, "commit", "--allow-empty", "-m", "two")
+	head := strings.TrimSpace(gitOutput(t, shop, "rev-parse", "--short", "main"))
+	writeFixture(t, w.ProjectDoc("shop"), "# shop\n\n## Layout and state\n- Web. (crews/k1/report.md, shop:main@"+first+")\n- API. (project facts, api:develop@none)\n")
+	out := recallText(t, w, time.Now(), recallOptions{})
+	mustOrder(t, recallPartBody(t, out, 2),
+		"shop: repo shop at "+shop+", default branch main", "head: "+head+" (anchor shop:main@"+head+")",
+		"\n\nshop: repo api at "+w.RepoDir("api")+", default branch develop", "head: none (anchor api:develop@none)")
+	part3 := recallPartBody(t, out, 3)
+	if !strings.Contains(part3, "warning: PROJECT.md line 4 is anchored at shop:main@"+first+", and shop:main has 1 newer commit(s)") {
+		t.Errorf("part 3 lacks the stale shop anchor:\n%s", part3)
+	}
+	if strings.Count(part3, "warning:") != 1 {
+		t.Errorf("part 3 warns about more than the one stale anchor:\n%s", part3)
 	}
 }
 

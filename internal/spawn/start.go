@@ -421,11 +421,14 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 	if err != nil {
 		return err
 	}
+	repos := make([]mateassets.RepoParams, 0, len(cfg.Repos))
+	for _, r := range cfg.Repos {
+		repos = append(repos, mateassets.RepoParams{Name: r.Name, Path: w.RepoDir(r.Path), DefaultBranch: r.DefaultBranch})
+	}
 	if err := mateassets.Write(mateDir, mateassets.Params{
 		ProjectName:      project,
 		WorkspaceRoot:    w.Root(),
-		ProjectRepo:      w.RepoDir(cfg.Repo),
-		DefaultBranch:    cfg.DefaultBranch,
+		Repos:            repos,
 		Mode:             cfg.Mode,
 		Yolo:             cfg.Yolo,
 		Harness:          string(kind),

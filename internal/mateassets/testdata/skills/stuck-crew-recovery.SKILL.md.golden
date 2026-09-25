@@ -69,11 +69,11 @@ If the first specific line does not move it, more lines will not either - go to 
 
 There is no interrupt key available to you, so a looping or unresponsive Crew is recovered by replacement, not by rescue.
 
-1. Read the branch it has so far: `git -C <worktree> log --oneline main..<branch>`. Committed work is not lost.
+1. Read the branch it has so far: `mate diff shop <id> --stat`, which compares it with the default branch of its own repo. Committed work is not lost.
 2. Copy the `# Task` part of `/ws/.mate/projects/shop/crews/<id>/brief.md` - the app's copy, which also holds any captain's words appended since spawn - to `briefs/<new-id>.md`, and add `- Already tried (crew <id>): ...` lines to its `## What we already know`, above the `Unknown:` line: what it attempted, where it got stuck, and what not to repeat.
    Run `mate brief check` on it.
 3. Stop the old Crew. Use `mate crew stop shop <id>` first; if it refuses because the branch is unlanded, keep it - do not reach for `--discard` to make a refusal go away.
-4. Spawn the replacement with the new brief, with `--scout` again if the old Crew was a scout.
+4. Spawn the replacement with the new brief, with the same `--repo` as the old Crew, and `--scout` again if it was a scout.
 5. Update `/ws/.mate/projects/shop/mate/backlog.md`: the old id closed with what happened, the new id under In flight.
 
 A low context reading is not stuck.

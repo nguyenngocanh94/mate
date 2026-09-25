@@ -47,7 +47,7 @@ func mergeLiveWorkspace(t *testing.T, session string, yolo bool) *store.Workspac
 	}
 	runGitOrFatal(t, repo, "add", "README.md")
 	runGitOrFatal(t, repo, "commit", "-m", "readme")
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo, DefaultBranch: "main", Yolo: yolo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}, Yolo: yolo}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w

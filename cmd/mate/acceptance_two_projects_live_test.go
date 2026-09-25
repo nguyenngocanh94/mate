@@ -102,13 +102,13 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		"docs/hardware.md":   "Bench rig: one ESP32 devkit and one relay board.\n",
 		"docs/pricing.md":    "Prices are in VND, inclusive of tax.\n",
 	})
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: shop, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: shop, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject shop: %v", err)
 	}
 
 	blog := filepath.Join(w.Root(), "blog")
 	writeRepo(t, blog, map[string]string{"README.md": "# blog\n\nA tiny blog.\n"})
-	if err := w.AddProject("blog", store.ProjectConfig{Repo: blog, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: blog, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject blog: %v", err)
 	}
 	// `mate project yolo blog on`, through the command itself: the flag

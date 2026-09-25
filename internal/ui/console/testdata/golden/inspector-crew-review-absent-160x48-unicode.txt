@@ -12,8 +12,7 @@
                                                                                                    │ Binding          none · session ended after completion     
                                                                                                    │                  report                                    
                                                                                                    │                                                            
-                                                                                                   │ Repo             payments-api                              
-                                                                                                   │ Repo ID          repo_01J9M1E7K1V6B3G8Z2F5S0R9TH           
+                                                                                                   │ Repo             payments-api  repos/payments-api          
                                                                                                    │ Branch           crew/task_1/attempt-1                     
                                                                                                    │ Worktree         /Users/dev/work/acme/repos/payments-api/  
                                                                                                    │                  .worktrees/                               
@@ -24,6 +23,7 @@
                                                                                                    │ Reason           none · the recorded status of this        
                                                                                                    │                  attempt is not an error state             
                                                                                                    │ Attention        unknown · r re-reads                      
+                                                                                                   │                                                            
                                                                                                    │                                                            
                                                                                                    │                                                            
                                                                                                    │                                                            

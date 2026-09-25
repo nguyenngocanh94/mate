@@ -54,7 +54,7 @@ func TestMateStatusPrintsOneLineForAStoppedProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 

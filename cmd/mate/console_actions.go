@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
@@ -30,8 +32,7 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return startMateAction(ctx, ws, deps, req)
 		case console.ActionOnboard:
 			if req.TargetKind == "workspace" {
-				return "", observability.NewError(observability.CodeUsage,
-					"use `mate project add <name> <repo>`; the Console cannot register a repo it has not been given")
+				return addProjectAction(ws, req)
 			}
 			return startMateAction(ctx, ws, deps, req)
 		case console.ActionStop:
@@ -193,4 +194,45 @@ func consoleHarness(kind query.HarnessKind) (harness.Kind, error) {
 		return "", observability.WrapError(observability.CodeUsage, "harness", err)
 	}
 	return parsed, nil
+}
+
+// addProjectAction is the Console's new-project form: the same registration
+// `mate project add <name> [<repo>]` performs, with the repo path resolved
+// against the workspace root rather than a shell's working directory, since
+// the Console has no cwd the reader chose. An empty repo registers a
+// Project with no repo yet (docs/mvp.md M9).
+//
+// It registers through a freshly opened Workspace rather than the shared
+// one: the snapshot loader re-reads workspace.yaml into that one on every
+// refresh, from another goroutine, and the next refresh picks the new
+// Project up from disk anyway.
+func addProjectAction(ws *store.Workspace, req console.ActionRequest) (string, error) {
+	name, repo := strings.TrimSpace(req.Input), strings.TrimSpace(req.Repo)
+	if name == "" {
+		return "", observability.NewError(observability.CodeUsage, "project name is required")
+	}
+	fresh, err := store.Open(ws.Root())
+	if err != nil {
+		return "", err
+	}
+	if repo == "" {
+		if _, err := addProject(fresh, name, projectAddOptions{}); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Project %s added with no repo yet; add one with `mate project repo add %s <path>`", name, name), nil
+	}
+	absRepo := repo
+	if !filepath.IsAbs(absRepo) {
+		absRepo = filepath.Join(fresh.Root(), repo)
+	}
+	repoCfg, err := repoConfigFor(absRepo, repo, "", "")
+	if err != nil {
+		return "", err
+	}
+	saved, err := addProject(fresh, name, projectAddOptions{Repos: []store.RepoConfig{repoCfg}})
+	if err != nil {
+		return "", err
+	}
+	added := saved.Repos[0]
+	return fmt.Sprintf("Project %s added: repo %s, default branch %s", name, added.Path, added.DefaultBranch), nil
 }

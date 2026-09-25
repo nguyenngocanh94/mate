@@ -33,7 +33,7 @@ func consoleFixture(t *testing.T, project string) (*store.Workspace, spawn.Deps)
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject(project, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	rt := runtime.NewFake()

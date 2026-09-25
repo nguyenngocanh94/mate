@@ -378,6 +378,7 @@ func (m Model) beginActions() Model {
 	m.confirm = nil
 	m.actionInputMode = false
 	m.actionInput = ""
+	m.actionRepo, m.actionField = "", fieldName
 	m.actionChoices = m.actionChoicesForSelected()
 	m.actionRow, _ = m.selectedRow()
 	m.actionIndex = 0
@@ -407,6 +408,7 @@ func (m Model) beginNewProject() Model {
 	m.pendingChoice = choice
 	m.actionInputMode = true
 	m.actionInput = ""
+	m.actionRepo, m.actionField = "", fieldName
 	m.msg = footerMsg{}
 	return m
 }
@@ -436,6 +438,7 @@ func (m Model) closeActions() Model {
 	m.confirm = nil
 	m.actionInputMode = false
 	m.actionInput = ""
+	m.actionRepo, m.actionField = "", fieldName
 	m.pendingChoice = actionChoice{}
 	m.harnessPick = false
 	m.harnessIndex = 0
@@ -463,6 +466,7 @@ func (m Model) handleActionEnter() (Model, tea.Cmd) {
 	if choice.action == ActionOnboard && choice.req.TargetKind == "workspace" {
 		m.actionInputMode = true
 		m.actionInput = ""
+		m.actionRepo, m.actionField = "", fieldName
 		m.pendingChoice = choice
 		return m, nil
 	}
@@ -511,13 +515,43 @@ func (m Model) onActionOverlayKey(key string) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// onboardField is one field of the new-project form: the Project's name,
+// and optionally the git repository it starts with (`mate project add
+// <name> [<repo>]`). A Project may be created with no repo and given repos
+// later with `mate project repo add` (docs/mvp.md M9).
+type onboardField int
+
+const (
+	fieldName onboardField = iota
+	fieldRepo
+)
+
+// Input limits: a name longer than this is no name anyone types, and a path
+// longer than PATH_MAX-ish is not a path this filesystem holds.
+const (
+	onboardNameLimit = 120
+	onboardRepoLimit = 1024
+)
+
 func (m Model) onActionInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab", "shift+tab", "up", "down":
+		m.actionField = 1 - m.actionField
+		return m, nil
 	case "esc", "backspace":
-		if msg.String() == "backspace" && m.actionInput != "" {
-			r := []rune(m.actionInput)
-			m.actionInput = string(r[:len(r)-1])
-			return m, nil
+		if msg.String() == "backspace" {
+			if field := m.onboardValue(); *field != "" {
+				r := []rune(*field)
+				*field = string(r[:len(r)-1])
+				return m, nil
+			}
+			// Backspace on an empty Repo steps back into Name, the way
+			// it would in any two-field form, rather than throwing the
+			// typed name away.
+			if m.actionField == fieldRepo {
+				m.actionField = fieldName
+				return m, nil
+			}
 		}
 		// Esc unwinds exactly one step: back to the menu when the menu is
 		// what opened this input, and out of the overlay entirely when the
@@ -525,13 +559,24 @@ func (m Model) onActionInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if m.actions {
 			m.actionInputMode = false
 			m.actionInput = ""
+			m.actionRepo, m.actionField = "", fieldName
 			m.pendingChoice = actionChoice{}
 			return m, nil
 		}
 		return m.closeActions(), nil
 	case "enter":
 		if strings.TrimSpace(m.actionInput) == "" {
+			m.actionField = fieldName
 			m.msg = errMsg("Action refused: project name is required · nothing started")
+			return m, nil
+		}
+		// Enter on the name moves on to the repo, so the common case is
+		// name, Enter, path, Enter - never a submit with the path unasked.
+		// Enter on an empty repo is the answer "no repo yet": the Project
+		// is created without one.
+		if m.actionField == fieldName && strings.TrimSpace(m.actionRepo) == "" {
+			m.actionField = fieldRepo
+			m.msg = footerMsg{}
 			return m, nil
 		}
 		// The pending choice is the input's own, not whatever the menu
@@ -540,20 +585,33 @@ func (m Model) onActionInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if choice.action == "" {
 			return m.closeActions(), nil
 		}
-		choice.req.Input = m.actionInput
+		choice.req.Input = strings.TrimSpace(m.actionInput)
+		choice.req.Repo = strings.TrimSpace(m.actionRepo)
 		return m.runAction(choice)
+	}
+	field, limit, label := &m.actionInput, onboardNameLimit, "Project name"
+	if m.actionField == fieldRepo {
+		field, limit, label = &m.actionRepo, onboardRepoLimit, "Repo path"
 	}
 	for _, r := range msg.Runes {
 		if unicode.IsPrint(r) && !unicode.IsSpace(r) || r == ' ' {
-			if len([]rune(m.actionInput)) < 120 {
-				m.actionInput += string(r)
+			if len([]rune(*field)) < limit {
+				*field += string(r)
 				m.msg = footerMsg{}
 			} else {
-				m.msg = infoMsg("Project name limit reached (120 characters); further input is ignored")
+				m.msg = infoMsg(fmt.Sprintf("%s limit reached (%d characters); further input is ignored", label, limit))
 			}
 		}
 	}
 	return m, nil
+}
+
+// onboardValue is the field the keyboard is typing into.
+func (m *Model) onboardValue() *string {
+	if m.actionField == fieldRepo {
+		return &m.actionRepo
+	}
+	return &m.actionInput
 }
 
 func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
@@ -756,15 +814,58 @@ func (m Model) confirmationLines(w, h int, choice actionChoice) []*line {
 }
 
 func (m Model) onboardInputLines(w, h int) []*line {
+	field := func(f onboardField, label, value string) *line {
+		l := newLine().pad(2)
+		style := m.p.Dim
+		if m.actionField == f {
+			l.add(m.g.Selected+" ", m.p.Acc)
+			style = m.p.Fg
+			value += "_"
+		} else {
+			l.add("  ", m.p.Dim)
+		}
+		return l.add(padRight(label, onboardLabelWidth), m.p.Dim).add(value, style)
+	}
+	// The root gets a line of its own: a real workspace path is long, and
+	// after the sentence that introduces it, it would be the part cut off
+	// at the pane edge.
+	root := "the workspace root"
+	if ws := m.tree.Workspace; ws.IsKnown() && ws.Value.Root != "" {
+		root = ws.Value.Root
+	}
+	enter := m.onboardEnterLabel()
 	out := []*line{
 		newLine().pad(2).add("NEW PROJECT", m.p.Bold),
 		newLine().pad(2).add(strings.Repeat(m.g.HRule, maxInt(1, w-4)), m.p.Faint),
-		newLine().pad(2).add("Name    ", m.p.Dim).add(m.actionInput+"_", m.p.Fg),
-		newLine().pad(2).add("Create a Project record; no runtime agent is started.", m.p.Dim),
+		field(fieldName, "Name", m.actionInput),
+		field(fieldRepo, "Repo (optional)", m.actionRepo),
 		newLine(),
-		newLine().pad(2).add("Enter ", m.p.Fg).add("Create project", m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
+		newLine().pad(2).add("Repo is a git repo root, absolute or relative to the workspace:", m.p.Dim),
+		newLine().pad(4).add(root, m.p.Fg),
+		newLine().pad(2).add("Leave it empty to create the Project with no repo; add repos later with `mate project repo add`.", m.p.Dim),
+		newLine().pad(2).add("Registers a Project, like `mate project add`; no runtime agent is started.", m.p.Dim),
+		newLine(),
+		newLine().pad(2).add("Enter ", m.p.Fg).add(enter, m.p.Dim).add("  Tab ", m.p.Fg).add("Switch field", m.p.Dim).add("  Esc ", m.p.Fg).add("Cancel", m.p.Dim),
 	}
 	return fitLines(out, h)
+}
+
+// onboardLabelWidth fits the form's longest label, "Repo (optional)", plus
+// a gap.
+const onboardLabelWidth = 17
+
+// onboardEnterLabel is what Enter does in the new-project form right now,
+// for the key line: move on to the repo, create the Project with the typed
+// repo, or create it with none.
+func (m Model) onboardEnterLabel() string {
+	switch {
+	case strings.TrimSpace(m.actionRepo) != "":
+		return "Create project"
+	case m.actionField == fieldRepo:
+		return "Create without repo"
+	default:
+		return "Next"
+	}
 }
 
 // ---------- the Mate keys: s (create/start/resume) and h (change harness) ----------

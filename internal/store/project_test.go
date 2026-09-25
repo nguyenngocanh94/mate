@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -14,7 +15,7 @@ import (
 func newProjectWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w
@@ -23,7 +24,7 @@ func newProjectWorkspace(t *testing.T) *store.Workspace {
 func TestStoreProjectAddLoadSave(t *testing.T) {
 	w := newWorkspace(t)
 
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 
@@ -31,7 +32,8 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
-	if cfg.Repo != "shop" || cfg.DefaultBranch != store.DefaultBranch || cfg.Mode != store.ModeLocalOnly || cfg.Yolo {
+	want := []store.RepoConfig{{Name: "shop", Path: "shop", DefaultBranch: store.DefaultBranch}}
+	if !reflect.DeepEqual(cfg.Repos, want) || cfg.Mode != store.ModeLocalOnly || cfg.Yolo {
 		t.Fatalf("defaults not applied: %+v", cfg)
 	}
 
@@ -42,7 +44,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 	}
 
 	cfg.Yolo = true
-	cfg.DefaultBranch = "trunk"
+	cfg.Repos[0].DefaultBranch = "trunk"
 	if err := w.SaveProject("shop", cfg); err != nil {
 		t.Fatalf("SaveProject: %v", err)
 	}
@@ -50,7 +52,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject after save: %v", err)
 	}
-	if !reloaded.Yolo || reloaded.DefaultBranch != "trunk" {
+	if !reloaded.Yolo || reloaded.Repos[0].DefaultBranch != "trunk" {
 		t.Fatalf("round trip lost fields: %+v", reloaded)
 	}
 
@@ -60,11 +62,11 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 		t.Fatalf("Open: %v", err)
 	}
 	refs := reopened.Projects()
-	if len(refs) != 1 || refs[0].Name != "shop" || refs[0].Repo != "shop" {
+	if len(refs) != 1 || refs[0].Name != "shop" {
 		t.Fatalf("projects = %+v, want one shop entry", refs)
 	}
 
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); !errors.Is(err, store.ErrProjectExists) {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); !errors.Is(err, store.ErrProjectExists) {
 		t.Fatalf("duplicate AddProject: err = %v, want ErrProjectExists", err)
 	}
 
@@ -143,13 +145,16 @@ func TestStoreAddProjectRejectsBadConfig(t *testing.T) {
 		proj string
 		cfg  store.ProjectConfig
 	}{
-		{"invalid name", "Shop", store.ProjectConfig{Repo: "shop"}},
-		{"empty repo", "shop", store.ProjectConfig{}},
-		{"repo outside workspace", "shop", store.ProjectConfig{Repo: outside}},
-		{"repo escaping with ..", "shop", store.ProjectConfig{Repo: "../elsewhere"}},
-		{"repo is the root", "shop", store.ProjectConfig{Repo: "."}},
-		{"repo inside state dir", "shop", store.ProjectConfig{Repo: ".mate/projects"}},
-		{"unsupported mode", "shop", store.ProjectConfig{Repo: "shop", Mode: "remote"}},
+		{"invalid name", "Shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}},
+		{"empty repo path", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: ""}}}},
+		{"invalid repo name", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "Api", Path: "shop"}}}},
+		{"repo name twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop"}, {Name: "a", Path: "blog"}}}},
+		{"repo path twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop"}, {Name: "b", Path: "./shop"}}}},
+		{"repo outside workspace", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: outside}}}},
+		{"repo escaping with ..", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "../elsewhere"}}}},
+		{"repo is the root", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "."}}}},
+		{"repo inside state dir", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: ".mate/projects"}}}},
+		{"unsupported mode", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}, Mode: "remote"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -170,24 +175,28 @@ func TestStoreRepoNeedNotBeADirectChild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := w.AddProject("blog", store.ProjectConfig{Repo: nested}); err != nil {
+	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: nested}}}); err != nil {
 		t.Fatalf("AddProject with a nested repo: %v", err)
 	}
 	cfg, err := w.LoadProject("blog")
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
-	if cfg.Repo != "group/blog" {
-		t.Fatalf("repo = %q, want the path relative to the root", cfg.Repo)
+	repo, err := cfg.SoleRepo()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if w.RepoDir(cfg.Repo) != nested {
-		t.Fatalf("RepoDir = %q, want %q", w.RepoDir(cfg.Repo), nested)
+	if repo.Path != "group/blog" || repo.Name != "blog" {
+		t.Fatalf("repo = %+v, want path group/blog named blog", repo)
+	}
+	if w.RepoDir(repo.Path) != nested {
+		t.Fatalf("RepoDir = %q, want %q", w.RepoDir(repo.Path), nested)
 	}
 }
 
 func TestStoreAutoFlag(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 

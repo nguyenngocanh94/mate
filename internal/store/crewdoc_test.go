@@ -17,7 +17,7 @@ func TestInitAndAddProjectSeedCrewDocs(t *testing.T) {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.AddProject("shop", ProjectConfig{Repo: repo}); err != nil {
+	if err := w.AddProject("shop", ProjectConfig{Repos: []RepoConfig{{Path: repo}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{w.WorkspaceCrewDoc(), w.ProjectCrewDoc("shop")} {
