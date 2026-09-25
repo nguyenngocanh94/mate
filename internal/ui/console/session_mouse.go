@@ -218,10 +218,9 @@ func (m Model) runBoxEntryAction(id labelID, project string, b boxList, index in
 
 // ---------- the project frame ----------
 
-// onFrameMouse is the mouse outside the session view. Only the box panel
-// responds: it is the one region of a project frame whose rows carry
-// actions of their own, and the rest of the frame is a table a reader moves
-// through with the arrow keys.
+// onFrameMouse is the mouse outside the session view. A press on a list
+// Mate/Crew row is Enter (docs/mvp.md M10). The box panel still owns
+// presses on its own rows.
 func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	ev := tea.MouseEvent(msg)
 	// The diff overlay takes the wheel over the whole frame while it is
@@ -238,6 +237,23 @@ func (m Model) onFrameMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.actions || m.actionInputMode || m.harnessPick || m.confirm != nil {
 		return m, nil
+	}
+	if ev.Action == tea.MouseActionPress && ev.Button == tea.MouseButtonLeft {
+		if idx, ok := m.listRowIndexAt(ev.X, ev.Y); ok {
+			rows := m.currentRows()
+			f := m.cur()
+			f.sel = idx
+			f.selID = rows[idx].id
+			m = m.setCur(f)
+			m.focus = paneList
+			m.inspTop = 0
+			m.msg = footerMsg{}
+			r := rows[idx]
+			if r.kind == rowMate || r.kind == rowCrew {
+				return m.onEnter()
+			}
+			return m, nil
+		}
 	}
 	top, h, ok := m.boxPanelBodyRegion()
 	if !ok || ev.Y < top || ev.Y >= top+h {

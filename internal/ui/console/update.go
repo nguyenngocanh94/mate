@@ -66,6 +66,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionCloseSentMsg:
 		// Snapshot mode's own close, and the other half of the pending open.
 		return m.startPendingBoxOpen()
+	case stageDoneMsg:
+		return m.onStageDone(msg), nil
 	case tea.KeyMsg:
 		return m.onKey(msg)
 	case tea.MouseMsg:
@@ -551,6 +553,9 @@ func (m Model) onEnter() (tea.Model, tea.Cmd) {
 		// summary. This is the only place the chain is cleared.
 		m = m.clearOpenFailures()
 		if target, ok := m.sessionAvailableFor(r); ok {
+			if m.stage != nil {
+				return m.beginStage(target)
+			}
 			return m.beginSession(r, target)
 		}
 		return m.beginAttach(r)

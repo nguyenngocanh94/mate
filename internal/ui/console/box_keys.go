@@ -298,6 +298,9 @@ func (m Model) openBoxCrew(e query.BoxEntry) (Model, tea.Cmd) {
 	m.msg, m.boxMsg = footerMsg{}, footerMsg{}
 	m = m.clearOpenFailures()
 	if target, ok := m.sessionAvailableFor(r); ok {
+		if m.stage != nil {
+			return m.beginStage(target)
+		}
 		return m.beginSession(r, target)
 	}
 	return m.beginAttach(r)

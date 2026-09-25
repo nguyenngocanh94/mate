@@ -534,6 +534,7 @@ internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất 
 internal/spawn/          start Mate, spawn Crew
 internal/brief/          schema brief M7: tên section, `brief check`, `brief append`
 internal/facts/          `project facts`: chỉ metadata git, không mở file nào
+internal/host/           host-pane attach: WezTerm/Ghostty Stage (M10)
 internal/runtime/        copy v1
 internal/harness/        copy v1
 internal/process/        copy v1
@@ -746,5 +747,48 @@ Quyết định:
 | 41 ∥ | Sau 39: `project facts`, `recall` phần 2, `memory check` với mốc `<repo>:<branch>@<sha>`; manual Mate (mục 1, 4, 6, 7, 14) liệt kê repo và dạy `--repo`, nói rõ một crew một repo; mẫu `PROJECT.md`. | Golden manual; unit facts/recall/memory cho không, một và hai repo; test ngân sách manual. Đã xong 2026-09-25: `project facts` in một khối mỗi repo (`<project>: repo <name> at <path>, default branch <b>`, `head: <sha> (anchor <repo>:<b>@<sha>)`), hoặc `repos: none` kèm gợi ý, exit 0; mốc `<repo>:<branch>@<sha\|none>` với branch phải là default branch của repo đó, mốc trần hợp lệ khi đúng một repo, bị báo khi nhiều repo (gợi ý dạng có repo), không repo thì mọi dòng repo-state là vấn đề; cảnh báo mốc cũ so với head của đúng repo. Start Mate chạy cho project không repo và nhiều repo; manual liệt kê repo (bảng), mục 5 thêm quyết định "một crew một repo", mục 7 dạy `--repo`; manual 75.157 → 79.437 byte. Chưa chạy live. |
 | 42 ∥ | Sau 39: query và console: tên project là tên project (không còn `filepath.Base(repo)`), inspector liệt kê repo, form New project có ô Repo tuỳ chọn (trống = project chưa có repo). | Golden console; unit form gửi request không repo; `mate .` hiện project không repo và project hai repo. Đã xong 2026-09-25: query trả đường dẫn repo tương đối workspace, repo của crew theo `.meta` (Unknown có lý do khi không nói được); inspector project liệt kê `name · branch` rồi đường dẫn, project không repo hiện "none yet · a crew needs one" kèm lệnh; inspector crew hiện repo; form New project có "Repo (optional)", trống thì tạo project không repo. Thử bằng binary thật trong tmux. |
 | 43 | Sau 40-42: acceptance live: tạo project không repo từ console, `project repo add` hai repo, Mate chia một yêu cầu chạm cả hai repo thành hai crew ship, mỗi crew merge vào đúng repo. | Evidence `docs/evidence/m9-multi-repo-<ngày>.md`, hai lần pass liên tiếp. |
+
+### M10. Host stage: cột host hiện terminal agent
+
+Chốt 2026-09-25.
+Captain mở mate trong một split của host terminal (Ghostty, WezTerm, iTerm).
+Cột còn lại là sân khấu: click hoặc Enter một hàng Mate/Crew thì host tự hiện `herdr agent attach` của agent đó.
+Host sở hữu layout; Herdr sở hữu process agent; mate console chỉ điều phối.
+
+Quyết định:
+
+- Package mới `internal/host`, không nhét vào `internal/runtime` (adapter Herdr).
+  Herdr vẫn tạo session/workspace/tab và start agent.
+  Host chỉ đặt client attach vào pane của captain.
+- Port một việc: `Stage(ctx, StageTarget) (StageHandle, error)`.
+  `StageTarget` mang Herdr session name, agent name, kind (mate/crew), id domain.
+  Driver được chọn lúc mở console từ môi trường, không từ config.
+- Nhận diện, theo thứ tự, dừng ở cái đầu khớp:
+  1. `WEZTERM_PANE` khác rỗng → WezTerm
+  2. `TERM_PROGRAM=ghostty` → Ghostty (macOS AppleScript)
+  3. `TERM_PROGRAM=iTerm.app` → iTerm, để sau
+  4. không khớp → `None`: console giữ stream mode nhúng PTY như hiện tại
+- WezTerm: `wezterm cli get-pane-direction --pane-id $WEZTERM_PANE Right`.
+  Có pane stage do lần `Stage` trước của **cùng process console** thì `kill-pane` rồi `split-pane --right --percent <giữ>` với argv `herdr --session <s> agent attach <agent>`.
+  Chưa có thì `split-pane` thôi.
+  Cấm `send-text` vào pane đang attach.
+- Ghostty 1.3+: `osascript` `split` pane đang focus `direction right` với `surface configuration.command` là cùng argv attach, `wait after command` bật.
+  Lần sau `close` terminal id đã lưu rồi `split` lại.
+  Cấm `input text` vào pane đang attach.
+  Không có `GHOSTTY_SURFACE_ID`; handle stage sống trong process console, mất khi tắt mate.
+- Chỉ giết pane mà chính `Stage` vừa tạo (handle trong bộ nhớ).
+  Pane phải có sẵn (nvim, shell của captain) thì từ chối với một dòng, không `kill-pane`.
+  Captain tự split trống rồi bấm lần nữa, hoặc để mate tạo split mới khi bên phải chưa có gì.
+- Console không import `internal/host` hay `internal/runtime`.
+  `cmd/mate` bơm một `StageFunc` seam, cùng kiểu `SessionStreamFactory`.
+  Khi host không phải `None`, Enter/click hàng Mate hoặc Crew gọi `Stage` và **ở lại** khung cây/inbox; không mở session view, không PTY trong console.
+  Khi `None`, hành vi task 09 giữ nguyên.
+- Chuột: hàng Mate/Crew trên cây bấm trái cùng nghĩa Enter.
+  Inbox vẫn mở đúng crew, qua `Stage` nếu host có.
+- `mate console [<workspace>]` mở console và gọi `EnsureSplit`: tạo pane trống bên phải (shell mặc định), giữ focus ở pane mate, ghi handle để `Stage` thay bằng `herdr agent attach`. Pane phải thì in một dòng lên stderr rồi vẫn mở console. `mate` / `mate <dir>` không tự split.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 44 | `internal/host`: `Detect` từ env, port `Stage`, fake CLI/osascript, driver WezTerm và Ghostty theo quyết định trên; `cmd/mate` chọn driver lúc mở console, bơm `StageFunc`. Console: khi `StageFunc` khác nil thì Enter và click hàng Mate/Crew (cây và inbox) gọi stage, không `beginSession`; host `None` hoặc `StageFunc` nil thì golden session stream không đổi. | Unit: fixture env WezTerm/`ghostty`/trống; fake WezTerm ghi `get-pane-direction` + `split-pane --right` với argv `herdr … agent attach`, lần hai `kill-pane` đúng id đã trả, không có `send-text`; fake Ghostty ghi `split` rồi lần hai `close` + `split`, không có `input text`; pane phải không phải handle của mình thì `Stage` từ chối và không kill. Golden: Enter trên Mate với `StageFunc` không vẽ session frame, có một lời gọi stage; không `StageFunc` thì fixture `session-mate-120x36` còn khớp. `make check` xanh. Đã xong 2026-09-25. |
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

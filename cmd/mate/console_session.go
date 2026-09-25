@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -13,6 +14,28 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
+
+// consoleStage is the host-pane attach seam (docs/mvp.md M10). A nil Host
+// yields a nil StageFunc, which the Console reads as "keep the embedded
+// session view".
+func consoleStage(ws *store.Workspace, h host.Host) console.StageFunc {
+	if h == nil {
+		return nil
+	}
+	return func(ctx context.Context, target console.SessionTarget) error {
+		ref, err := sessionRef(ws, target)
+		if err != nil {
+			return err
+		}
+		_, err = h.Stage(ctx, host.StageTarget{
+			Kind:      string(target.Kind),
+			ID:        target.ID,
+			Session:   ref.HerdrSession,
+			AgentName: ref.AgentName,
+		})
+		return err
+	}
+}
 
 // consoleSessionStream is the runtime/UI boundary for the embedded session
 // view (ADR 0026). The Console receives only its own SessionChannel

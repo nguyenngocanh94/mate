@@ -30,6 +30,11 @@ type SessionChannel interface {
 // internal/ui/console does not resolve state or import runtime.
 type SessionStreamFactory func(context.Context, SessionTarget, TerminalSize) (SessionChannel, error)
 
+// StageFunc shows the named agent in the host terminal's sibling pane
+// (docs/mvp.md M10). The Console never talks to WezTerm or Ghostty; cmd/mate
+// builds this closure. A nil StageFunc keeps the embedded session view.
+type StageFunc func(context.Context, SessionTarget) error
+
 // SessionMetadataReader refreshes the slow side channels while stream output
 // remains the hot path. Its result may contain recorded status, runtime
 // observation and inbox data, but its transcript is never applied in stream

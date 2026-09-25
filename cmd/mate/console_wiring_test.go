@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
+	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -399,5 +400,52 @@ func TestConsoleSessionMetadataFollowsACrewStatusFile(t *testing.T) {
 	}
 	if snap.RecordedStatus.Value != string(query.CrewFailed) {
 		t.Fatalf("recorded for a silent discarded crew = %+v, want failed", snap.RecordedStatus)
+	}
+}
+
+type recordingHost struct {
+	targets []host.StageTarget
+}
+
+func (r *recordingHost) EnsureSplit(context.Context) (host.StageHandle, error) {
+	return host.StageHandle{PaneID: "pane-1"}, nil
+}
+
+func (r *recordingHost) Stage(_ context.Context, t host.StageTarget) (host.StageHandle, error) {
+	r.targets = append(r.targets, t)
+	return host.StageHandle{PaneID: "pane-1"}, nil
+}
+
+func TestConsoleStageResolvesMateMeta(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	action := consoleAction(w, deps)
+	if _, err := action(context.Background(), console.ActionRequest{Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	rec := &recordingHost{}
+	fn := consoleStage(w, rec)
+	if fn == nil {
+		t.Fatal("consoleStage on a Host is nil")
+	}
+	err := fn(context.Background(), console.SessionTarget{Kind: console.SessionTargetMate, ProjectID: "shop"})
+	if err != nil {
+		t.Fatalf("stage: %v", err)
+	}
+	if len(rec.targets) != 1 {
+		t.Fatalf("stage calls = %d, want 1", len(rec.targets))
+	}
+	got := rec.targets[0]
+	if got.Session != w.Session() {
+		t.Fatalf("session = %q, want workspace session %q", got.Session, w.Session())
+	}
+	if got.AgentName != "mate-shop" {
+		t.Fatalf("agent = %q, want mate-shop", got.AgentName)
+	}
+}
+
+func TestConsoleStageNilHostIsNil(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	if consoleStage(w, nil) != nil {
+		t.Fatal("consoleStage(nil) must be nil")
 	}
 }

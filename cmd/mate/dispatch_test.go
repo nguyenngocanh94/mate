@@ -29,6 +29,33 @@ func TestRunTopLevelVersionFlag(t *testing.T) {
 	}
 }
 
+func TestRunConsoleSubcommandNeedsATerminal(t *testing.T) {
+	ws := t.TempDir()
+	var out, errw bytes.Buffer
+	if err := cmdInit([]string{ws}, &out, &errw); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	out.Reset()
+	errw.Reset()
+	err := run([]string{"console", ws}, &out, &errw)
+	var ue *usageError
+	if !errors.As(err, &ue) {
+		t.Fatalf("err = %v, want *usageError (console needs a TTY)", err)
+	}
+	if !strings.Contains(err.Error(), "real terminal") {
+		t.Fatalf("err = %v, want the console TTY refusal", err)
+	}
+}
+
+func TestRunConsoleSubcommandRejectsExtraArgs(t *testing.T) {
+	var out, errw bytes.Buffer
+	err := run([]string{"console", "a", "b"}, &out, &errw)
+	var ue *usageError
+	if !errors.As(err, &ue) {
+		t.Fatalf("err = %v, want *usageError", err)
+	}
+}
+
 func TestRunUnknownCommandIsUsageError(t *testing.T) {
 	var out, errw bytes.Buffer
 	err := run([]string{"bogus"}, &out, &errw)

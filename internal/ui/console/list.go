@@ -116,14 +116,36 @@ func rowListLine(idx int, build func(selected, focused bool) *line) listLine {
 // the rows in view, windowed to h lines with an indicator for whatever is
 // off screen above or below.
 func (m Model) listLines(w, h int) []*line {
+	visible, start, below, needUp, needDown := m.windowedListItems(w, h)
 	if h <= 0 {
 		return nil
+	}
+	focused := m.focus == paneList
+	out := make([]*line, 0, h)
+	if needUp {
+		out = append(out, newLine().pad(2).add(fmt.Sprintf("%s %d more", m.g.Up, start), m.p.Dim))
+	}
+	for _, it := range visible {
+		selected := it.rowIdx >= 0 && it.rowIdx == m.cur().sel
+		out = append(out, it.build(selected, focused))
+	}
+	if needDown {
+		out = append(out, newLine().pad(2).add(fmt.Sprintf("%s %d more", m.g.Down, below), m.p.Dim))
+	}
+	return out
+}
+
+// windowedListItems is the list pane's visible rows, sharing the same
+// window as listLines so a click cannot land on a row the renderer did
+// not draw. below is how many items sit under the window (the "N more"
+// count).
+func (m Model) windowedListItems(w, h int) (visible []listLine, start, below int, needUp, needDown bool) {
+	if h <= 0 {
+		return nil, 0, 0, false, false
 	}
 	rows := m.currentRows()
 	items := m.buildListItems(rows, w)
 	f := m.cur()
-	focused := m.focus == paneList
-
 	want := indexOfListItem(items, f.sel)
 	// f.top is the model's own row-space scroll hint (model.go's clampTop,
 	// applied with a budget that assumes one header line - true at every
@@ -141,21 +163,46 @@ func (m Model) listLines(w, h int) []*line {
 			topHint = hint
 		}
 	}
-	start, end, needUp, needDown := windowListItems(len(items), h, topHint, want)
+	var end int
+	start, end, needUp, needDown = windowListItems(len(items), h, topHint, want)
+	return items[start:end], start, len(items) - end, needUp, needDown
+}
 
-	out := make([]*line, 0, h)
+// listRowIndexAt maps a click in the list pane onto currentRows(). Headers,
+// blank separators and the "N more" indicators miss.
+func (m Model) listRowIndexAt(x, y int) (int, bool) {
+	l := m.listLayout()
+	if l.TooSmall || m.phase != phaseReady || m.overlayOwnsRegion() || m.detail {
+		return 0, false
+	}
+	frame := layout(m.w, m.h)
+	listW := l.Cols
+	if m.hasInspectorColumn(frame) {
+		listW = l.List
+	}
+	if x < 0 || x >= listW {
+		return 0, false
+	}
+	rel := y - frameBodyTop
+	if rel < 0 || rel >= l.Body {
+		return 0, false
+	}
+	visible, _, _, needUp, _ := m.windowedListItems(listW, l.Body)
+	item := rel
 	if needUp {
-		out = append(out, newLine().pad(2).add(fmt.Sprintf("%s %d more", m.g.Up, start), m.p.Dim))
+		if rel == 0 {
+			return 0, false
+		}
+		item = rel - 1
 	}
-	for i := start; i < end; i++ {
-		it := items[i]
-		selected := it.rowIdx >= 0 && it.rowIdx == f.sel
-		out = append(out, it.build(selected, focused))
+	if item < 0 || item >= len(visible) {
+		return 0, false
 	}
-	if needDown {
-		out = append(out, newLine().pad(2).add(fmt.Sprintf("%s %d more", m.g.Down, len(items)-end), m.p.Dim))
+	it := visible[item]
+	if it.rowIdx < 0 {
+		return 0, false
 	}
-	return out
+	return it.rowIdx, true
 }
 
 // indexOfListItem finds the display position of the selectable item naming

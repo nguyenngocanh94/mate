@@ -862,6 +862,9 @@ func (m Model) enterLabel(r row) string {
 	// advertise the hand-off panel the Agent View replaced, which is exactly
 	// the confusion issue #60 was.
 	if _, ok := m.sessionAvailableFor(r); ok {
+		if m.stage != nil {
+			return "Show in next pane"
+		}
 		return "Open agent view"
 	}
 	if r.kind == rowMate {

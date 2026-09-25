@@ -43,6 +43,7 @@ var forbiddenImports = []string{
 	// The Console queues through ActionFunc and draws the queue's state as
 	// query.BoxEntry.Assigned; it never reaches the sender itself.
 	"github.com/nguyenngocanh94/mate/internal/outbox",
+	"github.com/nguyenngocanh94/mate/internal/host",
 }
 
 func TestConsoleImportsNeitherStoreNorRuntime(t *testing.T) {

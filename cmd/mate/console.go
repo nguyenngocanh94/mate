@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -26,6 +27,28 @@ import (
 // everything that would need a live agent is refused with a message naming
 // the mvp.md task that wires it, never a fake success.
 func cmdConsole(dir string, stdout, stderr io.Writer) error {
+	return runConsole(dir, stdout, stderr, false)
+}
+
+// cmdConsoleLaunch is `mate console [<workspace-dir>]`: the interactive
+// console, and on a known host (WezTerm, Ghostty) it splits an empty pane
+// to the right before the TUI starts so Enter can fill that pane.
+func cmdConsoleLaunch(args []string, stdout, stderr io.Writer) error {
+	if len(args) > 1 {
+		return newUsageError("usage: mate console [<workspace-dir>]")
+	}
+	dir := ""
+	if len(args) == 1 {
+		dir = args[0]
+	}
+	resolved, err := findWorkspaceDir(dir)
+	if err != nil {
+		return err
+	}
+	return runConsole(resolved, stdout, stderr, true)
+}
+
+func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	ws, err := store.Open(dir)
 	if err != nil {
 		return err
@@ -91,9 +114,16 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	if s, ok := deps.Runtime.(runtime.SessionStream); ok {
 		stream = s
 	}
+	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv})
+	if split && h != nil {
+		if _, err := h.EnsureSplit(ctx); err != nil {
+			fmt.Fprintf(stderr, "mate console: %s\n", err)
+		}
+	}
 	model := console.New(load, notWiredAttachCmd, consoleAction(ws, deps)).
 		WithContext(ctx).
 		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps)).
+		WithStage(consoleStage(ws, h)).
 		WithClipboard(func(seq []byte) {
 			// One write per sequence: the renderer also writes this file
 			// from its own goroutine, one frame per write, so a single

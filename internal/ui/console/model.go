@@ -253,6 +253,10 @@ type Model struct {
 	// sessionStream and sessionMetadata are the ADR 0026 primary transport and
 	// slow side-channel ports. The stream controller state lives in sess.
 	sess sessionFlow
+	// stage, when set, is the host-pane attach (docs/mvp.md M10). Enter and
+	// a click on a Mate/Crew row call it and stay on the tree; they do not
+	// open the embedded session view.
+	stage StageFunc
 	// sessionPollIntervalOverride lets tests replace the real 300-500ms
 	// poll cadence (session_mode.go's pollInterval) so they do not have to
 	// block on it to exercise the tick chain. Zero (every production
@@ -490,6 +494,13 @@ func (m Model) WithSessionStream(factory SessionStreamFactory, metadata ...Sessi
 	if len(metadata) > 0 {
 		m.sessionMetadata = metadata[0]
 	}
+	return m
+}
+
+// WithStage installs the host-pane attach. A nil function leaves Enter on
+// the embedded session view (or the classic hand-off).
+func (m Model) WithStage(fn StageFunc) Model {
+	m.stage = fn
 	return m
 }
 

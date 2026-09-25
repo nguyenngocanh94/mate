@@ -133,7 +133,7 @@ type sessionCloseSentMsg struct{}
 // agent, so the Agent View looks rather than refuses (see attachRefusal's
 // own note on reserved).
 func (m Model) sessionAvailableFor(r row) (SessionTarget, bool) {
-	if m.sessionReader == nil && m.sessionStream == nil {
+	if m.sessionReader == nil && m.sessionStream == nil && m.stage == nil {
 		return SessionTarget{}, false
 	}
 	target, ok := m.sessionTargetFor(r)

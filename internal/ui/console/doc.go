@@ -11,8 +11,9 @@
 // repair/discard/onboard), and the three session-mode ports from ADR 0025
 // (session.go) - SessionReader (snapshot fallback), SessionPrompt (send
 // composer input), SessionClose (release the snapshot controller),
-// SessionStreamFactory (open the primary PTY stream), and
-// SessionMetadataReader (refresh status/runtime/inbox side channels). The
+// SessionStreamFactory (open the primary PTY stream),
+// SessionMetadataReader (refresh status/runtime/inbox side channels), and
+// StageFunc (host-pane attach, docs/mvp.md M10). The
 // CLI layer in cmd/mate is the only place those
 // seams are built, which is where the persistence/runtime access actually
 // happens (G6 gate, see
