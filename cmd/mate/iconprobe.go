@@ -89,6 +89,9 @@ func weztermBinary(getenv func(string) string) string {
 	if p, err := exec.LookPath("wezterm"); err == nil {
 		return p
 	}
+	if p := "/Applications/WezTerm.app/Contents/MacOS/wezterm"; isExecutable(p) {
+		return p
+	}
 	return ""
 }
 

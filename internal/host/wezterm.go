@@ -3,6 +3,8 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -27,18 +29,7 @@ func newWezTerm(opt Options) *wezTerm {
 	if self == "" {
 		self = opt.getenv("WEZTERM_PANE")
 	}
-	// WezTerm.app puts no `wezterm` on PATH. Every pane it spawns gets
-	// WEZTERM_EXECUTABLE_DIR, where the CLI sits beside the GUI (the
-	// WEZTERM_EXECUTABLE it also sets is wezterm-gui, which has no `cli`).
-	bin := opt.WezTerm
-	if bin == "" {
-		if dir := opt.getenv("WEZTERM_EXECUTABLE_DIR"); dir != "" {
-			bin = filepath.Join(dir, "wezterm")
-		}
-	}
-	if bin == "" {
-		bin = "wezterm"
-	}
+	bin := weztermCLI(opt, exec.LookPath, weztermBundles)
 	return &wezTerm{
 		runner:  opt.runner(),
 		bin:     bin,
@@ -194,4 +185,41 @@ func (w *wezTerm) selfCols(ctx context.Context) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// weztermBundles are where WezTerm.app keeps its CLI.
+var weztermBundles = []string{
+	"/Applications/WezTerm.app/Contents/MacOS/wezterm",
+	filepath.Join(os.Getenv("HOME"), "Applications/WezTerm.app/Contents/MacOS/wezterm"),
+}
+
+// weztermCLI finds the `wezterm` CLI. WezTerm.app puts none on PATH; every
+// pane it spawns gets WEZTERM_EXECUTABLE_DIR, where the CLI sits beside the
+// GUI (the WEZTERM_EXECUTABLE it also sets is wezterm-gui, which has no
+// `cli`). A pane that lost that variable - tmux or ssh inside WezTerm -
+// falls back to PATH, then to the app bundle. The bare name is last, so a
+// failure still names what was looked for.
+func weztermCLI(opt Options, lookPath func(string) (string, error), bundles []string) string {
+	if opt.WezTerm != "" {
+		return opt.WezTerm
+	}
+	if dir := opt.getenv("WEZTERM_EXECUTABLE_DIR"); dir != "" {
+		if p := filepath.Join(dir, "wezterm"); isExecutable(p) {
+			return p
+		}
+	}
+	if p, err := lookPath("wezterm"); err == nil {
+		return p
+	}
+	for _, p := range bundles {
+		if isExecutable(p) {
+			return p
+		}
+	}
+	return "wezterm"
+}
+
+func isExecutable(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && !st.IsDir() && st.Mode()&0o111 != 0
 }

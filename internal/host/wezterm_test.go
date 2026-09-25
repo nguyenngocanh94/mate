@@ -3,6 +3,8 @@ package host
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,9 +18,10 @@ func TestWezTermStageSplitsThenReplacesOwnPane(t *testing.T) {
 	script := &weztermScript{self: "10", next: 20}
 	fake := &process.FakeRunner{Handler: script.handle}
 	h := Open(WezTerm, Options{
-		Runner: fake,
-		Pane:   "10",
-		Herdr:  "herdr",
+		Runner:  fake,
+		Pane:    "10",
+		Herdr:   "herdr",
+		WezTerm: "wezterm",
 	})
 	if h == nil {
 		t.Fatal("Open(WezTerm) is nil")
@@ -67,7 +70,7 @@ func TestWezTermStageRefusesAForeignRightPane(t *testing.T) {
 		next:    20,
 		foreign: true,
 	}).handle}
-	h := Open(WezTerm, Options{Runner: fake, Pane: "10"})
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", WezTerm: "wezterm"})
 	_, err := h.Stage(context.Background(), StageTarget{Session: "mate-acme", AgentName: "mate-shop"})
 	if err == nil {
 		t.Fatal("Stage accepted a foreign pane")
@@ -87,7 +90,7 @@ func TestWezTermEnsureSplitCreatesAnEmptyRightPane(t *testing.T) {
 	t.Parallel()
 	script := &weztermScript{self: "10", next: 20}
 	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(WezTerm, Options{Runner: fake, Pane: "10"})
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", WezTerm: "wezterm"})
 	got, err := h.EnsureSplit(context.Background())
 	if err != nil {
 		t.Fatalf("EnsureSplit: %v", err)
@@ -128,7 +131,7 @@ func TestWezTermEnsureSplitThenStageReplacesTheEmptyPane(t *testing.T) {
 	t.Parallel()
 	script := &weztermScript{self: "10", next: 20}
 	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(WezTerm, Options{Runner: fake, Pane: "10", Herdr: "herdr"})
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", Herdr: "herdr", WezTerm: "wezterm"})
 	if _, err := h.EnsureSplit(context.Background()); err != nil {
 		t.Fatalf("EnsureSplit: %v", err)
 	}
@@ -153,7 +156,7 @@ func TestWezTermEnsureSplitRefusesAForeignPane(t *testing.T) {
 	fake := &process.FakeRunner{Handler: (&weztermScript{
 		self: "10", right: "99", foreign: true,
 	}).handle}
-	h := Open(WezTerm, Options{Runner: fake, Pane: "10"})
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", WezTerm: "wezterm"})
 	_, err := h.EnsureSplit(context.Background())
 	if err == nil {
 		t.Fatal("EnsureSplit accepted a foreign pane")
@@ -166,7 +169,7 @@ func TestWezTermEnsureSplitRefusesAForeignPane(t *testing.T) {
 
 func TestWezTermStageRejectsEmptyTarget(t *testing.T) {
 	t.Parallel()
-	h := Open(WezTerm, Options{Runner: &process.FakeRunner{}, Pane: "1"})
+	h := Open(WezTerm, Options{Runner: &process.FakeRunner{}, Pane: "1", WezTerm: "wezterm"})
 	_, err := h.Stage(context.Background(), StageTarget{})
 	if err == nil {
 		t.Fatal("empty target succeeded")
@@ -267,15 +270,19 @@ func TestWezTermRunsTheCLIWezTermNamesForItsPanes(t *testing.T) {
 	t.Parallel()
 	script := &weztermScript{self: "10", next: 20}
 	fake := &process.FakeRunner{Handler: script.handle}
-	exe := "/Applications/WezTerm.app/Contents/MacOS/wezterm"
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "wezterm")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	h := Open(WezTerm, Options{Runner: fake, Herdr: "herdr", Env: func(k string) string {
 		switch k {
 		case "WEZTERM_PANE":
 			return "10"
 		case "WEZTERM_EXECUTABLE_DIR":
-			return "/Applications/WezTerm.app/Contents/MacOS"
+			return dir
 		case "WEZTERM_EXECUTABLE":
-			return "/Applications/WezTerm.app/Contents/MacOS/wezterm-gui"
+			return filepath.Join(dir, "wezterm-gui")
 		}
 		return ""
 	}})
@@ -309,7 +316,7 @@ func TestWezTermSplitLeavesTheConsoleItsColumns(t *testing.T) {
 	} {
 		script := &weztermScript{self: "10", next: 20, cols: tc.cols}
 		fake := &process.FakeRunner{Handler: script.handle}
-		h := Open(WezTerm, Options{Runner: fake, Pane: "10", Herdr: "herdr"})
+		h := Open(WezTerm, Options{Runner: fake, Pane: "10", Herdr: "herdr", WezTerm: "wezterm"})
 		if _, err := h.EnsureSplit(context.Background()); err != nil {
 			t.Fatalf("%d cols: EnsureSplit: %v", tc.cols, err)
 		}
@@ -332,4 +339,40 @@ func argAfter(args []string, flag string) string {
 		}
 	}
 	return ""
+}
+
+// TestWezTermFindsTheAppBundleCLIWithoutItsEnv: a pane whose environment
+// lost WEZTERM_EXECUTABLE_DIR (tmux or ssh inside WezTerm) and has no
+// `wezterm` on PATH still reaches the CLI in the app bundle rather than
+// failing with `exec: "wezterm": executable file not found` (reported
+// 2026-09-25).
+func TestWezTermFindsTheAppBundleCLIWithoutItsEnv(t *testing.T) {
+	t.Parallel()
+	bundle := filepath.Join(t.TempDir(), "wezterm")
+	if err := os.WriteFile(bundle, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got := weztermCLI(Options{Env: func(string) string { return "" }}, func(string) (string, error) {
+		return "", errors.New("not found")
+	}, []string{filepath.Join(t.TempDir(), "missing"), bundle})
+	if got != bundle {
+		t.Fatalf("CLI = %q, want the bundle's %q", got, bundle)
+	}
+	// PATH wins over the bundle, and the pane's own dir wins over both.
+	got = weztermCLI(Options{Env: func(string) string { return "" }}, func(string) (string, error) {
+		return "/usr/local/bin/wezterm", nil
+	}, []string{bundle})
+	if got != "/usr/local/bin/wezterm" {
+		t.Fatalf("CLI = %q, want the one on PATH", got)
+	}
+	dir := filepath.Dir(bundle)
+	got = weztermCLI(Options{Env: func(k string) string {
+		if k == "WEZTERM_EXECUTABLE_DIR" {
+			return dir
+		}
+		return ""
+	}}, func(string) (string, error) { return "/usr/local/bin/wezterm", nil }, nil)
+	if got != bundle {
+		t.Fatalf("CLI = %q, want the pane's own %q", got, bundle)
+	}
 }
