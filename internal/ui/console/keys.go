@@ -11,6 +11,7 @@ import tea "github.com/charmbracelet/bubbletea"
 // key waits.
 func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	m.notice = ""
 	if key == "ctrl+c" || (key == "q" && !m.actionInputMode && !m.diff.open) {
 		if m.actionBusy {
 			return m.onBusyQuit(), tea.Quit

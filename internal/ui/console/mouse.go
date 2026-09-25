@@ -165,6 +165,13 @@ func (m Model) onSheetMouse(p framePlan, sl slot, y int, wheel bool, delta int) 
 	case sheetHarness:
 		if wheel {
 			m.harnessIndex = clampInt(m.harnessIndex+delta, 0, len(harnessOrder)-1)
+			return m, nil
+		}
+		// A click on a harness row is Enter on it, like every other row.
+		top, _ := sl.body()
+		if i := y - top; i >= 0 && i < len(harnessOrder) {
+			m.harnessIndex = i
+			return m.onHarnessKey(tea.KeyMsg{Type: tea.KeyEnter})
 		}
 	}
 	return m, nil

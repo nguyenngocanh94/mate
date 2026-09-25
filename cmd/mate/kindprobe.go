@@ -18,12 +18,18 @@ import (
 // emoji, four cells, and pushes the rest of every row right. So before the
 // TUI starts, mate draws the mark at the start of the current line, asks
 // the terminal where the cursor went (CSI 6n), and erases the line again;
-// if the mark moved anything but two cells it falls back to ◆ / ◇, then to
-// @ / o (the console design, "Emoji width rule").
+// if the mark moved anything but two cells it falls back to ◆ / ◇ (the
+// console design, "Emoji width rule"; @ / o stays MATE_KINDS=ascii).
+//
+// The probe reads the same tty Bubble Tea reads next, so a key typed in
+// the moment before the first frame - while the probe waits for the
+// terminal's answer - is read here and lost. It measures once, and waits at
+// most kindProbeWait: a terminal that answers takes a few milliseconds, and
+// MATE_KINDS skips the probe altogether.
 
 // kindProbeWait is how long mate waits for a cursor-position report. A
 // terminal that does not answer keeps the design's emoji.
-const kindProbeWait = 300 * time.Millisecond
+const kindProbeWait = 150 * time.Millisecond
 
 // probeKindGlyphs picks the kind marks: MATE_KINDS (emoji | symbol |
 // ascii) when set, else what the terminal measures.
@@ -54,16 +60,16 @@ func probeKindGlyphs(getenv func(string) string) console.KindGlyphs {
 	return chooseKindGlyphs(func(s string) (int, bool) { return measureCells(tty, s) })
 }
 
-// chooseKindGlyphs is the fallback order, over a measure that reports how
-// many cells a string advanced the cursor (ok false when unknown).
+// chooseKindGlyphs is the fallback, over a measure that reports how many
+// cells a string advanced the cursor (ok false when unknown). One
+// measurement: ◆ and ◇ are one cell in every terminal that draws Unicode at
+// all, and a second round trip would double the window in which a key can
+// be lost.
 func chooseKindGlyphs(measure func(string) (int, bool)) console.KindGlyphs {
 	if n, ok := measure("👨‍💻"); !ok || n == 2 {
 		return console.KindEmoji
 	}
-	if n, ok := measure("◆"); !ok || n == 1 {
-		return console.KindSymbol
-	}
-	return console.KindASCII
+	return console.KindSymbol
 }
 
 // measureCells draws s at column 1, reads the cursor-position report, and

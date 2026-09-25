@@ -53,7 +53,7 @@ func TestNerdIconsFollowGhosttysOwnFontReport(t *testing.T) {
 }
 
 func TestNerdIconsFollowWeztermsOwnFontReport(t *testing.T) {
-	env := envOf(map[string]string{"WEZTERM_PANE": "3", "WEZTERM_EXECUTABLE": fakeBinary(t, "wezterm")})
+	env := envOf(map[string]string{"WEZTERM_PANE": "3", "WEZTERM_EXECUTABLE_DIR": filepath.Dir(fakeBinary(t, "wezterm"))})
 	have := " 0     \\u{ec82}     x_adv=8  cells=1  glyph=cod-claude,1  wezterm.font(\"Symbols Nerd Font Mono\")"
 	if run, _ := fakeHost(t, have, nil); !probeNerdIcons(env, run) {
 		t.Fatal("WezTerm reported the glyph and the icons stayed off")

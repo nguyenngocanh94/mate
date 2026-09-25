@@ -173,6 +173,9 @@ func (m Model) footerMessage() footerMsg {
 	if m.msg.text != "" {
 		return m.msg
 	}
+	if m.notice != "" {
+		return warnMsg(m.notice)
+	}
 	if d := daemonFooterMsg(m.tree.Projects); d.text != "" {
 		return d
 	}

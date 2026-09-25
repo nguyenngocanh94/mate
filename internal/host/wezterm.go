@@ -2,6 +2,8 @@ package host
 
 import (
 	"context"
+	"encoding/json"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -25,7 +27,15 @@ func newWezTerm(opt Options) *wezTerm {
 	if self == "" {
 		self = opt.getenv("WEZTERM_PANE")
 	}
+	// WezTerm.app puts no `wezterm` on PATH. Every pane it spawns gets
+	// WEZTERM_EXECUTABLE_DIR, where the CLI sits beside the GUI (the
+	// WEZTERM_EXECUTABLE it also sets is wezterm-gui, which has no `cli`).
 	bin := opt.WezTerm
+	if bin == "" {
+		if dir := opt.getenv("WEZTERM_EXECUTABLE_DIR"); dir != "" {
+			bin = filepath.Join(dir, "wezterm")
+		}
+	}
 	if bin == "" {
 		bin = "wezterm"
 	}
@@ -125,13 +135,28 @@ func (w *wezTerm) kill(ctx context.Context, pane string) error {
 	return err
 }
 
+// Console widths (the console design): mate is the left ~20% of the
+// window, never narrower than consoleMinCols nor wider than consoleMaxCols.
+const (
+	consoleMinCols = 40
+	consoleMaxCols = 48
+	stageMinCols   = 10
+)
+
 func (w *wezTerm) split(ctx context.Context, prog []string) (string, error) {
-	cli := []string{
+	size := []string{"--percent", strconv.Itoa(w.percent)}
+	if cols, ok := w.selfCols(ctx); ok {
+		keep := min(max(cols/5, consoleMinCols), consoleMaxCols)
+		// One cell of the split is WezTerm's divider.
+		if stage := cols - keep - 1; stage >= stageMinCols {
+			size = []string{"--cells", strconv.Itoa(stage)}
+		}
+	}
+	cli := append([]string{
 		"cli", "split-pane",
 		"--pane-id", w.self,
 		"--right",
-		"--percent", strconv.Itoa(w.percent),
-	}
+	}, size...)
 	if len(prog) > 0 {
 		cli = append(cli, "--")
 		cli = append(cli, prog...)
@@ -144,4 +169,29 @@ func (w *wezTerm) activate(ctx context.Context) error {
 		"cli", "activate-pane", "--pane-id", w.self,
 	}, nil)
 	return err
+}
+
+// selfCols is the console pane's width now, from `cli list`. A kill of the
+// last stage has just given the console back the whole window, so this is
+// read at every split rather than once.
+func (w *wezTerm) selfCols(ctx context.Context) (int, bool) {
+	out, err := run(ctx, w.runner, w.bin, []string{"cli", "list", "--format", "json"}, nil)
+	if err != nil {
+		return 0, false
+	}
+	var panes []struct {
+		PaneID int `json:"pane_id"`
+		Size   struct {
+			Cols int `json:"cols"`
+		} `json:"size"`
+	}
+	if err := json.Unmarshal([]byte(out), &panes); err != nil {
+		return 0, false
+	}
+	for _, p := range panes {
+		if strconv.Itoa(p.PaneID) == w.self {
+			return p.Size.Cols, p.Size.Cols > 0
+		}
+	}
+	return 0, false
 }

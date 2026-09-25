@@ -19,45 +19,44 @@
 // # The character grid
 //
 // The Console is a character grid, not a document. Its one structural
-// guarantee, which every screen in the redesign is built on:
+// guarantee:
 //
 //	View always returns exactly h lines of exactly w display cells.
 //
-// Display cells, measured with lipgloss.Width - not bytes, not runes, since
-// ids, paths and titles come from the database and are arbitrary text. Every
-// line is emitted through the primitives in cells.go (line and screen), and
-// nothing else in the package writes a rendered line by hand, so the
-// guarantee is checkable in one place.
+// Display cells, measured by grapheme cluster - not bytes, not runes, since
+// ids, paths and titles come from the database and are arbitrary text.
+// Every line is a gline rendered through grid.go, and nothing else writes a
+// frame line, so the guarantee is checkable in one place.
 //
-// Sizes come from tea.WindowSizeMsg and from nowhere else. layout(w, h)
-// resolves the design's four breakpoints (see design/mate-console-design-
-// notes.html, "Lưới ký tự và spacing") into the inspector width, the list
-// width, a main region of exactly h-6 lines, and a too-small flag. frame.go
-// owns the fixed six-line chrome around that region.
+// It is drawn for the left ~20% of the captain's terminal, 32 to 48
+// columns, beside the pane the host shows agents in (docs/console-design.md,
+// the "20% terminal butler" boards A-K). Sizes come from tea.WindowSizeMsg
+// and nowhere else. layout.go's plan places one stack of panes - list,
+// detail, box, or a bottom sheet in the box's place - above a status line
+// and, at 30+ rows, a key line; the renderer and the mouse both read it.
 //
-// The rest of the foundation:
-//
-//	glyphs.go   the Unicode and ASCII drawing alphabets, chosen by locale or
-//	            MATE_ASCII - the only place this package reads the environment
-//	palette.go  the ten design tokens as ANSI-indexed lipgloss styles
-//	signals.go  selection, focus and status as three separate primitives that
-//	            never share a drawing method, and each of which reads
-//	            correctly with colour stripped
-//	text.go     id abbreviation, title truncation, path wrapping, and
-//	            whole-item drop-priority
-//	seams.go    the surfaces that belong to the other Console tasks
+//	grid.go      gline and tok: text in design tokens, the frame
+//	palette.go   tokens as ANSI styles, and the lift rule for selected rows
+//	glyphs.go    the Unicode and ASCII alphabets, chosen by locale or
+//	             MATE_ASCII - the only place this package reads the
+//	             environment; kinds.go and icons.go the Mate/Crew marks and
+//	             harness icons cmd/mate settles on before the TUI starts
+//	words.go     status words, their one-line forms and tints, !N
+//	pane_*.go    the list, detail and box panes
+//	sheets.go    actions (menu.go), confirm, new project, harness, diff, keys
+//	chrome.go    pane rules, the status line, the key line
+//	states.go    too small, loading, a failed read, an empty workspace
 //
 // # Actions
 //
-// Press `a` to open the complete action menu for the selected snapshot row.
-// Unavailable actions stay visible with their reason and Enter reports a
-// refusal without invoking ActionFunc. Start, resume and workspace/project
-// onboarding are non-destructive; stop, retry, repair and discard always open a
-// confirmation containing Object, Scope and Effect before ActionFunc runs.
-// The action runner is asynchronous, and its result triggers one snapshot
-// re-read. Refusals and service failures use different message wording: a
-// refusal says that nothing started, while a failure says the service was
-// attempted and includes its diagnostics.
+// Press `a` for the selection's actions sheet. The order never changes
+// between objects of a kind; an action that cannot run stays in its place
+// with · in the key column and the reason on the right; each entry has its
+// own key. Destructive actions open the confirm sheet - object, scope,
+// effect - where Enter cancels and only the key that asked runs it. The
+// action runner is asynchronous, and its result triggers one snapshot
+// re-read. Refusals and service failures are worded differently: a refusal
+// says nothing started, a failure says the service ran and why it failed.
 //
 // # Show in next pane
 //
@@ -69,20 +68,19 @@
 //
 // # The golden-frame harness
 //
-// golden_test.go carries the harness the Console tests share. The usual
-// shape of a test is one line:
+// golden_test.go carries the harness the Console tests share, and
+// design_golden_test.go draws every design board from designTree() (the
+// boards' own acme workspace) at the board's own size:
 //
-//	func TestCrewListAt120(t *testing.T) {
-//	    goldenFrame(t, "crew-list-120x36", sampleTree(), 120, 36, unicodeGlyphs)
-//	}
+//	{"design-b-project-40x36", func(t *testing.T) Model { return designProject(t, 40, 36, unicodeGlyphs) }},
 //
-// which builds a deterministic model (fixed AsOf, no colour), renders it,
+// Each builds a deterministic model (fixed AsOf, no colour), renders it,
 // asserts the frame contract, and diffs the result against
-// testdata/golden/crew-list-120x36.txt - reporting the differing lines with
-// their cell widths and a caret under the first divergent column. To accept
-// a deliberate change:
+// testdata/golden/<name>.txt - reporting the differing lines with their
+// cell widths and a caret under the first divergent column. To accept a
+// deliberate change:
 //
-//	go test ./internal/ui/console -run TestCrewListAt120 -update
+//	go test ./internal/ui/console -run TestDesignBoards -update
 //
 // The pieces are usable separately: newFixture builds the model,
 // renderFrame renders and checks the contract, assertGolden does the diff,

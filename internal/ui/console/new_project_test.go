@@ -1,6 +1,7 @@
 package console
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -295,5 +296,37 @@ func TestNewProjectNameStopsAtItsLimit(t *testing.T) {
 	}
 	if !strings.Contains(m.msg.text, "limit reached") {
 		t.Fatalf("message = %+v, want a word that further input is ignored", m.msg)
+	}
+}
+
+// Design K: the new Project lands in order and becomes the selection.
+func TestANewProjectBecomesTheSelection(t *testing.T) {
+	tree := designTree()
+	calls := 0
+	m := New(func(context.Context) (query.Snapshot, error) {
+		calls++
+		if calls > 1 {
+			added := tree
+			added.Projects = append([]query.ProjectNode{}, tree.Projects...)
+			p := tree.Projects[0]
+			p.ProjectID, p.Name = "ledger-audit", "ledger-audit"
+			added.Projects = append(added.Projects[:6], append([]query.ProjectNode{p}, added.Projects[6:]...)...)
+			return added, nil
+		}
+		return tree, nil
+	}, func(context.Context, ActionRequest) (string, error) { return "added", nil })
+	m.p = plainPalette()
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
+	m, _ = send(t, m, m.Init()())
+	m, _ = send(t, m, key("n"))
+	for _, r := range "ledger-audit" {
+		m, _ = send(t, m, key(string(r)))
+	}
+	m, _ = send(t, m, key("enter")) // name -> repo
+	m, cmd := send(t, m, key("enter"))
+	m, cmd = send(t, m, cmd())
+	m, _ = send(t, m, cmd())
+	if r, ok := m.selectedRow(); !ok || r.id != "ledger-audit" {
+		t.Fatalf("selected after create = %+v, want the new ledger-audit row", r)
 	}
 }

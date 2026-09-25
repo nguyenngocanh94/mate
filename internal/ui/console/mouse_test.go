@@ -1,9 +1,11 @@
 package console
 
 import (
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 func press(x, y int) tea.MouseMsg {
@@ -199,5 +201,37 @@ func TestMotionIsNotAClick(t *testing.T) {
 		if cmd != nil || m2.cur().sel != m.cur().sel || len(spy.calls) != 0 {
 			t.Fatalf("mouse action %v acted like a click", a)
 		}
+	}
+}
+
+// A click on a harness row is Enter on it: the picker creates the Mate
+// with the harness clicked, like the actions sheet runs the row clicked.
+func TestClickOnAHarnessRowPicksIt(t *testing.T) {
+	var got []ActionRequest
+	tree := sampleTree()
+	tree.Projects[0].Mate = absentMate("this project has no designated Mate")
+	tree.AsOf = goldenAsOf
+	m := New(func(context.Context) (query.Snapshot, error) { return tree, nil },
+		func(_ context.Context, req ActionRequest) (string, error) { got = append(got, req); return "", nil })
+	m.p = plainPalette()
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
+	m, _ = send(t, m, m.Init()())
+	m, _ = send(t, m, key("enter")) // the project; its Mate row
+	m, _ = send(t, m, key("s"))     // create: the harness picker
+	if !m.harnessPick {
+		t.Fatal("setup: s did not open the harness picker")
+	}
+	sl, ok := m.plan().slot(slotSheet)
+	if !ok {
+		t.Fatal("setup: the picker draws no sheet")
+	}
+	top, _ := sl.body()
+	m, cmd := send(t, m, tea.MouseMsg{X: 4, Y: top + 1, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	if cmd == nil {
+		t.Fatal("a click on codex ran nothing")
+	}
+	cmd()
+	if len(got) != 1 || got[0].Harness != query.HarnessCodex {
+		t.Fatalf("requests = %+v, want one create with codex", got)
 	}
 }

@@ -35,6 +35,7 @@ func TestWezTermStageSplitsThenReplacesOwnPane(t *testing.T) {
 	}
 	assertWeztermSeq(t, fake.Calls, [][]string{
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
+		{"cli", "list", "--format", "json"},
 		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
@@ -48,9 +49,10 @@ func TestWezTermStageSplitsThenReplacesOwnPane(t *testing.T) {
 	if second.PaneID != "21" {
 		t.Fatalf("second pane = %q, want 21", second.PaneID)
 	}
-	assertWeztermSeq(t, fake.Calls[3:], [][]string{
+	assertWeztermSeq(t, fake.Calls[4:], [][]string{
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
 		{"cli", "kill-pane", "--pane-id", "20"},
+		{"cli", "list", "--format", "json"},
 		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "crew-k3"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
@@ -95,6 +97,7 @@ func TestWezTermEnsureSplitCreatesAnEmptyRightPane(t *testing.T) {
 	}
 	assertWeztermSeq(t, fake.Calls, [][]string{
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
+		{"cli", "list", "--format", "json"},
 		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
@@ -136,9 +139,10 @@ func TestWezTermEnsureSplitThenStageReplacesTheEmptyPane(t *testing.T) {
 	if got.PaneID != "21" {
 		t.Fatalf("pane = %q, want 21", got.PaneID)
 	}
-	assertWeztermSeq(t, fake.Calls[3:], [][]string{
+	assertWeztermSeq(t, fake.Calls[4:], [][]string{
 		{"cli", "get-pane-direction", "--pane-id", "10", "Right"},
 		{"cli", "kill-pane", "--pane-id", "20"},
+		{"cli", "list", "--format", "json"},
 		{"cli", "split-pane", "--pane-id", "10", "--right", "--percent", "70", "--", "herdr", "--session", "mate-acme", "agent", "attach", "mate-shop"},
 		{"cli", "activate-pane", "--pane-id", "10"},
 	})
@@ -175,6 +179,9 @@ type weztermScript struct {
 	next    int
 	foreign bool
 	spawned string
+	// cols is the console pane's width `cli list` reports; 0 answers the
+	// list with an error, as a mux that cannot be listed does.
+	cols int
 }
 
 func (s *weztermScript) handle(_ context.Context, spec process.Spec) (process.Result, error) {
@@ -190,6 +197,11 @@ func (s *weztermScript) handle(_ context.Context, spec process.Spec) (process.Re
 		return process.Result{}, nil
 	case containsArg(args, "activate-pane"):
 		return process.Result{}, nil
+	case containsArg(args, "list"):
+		if s.cols == 0 {
+			return process.Result{ExitCode: 1, Stderr: []byte("no mux")}, nil
+		}
+		return process.Result{Stdout: []byte(`[{"pane_id":` + s.self + `,"size":{"cols":` + strconv.Itoa(s.cols) + `,"rows":36}},{"pane_id":99,"size":{"cols":7,"rows":3}}]`)}, nil
 	case containsArg(args, "split-pane"):
 		id := s.next
 		s.next++
@@ -243,4 +255,81 @@ func equalArgs(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// TestWezTermRunsTheCLIWezTermNamesForItsPanes: WezTerm installed as an
+// .app puts no `wezterm` on PATH, but sets WEZTERM_EXECUTABLE_DIR for every
+// pane it spawns, and the CLI sits there beside the GUI. WEZTERM_EXECUTABLE
+// is the GUI itself and has no `cli`. Calling the bare name failed the
+// split (found live on 2026-09-25: `mate console` in WezTerm.app drew no
+// pane; env measured in a WezTerm 20240203 pane).
+func TestWezTermRunsTheCLIWezTermNamesForItsPanes(t *testing.T) {
+	t.Parallel()
+	script := &weztermScript{self: "10", next: 20}
+	fake := &process.FakeRunner{Handler: script.handle}
+	exe := "/Applications/WezTerm.app/Contents/MacOS/wezterm"
+	h := Open(WezTerm, Options{Runner: fake, Herdr: "herdr", Env: func(k string) string {
+		switch k {
+		case "WEZTERM_PANE":
+			return "10"
+		case "WEZTERM_EXECUTABLE_DIR":
+			return "/Applications/WezTerm.app/Contents/MacOS"
+		case "WEZTERM_EXECUTABLE":
+			return "/Applications/WezTerm.app/Contents/MacOS/wezterm-gui"
+		}
+		return ""
+	}})
+	if _, err := h.EnsureSplit(context.Background()); err != nil {
+		t.Fatalf("EnsureSplit: %v", err)
+	}
+	if len(fake.Calls) == 0 {
+		t.Fatal("EnsureSplit ran nothing")
+	}
+	for _, c := range fake.Calls {
+		if c.Name != exe {
+			t.Fatalf("ran %q, want the CLI in WEZTERM_EXECUTABLE_DIR %q", c.Name, exe)
+		}
+	}
+}
+
+// TestWezTermSplitLeavesTheConsoleItsColumns: mate is the left ~20% pane,
+// 40 to 48 columns (the console design). The stage is split off in cells so
+// the console keeps them, whatever the window's width: 70% of an 80-column
+// window left mate 23 columns and the too-small screen (found live on
+// 2026-09-25).
+func TestWezTermSplitLeavesTheConsoleItsColumns(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		cols int
+		want string // --cells of the stage
+	}{
+		{80, "39"},   // mate keeps 40
+		{200, "159"}, // 20% is 40
+		{300, "251"}, // 20% is 60, capped at 48
+	} {
+		script := &weztermScript{self: "10", next: 20, cols: tc.cols}
+		fake := &process.FakeRunner{Handler: script.handle}
+		h := Open(WezTerm, Options{Runner: fake, Pane: "10", Herdr: "herdr"})
+		if _, err := h.EnsureSplit(context.Background()); err != nil {
+			t.Fatalf("%d cols: EnsureSplit: %v", tc.cols, err)
+		}
+		var split []string
+		for _, c := range fake.Calls {
+			if containsArg(c.Args, "split-pane") {
+				split = c.Args
+			}
+		}
+		if got := argAfter(split, "--cells"); got != tc.want || containsArg(split, "--percent") {
+			t.Fatalf("%d cols: split %q, want --cells %s", tc.cols, split, tc.want)
+		}
+	}
+}
+
+func argAfter(args []string, flag string) string {
+	for i, a := range args {
+		if a == flag && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }

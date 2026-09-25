@@ -110,9 +110,12 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
 	}
 	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv})
+	notice := ""
 	if split && h != nil {
 		if _, err := h.EnsureSplit(ctx); err != nil {
-			fmt.Fprintf(stderr, "mate console: %s\n", err)
+			// Said on the status line: stderr is under the alt screen by
+			// the time anyone could read it.
+			notice = "no next pane: " + err.Error()
 		}
 	}
 	model := console.New(load, consoleAction(ws, deps)).
@@ -120,6 +123,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithStage(consoleStage(ws, h)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
+		WithNotice(notice).
 		WithClipboard(func(seq []byte) {
 			// One write per sequence: the renderer also writes this file
 			// from its own goroutine, one frame per write, so a single

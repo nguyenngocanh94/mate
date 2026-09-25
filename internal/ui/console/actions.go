@@ -572,6 +572,13 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	}
 	m.actionAfterRead = &result
 	m.msg = result
+	if msg.err == nil && msg.choice.action == ActionOnboard && msg.choice.req.TargetKind == "workspace" && m.cur().kind == frameWorkspace {
+		// The new Project lands in order and becomes the selection (design
+		// K): the re-read finds it by id, which is its name.
+		f := m.cur()
+		f.selID = msg.choice.req.Input
+		m = m.setCur(f)
+	}
 	return m.startLoad()
 }
 

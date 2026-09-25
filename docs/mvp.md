@@ -767,7 +767,7 @@ Quyết định:
   1. `WEZTERM_PANE` khác rỗng → WezTerm
   2. `TERM_PROGRAM=ghostty` → Ghostty (macOS AppleScript)
   3. `TERM_PROGRAM=iTerm.app` → iTerm, để sau
-  4. không khớp → `None`: console giữ stream mode nhúng PTY như hiện tại
+  4. không khớp → `None`: console giữ stream mode nhúng PTY như hiện tại (M11 bỏ stream mode: `None` chỉ nói "no next pane")
 - WezTerm: `wezterm cli get-pane-direction --pane-id $WEZTERM_PANE Right`.
   Có pane stage do lần `Stage` trước của **cùng process console** thì `kill-pane` rồi `split-pane --right --percent <giữ>` với argv `herdr --session <s> agent attach <agent>`.
   Chưa có thì `split-pane` thôi.
@@ -782,7 +782,7 @@ Quyết định:
 - Console không import `internal/host` hay `internal/runtime`.
   `cmd/mate` bơm một `StageFunc` seam, cùng kiểu `SessionStreamFactory`.
   Khi host không phải `None`, Enter/click hàng Mate hoặc Crew gọi `Stage` và **ở lại** khung cây/inbox; không mở session view, không PTY trong console.
-  Khi `None`, hành vi task 09 giữ nguyên.
+  Khi `None`, hành vi task 09 giữ nguyên (thay bởi M11).
 - Chuột: hàng Mate/Crew trên cây bấm trái cùng nghĩa Enter.
   Inbox vẫn mở đúng crew, qua `Stage` nếu host có.
 - `mate console [<workspace>]` mở console và gọi `EnsureSplit`: tạo pane trống bên phải (shell mặc định), giữ focus ở pane mate, ghi handle để `Stage` thay bằng `herdr agent attach`. Pane phải thì in một dòng lên stderr rồi vẫn mở console. `mate` / `mate <dir>` không tự split.
@@ -790,5 +790,27 @@ Quyết định:
 | # | Task | Xong khi |
 | --- | --- | --- |
 | 44 | `internal/host`: `Detect` từ env, port `Stage`, fake CLI/osascript, driver WezTerm và Ghostty theo quyết định trên; `cmd/mate` chọn driver lúc mở console, bơm `StageFunc`. Console: khi `StageFunc` khác nil thì Enter và click hàng Mate/Crew (cây và inbox) gọi stage, không `beginSession`; host `None` hoặc `StageFunc` nil thì golden session stream không đổi. | Unit: fixture env WezTerm/`ghostty`/trống; fake WezTerm ghi `get-pane-direction` + `split-pane --right` với argv `herdr … agent attach`, lần hai `kill-pane` đúng id đã trả, không có `send-text`; fake Ghostty ghi `split` rồi lần hai `close` + `split`, không có `input text`; pane phải không phải handle của mình thì `Stage` từ chối và không kill. Golden: Enter trên Mate với `StageFunc` không vẽ session frame, có một lời gọi stage; không `StageFunc` thì fixture `session-mate-120x36` còn khớp. `make check` xanh. Đã xong 2026-09-25. |
+
+### M11. Console hẹp: controller 20% bên cạnh host
+
+Chốt 2026-09-25.
+Console bỏ hẳn session view nhúng (PTY stream, composer, `mate attach` handover): mate chỉ còn là controller, terminal của agent do host hiện qua `Stage` (M10).
+Giao diện theo bundle "20% terminal butler", chép thành chữ ở `docs/console-design.md`.
+
+Quyết định:
+
+- Host None (không phải WezTerm/Ghostty): Enter nói "no next pane" trên status line, không mở gì trong console.
+- Chức năng backend chưa có thì không vẽ theo board (tool call cuối, Answered today, New crew, tokens in/out); frame hiện đúng thứ snapshot có.
+- Harness vẽ bằng icon thay chữ; Nerd Font chỉ khi `cmd/mate` hỏi font report của host thấy glyph, không thì ✻ ⌬.
+- Kind mark đo bằng CSI 6n một lần trước khi TUI chạy, lệch thì lùi về ◆ ◇; `MATE_KINDS` ghi đè (phím gõ trong ≤150ms probe có thể mất).
+- WezTerm: stage split theo cell để mate giữ `clamp(cols/5, 40, 48)` cột; CLI lấy từ `WEZTERM_EXECUTABLE_DIR` (bản .app không có `wezterm` trong PATH).
+- Quy tắc tên project nằm ở `internal/names`, store và form New project dùng chung.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 45 | Xoá session view nhúng; Enter/click/box chỉ gọi `StageFunc`; không host thì nói rõ. | Golden session/attach bỏ; unit stage (Mate, Crew, stale bị từ chối trước khi hỏi host, lỗi hiện trên status line, `r` retry). `make check` xanh. Đã xong 2026-09-25. |
+| 46 | Renderer hẹp: plan một chồng list · detail · box, sheet actions/confirm/new project/harness/diff/keys, status line "→ next pane", key line; phím và chuột theo board I. | Golden `design-*` cho A–K và H1–H4 ở kích thước của board; hợp đồng khung ở mọi kích thước 16–64 × 6–56 và mọi trạng thái; cột hàng đúng board I. `make check` xanh. Đã xong 2026-09-25. |
+| 47 | `cmd/mate`: probe kind (CSI 6n), probe icon (font report của host), notice của split lỗi lên status line, WezTerm split theo cell. | Unit probe với fake host; chạy binary thật trong WezTerm.app: split 40/39 ở cửa sổ 80 cột, new project tạo và chọn hàng mới. Đã xong 2026-09-25. |
+| 48 | Acceptance live: Enter trên Mate và Crew đang chạy hiện đúng agent ở pane phải trong WezTerm và Ghostty, lần hai thay pane cũ. | Evidence `docs/evidence/m11-console-stage-<ngày>.md`. |
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

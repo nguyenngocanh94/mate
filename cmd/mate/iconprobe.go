@@ -76,13 +76,14 @@ func ghosttyBinary(getenv func(string) string) string {
 	return ""
 }
 
-// weztermBinary is the running WezTerm's CLI: WEZTERM_EXECUTABLE, which
-// WezTerm sets for its panes.
+// weztermBinary is the running WezTerm's CLI: `wezterm` in
+// WEZTERM_EXECUTABLE_DIR, which WezTerm sets for its panes
+// (WEZTERM_EXECUTABLE is the GUI, which has no ls-fonts).
 func weztermBinary(getenv func(string) string) string {
 	if getenv("WEZTERM_PANE") == "" {
 		return ""
 	}
-	if p := getenv("WEZTERM_EXECUTABLE"); isExecutable(p) {
+	if p := filepath.Join(getenv("WEZTERM_EXECUTABLE_DIR"), "wezterm"); getenv("WEZTERM_EXECUTABLE_DIR") != "" && isExecutable(p) {
 		return p
 	}
 	if p, err := exec.LookPath("wezterm"); err == nil {

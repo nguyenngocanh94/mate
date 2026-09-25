@@ -23,9 +23,9 @@ func TestParseCursorColumn(t *testing.T) {
 	}
 }
 
-// The fallback order of the emoji width rule: emoji when 👨‍💻 is two
-// cells, ◆ ◇ when it is not but ◆ is one, @ o otherwise. A terminal that
-// does not answer keeps the emoji.
+// The emoji width rule: emoji when 👨‍💻 is two cells, ◆ ◇ when it is not.
+// A terminal that does not answer keeps the emoji. One measurement only,
+// so the window in which a startup key can be lost stays one round trip.
 func TestChooseKindGlyphs(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -34,16 +34,20 @@ func TestChooseKindGlyphs(t *testing.T) {
 	}{
 		{"clusters", map[string]int{"👨‍💻": 2, "◆": 1}, console.KindEmoji},
 		{"tmux draws two emoji", map[string]int{"👨‍💻": 4, "◆": 1}, console.KindSymbol},
-		{"nothing is one cell", map[string]int{"👨‍💻": 4, "◆": 2}, console.KindASCII},
 		{"no answer", map[string]int{}, console.KindEmoji},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
 			got := chooseKindGlyphs(func(s string) (int, bool) {
+				calls++
 				n, ok := tc.cells[s]
 				return n, ok
 			})
 			if got != tc.want {
 				t.Fatalf("chooseKindGlyphs = %v, want %v", got, tc.want)
+			}
+			if calls != 1 {
+				t.Fatalf("measured %d times, want one round trip", calls)
 			}
 		})
 	}

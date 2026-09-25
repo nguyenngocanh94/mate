@@ -286,6 +286,8 @@ type Model struct {
 	detailSel int
 	// keysOpen is `?`: the key list, until the next key.
 	keysOpen bool
+	// notice is WithNotice's line; the first key clears it.
+	notice string
 	// staged is what the next pane shows, as far as this Console knows: the
 	// last StageFunc call's target and outcome.
 	staged stagedPane
@@ -392,6 +394,14 @@ type ClipboardFunc func(seq []byte)
 // WithClipboard attaches the real terminal's clipboard, which y writes to.
 func (m Model) WithClipboard(fn ClipboardFunc) Model {
 	m.clipboard = fn
+	return m
+}
+
+// WithNotice puts a line on the status line from the first frame: what
+// happened before the Console started (a host split that failed), which
+// stderr would lose under the alt screen.
+func (m Model) WithNotice(text string) Model {
+	m.notice = text
 	return m
 }
 
