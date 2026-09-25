@@ -49,6 +49,19 @@ const (
 // project name is the second, so a Mate is `mate-<project>`.
 const AgentNamePrefix = "mate"
 
+// cleanupTimeout bounds a compensation that runs after its caller's context
+// was cancelled.
+const cleanupTimeout = 30 * time.Second
+
+// cleanupContext is the context a compensation runs under: the caller's
+// values without its cancellation, bounded by cleanupTimeout. A start is
+// most often compensated *because* it was cancelled (the Console quit
+// mid-start), and undoing it with the cancelled context would fail every
+// Herdr call at once and leave the agent running unrecorded.
+func cleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+}
+
 // MateTabLabel is the Herdr tab label of the Mate pane.
 const MateTabLabel = "mate"
 

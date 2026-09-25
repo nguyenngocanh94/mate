@@ -160,3 +160,36 @@ func TestActionRunsUnderAContextThatWithContextControls(t *testing.T) {
 	}
 	_ = m
 }
+
+// TestAbandonedActionDoneClosesWhenTheActionReturns: after a quit mid-action
+// cmd/mate waits on AbandonedActionDone before the process exits, so the
+// action's own compensation runs instead of being killed with the process.
+// The channel must stay open while the action is still undoing its work and
+// close once it has returned.
+func TestAbandonedActionDoneClosesWhenTheActionReturns(t *testing.T) {
+	started := make(chan context.Context, 1)
+	release := make(chan struct{})
+	m, cmd := confirmAndRunStop(t, blockingAction(started, release))
+	if m.AbandonedActionDone() != nil {
+		t.Fatal("AbandonedActionDone is non-nil before anything was abandoned")
+	}
+	go func() { cmd() }()
+	<-started
+
+	m, _ = send(t, m, key("q"))
+	done := m.AbandonedActionDone()
+	if done == nil {
+		t.Fatal("quitting mid-action returned no channel to wait on")
+	}
+	select {
+	case <-done:
+		t.Fatal("done closed while the action was still running")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("done never closed after the action returned")
+	}
+}

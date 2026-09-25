@@ -500,6 +500,8 @@ type crewSaga struct {
 // failures are swallowed: the caller must see why the spawn was refused, not
 // why the cleanup was untidy. `crews/<id>/brief.md` is left in place.
 func (s *crewSaga) compensate(ctx context.Context) {
+	ctx, cancel := cleanupContext(ctx)
+	defer cancel()
 	if s.startedAgent && s.agentName != "" {
 		handle := runtime.AgentHandle{Session: s.session, Name: s.agentName, Tab: s.tab}
 		_ = s.deps.Runtime.StopAgent(ctx, handle, runtime.StopForce)

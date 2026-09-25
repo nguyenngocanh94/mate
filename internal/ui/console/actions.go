@@ -631,8 +631,11 @@ func (m Model) runAction(choice actionChoice) (Model, tea.Cmd) {
 	// Bubble Tea otherwise leaks until it returns on its own.
 	ctx, cancel := context.WithCancel(m.baseCtx())
 	m.actionCancel = cancel
+	done := make(chan struct{})
+	m.actionDone = done
 	action, req := m.action, choice.req
 	return m, func() tea.Msg {
+		defer close(done)
 		if action == nil {
 			return actionDoneMsg{choice: choice, err: fmt.Errorf("Console actions are not wired")}
 		}

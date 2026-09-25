@@ -412,6 +412,11 @@ type Model struct {
 	// "we'll have to leak the goroutine until Cmd returns"), so this is the
 	// one signal quitting mid-action can still send it.
 	actionCancel context.CancelFunc
+	// actionDone is closed when the in-flight ActionFunc returns, whether
+	// it finished or was cancelled. A quit mid-action hands it to cmd/mate
+	// (AbandonedActionDone) so the process waits for the action's own
+	// cleanup instead of exiting under it.
+	actionDone chan struct{}
 	// actionAbandoned is set when the operator quits while actionBusy: the
 	// description of what was abandoned, surfaced to cmd/mate via
 	// AbandonedAction so it can tell the operator plainly after the
@@ -485,6 +490,16 @@ func (m Model) baseCtx() context.Context {
 // screen is gone by then, so this is the one place left to say it.
 func (m Model) AbandonedAction() (string, bool) {
 	return m.actionAbandoned, m.actionAbandoned != ""
+}
+
+// AbandonedActionDone is closed once the abandoned action has returned -
+// after its context was cancelled and it has undone what it had started.
+// Nil when no action was abandoned.
+func (m Model) AbandonedActionDone() <-chan struct{} {
+	if m.actionAbandoned == "" {
+		return nil
+	}
+	return m.actionDone
 }
 
 // New builds the initial Console model. load and attachCmd must be non-nil

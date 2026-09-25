@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -110,7 +111,8 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	}
 	if cm, ok := final.(console.Model); ok {
 		if desc, abandoned := cm.AbandonedAction(); abandoned {
-			fmt.Fprintf(stderr, "\nmate console: quit while %s was still running.\n", desc)
+			fmt.Fprintf(stderr, "\nmate console: quit while %s was still running; waiting for it to undo what it started...\n", desc)
+			waitAbandoned(stderr, desc, cm.AbandonedActionDone(), abandonedWait)
 		}
 	}
 	return nil
@@ -147,3 +149,24 @@ var errNotATerminal = newUsageError(
 // than duplicated), but its message is an attach client's and would name
 // the wrong command.
 func consoleTerminalRefusal(error) error { return errNotATerminal }
+
+// abandonedWait bounds how long the Console waits, after the terminal is
+// restored, for an action it quit in the middle of. It is longer than the
+// spawn package's own 30s cleanup bound, so the action's compensation gets
+// the chance to finish.
+const abandonedWait = 45 * time.Second
+
+// waitAbandoned blocks until the abandoned action has returned, or the
+// bound passes. Exiting earlier would kill the goroutine mid-cleanup and
+// leave a half-started agent behind (a Mate running with no mate.meta).
+func waitAbandoned(stderr io.Writer, desc string, done <-chan struct{}, bound time.Duration) {
+	if done == nil {
+		return
+	}
+	select {
+	case <-done:
+		fmt.Fprintf(stderr, "mate console: %s has stopped.\n", desc)
+	case <-time.After(bound):
+		fmt.Fprintf(stderr, "mate console: %s had not stopped after %s; if it left an agent running, starting again adopts or refuses it by name.\n", desc, bound)
+	}
+}

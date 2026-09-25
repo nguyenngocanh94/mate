@@ -688,6 +688,8 @@ func launchEnv(env []runtime.EnvVar, kind harness.Kind) []harness.EnvVar {
 // a meta naming a pane nobody owns is worse than none. Its own failures are
 // deliberately swallowed: the caller must see why the start was refused.
 func compensate(ctx context.Context, deps Deps, w *store.Workspace, project string, session runtime.SessionHandle, tab runtime.TabHandle) {
+	ctx, cancel := cleanupContext(ctx)
+	defer cancel()
 	name, _ := runtime.SanitizeAgentName(AgentNamePrefix, project)
 	if name != "" {
 		// The agent is stopped only when Herdr has it in this attempt's own

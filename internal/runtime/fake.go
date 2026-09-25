@@ -422,7 +422,12 @@ func (f *Fake) ListAgents(_ context.Context, session SessionHandle) ([]ObservedA
 }
 
 // InspectAgent implements Adapter.
-func (f *Fake) InspectAgent(_ context.Context, handle AgentHandle) (ObservedAgent, error) {
+func (f *Fake) InspectAgent(ctx context.Context, handle AgentHandle) (ObservedAgent, error) {
+	// A cancelled context fails the call before it reaches Herdr, as the
+	// real adapter's exec does.
+	if err := ctx.Err(); err != nil {
+		return ObservedAgent{}, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("InspectAgent")
@@ -701,7 +706,12 @@ func (f *Fake) terminalForPane(pane string, handle AgentHandle) string {
 }
 
 // StopAgent implements Adapter.
-func (f *Fake) StopAgent(_ context.Context, handle AgentHandle, mode StopMode) error {
+func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, mode StopMode) error {
+	// A cancelled context fails the call before it reaches Herdr, as the
+	// real adapter's exec does.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("StopAgent:" + string(mode))
@@ -728,7 +738,12 @@ func (f *Fake) StopAgent(_ context.Context, handle AgentHandle, mode StopMode) e
 }
 
 // RemoveTab implements Adapter.
-func (f *Fake) RemoveTab(_ context.Context, handle TabHandle) error {
+func (f *Fake) RemoveTab(ctx context.Context, handle TabHandle) error {
+	// A cancelled context fails the call before it reaches Herdr, as the
+	// real adapter's exec does.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("RemoveTab")

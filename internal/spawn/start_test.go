@@ -528,3 +528,38 @@ func TestStartMateAdoptionKeepsTheRunningHarness(t *testing.T) {
 		t.Fatalf("agents %v calls %v: the running Mate was touched", rt.Agents, rt.Calls)
 	}
 }
+
+// cancelOnWait cancels the start's context the moment readiness is awaited,
+// the way quitting the Console mid-start does, and fails the wait.
+type cancelOnWait struct {
+	*runtime.Fake
+	cancel context.CancelFunc
+}
+
+func (c cancelOnWait) WaitAgent(ctx context.Context, h runtime.AgentHandle, until runtime.WaitCondition) (runtime.ObservedAgent, error) {
+	c.cancel()
+	return runtime.ObservedAgent{}, context.Canceled
+}
+
+// TestStartMateCleansUpAfterItsContextIsCancelled: quitting the Console
+// mid-start cancels the start's context. The compensation must still stop
+// the agent and close the tab it created - with the cancelled context every
+// Herdr call would fail at once and leave the Mate running unrecorded.
+func TestStartMateCleansUpAfterItsContextIsCancelled(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	deps := fakeDeps(t, rt)
+	deps.Runtime = cancelOnWait{Fake: rt, cancel: cancel}
+
+	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop"}); err == nil {
+		t.Fatal("StartMate succeeded although its context was cancelled mid-start")
+	}
+	if len(rt.Agents) != 0 || len(rt.Tabs) != 0 {
+		t.Fatalf("agents %v tabs %v left behind by a cancelled start", rt.Agents, rt.Tabs)
+	}
+	if _, statErr := os.Stat(w.MateMeta("shop")); !os.IsNotExist(statErr) {
+		t.Fatalf("a cancelled start left a mate.meta: %v", statErr)
+	}
+}
