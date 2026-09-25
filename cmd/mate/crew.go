@@ -283,7 +283,8 @@ func profileNote(res spawn.CrewResult) string {
 }
 
 // harnessCell is the HARNESS column: the harness, then the model and
-// effort it was spawned with when either was set - "codex gpt-5.5/high".
+// effort it was spawned with when either was set - "codex gpt-5.5/high",
+// "codex gpt-5.5", or "codex default/high" when only the effort was.
 func harnessCell(c spawn.CrewSummary) string {
 	cell := c.Harness
 	switch {
@@ -292,7 +293,7 @@ func harnessCell(c spawn.CrewSummary) string {
 	case c.Model != "":
 		cell += " " + c.Model
 	case c.Effort != "":
-		cell += " /" + c.Effort
+		cell += " default/" + c.Effort
 	}
 	return cell
 }

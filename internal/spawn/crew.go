@@ -481,7 +481,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		Harness:         plan.kind,
 		Model:           plan.model,
 		Effort:          plan.effort,
-		EffortOmitted:   plan.effort != "" && !plan.kind.SupportsEffort(plan.effort),
+		EffortOmitted:   launch.EffortOmitted(),
 		Task:            plan.task,
 		Agent:           handle.Name,
 		Session:         session.Name,

@@ -77,8 +77,9 @@ func TestNoDispatchTableKeepsTheWorkspaceDefault(t *testing.T) {
 func TestAMalformedDispatchTableStopsEverySpawn(t *testing.T) {
 	w := dispatchWorkspace(t, `{"rules": [{"when": "x", "use": {"harness": "codex", "effort": "max"}}]}`)
 	err := checkDispatch(w, spawn.SpawnCrewRequest{Harness: harness.KindCodex})
-	if !errors.Is(err, dispatch.ErrInvalid) {
-		t.Fatalf("err = %v, want the table's own refusal", err)
+	var ue *usageError
+	if !errors.Is(err, dispatch.ErrInvalid) || !errors.As(err, &ue) {
+		t.Fatalf("err = %v, want the table's own refusal, exit 2", err)
 	}
 }
 
@@ -125,5 +126,21 @@ func TestCrewDispatchWithoutATableSaysSoAndShowsAStart(t *testing.T) {
 	}
 	if _, ok, err := dispatch.Load(p); err != nil || !ok {
 		t.Fatalf("the example does not load: %v\n%s", err, out.String())
+	}
+}
+
+func TestHarnessCellNamesEachAxisThatWasSet(t *testing.T) {
+	for _, tc := range []struct {
+		c    spawn.CrewSummary
+		want string
+	}{
+		{spawn.CrewSummary{Harness: "codex"}, "codex"},
+		{spawn.CrewSummary{Harness: "codex", Model: "gpt-5.5", Effort: "high"}, "codex gpt-5.5/high"},
+		{spawn.CrewSummary{Harness: "claude", Model: "haiku"}, "claude haiku"},
+		{spawn.CrewSummary{Harness: "codex", Effort: "medium"}, "codex default/medium"},
+	} {
+		if got := harnessCell(tc.c); got != tc.want {
+			t.Errorf("harnessCell(%+v) = %q, want %q", tc.c, got, tc.want)
+		}
 	}
 }

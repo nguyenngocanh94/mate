@@ -162,7 +162,7 @@ Without `--scout` it is a ship, and a `## Deliverable` is refused.
 Without them the Crew runs the workspace default harness, which is Codex, on that harness's own model and effort.
 An effort the harness does not take (Codex has no `max`) is recorded and left out of the launch, with a note on stderr.
 `crew dispatch` prints the captain's dispatch table, `{{.WorkspaceRoot}}/.mate/crew-dispatch.json`: each rule's condition and its profiles as the exact flags to pass.
-While that table exists, a spawn without `--harness` is refused (exit 2), and a malformed table refuses every spawn until the captain fixes it.
+While that table exists, a spawn without `--harness` is refused (exit 2), and a malformed table refuses every spawn (exit 2, the reason on stderr) until the captain fixes it; tell the captain what it says.
 
 A successful spawn prints three lines:
 

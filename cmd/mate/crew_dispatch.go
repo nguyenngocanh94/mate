@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -23,6 +24,11 @@ import (
 // --harness.
 func checkDispatch(w *store.Workspace, req spawn.SpawnCrewRequest) error {
 	_, ok, err := dispatch.Load(dispatch.Path(w.StateDir()))
+	if errors.Is(err, dispatch.ErrInvalid) {
+		// Exit 2 like the missing --harness below: both are "fix the table
+		// or the invocation and run it again", never a crash.
+		return &usageError{err}
+	}
 	if err != nil {
 		return err
 	}
