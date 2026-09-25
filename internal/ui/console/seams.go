@@ -702,7 +702,7 @@ func (m Model) keyHints(l frameLayout) []keyHint {
 		// q is a character here, not the quit key (see onKey), so the line
 		// must not offer it as one: ctrl+c is the way out from inside a
 		// name input.
-		return []keyHint{{key: "Enter", desc: "Create project", sacrifice: keyAction}, {key: "Esc", desc: "Cancel", sacrifice: keyBack}, {key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit}}
+		return []keyHint{{key: "Enter", desc: m.onboardEnterLabel(), sacrifice: keyAction}, {key: "Tab", desc: "Switch field", sacrifice: keyMovement}, {key: "Esc", desc: "Cancel", sacrifice: keyBack}, {key: "Ctrl+C", desc: "Quit", sacrifice: keyQuit}}
 	}
 	if m.harnessPick {
 		return []keyHint{

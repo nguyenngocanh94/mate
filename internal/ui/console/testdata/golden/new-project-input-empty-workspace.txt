@@ -3,13 +3,13 @@
 ─────────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────
   NEW PROJECT                                                                                                           
   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
-  Name    _                                                                                                             
-  Create a Project record; no runtime agent is started.                                                                 
+  ▌ Name    _                                                                                                           
+    Repo                                                                                                                
                                                                                                                         
-  Enter Create project  Esc Cancel                                                                                      
+  Repo is a git repo root, absolute or relative to /Users/dev/work/acme                                                 
+  Registers the repo as a Project, like `mate project add`; no runtime agent is started.                                
                                                                                                                         
-                                                                                                                        
-                                                                                                                        
+  Enter Next  Tab Switch field  Esc Cancel                                                                              
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -33,4 +33,4 @@
                                                                                                                         
 ─────────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────
                                                                                                                         
- Enter Create project  Esc Cancel  Ctrl+C Quit                                                                          
+ Enter Next  Tab Switch field  Esc Cancel  Ctrl+C Quit                                                                  

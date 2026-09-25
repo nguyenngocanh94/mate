@@ -113,6 +113,10 @@ type ActionRequest struct {
 	Target     string
 	TargetKind string
 	Input      string // project name for onboarding; the line to send for forward/reply
+	// Repo is the repository path a workspace onboard registers, as typed
+	// into the new-project form: absolute, or relative to the workspace
+	// root. Empty on every other request.
+	Repo string
 	// Crew is the crew a box action names (mvp.md task 15). It is separate
 	// from Target because those actions are addressed to a Project *and* one
 	// of its crews, and folding the two into one string would make the
@@ -383,6 +387,10 @@ type Model struct {
 	confirm         *actionConfirmation
 	actionInput     string
 	actionInputMode bool
+	// actionRepo is the new-project form's second field, the repository
+	// path; actionField is which of the two fields the keyboard types into.
+	actionRepo  string
+	actionField onboardField
 	// pendingChoice is the action the currently open sub-modal will run -
 	// the name input or the harness picker. It is kept here rather than read
 	// back off the menu cursor because 'n', 's' and 'h' all open a modal

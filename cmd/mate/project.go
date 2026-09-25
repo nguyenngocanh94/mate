@@ -47,58 +47,82 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fi, err := os.Stat(absRepo)
-	if err != nil {
-		return fmt.Errorf("repo path %s: %w", repoPath, err)
-	}
-	if !fi.IsDir() {
-		return fmt.Errorf("repo path %s is not a directory", repoPath)
-	}
-
-	top, err := gitTopLevel(absRepo)
-	if err != nil {
-		return fmt.Errorf("repo path %s is not a git repository: %w", repoPath, err)
-	}
-	resolvedRepo, err := filepath.EvalSymlinks(absRepo)
-	if err != nil {
-		return err
-	}
-	resolvedTop, err := filepath.EvalSymlinks(top)
-	if err != nil {
-		return err
-	}
-	if resolvedRepo != resolvedTop {
-		return fmt.Errorf("repo path %s is not the root of its git work tree (root is %s)", repoPath, top)
-	}
-
-	branch := *defaultBranchFlag
-	if branch == "" {
-		branch = detectDefaultBranch(absRepo, store.DefaultBranch)
-	}
-
-	cfg := store.ProjectConfig{
-		Repo:          absRepo,
-		DefaultBranch: branch,
+	saved, err := addProject(w, name, absRepo, repoPath, projectAddOptions{
+		DefaultBranch: *defaultBranchFlag,
 		Mode:          *modeFlag,
 		Yolo:          *yoloFlag,
-	}
-	if *budgetUSDFlag > 0 {
-		cfg.Budget = &store.BudgetConfig{ProjectUSD: *budgetUSDFlag}
-	}
-	if err := w.AddProject(name, cfg); err != nil {
-		return fmt.Errorf("project add %s: %w", name, err)
-	}
-	if err := ensureProjectDoc(w, name); err != nil {
-		return fmt.Errorf("project add %s: %w", name, err)
-	}
-
-	saved, err := w.LoadProject(name)
+		BudgetUSD:     *budgetUSDFlag,
+	})
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "added project %s: repo=%s default-branch=%s mode=%s yolo=%t\n",
 		name, saved.Repo, saved.DefaultBranch, saved.Mode, saved.Yolo)
 	return nil
+}
+
+// projectAddOptions are the settings `mate project add` takes beyond the
+// name and the repo. The Console's new-project form passes the zero value.
+type projectAddOptions struct {
+	DefaultBranch string // empty: detect it from the repo
+	Mode          string // empty: store.ModeLocalOnly
+	Yolo          bool
+	BudgetUSD     float64
+}
+
+// addProject registers a Project the one way both the CLI and the Console
+// do it: absRepo must be an existing directory that is the root of its git
+// work tree, the store proves it is inside the workspace, and PROJECT.md is
+// seeded. shownRepo is the path as the caller typed it, for error messages.
+func addProject(w *store.Workspace, name, absRepo, shownRepo string, opts projectAddOptions) (store.ProjectConfig, error) {
+	fi, err := os.Stat(absRepo)
+	if err != nil {
+		return store.ProjectConfig{}, fmt.Errorf("repo path %s: %w", shownRepo, err)
+	}
+	if !fi.IsDir() {
+		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not a directory", shownRepo)
+	}
+
+	top, err := gitTopLevel(absRepo)
+	if err != nil {
+		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not a git repository: %w", shownRepo, err)
+	}
+	resolvedRepo, err := filepath.EvalSymlinks(absRepo)
+	if err != nil {
+		return store.ProjectConfig{}, err
+	}
+	resolvedTop, err := filepath.EvalSymlinks(top)
+	if err != nil {
+		return store.ProjectConfig{}, err
+	}
+	if resolvedRepo != resolvedTop {
+		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not the root of its git work tree (root is %s)", shownRepo, top)
+	}
+
+	branch := opts.DefaultBranch
+	if branch == "" {
+		branch = detectDefaultBranch(absRepo, store.DefaultBranch)
+	}
+	mode := opts.Mode
+	if mode == "" {
+		mode = store.ModeLocalOnly
+	}
+	cfg := store.ProjectConfig{
+		Repo:          absRepo,
+		DefaultBranch: branch,
+		Mode:          mode,
+		Yolo:          opts.Yolo,
+	}
+	if opts.BudgetUSD > 0 {
+		cfg.Budget = &store.BudgetConfig{ProjectUSD: opts.BudgetUSD}
+	}
+	if err := w.AddProject(name, cfg); err != nil {
+		return store.ProjectConfig{}, fmt.Errorf("project add %s: %w", name, err)
+	}
+	if err := ensureProjectDoc(w, name); err != nil {
+		return store.ProjectConfig{}, fmt.Errorf("project add %s: %w", name, err)
+	}
+	return w.LoadProject(name)
 }
 
 // cmdProjectList implements `mate project list`.

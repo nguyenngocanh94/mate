@@ -62,7 +62,7 @@ func actionsMenuGallery() []actionsMenuGalleryState {
 			m, _ = send(t, m, key("n"))
 			return renderFrame(t, m)
 		},
-		says:    []string{"NEW PROJECT", "Name", "no runtime agent is started", "Enter Create project", "Esc Cancel", "Ctrl+C Quit"},
+		says:    []string{"NEW PROJECT", "Name", "Repo", "no runtime agent is started", "Enter Next", "Tab Switch field", "Esc Cancel", "Ctrl+C Quit"},
 		notSays: []string{"q Quit", "ACTIONS"},
 	}, {
 		name: "new-project-input-typed-name",
