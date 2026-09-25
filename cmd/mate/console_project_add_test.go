@@ -42,7 +42,7 @@ func TestConsoleNewProjectRegistersTheRepoItWasGiven(t *testing.T) {
 	if err != nil {
 		t.Fatalf("beta not registered on disk: %v", err)
 	}
-	if cfg.Repo != "services/beta" || cfg.DefaultBranch != "main" {
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != (store.RepoConfig{Name: "beta", Path: "services/beta", DefaultBranch: "main"}) {
 		t.Fatalf("beta config = %+v, want repo services/beta on main", cfg)
 	}
 	if _, err := os.Stat(fresh.ProjectDoc("beta")); err != nil {

@@ -189,6 +189,11 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if err != nil {
 		return CrewResult{}, err
 	}
+	repoCfg, err := cfg.SoleRepo()
+	if err != nil {
+		return CrewResult{}, observability.WrapError(observability.CodeUsage,
+			"crew spawn refused, nothing was created", err)
+	}
 	harnessKind := req.Harness
 	if harnessKind == "" {
 		if harnessKind, err = harness.ParseKind(w.Defaults().CrewHarness); err != nil {
@@ -225,11 +230,11 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	}
 	task := oneLineTask(req.Task, briefText)
 
-	repo := w.RepoDir(cfg.Repo)
+	repo := w.RepoDir(repoCfg.Path)
 	branch := CrewBranchPrefix + crew
 	worktree := w.WorktreeDir(project, crew)
 	git := deps.git()
-	if err := checkWorktreePreconditions(ctx, git, repo, worktree, branch, cfg.DefaultBranch); err != nil {
+	if err := checkWorktreePreconditions(ctx, git, repo, worktree, branch, repoCfg.DefaultBranch); err != nil {
 		return CrewResult{}, err
 	}
 
@@ -237,7 +242,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if err := os.MkdirAll(w.WorktreesDir(), 0o755); err != nil {
 		return CrewResult{}, err
 	}
-	if err := git.AddWorktree(ctx, repo, worktree, branch, cfg.DefaultBranch); err != nil {
+	if err := git.AddWorktree(ctx, repo, worktree, branch, repoCfg.DefaultBranch); err != nil {
 		return CrewResult{}, err
 	}
 	saga := &crewSaga{deps: deps, git: git, repo: repo, worktree: worktree, branch: branch}
@@ -253,7 +258,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		repo:             repo,
 		branch:           branch,
 		worktree:         worktree,
-		cfg:              cfg,
+		repoCfg:          repoCfg,
 	})
 	if err != nil {
 		saga.compensate(ctx)
@@ -324,7 +329,7 @@ type crewPlan struct {
 	repo             string
 	branch           string
 	worktree         string
-	cfg              store.ProjectConfig
+	repoCfg          store.RepoConfig
 }
 
 // spawnInWorktree is everything a failure has to compensate for: the brief,
@@ -442,6 +447,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		MetaSession:    session.Name,
 		MetaWorktree:   filepath.ToSlash(relWorktree),
 		MetaBranch:     plan.branch,
+		store.MetaRepo: plan.repoCfg.Name,
 		MetaSessionID:  sessionID,
 		MetaTranscript: "",
 		MetaStartedAt:  startedAt.Format(time.RFC3339),
@@ -691,7 +697,7 @@ func renderCrewBrief(w *store.Workspace, plan crewPlan) ([]byte, error) {
 		RepoPath:           plan.repo,
 		WorktreePath:       plan.worktree,
 		Branch:             plan.branch,
-		DefaultBranch:      plan.cfg.DefaultBranch,
+		DefaultBranch:      plan.repoCfg.DefaultBranch,
 		BriefPath:          w.CrewBrief(plan.project, plan.crew),
 		ReportPath:         w.CrewReport(plan.project, plan.crew),
 		HandbackPath:       w.CrewHandback(plan.project, plan.crew),

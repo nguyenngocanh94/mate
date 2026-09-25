@@ -92,8 +92,13 @@ func crewDiffText(ctx context.Context, w *store.Workspace, git gitx.Git, project
 	if err != nil {
 		return "", err
 	}
-	repo := w.RepoDir(cfg.Repo)
-	base := cfg.DefaultBranch
+	repoCfg, err := cfg.CrewRepo(meta)
+	if err != nil {
+		return "", observability.WrapError(observability.CodeStateConflict,
+			fmt.Sprintf("crew %s/%s: nothing to diff", project, crew), err)
+	}
+	repo := w.RepoDir(repoCfg.Path)
+	base := repoCfg.DefaultBranch
 
 	branch := meta[spawn.MetaBranch]
 	if branch == "" {

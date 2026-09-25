@@ -421,11 +421,19 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 	if err != nil {
 		return err
 	}
+	// TODO(mvp.md task 41): the manual names one repository throughout, so
+	// a project with none or several cannot get a Mate until the manual
+	// lists its repos.
+	repoCfg, err := cfg.SoleRepo()
+	if err != nil {
+		return observability.WrapError(observability.CodeUsage,
+			"a Mate for a project without exactly one repo arrives with mvp.md task 41", err)
+	}
 	if err := mateassets.Write(mateDir, mateassets.Params{
 		ProjectName:      project,
 		WorkspaceRoot:    w.Root(),
-		ProjectRepo:      w.RepoDir(cfg.Repo),
-		DefaultBranch:    cfg.DefaultBranch,
+		ProjectRepo:      w.RepoDir(repoCfg.Path),
+		DefaultBranch:    repoCfg.DefaultBranch,
 		Mode:             cfg.Mode,
 		Yolo:             cfg.Yolo,
 		Harness:          string(kind),

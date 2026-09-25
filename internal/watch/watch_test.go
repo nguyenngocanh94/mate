@@ -422,7 +422,7 @@ func TestWatchWatchesEveryProject(t *testing.T) {
 	if err := os.MkdirAll(f.ws.Root()+"/blog", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.ws.AddProject("blog", store.ProjectConfig{Repo: "blog"}); err != nil {
+	if err := f.ws.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	if err := f.ws.WriteCrewMeta("blog", "k9", map[string]string{

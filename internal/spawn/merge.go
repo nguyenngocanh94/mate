@@ -150,7 +150,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		return MergeResult{}, err
 	}
 
-	out := MergeResult{Project: project, Crew: crew, Branch: meta[MetaBranch], DefaultBranch: cfg.DefaultBranch}
+	out := MergeResult{Project: project, Crew: crew, Branch: meta[MetaBranch]}
 
 	// 1. The crew itself.
 	if len(meta) == 0 {
@@ -165,6 +165,12 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
 			fmt.Sprintf("crew %s/%s records no branch; there is nothing to merge", project, crew))
 	}
+	repoCfg, err := cfg.CrewRepo(meta)
+	if err != nil {
+		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
+			fmt.Sprintf("crew %s/%s: %v", project, crew, err))
+	}
+	out.DefaultBranch = repoCfg.DefaultBranch
 
 	// 2 & 3. Who is typing. A crew is refused outright; a Mate is refused
 	// while `yolo` is off, in the wording the manual quotes back.
@@ -179,7 +185,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		}
 	}
 
-	repo := w.RepoDir(cfg.Repo)
+	repo := w.RepoDir(repoCfg.Path)
 	git := deps.git()
 
 	// 4. The crew's worktree. Uncommitted work is not on the branch, so a
@@ -209,26 +215,26 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	}
 
 	// 5. Something to merge at all.
-	ahead, err := git.AheadCount(ctx, repo, out.Branch, cfg.DefaultBranch)
+	ahead, err := git.AheadCount(ctx, repo, out.Branch, repoCfg.DefaultBranch)
 	if err != nil {
 		return MergeResult{}, err
 	}
 	if ahead == 0 {
 		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
-			fmt.Sprintf("branch %s is not ahead of %s: nothing to merge", out.Branch, cfg.DefaultBranch))
+			fmt.Sprintf("branch %s is not ahead of %s: nothing to merge", out.Branch, repoCfg.DefaultBranch))
 	}
 	out.Commits = ahead
 
 	// 6. Fast-forwardable. `needs-rebase` is a command result, not a state:
 	// the crew is untouched and stays exactly where it was.
-	ff, err := git.IsAncestor(ctx, repo, cfg.DefaultBranch, out.Branch)
+	ff, err := git.IsAncestor(ctx, repo, repoCfg.DefaultBranch, out.Branch)
 	if err != nil {
 		return MergeResult{}, err
 	}
 	if !ff {
 		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
 			fmt.Sprintf("needs-rebase: %s has moved on since %s branched, so %s cannot fast-forward; send the crew one line telling it to rebase onto %s and hand back with wait-mate",
-				cfg.DefaultBranch, out.Branch, out.Branch, cfg.DefaultBranch))
+				repoCfg.DefaultBranch, out.Branch, out.Branch, repoCfg.DefaultBranch))
 	}
 
 	// 7. The primary repository: the branch it has checked out is the one
@@ -237,14 +243,14 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	if err != nil {
 		return MergeResult{}, err
 	}
-	if head != cfg.DefaultBranch {
+	if head != repoCfg.DefaultBranch {
 		where := head
 		if head == "" || head == "HEAD" {
 			where = "a detached HEAD"
 		}
 		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
 			fmt.Sprintf("%s has %s checked out, not %s; check out %s in the primary repo and merge again",
-				repo, where, cfg.DefaultBranch, cfg.DefaultBranch))
+				repo, where, repoCfg.DefaultBranch, repoCfg.DefaultBranch))
 	}
 	repoDirty, err := git.IsDirty(ctx, repo)
 	if err != nil {
@@ -256,7 +262,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	}
 
 	// The merge.
-	before, err := git.HeadCommit(ctx, repo, cfg.DefaultBranch)
+	before, err := git.HeadCommit(ctx, repo, repoCfg.DefaultBranch)
 	if err != nil {
 		return MergeResult{}, err
 	}
@@ -264,7 +270,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	if err := git.MergeFFOnly(ctx, repo, out.Branch); err != nil {
 		return MergeResult{}, err
 	}
-	after, err := git.HeadCommit(ctx, repo, cfg.DefaultBranch)
+	after, err := git.HeadCommit(ctx, repo, repoCfg.DefaultBranch)
 	if err != nil {
 		return MergeResult{}, err
 	}
@@ -278,7 +284,7 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	if err != nil {
 		return out, observability.WrapError(observability.CodeStateConflict,
 			fmt.Sprintf("%s/%s: merged %d commit(s) into %s (%s..%s), but the crew was not torn down and is still open; rerun `mate crew stop %s %s` - the merge is done and must not be repeated",
-				project, crew, out.Commits, cfg.DefaultBranch, shortCommit(out.Before), shortCommit(out.After), project, crew), err)
+				project, crew, out.Commits, repoCfg.DefaultBranch, shortCommit(out.Before), shortCommit(out.After), project, crew), err)
 	}
 	return out, nil
 }

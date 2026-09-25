@@ -36,10 +36,11 @@ const (
 )
 
 // ProjectRef is one row of the project list in workspace.yaml: the project
-// name and the repository path, relative to the workspace root.
+// name. Its repos live in the project's own project.yaml (docs/mvp.md M9);
+// the `repo:` a pre-M9 workspace.yaml carries here is ignored on read and
+// dropped on the next save.
 type ProjectRef struct {
 	Name string `yaml:"name"`
-	Repo string `yaml:"repo"`
 }
 
 // WorkspaceConfig is `.mate/workspace.yaml`.

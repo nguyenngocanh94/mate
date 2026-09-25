@@ -221,9 +221,14 @@ func addProjectAction(ws *store.Workspace, req console.ActionRequest) (string, e
 	if !filepath.IsAbs(absRepo) {
 		absRepo = filepath.Join(fresh.Root(), repo)
 	}
-	saved, err := addProject(fresh, name, absRepo, repo, projectAddOptions{})
+	repoCfg, err := repoConfigFor(absRepo, repo, "", "")
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Project %s added: repo %s, default branch %s", name, saved.Repo, saved.DefaultBranch), nil
+	saved, err := addProject(fresh, name, projectAddOptions{Repos: []store.RepoConfig{repoCfg}})
+	if err != nil {
+		return "", err
+	}
+	added := saved.Repos[0]
+	return fmt.Sprintf("Project %s added: repo %s, default branch %s", name, added.Path, added.DefaultBranch), nil
 }

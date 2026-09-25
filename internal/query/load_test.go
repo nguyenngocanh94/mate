@@ -21,7 +21,7 @@ func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
 		if err := os.MkdirAll(filepath.Join(root, name, ".git"), 0o755); err != nil {
 			t.Fatalf("create repo %s: %v", name, err)
 		}
-		if err := ws.AddProject(name, store.ProjectConfig{Repo: name}); err != nil {
+		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name}}}); err != nil {
 			t.Fatalf("add project %s: %v", name, err)
 		}
 	}
@@ -365,7 +365,7 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(ws.Root(), "blog", ".git"), 0o755); err != nil {
 		t.Fatalf("create repo: %v", err)
 	}
-	if err := other.AddProject("blog", store.ProjectConfig{Repo: "blog"}); err != nil {
+	if err := other.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
 		t.Fatalf("add project: %v", err)
 	}
 	snap, err := Load(context.Background(), ws)

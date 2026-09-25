@@ -323,7 +323,12 @@ func inboxLine(w *store.Workspace, project string, e query.BoxEntry) string {
 // the digest is still worth reading.
 func recallFacts(ctx context.Context, w *store.Workspace, git gitx.Git, project string, cfg store.ProjectConfig) recallPart {
 	title := "Project facts (mate project facts " + project + ")"
-	f, err := facts.Gather(ctx, git, project, w.RepoDir(cfg.Repo), cfg.DefaultBranch)
+	// TODO(mvp.md task 41): one block per repo.
+	repoCfg, err := cfg.SoleRepo()
+	if err != nil {
+		return recallPart{2, title, fmt.Sprintf("project facts: %v\n", err)}
+	}
+	f, err := facts.Gather(ctx, git, project, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch)
 	if err != nil {
 		return recallPart{2, title, fmt.Sprintf("project facts failed: %v\n", err)}
 	}
@@ -338,10 +343,15 @@ func recallProjectDoc(ctx context.Context, w *store.Workspace, git gitx.Git, pro
 	if err != nil {
 		return recallPart{}, err
 	}
-	anchors, _ := memory.CheckProject(doc, cfg.DefaultBranch)
-	warnings, err := anchorWarnings(ctx, git, w.RepoDir(cfg.Repo), cfg.DefaultBranch, anchors)
-	if err != nil {
-		warnings = []string{fmt.Sprintf("warning: could not compare %s's anchors with %s: %v", memory.ProjectFileName, cfg.DefaultBranch, err)}
+	var warnings []string
+	if repoCfg, err := cfg.SoleRepo(); err != nil {
+		warnings = []string{fmt.Sprintf("warning: %s's anchors were not compared: %v", memory.ProjectFileName, err)}
+	} else {
+		anchors, _ := memory.CheckProject(doc, repoCfg.DefaultBranch)
+		warnings, err = anchorWarnings(ctx, git, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch, anchors)
+		if err != nil {
+			warnings = []string{fmt.Sprintf("warning: could not compare %s's anchors with %s: %v", memory.ProjectFileName, repoCfg.DefaultBranch, err)}
+		}
 	}
 	for _, line := range warnings {
 		body += line + "\n"

@@ -34,7 +34,7 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, name, ".git"), 0o755); err != nil {
 			t.Fatalf("create repo %s: %v", name, err)
 		}
-		if err := ws.AddProject(name, store.ProjectConfig{Repo: name}); err != nil {
+		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name}}}); err != nil {
 			t.Fatalf("add project %s: %v", name, err)
 		}
 	}

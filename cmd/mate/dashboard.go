@@ -101,11 +101,20 @@ func dashboardDeps(w *store.Workspace) dashboard.Deps {
 			return crewDiffText(ctx, w, git, project, crew, false)
 		},
 		BranchExists: func(ctx context.Context, project, branch string) (bool, error) {
+			// A crew branch lives in whichever of the project's repos the
+			// crew worked in; a project's repos never share a path, so at
+			// most one of them has it.
 			cfg, err := w.LoadProject(project)
 			if err != nil {
 				return false, err
 			}
-			return git.BranchExists(ctx, w.RepoDir(cfg.Repo), branch)
+			for _, r := range cfg.Repos {
+				ok, err := git.BranchExists(ctx, w.RepoDir(r.Path), branch)
+				if err != nil || ok {
+					return ok, err
+				}
+			}
+			return false, nil
 		},
 	}
 }

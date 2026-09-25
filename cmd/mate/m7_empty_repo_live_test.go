@@ -65,7 +65,7 @@ func TestLiveM7EmptyRepoDoesNotGuess(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, shop)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: shop, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: shop, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject shop: %v", err)
 	}
 	if err := os.WriteFile(w.ProjectDoc("shop"), []byte(projectDocTemplate("shop")), 0o644); err != nil {

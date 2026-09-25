@@ -239,6 +239,12 @@ func memoryCheck(ctx context.Context, w *store.Workspace, git gitx.Git, project 
 	if err != nil {
 		return rep, err
 	}
+	// TODO(mvp.md task 41): anchors become <repo>:<branch>@<sha> across
+	// every repo; until then the check needs the project's one repo.
+	repoCfg, err := cfg.SoleRepo()
+	if err != nil {
+		return rep, err
+	}
 	text, err := readOptional(w.MemoryFile(project))
 	if err != nil {
 		return rep, err
@@ -255,7 +261,7 @@ func memoryCheck(ctx context.Context, w *store.Workspace, git gitx.Git, project 
 	if err != nil {
 		return rep, err
 	}
-	anchors, projectProblems := memory.CheckProject(doc, cfg.DefaultBranch)
+	anchors, projectProblems := memory.CheckProject(doc, repoCfg.DefaultBranch)
 	rep.Anchored = len(anchors)
 	for _, p := range append(problems, projectProblems...) {
 		rep.Problems = append(rep.Problems, p.String())
@@ -266,7 +272,7 @@ func memoryCheck(ctx context.Context, w *store.Workspace, git gitx.Git, project 
 	if rep.Budget.Over() {
 		rep.Problems = append(rep.Problems, rep.Budget.OverLine())
 	}
-	rep.Warnings, err = anchorWarnings(ctx, git, w.RepoDir(cfg.Repo), cfg.DefaultBranch, anchors)
+	rep.Warnings, err = anchorWarnings(ctx, git, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch, anchors)
 	return rep, err
 }
 

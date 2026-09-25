@@ -21,7 +21,7 @@ func TestCheckBudgetsOpensAnIncidentOnceWhenCrewTokensIsCrossed(t *testing.T) {
 	f.ingest(t)
 
 	if err := f.ws.SaveProject(fixtureProject, store.ProjectConfig{
-		Repo: fixtureProject, DefaultBranch: "main",
+		Repos:  []store.RepoConfig{{Path: fixtureProject, DefaultBranch: "main"}},
 		Budget: &store.BudgetConfig{CrewTokens: 200000},
 	}); err != nil {
 		t.Fatalf("SaveProject: %v", err)
@@ -56,7 +56,7 @@ func TestCheckBudgetsOpensNothingUnderTheLimit(t *testing.T) {
 	f.ingest(t)
 
 	if err := f.ws.SaveProject(fixtureProject, store.ProjectConfig{
-		Repo: fixtureProject, DefaultBranch: "main",
+		Repos:  []store.RepoConfig{{Path: fixtureProject, DefaultBranch: "main"}},
 		Budget: &store.BudgetConfig{CrewTokens: 10_000_000},
 	}); err != nil {
 		t.Fatalf("SaveProject: %v", err)
@@ -80,7 +80,7 @@ func TestCheckBudgetsCrewUSDIgnoresAnUnpricedModel(t *testing.T) {
 	f.ingest(t)
 
 	if err := f.ws.SaveProject(fixtureProject, store.ProjectConfig{
-		Repo: fixtureProject, DefaultBranch: "main",
+		Repos:  []store.RepoConfig{{Path: fixtureProject, DefaultBranch: "main"}},
 		Budget: &store.BudgetConfig{CrewUSD: 0.01},
 	}); err != nil {
 		t.Fatalf("SaveProject: %v", err)
@@ -129,7 +129,7 @@ func TestCheckBudgetsProjectUSDIsFiledUnderMate(t *testing.T) {
 	f.ingest(t)
 
 	if err := f.ws.SaveProject(fixtureProject, store.ProjectConfig{
-		Repo: fixtureProject, DefaultBranch: "main",
+		Repos:  []store.RepoConfig{{Path: fixtureProject, DefaultBranch: "main"}},
 		Budget: &store.BudgetConfig{ProjectUSD: 0.01},
 	}); err != nil {
 		t.Fatalf("SaveProject: %v", err)

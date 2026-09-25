@@ -66,7 +66,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	repo := filepath.Join(root, fixtureProject)
 	initRepo(t, repo)
-	if err := ws.AddProject(fixtureProject, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := ws.AddProject(fixtureProject, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	if ws, err = store.Open(root); err != nil {

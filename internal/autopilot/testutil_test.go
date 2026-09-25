@@ -88,7 +88,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.AddProject(project, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 
@@ -180,7 +180,7 @@ func (f *fixture) addProject(name string) {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.ws.AddProject(name, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := f.ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		f.t.Fatalf("AddProject(%s): %v", name, err)
 	}
 }

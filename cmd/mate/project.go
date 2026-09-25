@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/facts"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
@@ -16,103 +17,128 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// cmdProjectAdd implements `mate project add <name> <repo-path>`.
+// cmdProjectAdd implements `mate project add <name> [<repo-path>]`. A
+// project may start without a repo (docs/mvp.md M9); repos are added and
+// removed later with `mate project repo`.
 func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project add", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate project add <name> <repo-path> [--workspace <dir>] [--default-branch <branch>] [--mode local-only] [--yolo] [--budget-usd <amount>]")
+		fmt.Fprintln(stderr, "usage: mate project add <name> [<repo-path>] [--repo-name <name>] [--default-branch <branch>] [--workspace <dir>] [--mode local-only] [--yolo] [--budget-usd <amount>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	defaultBranchFlag := fs.String("default-branch", "", "override the detected default branch")
+	repoNameFlag := fs.String("repo-name", "", "name of the repo inside the project (default: derived from its directory)")
+	defaultBranchFlag := fs.String("default-branch", "", "override the repo's detected default branch")
 	modeFlag := fs.String("mode", store.ModeLocalOnly, "project mode (only local-only is supported)")
 	yoloFlag := fs.Bool("yolo", false, "let Mate merge without asking the user")
 	budgetUSDFlag := fs.Float64("budget-usd", 0, "open a budget incident once this project's total cost crosses this amount; hand-edit project.yaml for crew_tokens/crew_usd")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
-	if fs.NArg() != 2 {
+	if fs.NArg() < 1 || fs.NArg() > 2 {
 		fs.Usage()
-		return newUsageError("mate project add: want exactly 2 arguments: <name> <repo-path>")
+		return newUsageError("mate project add: want 1 or 2 arguments: <name> [<repo-path>]")
 	}
 	name := fs.Arg(0)
-	repoPath := fs.Arg(1)
+	if fs.NArg() == 1 && (*repoNameFlag != "" || *defaultBranchFlag != "") {
+		fs.Usage()
+		return newUsageError("mate project add: --repo-name and --default-branch describe a repo; give its <repo-path>")
+	}
 
 	w, err := resolveWorkspace(*workspaceFlag)
 	if err != nil {
 		return err
 	}
-
-	absRepo, err := filepath.Abs(repoPath)
+	opts := projectAddOptions{Mode: *modeFlag, Yolo: *yoloFlag, BudgetUSD: *budgetUSDFlag}
+	if fs.NArg() == 2 {
+		repoPath := fs.Arg(1)
+		absRepo, err := filepath.Abs(repoPath)
+		if err != nil {
+			return err
+		}
+		repo, err := repoConfigFor(absRepo, repoPath, *repoNameFlag, *defaultBranchFlag)
+		if err != nil {
+			return err
+		}
+		opts.Repos = []store.RepoConfig{repo}
+	}
+	saved, err := addProject(w, name, opts)
 	if err != nil {
 		return err
 	}
-	saved, err := addProject(w, name, absRepo, repoPath, projectAddOptions{
-		DefaultBranch: *defaultBranchFlag,
-		Mode:          *modeFlag,
-		Yolo:          *yoloFlag,
-		BudgetUSD:     *budgetUSDFlag,
-	})
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "added project %s: repo=%s default-branch=%s mode=%s yolo=%t\n",
-		name, saved.Repo, saved.DefaultBranch, saved.Mode, saved.Yolo)
+	fmt.Fprintf(stdout, "added project %s: %s mode=%s yolo=%t\n", name, describeRepos(name, saved.Repos), saved.Mode, saved.Yolo)
 	return nil
 }
 
-// projectAddOptions are the settings `mate project add` takes beyond the
-// name and the repo. The Console's new-project form passes the zero value.
-type projectAddOptions struct {
-	DefaultBranch string // empty: detect it from the repo
-	Mode          string // empty: store.ModeLocalOnly
-	Yolo          bool
-	BudgetUSD     float64
+// describeRepos is the repos part of a one-line project summary.
+func describeRepos(project string, repos []store.RepoConfig) string {
+	if len(repos) == 0 {
+		return fmt.Sprintf("no repo yet (add one with `mate project repo add %s <repo-path>`)", project)
+	}
+	parts := make([]string, 0, len(repos))
+	for _, r := range repos {
+		parts = append(parts, describeRepo(r))
+	}
+	return "repos=" + strings.Join(parts, ",")
 }
 
-// addProject registers a Project the one way both the CLI and the Console
-// do it: absRepo must be an existing directory that is the root of its git
-// work tree, the store proves it is inside the workspace, and PROJECT.md is
-// seeded. shownRepo is the path as the caller typed it, for error messages.
-func addProject(w *store.Workspace, name, absRepo, shownRepo string, opts projectAddOptions) (store.ProjectConfig, error) {
+// describeRepo is `<name>(<path>@<default-branch>)`.
+func describeRepo(r store.RepoConfig) string {
+	return fmt.Sprintf("%s(%s@%s)", r.Name, r.Path, r.DefaultBranch)
+}
+
+// projectAddOptions are the settings `mate project add` takes beyond the
+// name. The Console's new-project form passes only Repos.
+type projectAddOptions struct {
+	Repos     []store.RepoConfig // zero or more, each from repoConfigFor
+	Mode      string             // empty: store.ModeLocalOnly
+	Yolo      bool
+	BudgetUSD float64
+}
+
+// repoConfigFor checks a repo the one way both the CLI and the Console do
+// it - absRepo must be an existing directory that is the root of its git
+// work tree - and fills its default branch from the repo when none is
+// given. The store later proves the path is inside the workspace and owned
+// by no other project. shownRepo is the path as the caller typed it, for
+// error messages.
+func repoConfigFor(absRepo, shownRepo, name, defaultBranch string) (store.RepoConfig, error) {
 	fi, err := os.Stat(absRepo)
 	if err != nil {
-		return store.ProjectConfig{}, fmt.Errorf("repo path %s: %w", shownRepo, err)
+		return store.RepoConfig{}, fmt.Errorf("repo path %s: %w", shownRepo, err)
 	}
 	if !fi.IsDir() {
-		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not a directory", shownRepo)
+		return store.RepoConfig{}, fmt.Errorf("repo path %s is not a directory", shownRepo)
 	}
-
 	top, err := gitTopLevel(absRepo)
 	if err != nil {
-		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not a git repository: %w", shownRepo, err)
+		return store.RepoConfig{}, fmt.Errorf("repo path %s is not a git repository: %w", shownRepo, err)
 	}
 	resolvedRepo, err := filepath.EvalSymlinks(absRepo)
 	if err != nil {
-		return store.ProjectConfig{}, err
+		return store.RepoConfig{}, err
 	}
 	resolvedTop, err := filepath.EvalSymlinks(top)
 	if err != nil {
-		return store.ProjectConfig{}, err
+		return store.RepoConfig{}, err
 	}
 	if resolvedRepo != resolvedTop {
-		return store.ProjectConfig{}, fmt.Errorf("repo path %s is not the root of its git work tree (root is %s)", shownRepo, top)
+		return store.RepoConfig{}, fmt.Errorf("repo path %s is not the root of its git work tree (root is %s)", shownRepo, top)
 	}
+	if defaultBranch == "" {
+		defaultBranch = detectDefaultBranch(absRepo, store.DefaultBranch)
+	}
+	return store.RepoConfig{Name: name, Path: absRepo, DefaultBranch: defaultBranch}, nil
+}
 
-	branch := opts.DefaultBranch
-	if branch == "" {
-		branch = detectDefaultBranch(absRepo, store.DefaultBranch)
-	}
+// addProject registers a Project the one way both the CLI and the Console
+// do it, and seeds its PROJECT.md.
+func addProject(w *store.Workspace, name string, opts projectAddOptions) (store.ProjectConfig, error) {
 	mode := opts.Mode
 	if mode == "" {
 		mode = store.ModeLocalOnly
 	}
-	cfg := store.ProjectConfig{
-		Repo:          absRepo,
-		DefaultBranch: branch,
-		Mode:          mode,
-		Yolo:          opts.Yolo,
-	}
+	cfg := store.ProjectConfig{Repos: opts.Repos, Mode: mode, Yolo: opts.Yolo}
 	if opts.BudgetUSD > 0 {
 		cfg.Budget = &store.BudgetConfig{ProjectUSD: opts.BudgetUSD}
 	}
@@ -154,13 +180,11 @@ func cmdProjectList(args []string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("project list: %s: %w", ref.Name, err)
 		}
-		rows = append(rows, projectRow{
-			Name:          ref.Name,
-			Repo:          cfg.Repo,
-			DefaultBranch: cfg.DefaultBranch,
-			Mode:          cfg.Mode,
-			Yolo:          cfg.Yolo,
-		})
+		repos := make([]repoRow, 0, len(cfg.Repos))
+		for _, r := range cfg.Repos {
+			repos = append(repos, repoRow(r))
+		}
+		rows = append(rows, projectRow{Name: ref.Name, Repos: repos, Mode: cfg.Mode, Yolo: cfg.Yolo})
 	}
 
 	if *jsonFlag {
@@ -266,22 +290,47 @@ func cmdProjectYolo(args []string, stdout, stderr io.Writer) error {
 // projectRow is one row of `mate project list`, in both the table and the
 // --json output.
 type projectRow struct {
+	Name  string    `json:"name"`
+	Repos []repoRow `json:"repos"`
+	Mode  string    `json:"mode"`
+	Yolo  bool      `json:"yolo"`
+}
+
+// repoRow is one repo of a project in `project list --json` and `project
+// repo list --json`.
+type repoRow struct {
 	Name          string `json:"name"`
-	Repo          string `json:"repo"`
+	Path          string `json:"path"`
 	DefaultBranch string `json:"default_branch"`
-	Mode          string `json:"mode"`
-	Yolo          bool   `json:"yolo"`
 }
 
 // printProjectTable writes an aligned plain-text table: one header row plus
 // one row per project, columns padded to the widest cell.
 func printProjectTable(w io.Writer, rows []projectRow) {
-	headers := []string{"NAME", "REPO", "DEFAULT BRANCH", "MODE", "YOLO"}
+	headers := []string{"NAME", "REPOS", "MODE", "YOLO"}
 	table := make([][]string, 0, len(rows)+1)
 	table = append(table, headers)
 	for _, r := range rows {
-		table = append(table, []string{r.Name, r.Repo, r.DefaultBranch, r.Mode, strconv.FormatBool(r.Yolo)})
+		names := make([]string, 0, len(r.Repos))
+		for _, repo := range r.Repos {
+			names = append(names, repo.Name)
+		}
+		repos := strings.Join(names, ",")
+		if repos == "" {
+			repos = "-"
+		}
+		table = append(table, []string{r.Name, repos, r.Mode, strconv.FormatBool(r.Yolo)})
 	}
+	printTable(w, table)
+}
+
+// printTable writes an aligned plain-text table, columns padded to the
+// widest cell and the last column unpadded.
+func printTable(w io.Writer, table [][]string) {
+	if len(table) == 0 {
+		return
+	}
+	headers := table[0]
 
 	widths := make([]int, len(headers))
 	for _, row := range table {
@@ -359,7 +408,12 @@ func cmdProjectFacts(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := facts.Gather(context.Background(), gitx.New(), name, w.RepoDir(cfg.Repo), cfg.DefaultBranch)
+	// TODO(mvp.md task 41): one block per repo, and `repos: none`.
+	repoCfg, err := cfg.SoleRepo()
+	if err != nil {
+		return fmt.Errorf("project facts %s: %w", name, err)
+	}
+	f, err := facts.Gather(context.Background(), gitx.New(), name, w.RepoDir(repoCfg.Path), repoCfg.DefaultBranch)
 	if err != nil {
 		return fmt.Errorf("project facts %s: %w", name, err)
 	}

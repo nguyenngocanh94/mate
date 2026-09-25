@@ -58,7 +58,7 @@ func TestCmdProjectAddListRemove(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("want header + 2 rows, got %d lines: %q", len(lines), text)
 	}
-	if !strings.HasPrefix(lines[0], "NAME") || !strings.Contains(lines[0], "DEFAULT BRANCH") || !strings.Contains(lines[0], "MODE") || !strings.Contains(lines[0], "YOLO") {
+	if !strings.HasPrefix(lines[0], "NAME") || !strings.Contains(lines[0], "REPOS") || !strings.Contains(lines[0], "MODE") || !strings.Contains(lines[0], "YOLO") {
 		t.Fatalf("header row = %q", lines[0])
 	}
 	if !strings.Contains(text, "shop") || !strings.Contains(text, "blog") {
@@ -81,11 +81,11 @@ func TestCmdProjectAddListRemove(t *testing.T) {
 		if r.Mode != store.ModeLocalOnly {
 			t.Fatalf("mode = %q, want %q", r.Mode, store.ModeLocalOnly)
 		}
-		if r.DefaultBranch != "main" {
-			t.Fatalf("default branch = %q, want main", r.DefaultBranch)
+		if len(r.Repos) != 1 || r.Repos[0].Name != r.Name || r.Repos[0].DefaultBranch != "main" {
+			t.Fatalf("repos = %+v, want one repo named %s on main", r.Repos, r.Name)
 		}
-		if r.Repo == "" || filepath.IsAbs(r.Repo) {
-			t.Fatalf("repo = %q, want a workspace-relative path", r.Repo)
+		if p := r.Repos[0].Path; p == "" || filepath.IsAbs(p) {
+			t.Fatalf("repo path = %q, want a workspace-relative path", p)
 		}
 	}
 
@@ -262,8 +262,8 @@ func TestCmdProjectAddDefaultBranchOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
-	if cfg.DefaultBranch != "trunk" {
-		t.Fatalf("default branch = %q, want trunk", cfg.DefaultBranch)
+	if len(cfg.Repos) != 1 || cfg.Repos[0].DefaultBranch != "trunk" {
+		t.Fatalf("repos = %+v, want one repo on trunk", cfg.Repos)
 	}
 }
 
@@ -275,5 +275,107 @@ func TestCmdProjectRemoveUnknownProject(t *testing.T) {
 	}
 	if err := cmdProjectRemove([]string{"--workspace", ws, "nope"}, &out, &errw); err == nil {
 		t.Fatal("want error for removing an unknown project")
+	}
+}
+
+// initProjectWorkspace is an initialised workspace with a git repo at each
+// of the given workspace-relative paths.
+func initProjectWorkspace(t *testing.T, repos ...string) string {
+	t.Helper()
+	ws := t.TempDir()
+	var out, errw bytes.Buffer
+	if err := cmdInit([]string{ws}, &out, &errw); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	for _, r := range repos {
+		dir := filepath.Join(ws, r)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		initGitRepo(t, dir)
+	}
+	return ws
+}
+
+// TestCmdProjectAddWithoutRepo: a project may start with no repo (docs/mvp.md
+// M9); the summary line says how to add one, and repo-only flags without a
+// repo are a usage error rather than silently dropped.
+func TestCmdProjectAddWithoutRepo(t *testing.T) {
+	ws := initProjectWorkspace(t)
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "plan"}, &out, &errw); err != nil {
+		t.Fatalf("add without a repo: %v", err)
+	}
+	if !strings.Contains(out.String(), "no repo yet") || !strings.Contains(out.String(), "mate project repo add plan") {
+		t.Fatalf("summary = %q, want it to say how to add a repo", out.String())
+	}
+	if _, err := os.Stat(filepath.Join(ws, ".mate", "projects", "plan", "PROJECT.md")); err != nil {
+		t.Fatalf("PROJECT.md not seeded for a repo-less project: %v", err)
+	}
+	var ue *usageError
+	if err := cmdProjectAdd([]string{"--workspace", ws, "other", "--default-branch", "trunk"}, &out, &errw); !errors.As(err, &ue) {
+		t.Fatalf("--default-branch without a repo: err = %v, want a usage error", err)
+	}
+	out.Reset()
+	if err := cmdProjectList([]string{"--workspace", ws}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "plan  -") {
+		t.Fatalf("list = %q, want plan with a - for its repos", out.String())
+	}
+}
+
+// TestCmdProjectRepoAddListRemove walks a project from no repo to two and
+// back to one through the CLI.
+func TestCmdProjectRepoAddListRemove(t *testing.T) {
+	ws := initProjectWorkspace(t, "services/api", "web")
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "services/api")}, &out, &errw); err != nil {
+		t.Fatalf("repo add api: %v", err)
+	}
+	if !strings.Contains(out.String(), "added repo api to project shop: path=services/api default-branch=main") {
+		t.Fatalf("repo add output = %q", out.String())
+	}
+	if err := cmdProjectRepo([]string{"add", "shop", filepath.Join(ws, "web"), "--name", "frontend", "--default-branch", "trunk", "--workspace", ws}, &out, &errw); err != nil {
+		t.Fatalf("repo add web: %v", err)
+	}
+
+	out.Reset()
+	if err := cmdProjectRepo([]string{"list", "--workspace", ws, "shop", "--json"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	var rows []repoRow
+	if err := json.Unmarshal(out.Bytes(), &rows); err != nil {
+		t.Fatalf("json: %v\n%s", err, out.String())
+	}
+	want := []repoRow{{Name: "api", Path: "services/api", DefaultBranch: "main"}, {Name: "frontend", Path: "web", DefaultBranch: "trunk"}}
+	if len(rows) != 2 || rows[0] != want[0] || rows[1] != want[1] {
+		t.Fatalf("repo list = %+v, want %+v", rows, want)
+	}
+
+	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "web")}, &out, &errw); !errors.Is(err, store.ErrRepoExists) {
+		t.Fatalf("adding web twice: err = %v, want ErrRepoExists", err)
+	}
+
+	out.Reset()
+	if err := cmdProjectRepo([]string{"remove", "--workspace", ws, "shop", "api"}, &out, &errw); err != nil {
+		t.Fatalf("repo remove: %v", err)
+	}
+	if !strings.Contains(out.String(), "not touched") {
+		t.Fatalf("remove output = %q", out.String())
+	}
+	if _, err := os.Stat(filepath.Join(ws, "services/api", ".git")); err != nil {
+		t.Fatalf("repo remove touched the repository: %v", err)
+	}
+	out.Reset()
+	if err := cmdProjectRepo([]string{"list", "--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "services/api") || !strings.Contains(out.String(), "frontend") {
+		t.Fatalf("repo list after remove = %q", out.String())
 	}
 }

@@ -82,12 +82,16 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	case err != nil:
 		p.Repos = note(w, UnknownField[[]RepoValue](readFailureReason(err)), "repos", row)
 	default:
-		p.Repos = KnownField([]RepoValue{{
-			RepoID:        ref.Name,
-			DisplayName:   filepath.Base(cfg.Repo),
-			Path:          filepath.Join(ws.Root(), cfg.Repo),
-			DefaultBranch: cfg.DefaultBranch,
-		}})
+		repos := make([]RepoValue, 0, len(cfg.Repos))
+		for _, r := range cfg.Repos {
+			repos = append(repos, RepoValue{
+				RepoID:        r.Name,
+				DisplayName:   r.Name,
+				Path:          ws.RepoDir(r.Path),
+				DefaultBranch: r.DefaultBranch,
+			})
+		}
+		p.Repos = KnownField(repos)
 	}
 
 	p.Mate = loadMate(ws, ref.Name, w)
@@ -282,8 +286,9 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 	c := CrewNode{
 		CrewID:    id,
 		ProjectID: project,
-		RepoID:    project,
-		Repo:      repoFor(repos, project),
+		// The repo is the one the meta names; until the meta is read it
+		// is unknown, and an unreadable meta leaves it that way.
+		Repo:      UnknownField[RepoValue]("crews/" + id + ".meta could not be read"),
 		LastEvent: AbsentField[EventValue]("mate records no event log yet"),
 		Error:     AbsentField[ErrorReason](notAnErrorState),
 		// This package reads files; an observation comes from Herdr. A
@@ -311,6 +316,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 		return c
 	}
 
+	c.RepoID, c.Repo = crewRepo(repos, meta[store.MetaRepo])
 	c.Task = meta["task"]
 	if kind, err := ParseHarnessKind(meta["harness"]); err == nil {
 		c.HarnessKind = kind
@@ -373,6 +379,22 @@ func lastStatusVerb(ws *store.Workspace, project, id string, w *warnings, row Ro
 		return ""
 	}
 	return string(verb)
+}
+
+// crewRepo is the repo a crew's meta names. A meta written before M9 names
+// none and belongs to the project's sole repo; with several repos there is
+// no answer, and the field says so rather than guessing.
+func crewRepo(repos Field[[]RepoValue], named string) (string, Field[RepoValue]) {
+	if named == "" {
+		if repos.State == Known && len(repos.Value) == 1 {
+			return repos.Value[0].RepoID, KnownField(repos.Value[0])
+		}
+		if repos.State == Known {
+			return "", UnknownField[RepoValue]("the crew's meta names no repo and the project does not have exactly one")
+		}
+		return "", repoFor(repos, "")
+	}
+	return named, repoFor(repos, named)
 }
 
 func repoFor(repos Field[[]RepoValue], repoID string) Field[RepoValue] {

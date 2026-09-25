@@ -12,7 +12,7 @@ import (
 
 func TestStoreMetaRoundTrip(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +147,7 @@ func TestStoreMetaReadRejectsMalformedFile(t *testing.T) {
 
 func TestStoreAtomicWritesLeaveNoTempFiles(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repo: "shop"}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"task": "x"}); err != nil {

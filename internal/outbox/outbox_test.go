@@ -67,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.AddProject(project, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	rt := runtime.NewFake()

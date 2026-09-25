@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/box"
@@ -125,7 +123,12 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	if err != nil {
 		return StopResult{}, err
 	}
-	repo := w.RepoDir(cfg.Repo)
+	repoCfg, err := cfg.CrewRepo(meta)
+	if err != nil {
+		return StopResult{}, observability.WrapError(observability.CodeStateConflict,
+			fmt.Sprintf("crew stop %s/%s refused, nothing was stopped", project, crew), err)
+	}
+	repo := w.RepoDir(repoCfg.Path)
 	git := deps.git()
 
 	branch := meta[MetaBranch]
@@ -144,12 +147,12 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 			return StopResult{}, err
 		}
 		if branchExists {
-			isAncestor, err = git.IsAncestor(ctx, repo, branch, cfg.DefaultBranch)
+			isAncestor, err = git.IsAncestor(ctx, repo, branch, repoCfg.DefaultBranch)
 			if err != nil {
 				return StopResult{}, err
 			}
 			if !isAncestor {
-				ahead, err = git.AheadCount(ctx, repo, branch, cfg.DefaultBranch)
+				ahead, err = git.AheadCount(ctx, repo, branch, repoCfg.DefaultBranch)
 				if err != nil {
 					return StopResult{}, err
 				}
@@ -176,7 +179,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		// at the branch before deciding.
 		return out, observability.WrapError(observability.CodeStateConflict,
 			fmt.Sprintf("branch %s is %d commit(s) ahead of %s and the worktree has %d dirty file(s); nothing was stopped - land the branch, or rerun with --discard to throw the work away",
-				branch, ahead, cfg.DefaultBranch, dirty), ErrUnlandedWork).
+				branch, ahead, repoCfg.DefaultBranch, dirty), ErrUnlandedWork).
 			WithDetails(map[string]any{"branch": branch, "ahead": ahead, "dirty_files": dirty})
 	}
 
@@ -407,25 +410,7 @@ func readDirNames(dir string) ([]string, error) {
 	return names, nil
 }
 
-// crewIDs are the ids with a `.meta` under `crews/`, sorted. A file whose
-// name is not a valid crew id is ignored rather than reported: `crews/` is a
-// directory the user can also put things in.
+// crewIDs are the ids with a `.meta` under `crews/`, sorted (store.CrewIDs).
 func crewIDs(w *store.Workspace, project string) ([]string, error) {
-	entries, err := readDirNames(w.CrewsDir(project))
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, name := range entries {
-		id, ok := strings.CutSuffix(name, ".meta")
-		if !ok {
-			continue
-		}
-		if store.ValidateCrewID(id) != nil {
-			continue
-		}
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids, nil
+	return w.CrewIDs(project)
 }

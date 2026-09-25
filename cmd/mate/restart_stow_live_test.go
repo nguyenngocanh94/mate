@@ -39,7 +39,7 @@ func TestLiveRestartMateStowsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
-	if err := w.AddProject(stowProject, store.ProjectConfig{Repo: repo, DefaultBranch: "main"}); err != nil {
+	if err := w.AddProject(stowProject, store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	if err := os.WriteFile(w.ProjectDoc(stowProject), []byte(memory.ProjectTemplate(stowProject)), 0o644); err != nil {
