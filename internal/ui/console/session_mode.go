@@ -50,6 +50,10 @@ type sessionFlow struct {
 	target   SessionTarget
 	snapshot SessionSnapshot
 	composer string
+	// sel is the terminal zone's text selection and copied the hint
+	// line's note about the last copy (session_select.go).
+	sel    termSelection
+	copied string
 	// entryRow is the row beginSession was called for. It is what the
 	// fallback-to-hand-off path (onSessionSnapshot, entry-read failure)
 	// replays through beginAttach, rather than whatever row happens to be
@@ -734,6 +738,7 @@ func (m Model) onSessionStreamKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return model, cmd
 	}
 	if data, ok := encodeKeyMsg(msg); ok && m.sess.stream != nil {
+		m = m.clearSelection()
 		m.sess.stream.enqueueWrite(data)
 	}
 	return m, nil

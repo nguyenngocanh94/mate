@@ -47,10 +47,17 @@ func RenderSessionFrame(snapshot SessionSnapshot, composer string, rail boxRail,
 // of Console chrome left on the frame is sessionHintLine, which names the
 // focused zone's keys (session_focus.go).
 func RenderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, frozen bool, rail boxRail, w, h int, g glyphSet, p palette) string {
+	return renderStreamSessionFrame(snapshot, buffer, frozen, termSelection{}, rail, w, h, g, p)
+}
+
+// renderStreamSessionFrame is RenderStreamSessionFrame with the terminal
+// zone's selection drawn onto the agent's screen (session_select.go).
+func renderStreamSessionFrame(snapshot SessionSnapshot, buffer *TerminalBuffer, frozen bool, sel termSelection, rail boxRail, w, h int, g glyphSet, p palette) string {
 	if buffer == nil {
 		return RenderSessionFrame(snapshot, "", rail, w, h, g, p)
 	}
 	frame := buffer.Snapshot()
+	applySelection(&frame, sel)
 	return renderSessionFrame(snapshot, &frame, frozen, "", rail, w, h, g, p)
 }
 
@@ -287,6 +294,10 @@ type boxRail struct {
 	// full width, because a refused send quotes the screen it was refused
 	// from and the rail's 36 columns would cut that mid-sentence.
 	outcome footerMsg
+	// copied is the note the last selection copy left for the hint line
+	// (session_select.go). It stays out of outcome on purpose: outcome
+	// takes a row of its own, and a copy must not resize the agent's PTY.
+	copied string
 }
 
 // sessionRailLines returns exactly geo.bodyH *line values for the rail
@@ -361,7 +372,12 @@ func sessionHintLine(rail boxRail, geo sessionGeom, g glyphSet, p palette, w int
 			add("  F2", p.Fg).add(" terminal", p.Dim)
 		return l.cut(w, g)
 	default:
-		l.add(" TERMINAL  ", p.Bold).add("every key goes to the agent", p.Dim)
+		l.add(" TERMINAL  ", p.Bold)
+		if rail.copied != "" {
+			l.add(rail.copied, p.Green)
+		} else {
+			l.add("every key goes to the agent", p.Dim).add("  "+g.Dot+"  ", p.Faint).add("drag", p.Fg).add(" copies", p.Dim)
+		}
 		if geo.railW > 0 || geo.digestH > 0 {
 			l.add("  "+g.Dot+"  ", p.Faint).add("F2", p.Fg).add(" box", p.Dim)
 		} else {

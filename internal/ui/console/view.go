@@ -28,7 +28,7 @@ func (m Model) View() string {
 			// sessionFallback keeps the last live frame frozen on screen (see
 			// beginStreamFallback): the renderer crops that buffer's HEAD, not
 			// its tail, once the notice banner takes a frame row.
-			return RenderStreamSessionFrame(m.sess.snapshot, m.sess.terminal, m.sess.phase == sessionFallback, m.sessionRailState(), m.w, m.h, m.g, m.p)
+			return renderStreamSessionFrame(m.sess.snapshot, m.sess.terminal, m.sess.phase == sessionFallback, m.sess.sel, m.sessionRailState(), m.w, m.h, m.g, m.p)
 		}
 		return RenderSessionFrame(m.sess.snapshot, m.sess.composer, m.sessionRailState(), m.w, m.h, m.g, m.p)
 	}

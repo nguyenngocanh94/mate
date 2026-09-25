@@ -33,4 +33,4 @@
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ? for shortcuts                                                                                       ⏵⏵ accept edits on
- TERMINAL  every key goes to the agent  ·  F2 console                                                                   
+ TERMINAL  every key goes to the agent  ·  drag copies  ·  F2 console                                                   

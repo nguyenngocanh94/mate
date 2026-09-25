@@ -93,7 +93,13 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 	}
 	model := console.New(load, notWiredAttachCmd, consoleAction(ws, deps)).
 		WithContext(ctx).
-		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps))
+		WithSessionStream(consoleSessionStream(ws, stream), consoleSessionMetadata(ws, deps)).
+		WithClipboard(func(seq []byte) {
+			// One write per sequence: the renderer also writes this file
+			// from its own goroutine, one frame per write, so a single
+			// write lands between two frames rather than inside one.
+			_, _ = stdoutFile.Write(seq)
+		})
 
 	// tea.WithMouseAllMotion is a Program-level terminal mode, so it is on
 	// for the Console's whole run. All motion, not cell motion: cell motion
