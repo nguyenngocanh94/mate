@@ -9,10 +9,11 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// ErrRepoRefused matches (errors.Is) every spawn refused because the repo
-// the crew is to work in could not be settled: the project has none, has
-// several and `--repo` was not given, or has none by the given name. The
-// CLI reports it as a usage error.
+// ErrRepoRefused matches (errors.Is) every spawn refused because the caller
+// did not settle the crew's repo: the project has several and `--repo` was
+// not given, or has none by the given name. The CLI reports it as a usage
+// error. A project with no repo at all is not the caller's mistake - only
+// the captain can add one - so that refusal is a state conflict instead.
 var ErrRepoRefused = errors.New("crew spawn: no repo settled")
 
 // repoRefusal carries the one-line reason and matches ErrRepoRefused, so the
@@ -31,7 +32,8 @@ func spawnRepo(cfg store.ProjectConfig, project, name string) (store.RepoConfig,
 	var why string
 	switch {
 	case len(cfg.Repos) == 0:
-		why = fmt.Sprintf("project %s has no repo yet; add one with `mate project repo add %s <repo-path>`", project, project)
+		return store.RepoConfig{}, observability.NewError(observability.CodeStateConflict, fmt.Sprintf(
+			"crew spawn refused, nothing was created: project %s has no repo yet; add one with `mate project repo add %s <repo-path>`", project, project))
 	case name != "":
 		if r, ok := cfg.Repo(name); ok {
 			return r, nil

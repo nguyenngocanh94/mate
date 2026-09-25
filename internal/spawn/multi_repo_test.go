@@ -271,7 +271,16 @@ func TestSpawnCrewRefusesAProjectWithNoRepo(t *testing.T) {
 		_, err := spawn.SpawnCrew(context.Background(), w, fakeDeps(t, rt), spawn.SpawnCrewRequest{
 			Project: "shop", Crew: "k3", Repo: repo, BriefText: brieftest.Ship("work"),
 		})
-		assertUsageRefusal(t, err, "nothing was created", "has no repo yet", "mate project repo add shop <repo-path>")
+		// Not a usage mistake: only the captain can add a repo, so it is
+		// a state refusal (exit 1), and not ErrRepoRefused.
+		if err == nil || errors.Is(err, spawn.ErrRepoRefused) || observability.ExitCode(err) != observability.ExitStateConflict {
+			t.Fatalf("repo %q: err = %v (exit %d), want a state refusal", repo, err, observability.ExitCode(err))
+		}
+		for _, want := range []string{"nothing was created", "has no repo yet", "mate project repo add shop <repo-path>"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("repo %q: %v does not contain %q", repo, err, want)
+			}
+		}
 		assertSpawnLeftNothing(t, w, rt)
 	}
 }

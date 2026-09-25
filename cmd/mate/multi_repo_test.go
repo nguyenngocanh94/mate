@@ -151,20 +151,24 @@ func TestCrewSpawnRefusesWhenTheRepoIsNotSettled(t *testing.T) {
 	if err := w.AddProject("empty", store.ProjectConfig{}); err != nil {
 		t.Fatalf("AddProject with no repo: %v", err)
 	}
+	// A missing or wrong --repo is the caller's argument to fix: exit 2. A
+	// project with no repo is a state only the captain can change, so it is
+	// a refusal: exit 1 (the manual's convention, section 4).
 	cases := []struct {
 		args  []string
+		code  int
 		wants []string
 	}{
-		{[]string{"shop", "k5"}, []string{"several repos (api, web)", "--repo <name>"}},
-		{[]string{"shop", "k5", "--repo", "mobile"}, []string{`no repo "mobile"`, "api, web"}},
-		{[]string{"empty", "k5"}, []string{"has no repo yet", "`mate project repo add empty <repo-path>`"}},
+		{[]string{"shop", "k5"}, 2, []string{"several repos (api, web)", "--repo <name>"}},
+		{[]string{"shop", "k5", "--repo", "mobile"}, 2, []string{`no repo "mobile"`, "api, web"}},
+		{[]string{"empty", "k5"}, 1, []string{"has no repo yet", "`mate project repo add empty <repo-path>`"}},
 	}
 	for _, c := range cases {
 		args := append([]string{"crew", "spawn", "--workspace", root, "--brief", brief}, c.args...)
 		var out, errw bytes.Buffer
 		code := mainRun(args, &out, &errw)
-		if code != 2 {
-			t.Errorf("%v: exit %d, want 2 (usage)\nstderr: %s", c.args, code, errw.String())
+		if code != c.code {
+			t.Errorf("%v: exit %d, want %d\nstderr: %s", c.args, code, c.code, errw.String())
 		}
 		for _, want := range append(c.wants, "nothing was created") {
 			if !strings.Contains(errw.String(), want) {
