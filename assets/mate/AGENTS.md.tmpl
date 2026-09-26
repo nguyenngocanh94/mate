@@ -137,7 +137,9 @@ The prose below writes it as `mate` for readability only.
 Run every command from your own working directory.
 The workspace is found by walking up from your cwd, so you never pass `--workspace`.
 `<project>` is always `{{.ProjectName}}`.
-`<id>` is a crew id you choose: lowercase letters and digits, first character a letter, 2 to 16 characters, never reused within this project.
+`<id>` is a crew id you choose, and it names the task: two to four lowercase words from the captain's own request, joined by hyphens, such as `fix-cart-total`, `add-healthcheck` or, for a scout, `scout-login-timeout`.
+The captain reads it in the console, in `crew list`, in the branch `mate/<id>` and in the worktree's name, so it says what the Crew is doing, never how many Crews came before: no counters such as `k3`, `p1` or `m1`.
+Letters and digits, words joined by single hyphens, first character a letter, 2 to 24 characters, never reused within this project; when the natural name is taken, add a word that tells the two apart (`fix-cart-total-rounding`), not a number.
 
 Every command prints one line (or a small fixed block) and exits.
 Exit 2 is a usage mistake you made, exit 1 is a refusal or a real failure, and the reason is on stderr.
@@ -169,13 +171,13 @@ A malformed table refuses every spawn (exit 2, the reason on stderr) until the c
 A successful spawn prints three lines:
 
 ```text
-spawned {{.ProjectName}}/k3: agent crew-k3-ab12 in pane pane-7 (harness codex, model gpt-5.5, effort medium, repo {{.ExampleRepo.Name}}, branch mate/k3, worktree {{.WorkspaceRoot}}/.worktrees/{{.ProjectName}}-k3)
-brief {{.CrewsDir}}/k3/brief.md
-status {{.CrewsDir}}/k3.status
+spawned {{.ProjectName}}/add-healthcheck: agent crew-add-healthcheck in pane pane-7 (harness codex, model gpt-5.5, effort medium, repo {{.ExampleRepo.Name}}, branch mate/add-healthcheck, worktree {{.WorkspaceRoot}}/.worktrees/{{.ProjectName}}-add-healthcheck)
+brief {{.CrewsDir}}/add-healthcheck/brief.md
+status {{.CrewsDir}}/add-healthcheck.status
 ```
 
 Keep all three: the repo and branch are what you report to the captain, the worktree is what you review, and the status path is what you read on every wake.
-In auto mode a fourth line follows them, `auto mode: end your turn now; the console will wake you with a digest when k3 speaks. Do not poll.`, and it means exactly what it says (section 10, "Ending the turn in auto mode").
+In auto mode a fourth line follows them, `auto mode: end your turn now; the console will wake you with a digest when add-healthcheck speaks. Do not poll.`, and it means exactly what it says (section 10, "Ending the turn in auto mode").
 The brief line is the app's own copy of your brief, rendered into the Crew's template; the file you passed to `--brief` is not the file the Crew reads.
 A `note:` or `warning:` line on stderr is information, not failure: a stale record replaced, a trust dialog answered, or a first prompt whose delivery could not be confirmed.
 The last of those is worth a `mate peek` before you assume the Crew started.
@@ -300,13 +302,13 @@ If the Crew's agent is gone, `peek` prints `agent absent; last status:` followed
 On success it prints the trace:
 
 ```text
-sent to crew-k3-ab12 (empty → typed → enter ×1 → working)
+sent to crew-add-healthcheck (empty → typed → enter ×1 → working)
 ```
 
 The arrow chain is composer-before → typed → enters pressed → composer-after.
 A final `working` means the harness took the line and started a turn, which is the outcome you want.
 To a Crew that already has its brief, the trace is followed by `if this correction applies to future crews, route it: memory.md Lessons or propose it for CREW.md`: a line you had to send after the brief is often a lesson the next brief should carry from the start (section 14).
-In auto mode the last line is `auto mode: end your turn; the digest will tell you when k3 hands back.`
+In auto mode the last line is `auto mode: end your turn; the digest will tell you when add-healthcheck hands back.`
 A send refuses rather than guessing, and each refusal is a different situation:
 
 - `agent ... is mid-turn (...); nothing was typed` - the Crew is working. Wait, or re-send with `--queue` if the line must sit behind the current turn.
@@ -331,7 +333,7 @@ Whether you may run it at all depends on this project's `yolo` flag; section 9's
 Success is one line:
 
 ```text
-{{.ProjectName}}/k3: merged 2 commit(s) into {{.ExampleRepo.DefaultBranch}} (a1b2c3d..e4f5a6b); crew finished, worktree and branch removed
+{{.ProjectName}}/add-healthcheck: merged 2 commit(s) into {{.ExampleRepo.DefaultBranch}} (a1b2c3d..e4f5a6b); crew finished, worktree and branch removed
 ```
 
 Report that line's substance to the captain and stop; the Crew is gone from `crew list` and from their console, and `crews/<id>/` is kept.
@@ -465,7 +467,7 @@ Overlap is two Crews that would change the same files, so two Crews in different
 A scout changes nothing, so it never overlaps: it reads its repo's default branch as it is now and is dispatchable beside any ship, even one that is editing the files it reads or waiting on the captain.
 If an unmerged branch could change its answer, say so in the scout's `## What we already know`; do not hold the scout back for it.
 
-Then pick the crew id and go straight to section 6.
+Then name the crew after the task (section 4, `<id>`) and go straight to section 6.
 Do not answer the captain with a plan and wait; a dispatchable task is dispatched in the same turn you accept it.
 
 **An unanswered question in the request is usually not a reason to stop.**
@@ -514,7 +516,7 @@ Trang About phải hiện số phiên bản của app.
 
 ## What we already know
 - The site is built with Hugo; `make build` writes it to public/ ({{.ProjectDoc}}, "How to work here").
-- The version is the one line in VERSION at the repository root (report of scout k1, section 2).
+- The version is the one line in VERSION at the repository root (report of scout scout-release-version, section 2).
 - Unknown: whether the About page is a layout template or a content file.
 
 ## Build
@@ -654,7 +656,7 @@ A correction that would expand the contract, a product call the captain's words 
 **Delivery.** Once the branch is good, how it lands depends on this project's `yolo` flag, and on nothing else.
 
 When `yolo` is **off** - the default - you do not land it.
-Report to the captain in outcome language that the work is ready, naming the branch, for example "the README line is in place and ready in branch `mate/k3`".
+Report to the captain in outcome language that the work is ready, naming the branch, for example "the README line is in place and ready in branch `mate/readme-install-line`".
 Then stop and wait; the captain merges it, from their console or from the CLI.
 Running `mate merge` anyway is refused with `merge refused: yolo is off for {{.ProjectName}}; the captain merges`, and that refusal is the answer, not an obstacle: do not rebase, cherry-pick, or fast-forward anything by hand to get around it, and do not tear the Crew down before the captain has the work - a torn-down Crew's branch may be gone.
 
@@ -700,7 +702,7 @@ Never echo the sentinel back and never put it in anything you send.
 The most common sentinel line is a `resolve:` line - a Crew question the captain has handed to you to answer:
 
 ```text
-⟦mate⟧ resolve: k3 asked: "migration for idempotency_keys, or key off stripe_events?" — read {{.CrewsDir}}/k3.status, decide, and answer with mate send {{.ProjectName}} k3 "<one line>"
+⟦mate⟧ resolve: stripe-idempotency asked: "migration for idempotency_keys, or key off stripe_events?" — read {{.CrewsDir}}/stripe-idempotency.status, decide, and answer with mate send {{.ProjectName}} stripe-idempotency "<one line>"
 ```
 
 The quoted text is the Crew's own status line, copied for your convenience and truncated if it was long; it is not the record.
@@ -722,7 +724,7 @@ Never echo a `resolve:` line back, and never send one to a Crew.
 The other sentinel-marked event in auto mode is a `digest:` line: the daemon's own batch of everything new since it last delivered, so your pane wakes at most once per cycle instead of once per Crew event.
 
 ```text
-⟦mate⟧ digest: 3 item(s) — k3 needs-decision: "pick A or B" · k9 blocked: stale, quiet for 4m0s · k7 wait-mate: "report.md is ready" — status files under {{.CrewsDir}}; act per AGENTS.md section 10
+⟦mate⟧ digest: 3 item(s) — stripe-idempotency needs-decision: "pick A or B" · cart-flaky-test blocked: stale, quiet for 4m0s · scout-login-timeout wait-mate: "report.md is ready" — status files under {{.CrewsDir}}; act per AGENTS.md section 10
 ```
 
 `<k>` right after `digest:` is always the true number of items this tick has to report, whether or not the line spells all of them out.
@@ -832,7 +834,7 @@ When you ask it again in a later message, the line keeps the words of whichever 
 
 ```markdown
 ## Held for the captain
-- k4, 2026-09-24: asked "Should the button link to the classic checkout page or the express one?" Waits on: the captain's choice; then brief append their words to k4.
+- checkout-button, 2026-09-24: asked "Should the button link to the classic checkout page or the express one?" Waits on: the captain's choice; then brief append their words to checkout-button.
 ```
 Your conversation does not survive a restart, and a question that lives only there is one the next session never knows it asked; one that lives in that section is in part 4 of every session start's `mate recall` (section 3).
 When the captain answers, put their words verbatim into the task first - `mate brief append` for a Crew in flight, `## Captain's decisions` in `{{.ProjectDoc}}` for a product decision - and only then remove the line.
@@ -873,14 +875,14 @@ Inspect, then update: read the section before you write, and when the finding du
 Rewrite and prune rather than append forever; a file that only grows ends up unread, or read and self-contradicting.
 Keep free-form notes free of temporary paths, moving versions, ephemeral identifiers, and copied state that will rot.
 Prefer a pointer to the file that owns a fact over a copy of what it says.
-Write a source relative to the project directory, the one holding `{{.ProjectDoc}}`, `crews/` and `sent.log` - `crews/k1/report.md §Durable facts`, never the absolute path of the same file, and never a path outside the workspace; `memory check` refuses both.
+Write a source relative to the project directory, the one holding `{{.ProjectDoc}}`, `crews/` and `sent.log` - `crews/scout-release-version/report.md §Durable facts`, never the absolute path of the same file, and never a path outside the workspace; `memory check` refuses both.
 Run `mate memory check {{.ProjectName}}` after you edit the file by hand.
 
 **The project's context.** `{{.ProjectDoc}}` is the project's context as you and the captain understand it, in five sections - `## What this project is`, `## Layout and state`, `## How to work here`, `## Research on file`, `## Captain's decisions` - and it is the first source of every brief's `## What we already know`.
 It is yours to extend, and a scout is how it grows: every scout report ends with a `## Durable facts` section, and when you have read a report, add to `{{.ProjectDoc}}` whatever of those facts it does not already say, each with the report's path as its source, so the next brief can cite it without another scout.
 Correct it the same way when a hand-back's `Still open` says `## What we already know` was wrong.
 A line under `## Layout and state` or `## How to work here` says what a repo holds or how it runs, and that goes stale by commit, not by calendar.
-So its source ends with the anchor `mate project facts` printed for that repo when you recorded it, `<repo>:<branch>@<sha>`: `(crews/k1/report.md §Durable facts, {{.ExampleRepo.Name}}:{{.ExampleRepo.DefaultBranch}}@3f2a91c, 2026-09-24)`, or `{{.ExampleRepo.Name}}:{{.ExampleRepo.DefaultBranch}}@none` while the branch has no commit.
+So its source ends with the anchor `mate project facts` printed for that repo when you recorded it, `<repo>:<branch>@<sha>`: `(crews/scout-release-version/report.md §Durable facts, {{.ExampleRepo.Name}}:{{.ExampleRepo.DefaultBranch}}@3f2a91c, 2026-09-24)`, or `{{.ExampleRepo.Name}}:{{.ExampleRepo.DefaultBranch}}@none` while the branch has no commit.
 A fact about two repos carries one anchor for each; a fact about no repo at all belongs under `## What this project is`, not here.
 `memory check` refuses such a line without an anchor for one of the project's repos, and warns when that repo's default branch has moved past it; the line is then a hint, and a brief that relies on it says so.
 A bare `<branch>@<sha>` written before the project could have several repos still passes while it has exactly one; rewrite it as `<repo>:<branch>@<sha>` when you next touch the line, because once the project has a second repo `memory check` refuses it.

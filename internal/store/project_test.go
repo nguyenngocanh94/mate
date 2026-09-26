@@ -116,15 +116,18 @@ func TestStoreCrewIDValidation(t *testing.T) {
 		id string
 		ok bool
 	}{
-		{"k3", true},
-		{"crew1", true},
-		{"abcdefghijabcdef", true}, // 16 chars
-		{"k", false},               // too short
+		{"k3", true}, // ids spawned before names were words stay valid
+		{"fix-cart-total", true},
+		{"k-3", true},
+		{"abcdefghij-abcdefghij-ab", true}, // 24 chars
+		{"k", false},                       // too short
 		{"", false},
 		{"K3", false},
 		{"3k", false},
-		{"k-3", false},
-		{"abcdefghijabcdefg", false}, // 17 chars
+		{"fix--cart", false},
+		{"fix-cart-", false},
+		{"fix_cart", false},
+		{"abcdefghij-abcdefghij-abc", false}, // 25 chars
 	}
 	for _, tc := range cases {
 		t.Run(tc.id, func(t *testing.T) {

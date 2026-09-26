@@ -7,10 +7,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/names"
 )
 
-var (
-	crewIDPattern  = regexp.MustCompile(`^[a-z][a-z0-9]{1,15}$`)
-	metaKeyPattern = regexp.MustCompile(`^[a-z_]+$`)
-)
+var metaKeyPattern = regexp.MustCompile(`^[a-z_]+$`)
 
 // ValidateProjectName accepts the names a project directory may have:
 // `[a-z][a-z0-9-]{0,31}`. Layout helpers assume a validated name; every method
@@ -22,10 +19,10 @@ func ValidateProjectName(name string) error {
 	return nil
 }
 
-// ValidateCrewID accepts the ids a crew may have: `[a-z][a-z0-9]{1,15}`.
+// ValidateCrewID accepts the ids a crew may have (names.ValidCrew).
 func ValidateCrewID(id string) error {
-	if !crewIDPattern.MatchString(id) {
-		return fmt.Errorf("store: invalid crew id %q: want [a-z][a-z0-9]{1,15}", id)
+	if !names.ValidCrew(id) {
+		return fmt.Errorf("store: invalid crew id %q: want %s", id, names.CrewRule)
 	}
 	return nil
 }

@@ -82,7 +82,7 @@ const DefaultBriefDeliveryTimeout = 30 * time.Second
 type SpawnCrewRequest struct {
 	// Project is the registered project the crew works in.
 	Project string
-	// Crew is the crew id: `[a-z][a-z0-9]{1,15}` (store.ValidateCrewID).
+	// Crew is the crew id, a kebab-case name of the task (names.ValidCrew).
 	Crew string
 	// Harness is the harness kind to launch. Empty means the workspace
 	// default for a Crew (Codex).

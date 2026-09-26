@@ -153,7 +153,7 @@ func TestManualListsTheRepos(t *testing.T) {
 func TestManualTeachesOneCrewOneRepo(t *testing.T) {
 	text := renderWith(t, twoRepoParams())
 	for heading, wants := range map[string][]string{
-		"## 4. The `mate` command contract": {"[--repo <name>]", "repo shop, branch mate/k3", "<repo>:<branch>@<sha>", "shop:main@none"},
+		"## 4. The `mate` command contract": {"[--repo <name>]", "repo shop, branch mate/add-healthcheck", "<repo>:<branch>@<sha>", "shop:main@none"},
 		"## 5. Task intake":                 {"one Crew per repo"},
 		"## 7. Spawn":                       {"--repo <repo>", "required", "one Crew per repo", "blocked-by:"},
 		"## 14. Project memory":             {"<repo>:<branch>@<sha>", "shop:main@3f2a91c"},
@@ -234,5 +234,22 @@ func TestManualNoLongerParaphrasesTheCaptain(t *testing.T) {
 	}
 	if !strings.Contains(section(t, text, "## 6. Writing the brief"), "verbatim, always") {
 		t.Error("section 6 does not say the captain's words are copied verbatim, always")
+	}
+}
+
+// TestManualNamesCrewsAfterTheirTask: the captain reads a crew's id in the
+// console, in crew list and in its branch, so the manual has the Mate name
+// it after the task and never teaches a counter by example.
+func TestManualNamesCrewsAfterTheirTask(t *testing.T) {
+	text := renderedManual(t)
+	sec := section(t, text, "## 4. The `mate` command contract")
+	for _, want := range []string{"it names the task", "`fix-cart-total`", "no counters such as `k3`, `p1` or `m1`", "2 to 24 characters"} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("section 4 does not say %q", want)
+		}
+	}
+	counter := regexp.MustCompile("\\b[kpm][0-9]+\\b")
+	for _, m := range counter.FindAllString(strings.Replace(text, "no counters such as `k3`, `p1` or `m1`", "", 1), -1) {
+		t.Errorf("the manual still uses the counter id %q in an example", m)
 	}
 }
