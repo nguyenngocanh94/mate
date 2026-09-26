@@ -82,6 +82,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdDashboard(args[1:], stdout, stderr)
 	case "console":
 		return cmdConsoleLaunch(args[1:], stdout, stderr)
+	case "pane":
+		return cmdPane(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {

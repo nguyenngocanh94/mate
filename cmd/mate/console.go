@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -30,8 +31,9 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 }
 
 // cmdConsoleLaunch is `mate console [<workspace-dir>]`: the interactive
-// console, and on a known host (WezTerm, Ghostty) it splits an empty pane
-// to the right before the TUI starts so Enter can fill that pane.
+// console, and on a known host (WezTerm, Ghostty) it lays out its columns -
+// the agent stage and the file review - before the TUI starts, so Enter
+// fills them.
 func cmdConsoleLaunch(args []string, stdout, stderr io.Writer) error {
 	if len(args) > 1 {
 		return newUsageError("usage: mate console [<workspace-dir>]")
@@ -109,18 +111,37 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		// same way.
 		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
 	}
-	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv})
+	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv, SelfCols: func() int {
+		cols, _, err := term.GetSize(stdoutFile.Fd())
+		if err != nil {
+			return 0
+		}
+		return cols
+	}})
 	notice := ""
-	if split && h != nil {
-		if _, err := h.EnsureSplit(ctx); err != nil {
-			// Said on the status line: stderr is under the alt screen by
-			// the time anyone could read it.
+	var columns *consoleColumns
+	if h != nil {
+		if columns, err = newConsoleColumns(h, os.Getenv); err != nil {
 			notice = "no next pane: " + err.Error()
+		} else {
+			defer columns.close()
+			// `mate console` lays the columns out now; `mate <dir>` at the
+			// first Enter, which finds them gone and makes them.
+			if split {
+				if err := columns.layout(ctx); err != nil {
+					// Said on the status line: stderr is under the alt
+					// screen by the time anyone could read it.
+					notice = "no next pane: " + err.Error()
+				}
+			}
+			if notice == "" && columns.review == "" {
+				notice = "file changes need terminal-code: curl -fsSL https://tode.sh/install | bash"
+			}
 		}
 	}
 	model := console.New(load, consoleAction(ws, deps)).
 		WithContext(ctx).
-		WithStage(consoleStage(ws, h)).
+		WithStage(consoleStage(ws, columns)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
 		WithNotice(notice).

@@ -1,15 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
 	"github.com/nguyenngocanh94/mate/internal/host"
+	"github.com/nguyenngocanh94/mate/internal/panerun"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -205,43 +211,95 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 }
 
-type recordingHost struct {
-	targets []host.StageTarget
+// recordingColumns is a Console's two columns with a recorder listening on
+// each socket in place of `mate pane serve`: what each column was told to
+// show, in order.
+type recordingColumns struct {
+	*consoleColumns
+	mu      sync.Mutex
+	shown   map[string][]panerun.Command
+	layouts int
 }
 
-func (r *recordingHost) EnsureSplit(context.Context) (host.StageHandle, error) {
-	return host.StageHandle{PaneID: "pane-1"}, nil
+type layoutCounter struct{ n *int }
+
+func (l layoutCounter) Layout(context.Context, []host.Column) error { *l.n++; return nil }
+func (layoutCounter) Close(context.Context) error                   { return nil }
+
+func newRecordingColumns(t *testing.T) *recordingColumns {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "mc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	r := &recordingColumns{shown: map[string][]panerun.Command{}}
+	r.consoleColumns = &consoleColumns{
+		h: layoutCounter{&r.layouts}, dir: dir,
+		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
+		tode: "/opt/tode", herdr: "/opt/herdr",
+	}
+	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.review} {
+		ln, err := net.Listen("unix", socket)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ln.Close() })
+		go func() {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				line, _ := bufio.NewReader(conn).ReadBytes('\n')
+				var cmd panerun.Command
+				_ = json.Unmarshal(line, &cmd)
+				r.mu.Lock()
+				r.shown[role] = append(r.shown[role], cmd)
+				r.mu.Unlock()
+				_, _ = conn.Write([]byte(`{"ok":true}` + "\n"))
+				_ = conn.Close()
+			}
+		}()
+	}
+	return r
 }
 
-func (r *recordingHost) Stage(_ context.Context, t host.StageTarget) (host.StageHandle, error) {
-	r.targets = append(r.targets, t)
-	return host.StageHandle{PaneID: "pane-1"}, nil
+func (r *recordingColumns) of(role string) []panerun.Command {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]panerun.Command(nil), r.shown[role]...)
 }
 
+// Enter on a Mate row attaches the Mate in the stage and opens the
+// project's repo in the review.
 func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	action := consoleAction(w, deps)
 	if _, err := action(context.Background(), console.ActionRequest{Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	rec := &recordingHost{}
-	fn := consoleStage(w, rec)
+	rec := newRecordingColumns(t)
+	fn := consoleStage(w, rec.consoleColumns)
 	if fn == nil {
-		t.Fatal("consoleStage on a Host is nil")
+		t.Fatal("consoleStage on columns is nil")
 	}
-	err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"})
-	if err != nil {
+	if err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"}); err != nil {
 		t.Fatalf("stage: %v", err)
 	}
-	if len(rec.targets) != 1 {
-		t.Fatalf("stage calls = %d, want 1", len(rec.targets))
+	stage := rec.of(roleStage)
+	want := []string{"/opt/herdr", "--session", w.Session(), "agent", "attach", "mate-shop", "--takeover"}
+	if len(stage) != 1 || !slices.Equal(stage[0].Argv, want) {
+		t.Fatalf("stage shown %+v, want %q", stage, want)
 	}
-	got := rec.targets[0]
-	if got.Session != w.Session() {
-		t.Fatalf("session = %q, want workspace session %q", got.Session, w.Session())
+	cfg, err := w.LoadProject("shop")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got.AgentName != "mate-shop" {
-		t.Fatalf("agent = %q, want mate-shop", got.AgentName)
+	repo := w.RepoDir(cfg.Repos[0].Path)
+	review := rec.of(roleReview)
+	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/tode", "--review", repo}) || review[0].Dir != repo {
+		t.Fatalf("review shown %+v, want terminal-code on %s", review, repo)
 	}
 }
 
@@ -257,8 +315,8 @@ func TestConsoleStageNilHostIsNil(t *testing.T) {
 // stopped state and the key that starts it, and the host is never asked.
 func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
 	w, _ := consoleFixture(t, "shop")
-	rec := &recordingHost{}
-	fn := consoleStage(w, rec)
+	rec := newRecordingColumns(t)
+	fn := consoleStage(w, rec.consoleColumns)
 	target := console.StageTarget{Kind: console.StageMate, ID: "mate:shop", ProjectID: "shop"}
 
 	// No meta at all.
@@ -280,8 +338,12 @@ func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
 	if err := fn(context.Background(), target); err == nil || !strings.Contains(err.Error(), "stopped") {
 		t.Fatalf("error = %v, want the stopped state", err)
 	}
-	if len(rec.targets) != 0 {
-		t.Fatalf("a stopped Mate reached the host: %+v", rec.targets)
+	if len(rec.of(roleStage)) != 0 {
+		t.Fatal("a stopped Mate reached the stage")
+	}
+	// Its repo still opens: a stopped Mate's changes are worth reading.
+	if len(rec.of(roleReview)) != 2 {
+		t.Fatalf("review shown %d times, want once per Enter", len(rec.of(roleReview)))
 	}
 }
 
@@ -291,15 +353,20 @@ func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
 func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	res := spawnFakeCrew(t, w, deps, "shop", "k3")
-	rec := &recordingHost{}
-	fn := consoleStage(w, rec)
+	rec := newRecordingColumns(t)
+	fn := consoleStage(w, rec.consoleColumns)
 	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
 
 	if err := fn(context.Background(), target); err != nil {
 		t.Fatalf("show a running crew: %v", err)
 	}
-	if len(rec.targets) != 1 || rec.targets[0].AgentName != res.Agent || rec.targets[0].Session != w.Session() {
-		t.Fatalf("staged %+v, want exactly the crew's own agent %s", rec.targets, res.Agent)
+	stage := rec.of(roleStage)
+	if len(stage) != 1 || stage[0].Argv[5] != res.Agent || stage[0].Argv[2] != w.Session() {
+		t.Fatalf("staged %+v, want exactly the crew's own agent %s", stage, res.Agent)
+	}
+	review := rec.of(roleReview)
+	if len(review) != 1 || review[0].Argv[2] != res.Worktree {
+		t.Fatalf("review shown %+v, want the crew's worktree %s", review, res.Worktree)
 	}
 
 	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true); err != nil {
@@ -309,7 +376,63 @@ func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "stopped") || !strings.Contains(err.Error(), "k3") {
 		t.Fatalf("error = %v, want the stopped state naming the crew", err)
 	}
-	if len(rec.targets) != 1 {
-		t.Fatalf("the stopped crew still reached the host: %+v", rec.targets)
+	if len(rec.of(roleStage)) != 1 {
+		t.Fatal("the stopped crew still reached the stage")
 	}
 }
+
+// A column the captain closed is laid out again, once, and asked again.
+func TestConsoleStageRemakesAClosedColumn(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	if _, err := consoleAction(w, deps)(context.Background(), console.ActionRequest{Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
+		t.Fatal(err)
+	}
+	rec := newRecordingColumns(t)
+	gone := filepath.Join(rec.dir, "gone.sock")
+	live := rec.stage
+	rec.stage = gone
+	// The layout "makes" the column again: its socket is the live one.
+	rec.h = layoutFunc(func() { rec.layouts++; _ = os.Symlink(live, gone) })
+	fn := consoleStage(w, rec.consoleColumns)
+	if err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"}); err != nil {
+		t.Fatalf("stage: %v", err)
+	}
+	if rec.layouts != 1 || len(rec.of(roleStage)) != 1 {
+		t.Fatalf("layouts %d, stage shown %d; want one relayout and one show", rec.layouts, len(rec.of(roleStage)))
+	}
+}
+
+type layoutFunc func()
+
+func (f layoutFunc) Layout(context.Context, []host.Column) error { f(); return nil }
+func (layoutFunc) Close(context.Context) error                   { return nil }
+
+// A column whose runner died under a pane the host keeps is made afresh:
+// the layout alone sees the pane and makes nothing.
+func TestConsoleStageRemakesAColumnWhoseRunnerDied(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	if _, err := consoleAction(w, deps)(context.Background(), console.ActionRequest{Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
+		t.Fatal(err)
+	}
+	rec := newRecordingColumns(t)
+	dead := filepath.Join(rec.dir, "dead.sock")
+	live := rec.stage
+	rec.stage = dead
+	closed := 0
+	prev := columnStartWait
+	columnStartWait = 100 * time.Millisecond
+	t.Cleanup(func() { columnStartWait = prev })
+	rec.h = closeAware{layout: func() { rec.layouts++ }, close: func() { closed++; _ = os.Symlink(live, dead) }}
+	fn := consoleStage(w, rec.consoleColumns)
+	if err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"}); err != nil {
+		t.Fatalf("stage: %v", err)
+	}
+	if closed != 1 || rec.layouts != 2 || len(rec.of(roleStage)) != 1 {
+		t.Fatalf("closed %d, layouts %d, shown %d; want the columns closed and made again once", closed, rec.layouts, len(rec.of(roleStage)))
+	}
+}
+
+type closeAware struct{ layout, close func() }
+
+func (c closeAware) Layout(context.Context, []host.Column) error { c.layout(); return nil }
+func (c closeAware) Close(context.Context) error                 { c.close(); return nil }

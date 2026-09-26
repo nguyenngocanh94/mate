@@ -534,7 +534,8 @@ internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất 
 internal/spawn/          start Mate, spawn Crew
 internal/brief/          schema brief M7: tên section, `brief check`, `brief append`
 internal/facts/          `project facts`: chỉ metadata git, không mở file nào
-internal/host/           host-pane attach: WezTerm/Ghostty Stage (M10)
+internal/host/           the Console's sibling columns: WezTerm/Ghostty Layout (M10, M13)
+internal/panerun/        the program each column runs; swaps what it shows (M13)
 internal/runtime/        copy v1
 internal/harness/        copy v1
 internal/process/        copy v1
@@ -838,5 +839,26 @@ Quyết định:
 | 52 | Skill `crew-dispatch` cho Mate: đọc bảng mỗi lượt spawn, lời captain trước bảng, định cỡ task (blast radius, open decisions, độ lan, khả năng revert), chọn giữa các alternative (lời captain → bằng chứng launch → model lớn hay effort cao → tải theo `crew list`), batch, harness không khởi động được, profile của crew thay thế. Manual §2/§7 và `stuck-crew-recovery` bước 3 trỏ vào skill. | Golden skill và manual; `make check` xanh. Đã xong 2026-09-26. |
 | 53 | `internal/quota`: đọc `quota-axi --json --no-credential-refresh` (schema 5 và 6, floor 0.1.34), map codex→`codex` (account `codex-home`, rồi `default`), claude→`claude`, gộp các scope toàn provider (captain chốt 2026-09-26: chỉ xét theo provider, không xét scope từng model), gate `exhausted_now`/0%, xếp theo spendPriority đã biết, unknown không bao giờ là 0. `crew dispatch` in khối quota và harness được ưu tiên; `crew spawn` cảnh báo (không chặn) khi harness đã cạn. Skill `crew-dispatch` §4: lời captain → gate cứng (cạn, runway ngắn hơn task, launch lỗi) → model hay effort → quota → tải. | Unit với snapshot thật 0.1.34 và fixture schema 6; test CLI không đụng quota-axi của máy; binary thật in đúng khối quota khi có và khi thiếu quota-axi. `make check` xanh. Đã xong 2026-09-26. |
 | 50 | Acceptance live: Mate đọc bảng, spawn hai crew khác profile theo hai task khác độ khó, `crew list` và meta khớp. | Evidence `docs/evidence/m12-crew-dispatch-<ngày>.md`. |
+
+### M13. Ba cột: console, agent, file changes
+
+Chốt 2026-09-26: mở console là có ba cột, console hẹp bên trái, terminal agent ở giữa, file changes bên phải bằng terminal-code (`tode`, zenbu-labs/terminal-code, VS Code trong terminal).
+
+Quyết định:
+
+- Mỗi cột bên phải là một pane host chạy `mate pane serve --role stage|review --socket <path> --owner <pid>` suốt đời cột (`internal/panerun`). Console nói cột hiện gì qua unix socket; runner thay chương trình con ngay trong pane. Không còn kill-pane, re-split, pkill hay resize mỗi lần đổi: độ rộng cột đặt một lần.
+- `host.Host` chỉ còn `Layout(columns)` và `Close`. Layout giữ cột của mình còn sống, làm lại cột bị đóng đúng chỗ (review bên phải stage, stage bên trái review), và từ chối pane lạ. WezTerm tách bằng cell (console 20%, 40–48 cột; review 45% phần còn lại). Ghostty chỉ tách đôi, nên sau khi tách nó `equalize_splits` rồi `resize_split` cột console, đo bề rộng thật của chính console để chỉnh (đo 2026-09-26: 175 cột → 41/66/66).
+- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`, cột file changes chạy `tode --review <folder>`: worktree của crew, repo đầu tiên của project với Mate. Review mở cả khi agent đã dừng.
+- terminal-code để lại viewer riêng trên tty (CLI thoát, viewer về ppid 1), nên cột là mọi tiến trình trên tty của nó, không chỉ con của runner: đổi nội dung thì dọn hết (TERM rồi KILL sau 2s), và cột chỉ về dòng chờ khi tty trống. Đo: đổi folder 0,2–1,5s, luôn một viewer.
+- Giữa hai chương trình runner khôi phục termios, rời alt screen, tắt mouse/paste, xoá ảnh kitty và RIS. Chương trình tự thoát thì giữ chữ nó in (lý do herdr từ chối) và chỉ tắt mode.
+- Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`tode` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
+- Console thoát: gửi exit cho hai runner rồi `Close` (Ghostty giữ pane đã hết tiến trình, kể cả với `wait after command` false; đo 2026-09-26). Console chết đột ngột: runner tự thoát trong 1s khi pid console mất.
+- Không có terminal-code: chỉ có cột agent, status line chỉ lệnh cài.
+- `mate console` dựng cột lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 54 | `internal/panerun`, `mate pane serve`, `host.Layout`/`Close` cho WezTerm và Ghostty, console dựng và đóng cột, Enter hiện agent và file changes. | Unit cho runner (thay tại chỗ, no-op khi trùng, TERM rồi KILL, viewer tách rời, exit, owner mất), host (layout, idempotent, làm lại cột, pane lạ, thu hẹp Ghostty bằng đo), wiring console. Chạy thật trong Ghostty 1.3.1 và WezTerm: ba cột, Enter hiện lỗi herdr ở cột agent và Source Control của repo ở cột file changes, ctrl+c đóng hết cột và viewer. `make check` xanh. Đã xong 2026-09-26. |
+| 55 | Acceptance live với Mate và crew thật: Enter đổi qua lại, cột agent attach đúng agent, cột file changes đúng worktree. | Evidence `docs/evidence/m13-columns-<ngày>.md`. |
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

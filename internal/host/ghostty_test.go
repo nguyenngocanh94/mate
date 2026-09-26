@@ -1,230 +1,175 @@
 package host
 
 import (
-	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 )
 
-func TestGhosttyStageSplitsThenClosesOwnTerminal(t *testing.T) {
-	t.Parallel()
-	script := &ghosttyScript{left: "left", next: []string{"stage-1", "stage-2"}}
-	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(Ghostty, Options{Runner: fake, Herdr: "/opt/herdr"})
-	if h == nil {
-		t.Fatal("Open(Ghostty) is nil")
-	}
-	ctx := context.Background()
-	first, err := h.Stage(ctx, StageTarget{Session: "mate-acme", AgentName: "mate-shop"})
-	if err != nil {
-		t.Fatalf("first Stage: %v", err)
-	}
-	if first.PaneID != "stage-1" {
-		t.Fatalf("first pane = %q, want stage-1", first.PaneID)
-	}
-	assertGhosttyHas(t, fake.Calls, ghosttyListScript)
-	assertGhosttyHas(t, fake.Calls, `set command of cfg to "/opt/herdr --session mate-acme agent attach mate-shop --takeover"`)
-	assertGhosttyHas(t, fake.Calls, "split leftPane direction right")
-	assertGhosttyHas(t, fake.Calls, "focus leftPane")
-	assertNoInputText(t, fake.Calls)
+const ghSelf = "AAAA0000-0000-0000-0000-000000000000"
 
-	second, err := h.Stage(ctx, StageTarget{Session: "mate-acme", AgentName: "crew-k3"})
-	if err != nil {
-		t.Fatalf("second Stage: %v", err)
-	}
-	if second.PaneID != "stage-2" {
-		t.Fatalf("second pane = %q, want stage-2", second.PaneID)
-	}
-	assertGhosttyHas(t, fake.Calls, `whose id is "stage-1"`)
-	assertGhosttyHas(t, fake.Calls, `set command of cfg to "/opt/herdr --session mate-acme agent attach crew-k3 --takeover"`)
-	assertNoInputText(t, fake.Calls)
+// ghosttyTab answers the AppleScript the driver sends: one tab of terminal
+// ids, the Console focused.
+type ghosttyTab struct {
+	ids     []string
+	next    int
+	splits  []string // "<from> <direction> <command>"
+	actions []string
 }
 
-func TestGhosttyStageResolvesHerdrOnPATH(t *testing.T) {
-	t.Parallel()
-	script := &ghosttyScript{left: "left", next: []string{"stage-1"}}
-	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(Ghostty, Options{Runner: fake, Herdr: "sh"})
-	_, err := h.Stage(context.Background(), StageTarget{Session: "mate-acme", AgentName: "mate-shop"})
-	if err != nil {
-		t.Fatalf("Stage: %v", err)
-	}
-	for _, c := range fake.Calls {
-		src := string(c.Stdin)
-		if !strings.Contains(src, "set command of cfg to") {
-			continue
-		}
-		if strings.Contains(src, `set command of cfg to "sh --session`) ||
-			strings.Contains(src, `set command of cfg to "direct:`) {
-			t.Fatalf("command = %s, want absolute path without direct:", src)
-		}
-		if !strings.Contains(src, "/sh --session mate-acme agent attach mate-shop --takeover\"") {
-			t.Fatalf("command = %s, want absolute sh", src)
-		}
-		return
-	}
-	t.Fatal("no split command")
-}
+var (
+	reAnchor  = regexp.MustCompile(`first terminal whose id is "([^"]+)"`)
+	reCommand = regexp.MustCompile(`set command of cfg to "([^"]*)"`)
+	reDir     = regexp.MustCompile(`split anchor direction (\w+)`)
+	reAction  = regexp.MustCompile(`perform action "([^"]+)"`)
+)
 
-func TestGhosttyEnsureSplitCreatesAnEmptyRightPane(t *testing.T) {
-	t.Parallel()
-	script := &ghosttyScript{left: "left", next: []string{"stage-1", "stage-2"}}
-	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(Ghostty, Options{Runner: fake})
-	got, err := h.EnsureSplit(context.Background())
-	if err != nil {
-		t.Fatalf("EnsureSplit: %v", err)
-	}
-	if got.PaneID != "stage-1" {
-		t.Fatalf("pane = %q, want stage-1", got.PaneID)
-	}
-	assertGhosttyHas(t, fake.Calls, ghosttySplitEmptyScript)
-	for _, c := range fake.Calls {
-		if strings.Contains(string(c.Stdin), "set command of cfg") {
-			t.Fatalf("EnsureSplit must not attach an agent: %s", c.Stdin)
-		}
-	}
-	again, err := h.EnsureSplit(context.Background())
-	if err != nil {
-		t.Fatalf("second EnsureSplit: %v", err)
-	}
-	if again.PaneID != "stage-1" {
-		t.Fatalf("second pane = %q, want the same stage-1", again.PaneID)
-	}
-	splits := 0
-	for _, c := range fake.Calls {
-		if strings.Contains(string(c.Stdin), "split leftPane") {
-			splits++
-		}
-	}
-	if splits != 1 {
-		t.Fatalf("split calls = %d, want 1", splits)
-	}
-}
-
-func TestGhosttyStageRefusesAForeignTerminal(t *testing.T) {
-	t.Parallel()
-	script := &ghosttyScript{left: "left", extra: "nvim", next: []string{"stage-1"}}
-	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(Ghostty, Options{Runner: fake})
-	_, err := h.Stage(context.Background(), StageTarget{Session: "mate-acme", AgentName: "mate-shop"})
-	if err == nil {
-		t.Fatal("Stage accepted a foreign pane")
-	}
-	var coded *observability.Error
-	if !errors.As(err, &coded) || coded.Code != observability.CodeStateConflict {
-		t.Fatalf("error = %v, want state_conflict", err)
-	}
-	for _, call := range fake.Calls {
-		src := string(call.Stdin)
-		if strings.Contains(src, "split leftPane") || strings.Contains(src, "close (") {
-			t.Fatalf("foreign pane must not close or split: %s", src)
-		}
-	}
-}
-
-type ghosttyScript struct {
-	left  string
-	extra string
-	next  []string
-	live  []string
-}
-
-func (s *ghosttyScript) handle(_ context.Context, spec process.Spec) (process.Result, error) {
+func (g *ghosttyTab) handle(_ context.Context, spec process.Spec) (process.Result, error) {
 	src := string(spec.Stdin)
 	switch {
-	case strings.Contains(src, "repeat with t in terminals"):
-		ids := []string{s.left}
-		ids = append(ids, s.live...)
-		if s.extra != "" {
-			ids = append(ids, s.extra)
-		}
-		return process.Result{Stdout: []byte(strings.Join(ids, "\n") + "\n")}, nil
-	case spec.Name == "pkill":
-		// No such process is exit 1 for pkill; either way nothing to say.
-		return process.Result{}, nil
-	case strings.Contains(src, "close (first terminal"):
-		return process.Result{}, nil
-	case strings.Contains(src, "split leftPane direction right"):
-		if len(s.next) == 0 {
-			return process.Result{ExitCode: 1, Stderr: []byte("no more panes")}, nil
-		}
-		id := s.next[0]
-		s.next = s.next[1:]
-		s.live = []string{id}
+	case strings.Contains(src, "focused terminal of selected tab"):
+		return process.Result{Stdout: []byte(ghSelf + "\n")}, nil
+	case strings.Contains(src, "repeat with w in windows"):
+		return process.Result{Stdout: []byte(strings.Join(g.ids, "\n") + "\n")}, nil
+	case strings.Contains(src, "split anchor"):
+		id := fmt.Sprintf("BBBB0000-0000-0000-0000-%012d", g.next)
+		g.next++
+		g.splits = append(g.splits, reAnchor.FindStringSubmatch(src)[1]+" "+reDir.FindStringSubmatch(src)[1]+" "+reCommand.FindStringSubmatch(src)[1])
+		g.ids = append(g.ids, id)
 		return process.Result{Stdout: []byte(id + "\n")}, nil
-	default:
-		return process.Result{ExitCode: 1, Stderr: []byte("unexpected script")}, nil
+	case strings.Contains(src, "perform action"):
+		g.actions = append(g.actions, reAction.FindStringSubmatch(src)[1])
 	}
+	return process.Result{}, nil
 }
 
-func assertGhosttyHas(t *testing.T, calls []process.Spec, snippet string) {
-	t.Helper()
-	for _, c := range calls {
-		if c.Name == "osascript" && bytes.Contains(c.Stdin, []byte(snippet)) {
-			return
-		}
-	}
-	t.Fatalf("no osascript stdin contained %q in %d calls", snippet, len(calls))
+func newGhosttyForTest(tab *ghosttyTab, cols func() int) *ghostty {
+	g := newGhostty(Options{Runner: &process.FakeRunner{Handler: tab.handle}, Osascript: "osascript", SelfCols: cols})
+	g.settle = time.Millisecond
+	return g
 }
 
-func assertNoInputText(t *testing.T, calls []process.Spec) {
-	t.Helper()
-	for _, c := range calls {
-		if bytes.Contains(c.Stdin, []byte("input text")) {
-			t.Fatalf("input text is forbidden: %s", c.Stdin)
-		}
-	}
-}
-
-// TestGhosttyEndsTheOldClientBeforeItClosesItsSurface: Ghostty's close
-// drops a surface but leaves its process running, so the old stage's
-// `herdr agent attach` lived on, still attached; returning to that agent
-// then failed "already has an attached client" (reported 2026-09-25
-// switching Mate, Crew, Mate; the orphan measured live in Ghostty 1.3.1).
-// The old client is ended first - by its exact command line, which only a
-// stage launches (login's `exec -l` gives it a leading "-") - then its
-// surface is closed, then the new one split.
-func TestGhosttyEndsTheOldClientBeforeItClosesItsSurface(t *testing.T) {
+// The first layout splits the stage off the Console and the review off the
+// stage, each running its program as one shell string, then evens the
+// columns.
+func TestGhosttyLaysOutStageThenReview(t *testing.T) {
 	t.Parallel()
-	script := &ghosttyScript{left: "left", next: []string{"stage-1", "stage-2"}}
-	fake := &process.FakeRunner{Handler: script.handle}
-	h := Open(Ghostty, Options{Runner: fake, Herdr: "/opt/herdr"})
-	ctx := context.Background()
-	if _, err := h.Stage(ctx, StageTarget{Session: "mate-acme", AgentName: "mate-shop"}); err != nil {
-		t.Fatalf("first Stage: %v", err)
+	tab := &ghosttyTab{ids: []string{ghSelf}}
+	g := newGhosttyForTest(tab, nil)
+	if err := g.Layout(context.Background(), testColumns); err != nil {
+		t.Fatal(err)
 	}
-	for _, c := range fake.Calls {
-		if c.Name == "pkill" {
-			t.Fatalf("the first stage ended a client it never started: %v", c.Args)
-		}
+	stage := "BBBB0000-0000-0000-0000-000000000000"
+	want := []string{
+		ghSelf + " right /bin/mate pane serve --role stage",
+		stage + " right /bin/mate pane serve --role review",
 	}
-	from := len(fake.Calls)
-	if _, err := h.Stage(ctx, StageTarget{Session: "mate-acme", AgentName: "crew-k3"}); err != nil {
-		t.Fatalf("second Stage: %v", err)
+	if !slices.Equal(tab.splits, want) {
+		t.Fatalf("splits = %q\nwant %q", tab.splits, want)
 	}
-	kill, closed, split := -1, -1, -1
-	for i, c := range fake.Calls[from:] {
-		src := string(c.Stdin)
-		switch {
-		case c.Name == "pkill":
-			kill = i
-			want := []string{"-f", "-x", `^-/opt/herdr --session mate-acme agent attach mate-shop --takeover$`}
-			if strings.Join(c.Args, "|") != strings.Join(want, "|") {
-				t.Fatalf("pkill %q, want exactly the old stage's client %q", c.Args, want)
-			}
-		case strings.Contains(src, `whose id is "stage-1"`):
-			closed = i
-		case strings.Contains(src, "split leftPane direction right"):
-			split = i
-		}
-	}
-	if kill < 0 || closed < 0 || split < 0 || !(kill < closed && closed < split) {
-		t.Fatalf("pkill at %d, close at %d, split at %d; want the client ended, then its surface closed, then the split", kill, closed, split)
+	if err := g.Layout(context.Background(), testColumns); err != nil || len(tab.splits) != 2 {
+		t.Fatalf("a settled layout split again: %v %q", err, tab.splits)
 	}
 }
+
+// Ghostty splits in halves, so after evening the columns the Console
+// measures itself and moves its divider until it is its design width.
+func TestGhosttyNarrowsTheConsoleByMeasuring(t *testing.T) {
+	t.Parallel()
+	tab := &ghosttyTab{ids: []string{ghSelf}}
+	width := 58 // an even third of a 174-column window
+	g := newGhosttyForTest(tab, func() int { return width })
+	orig := tab.handle
+	g.runner = &process.FakeRunner{Handler: func(ctx context.Context, spec process.Spec) (process.Result, error) {
+		res, err := orig(ctx, spec)
+		if m := reAction.FindStringSubmatch(string(spec.Stdin)); m != nil && strings.HasPrefix(m[1], "resize_split:left,") {
+			var points int
+			fmt.Sscanf(strings.TrimPrefix(m[1], "resize_split:left,"), "%d", &points)
+			width -= points * 10 / 83 // this window: 8.3 points a cell
+		}
+		return res, err
+	}}
+	if err := g.Layout(context.Background(), testColumns); err != nil {
+		t.Fatal(err)
+	}
+	if tab.actions[0] != "equalize_splits" {
+		t.Fatalf("actions = %q, want the columns evened first", tab.actions)
+	}
+	if want := consoleCols(174); width < want-1 || width > want+1 {
+		t.Fatalf("console width %d, want about %d (actions %q)", width, want, tab.actions)
+	}
+}
+
+// A closed stage comes back to the left of the review that is still there.
+func TestGhosttyRemakesAClosedStageLeftOfTheReview(t *testing.T) {
+	t.Parallel()
+	tab := &ghosttyTab{ids: []string{ghSelf}}
+	g := newGhosttyForTest(tab, nil)
+	ctx := context.Background()
+	if err := g.Layout(ctx, testColumns); err != nil {
+		t.Fatal(err)
+	}
+	stage := tab.ids[1]
+	tab.ids = slices.DeleteFunc(tab.ids, func(id string) bool { return id == stage })
+	if err := g.Layout(ctx, testColumns); err != nil {
+		t.Fatal(err)
+	}
+	review := "BBBB0000-0000-0000-0000-000000000001"
+	if last := tab.splits[len(tab.splits)-1]; last != review+" left /bin/mate pane serve --role stage" {
+		t.Fatalf("remade stage by %q", last)
+	}
+}
+
+func TestGhosttyRefusesAForeignTerminal(t *testing.T) {
+	t.Parallel()
+	tab := &ghosttyTab{ids: []string{ghSelf, "CCCC0000-0000-0000-0000-000000000000"}}
+	g := newGhosttyForTest(tab, nil)
+	err := g.Layout(context.Background(), testColumns)
+	var coded *observability.Error
+	if !errors.As(err, &coded) || coded.Code != observability.CodeStateConflict || len(tab.splits) != 0 {
+		t.Fatalf("err = %v, splits %q; want a refusal and nothing split", err, tab.splits)
+	}
+}
+
+// An answer that is not a Ghostty id never reaches a later script.
+func TestGhosttyRefusesAnIDItCannotQuote(t *testing.T) {
+	t.Parallel()
+	g := newGhostty(Options{Runner: &process.FakeRunner{Default: process.Result{Stdout: []byte(`x" & do shell script "rm`)}}})
+	if err := g.Layout(context.Background(), testColumns); err == nil {
+		t.Fatal("an unquotable id was accepted")
+	}
+}
+
+// Close closes every column this process made, and nothing else.
+func TestGhosttyCloseClosesOnlyItsColumns(t *testing.T) {
+	t.Parallel()
+	tab := &ghosttyTab{ids: []string{ghSelf}}
+	var closed []string
+	g := newGhosttyForTest(tab, nil)
+	g.runner = &process.FakeRunner{Handler: func(ctx context.Context, spec process.Spec) (process.Result, error) {
+		if src := string(spec.Stdin); strings.Contains(src, "close t") {
+			closed = append(closed, reAnchorAny.FindStringSubmatch(src)[1])
+		}
+		return tab.handle(ctx, spec)
+	}}
+	if err := g.Layout(context.Background(), testColumns); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(closed)
+	if len(closed) != 2 || slices.Contains(closed, ghSelf) {
+		t.Fatalf("closed %q, want the two columns and never the Console", closed)
+	}
+}
+
+var reAnchorAny = regexp.MustCompile(`whose id is "([^"]+)"`)

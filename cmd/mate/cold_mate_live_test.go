@@ -245,7 +245,7 @@ func waitForStreamComposer(t *testing.T, ctx context.Context, channel runtime.Se
 // size, resolving the Herdr identity from its meta the way the host stage
 // does (stageRef).
 func openMateStream(ctx context.Context, w *store.Workspace, rt runtime.SessionStream, project string, size runtime.TerminalSize) (runtime.SessionChannel, error) {
-	ref, err := stageRef(w, console.StageTarget{Kind: console.StageMate, ProjectID: project})
+	ref, _, err := stageRef(w, console.StageTarget{Kind: console.StageMate, ProjectID: project})
 	if err != nil {
 		return nil, err
 	}

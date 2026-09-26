@@ -1,12 +1,12 @@
-// Package host places a Herdr attach client in a sibling pane of the
-// captain's terminal emulator.
+// Package host lays out the Console's sibling columns in the captain's
+// terminal emulator (docs/mvp.md M10, M13): to the right of the Console,
+// the agent stage, then the file review. Each column is created once and
+// runs one long-lived program for its whole life - the pane runner
+// (internal/panerun) - which swaps what the column shows. So this package
+// never kills, re-splits or resizes a column after it made it.
 //
-// Herdr still owns the agent process (internal/runtime). This package only
-// decides which host pane shows `herdr agent attach`. The driver is chosen
-// from the process environment (Detect), not from config (docs/mvp.md M10).
-//
-// Ghostty's AppleScript command is always a shell string (libghostty
-// embedding API), wrapped on macOS by login(1) and bash --noprofile --norc.
-// A bare "herdr" is not on that PATH. Stage resolves the binary to an
-// absolute path. The config-file "direct:" prefix is not parsed here.
+// The driver is chosen from the process environment (Detect), not from
+// config. Ghostty's AppleScript command is always a shell string (the
+// libghostty embedding API), wrapped on macOS by login(1) and bash
+// --noprofile --norc, so a column's program must be an absolute path.
 package host
