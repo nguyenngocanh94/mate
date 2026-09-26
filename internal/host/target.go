@@ -37,16 +37,17 @@ func validColumns(cols []Column) error {
 
 // Host lays out the Console's columns.
 type Host interface {
-	// Layout makes sure every column exists to the right of the Console,
-	// in order. A column this process made that is still there is kept
-	// untouched, one that is missing is made again, and a pane that is not
+	// Layout makes sure every column in cols exists to the right of the
+	// Console, in order. A column this process made that is still there is
+	// kept untouched, one that is missing is made, and a pane that is not
 	// one of ours is refused rather than replaced: the captain's nvim or
-	// shell stays. cols is the whole layout, the same on every call.
+	// shell stays. A column of ours that cols leaves out is left as it is;
+	// Close removes it.
 	Layout(ctx context.Context, cols []Column) error
-	// Close closes every column this process made that is still there.
-	// Ghostty keeps a pane whose program has exited, so a column's runner
-	// ending is not enough.
-	Close(ctx context.Context) error
+	// Close closes the named columns this process made, or all of them
+	// when no role is named. Ghostty keeps a pane whose program has
+	// exited, so a column's runner ending is not enough.
+	Close(ctx context.Context, roles ...string) error
 }
 
 // errForeignPane is the refusal when a pane where a column belongs is not

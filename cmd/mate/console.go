@@ -135,7 +135,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 				}
 			}
 			if notice == "" && columns.review == "" {
-				notice = "file changes need terminal-code: curl -fsSL https://tode.sh/install | bash"
+				notice = "a crew's file changes need terminal-code: curl -fsSL https://tode.sh/install | bash"
 			}
 		}
 	}

@@ -216,15 +216,22 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 // show, in order.
 type recordingColumns struct {
 	*consoleColumns
-	mu      sync.Mutex
-	shown   map[string][]panerun.Command
-	layouts int
+	mu          sync.Mutex
+	shown       map[string][]panerun.Command
+	layouts     int
+	closedRoles []string
 }
 
-type layoutCounter struct{ n *int }
+type layoutCounter struct {
+	n      *int
+	closed *[]string
+}
 
 func (l layoutCounter) Layout(context.Context, []host.Column) error { *l.n++; return nil }
-func (layoutCounter) Close(context.Context) error                   { return nil }
+func (l layoutCounter) Close(_ context.Context, roles ...string) error {
+	*l.closed = append(*l.closed, roles...)
+	return nil
+}
 
 func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Helper()
@@ -235,7 +242,7 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	r := &recordingColumns{shown: map[string][]panerun.Command{}}
 	r.consoleColumns = &consoleColumns{
-		h: layoutCounter{&r.layouts}, dir: dir,
+		h: layoutCounter{&r.layouts, &r.closedRoles}, dir: dir,
 		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
 		tode: "/opt/tode", herdr: "/opt/herdr",
 	}
@@ -271,8 +278,7 @@ func (r *recordingColumns) of(role string) []panerun.Command {
 	return append([]panerun.Command(nil), r.shown[role]...)
 }
 
-// Enter on a Mate row attaches the Mate in the stage and opens the
-// project's repo in the review.
+// Enter on a Mate row attaches the Mate in the stage and closes the review.
 func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	action := consoleAction(w, deps)
@@ -292,14 +298,11 @@ func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	if len(stage) != 1 || !slices.Equal(stage[0].Argv, want) {
 		t.Fatalf("stage shown %+v, want %q", stage, want)
 	}
-	cfg, err := w.LoadProject("shop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo := w.RepoDir(cfg.Repos[0].Path)
+	// A Mate has no worktree: the review column closes, so the Console is
+	// two columns.
 	review := rec.of(roleReview)
-	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/tode", "--review", repo}) || review[0].Dir != repo {
-		t.Fatalf("review shown %+v, want terminal-code on %s", review, repo)
+	if len(review) != 1 || !review[0].Exit || rec.closedRoles[0] != roleReview {
+		t.Fatalf("review told %+v, host closed %q; want the review column closed", review, rec.closedRoles)
 	}
 }
 
@@ -338,12 +341,8 @@ func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
 	if err := fn(context.Background(), target); err == nil || !strings.Contains(err.Error(), "stopped") {
 		t.Fatalf("error = %v, want the stopped state", err)
 	}
-	if len(rec.of(roleStage)) != 0 {
-		t.Fatal("a stopped Mate reached the stage")
-	}
-	// Its repo still opens: a stopped Mate's changes are worth reading.
-	if len(rec.of(roleReview)) != 2 {
-		t.Fatalf("review shown %d times, want once per Enter", len(rec.of(roleReview)))
+	if len(rec.of(roleStage))+len(rec.of(roleReview)) != 0 {
+		t.Fatal("a stopped Mate reached a column")
 	}
 }
 
@@ -365,8 +364,15 @@ func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 		t.Fatalf("staged %+v, want exactly the crew's own agent %s", stage, res.Agent)
 	}
 	review := rec.of(roleReview)
-	if len(review) != 1 || review[0].Argv[2] != res.Worktree {
-		t.Fatalf("review shown %+v, want the crew's worktree %s", review, res.Worktree)
+	wt := filepath.Join(w.Root(), res.Worktree)
+	if filepath.IsAbs(res.Worktree) {
+		wt = res.Worktree
+	}
+	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/tode", "--review", wt}) || review[0].Dir != wt {
+		t.Fatalf("review shown %+v, want terminal-code on the crew's worktree %s", review, wt)
+	}
+	if rec.layouts != 0 {
+		t.Fatalf("laid out %d times; the recorder's columns were all there", rec.layouts)
 	}
 
 	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", true); err != nil {
@@ -405,7 +411,7 @@ func TestConsoleStageRemakesAClosedColumn(t *testing.T) {
 type layoutFunc func()
 
 func (f layoutFunc) Layout(context.Context, []host.Column) error { f(); return nil }
-func (layoutFunc) Close(context.Context) error                   { return nil }
+func (layoutFunc) Close(context.Context, ...string) error        { return nil }
 
 // A column whose runner died under a pane the host keeps is made afresh:
 // the layout alone sees the pane and makes nothing.
@@ -435,4 +441,37 @@ func TestConsoleStageRemakesAColumnWhoseRunnerDied(t *testing.T) {
 type closeAware struct{ layout, close func() }
 
 func (c closeAware) Layout(context.Context, []host.Column) error { c.layout(); return nil }
-func (c closeAware) Close(context.Context) error                 { c.close(); return nil }
+func (c closeAware) Close(_ context.Context, roles ...string) error {
+	if len(roles) == 0 { // the review closing is not the columns made afresh
+		c.close()
+	}
+	return nil
+}
+
+// The review column is not there until a crew is shown: the first Enter on
+// a crew lays it out, stage then review.
+func TestConsoleStageMakesTheReviewForACrew(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	spawnFakeCrew(t, w, deps, "shop", "k3")
+	rec := newRecordingColumns(t)
+	absent := filepath.Join(rec.dir, "absent.sock")
+	live := rec.review
+	rec.review = absent
+	rec.withReview = []host.Column{{Role: roleStage}, {Role: roleReview}}
+	var laid [][]host.Column
+	rec.h = colsHost{func(cols []host.Column) { laid = append(laid, cols); _ = os.Symlink(live, absent) }}
+	if err := consoleStage(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(laid) != 1 || len(laid[0]) != 2 || laid[0][1].Role != roleReview {
+		t.Fatalf("laid out %v, want stage and review once", laid)
+	}
+	if len(rec.of(roleReview)) != 1 {
+		t.Fatal("the review was not shown once made")
+	}
+}
+
+type colsHost struct{ f func([]host.Column) }
+
+func (h colsHost) Layout(_ context.Context, cols []host.Column) error { h.f(cols); return nil }
+func (colsHost) Close(context.Context, ...string) error               { return nil }

@@ -232,7 +232,7 @@ func (s *Server) Run(cmd Command) error {
 
 // occupantPoll is how often a column whose child has exited checks whether
 // what the child left on the terminal has gone too.
-const occupantPoll = 500 * time.Millisecond
+const occupantPoll = 2 * time.Second
 
 // wait reaps a child. The column still shows the program while anything
 // the child left runs on the terminal; once nothing does, the idle line

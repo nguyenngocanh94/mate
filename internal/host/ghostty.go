@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,11 +80,14 @@ func (g *ghostty) Layout(ctx context.Context, cols []Column) error {
 	return nil
 }
 
-func (g *ghostty) Close(ctx context.Context) error {
+func (g *ghostty) Close(ctx context.Context, roles ...string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	var first error
 	for role, id := range g.ours {
+		if len(roles) > 0 && !slices.Contains(roles, role) {
+			continue
+		}
 		if _, err := g.script(ctx, ghosttyCloseScript(id)); err != nil && first == nil {
 			first = err
 		}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -75,10 +76,13 @@ func (w *wezTerm) Layout(ctx context.Context, cols []Column) error {
 
 // Close kills the columns this process made. WezTerm closes a pane whose
 // program exits, so this only settles what the runners left.
-func (w *wezTerm) Close(ctx context.Context) error {
+func (w *wezTerm) Close(ctx context.Context, roles ...string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for role, id := range w.ours {
+		if len(roles) > 0 && !slices.Contains(roles, role) {
+			continue
+		}
 		// A pane already gone makes kill-pane fail; that is the goal met.
 		_, _ = run(ctx, w.runner, w.bin, []string{"cli", "kill-pane", "--pane-id", id}, nil)
 		delete(w.ours, role)

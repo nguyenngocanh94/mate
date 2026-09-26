@@ -279,3 +279,43 @@ func TestWezTermFindsTheAppBundleCLIWithoutItsEnv(t *testing.T) {
 		t.Fatalf("CLI = %q, want the pane's own %q", got, bundle)
 	}
 }
+
+// The review column comes and goes: Layout with the stage alone keeps the
+// review, Close of the review alone kills only it, and a later Layout with
+// both makes it again to the right of the stage.
+func TestWezTermAddsAndClosesTheReviewAlone(t *testing.T) {
+	t.Parallel()
+	row := &weztermRow{panes: []string{"10"}, next: 20, cols: 200}
+	var killed []string
+	fake := &process.FakeRunner{Handler: func(ctx context.Context, spec process.Spec) (process.Result, error) {
+		if len(spec.Args) > 3 && spec.Args[1] == "kill-pane" {
+			killed = append(killed, spec.Args[3])
+			row.panes = slices.DeleteFunc(row.panes, func(id string) bool { return id == spec.Args[3] })
+			return process.Result{}, nil
+		}
+		return row.handle(ctx, spec)
+	}}
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", WezTerm: "wezterm"})
+	ctx := context.Background()
+	if err := h.Layout(ctx, testColumns[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Layout(ctx, testColumns); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(row.panes, []string{"10", "20", "21"}) {
+		t.Fatalf("row = %v", row.panes)
+	}
+	if err := h.Close(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(killed, []string{"21"}) || !slices.Equal(row.panes, []string{"10", "20"}) {
+		t.Fatalf("killed %v, row %v; want the review alone", killed, row.panes)
+	}
+	if err := h.Layout(ctx, testColumns); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(row.panes, []string{"10", "20", "22"}) {
+		t.Fatalf("row = %v, want the review made again right of the stage", row.panes)
+	}
+}

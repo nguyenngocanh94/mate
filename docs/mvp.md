@@ -842,23 +842,25 @@ Quyết định:
 
 ### M13. Ba cột: console, agent, file changes
 
-Chốt 2026-09-26: mở console là có ba cột, console hẹp bên trái, terminal agent ở giữa, file changes bên phải bằng terminal-code (`tode`, zenbu-labs/terminal-code, VS Code trong terminal).
+Chốt 2026-09-26: console hẹp bên trái, terminal agent ở giữa, và - chỉ khi đang xem một crew - file changes bên phải bằng terminal-code (`tode`, zenbu-labs/terminal-code, VS Code trong terminal), mở thẳng vào worktree của crew.
+Mặc định là hai cột (captain chốt cùng ngày, sau khi dùng thử ba cột).
 
 Quyết định:
 
 - Mỗi cột bên phải là một pane host chạy `mate pane serve --role stage|review --socket <path> --owner <pid>` suốt đời cột (`internal/panerun`). Console nói cột hiện gì qua unix socket; runner thay chương trình con ngay trong pane. Không còn kill-pane, re-split, pkill hay resize mỗi lần đổi: độ rộng cột đặt một lần.
 - `host.Host` chỉ còn `Layout(columns)` và `Close`. Layout giữ cột của mình còn sống, làm lại cột bị đóng đúng chỗ (review bên phải stage, stage bên trái review), và từ chối pane lạ. WezTerm tách bằng cell (console 20%, 40–48 cột; review 45% phần còn lại). Ghostty chỉ tách đôi, nên sau khi tách nó `equalize_splits` rồi `resize_split` cột console, đo bề rộng thật của chính console để chỉnh (đo 2026-09-26: 175 cột → 41/66/66).
-- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`, cột file changes chạy `tode --review <folder>`: worktree của crew, repo đầu tiên của project với Mate. Review mở cả khi agent đã dừng.
+- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`. Trên hàng Crew, cột file changes được dựng (nếu chưa có) và chạy `tode --review <worktree>`; trên hàng Mate nó đóng (runner dừng tode, host đóng pane). `Close(roles...)` đóng từng cột.
+- Lag trên WezTerm (captain báo 2026-09-26; Ghostty không lag): terminal-browser vẽ bằng kitty graphics, WezTerm 20240203 tốn 100–200% CPU mỗi lúc tode vẽ, idle 0%. `TERMINAL_BROWSER_RENDER_SCALE=1`, `TERMINAL_BROWSER_FPS=30`, `TERMINAL_BROWSER_FRAMES=file` không đổi đáng kể (đo 2026-09-26). Không sửa được phía mate.
 - terminal-code để lại viewer riêng trên tty (CLI thoát, viewer về ppid 1), nên cột là mọi tiến trình trên tty của nó, không chỉ con của runner: đổi nội dung thì dọn hết (TERM rồi KILL sau 2s), và cột chỉ về dòng chờ khi tty trống. Đo: đổi folder 0,2–1,5s, luôn một viewer.
 - Giữa hai chương trình runner khôi phục termios, rời alt screen, tắt mouse/paste, xoá ảnh kitty và RIS. Chương trình tự thoát thì giữ chữ nó in (lý do herdr từ chối) và chỉ tắt mode.
 - Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`tode` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
 - Console thoát: gửi exit cho hai runner rồi `Close` (Ghostty giữ pane đã hết tiến trình, kể cả với `wait after command` false; đo 2026-09-26). Console chết đột ngột: runner tự thoát trong 1s khi pid console mất.
 - Không có terminal-code: chỉ có cột agent, status line chỉ lệnh cài.
-- `mate console` dựng cột lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
+- `mate console` dựng cột agent lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
 
 | # | Task | Xong khi |
 | --- | --- | --- |
 | 54 | `internal/panerun`, `mate pane serve`, `host.Layout`/`Close` cho WezTerm và Ghostty, console dựng và đóng cột, Enter hiện agent và file changes. | Unit cho runner (thay tại chỗ, no-op khi trùng, TERM rồi KILL, viewer tách rời, exit, owner mất), host (layout, idempotent, làm lại cột, pane lạ, thu hẹp Ghostty bằng đo), wiring console. Chạy thật trong Ghostty 1.3.1 và WezTerm: ba cột, Enter hiện lỗi herdr ở cột agent và Source Control của repo ở cột file changes, ctrl+c đóng hết cột và viewer. `make check` xanh. Đã xong 2026-09-26. |
-| 55 | Acceptance live với Mate và crew thật: Enter đổi qua lại, cột agent attach đúng agent, cột file changes đúng worktree. | Evidence `docs/evidence/m13-columns-<ngày>.md`. |
+| 55 | Acceptance live với Mate và crew thật: Enter đổi qua lại, cột agent attach đúng agent, cột file changes mở ở crew và đóng ở Mate. | Evidence `docs/evidence/m13-columns-<ngày>.md`. |
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

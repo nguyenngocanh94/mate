@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -19,19 +20,22 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
-// consoleColumns are the Console's two sibling columns (docs/mvp.md M13):
-// the stage, which shows the agent of the row Enter was pressed on, and the
-// review, which shows that row's repo in terminal-code. Each column runs
-// `mate pane serve` for its whole life; the Console tells it what to show
-// over its socket, and the host never re-splits a column once made.
+// consoleColumns are the Console's sibling columns (docs/mvp.md M13): the
+// stage, which shows the agent of the row Enter was pressed on, and - only
+// while that row is a Crew - the review, which shows the crew's worktree
+// in terminal-code. Each column runs `mate pane serve` for its whole life;
+// the Console tells it what to show over its socket, and the host never
+// re-splits a column once made.
 type consoleColumns struct {
-	h      host.Host
-	cols   []host.Column
-	dir    string
-	stage  string
-	review string // "" when terminal-code is not installed
-	tode   string
-	herdr  string
+	h host.Host
+	// cols is the stage alone; withReview adds the review after it.
+	cols       []host.Column
+	withReview []host.Column
+	dir        string
+	stage      string
+	review     string // "" when terminal-code is not installed
+	tode       string
+	herdr      string
 	// env is what every column's program gets over the pane's own: the
 	// Console's PATH.
 	env []string
@@ -60,7 +64,7 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 	c.cols = []host.Column{column(roleStage, c.stage)}
 	if tode := findTool(getenv, "tode"); tode != "" && filepath.IsAbs(tode) {
 		c.tode, c.review = tode, filepath.Join(dir, roleReview+".sock")
-		c.cols = append(c.cols, column(roleReview, c.review))
+		c.withReview = append(slices.Clip(c.cols), column(roleReview, c.review))
 	}
 	return c, nil
 }
@@ -94,17 +98,18 @@ func findTool(getenv func(string) string, name string) string {
 	return name
 }
 
-// layout makes the columns, or makes again the ones the captain closed.
+// layout makes the stage, or makes it again if the captain closed it.
 func (c *consoleColumns) layout(ctx context.Context) error { return c.h.Layout(ctx, c.cols) }
 
-// show tells a column what to run. A column that is gone is made again,
-// once, and asked again.
-func (c *consoleColumns) show(ctx context.Context, socket string, cmd panerun.Command) error {
+// show tells a column what to run. A column that is gone - never made, or
+// closed - is made, and asked again. cols is the layout the column belongs
+// to.
+func (c *consoleColumns) show(ctx context.Context, cols []host.Column, socket string, cmd panerun.Command) error {
 	err := panerun.Send(ctx, socket, cmd)
 	if !errors.Is(err, panerun.ErrGone) {
 		return err
 	}
-	if err := c.layout(ctx); err != nil {
+	if err := c.h.Layout(ctx, cols); err != nil {
 		return err
 	}
 	err = c.waitSend(ctx, socket, cmd)
@@ -117,7 +122,7 @@ func (c *consoleColumns) show(ctx context.Context, socket string, cmd panerun.Co
 	if err := c.h.Close(ctx); err != nil {
 		return err
 	}
-	if err := c.layout(ctx); err != nil {
+	if err := c.h.Layout(ctx, cols); err != nil {
 		return err
 	}
 	return c.waitSend(ctx, socket, cmd)
@@ -159,31 +164,31 @@ func (c *consoleColumns) close() {
 }
 
 // consoleStage is the Console's Enter seam: the stage attaches the row's
-// agent, and the review opens the row's repo. A nil columns yields a nil
-// StageFunc, which the Console reads as "no next pane".
+// agent; on a Crew row the review opens the crew's worktree, and on a Mate
+// row it closes, so the Console is two columns unless a crew is shown. A
+// nil columns yields a nil StageFunc, which the Console reads as "no next
+// pane".
 func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
 	if c == nil {
 		return nil
 	}
 	return func(ctx context.Context, target console.StageTarget) error {
-		ref, meta, stageErr := stageRef(ws, target)
-		// The review goes first and does not wait on the agent: a stopped
-		// Mate's repo still has changes worth reading.
-		if err := c.showReview(ctx, ws, target, meta); err != nil {
-			if stageErr != nil {
-				return stageErr
-			}
+		ref, meta, err := stageRef(ws, target)
+		if err != nil {
 			return err
 		}
-		if stageErr != nil {
-			return stageErr
+		if err := c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env}); err != nil {
+			return err
 		}
-		return c.show(ctx, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env})
+		if target.Kind != console.StageCrew {
+			return c.hideReview(ctx)
+		}
+		return c.showReview(ctx, ws, target, meta)
 	}
 }
 
-// showReview opens the row's repo in the review column; nothing without
-// terminal-code.
+// showReview opens a crew's worktree in the review column, making the
+// column if it is not there; nothing without terminal-code.
 func (c *consoleColumns) showReview(ctx context.Context, ws *store.Workspace, target console.StageTarget, meta map[string]string) error {
 	if c.review == "" {
 		return nil
@@ -192,37 +197,38 @@ func (c *consoleColumns) showReview(ctx context.Context, ws *store.Workspace, ta
 	if err != nil {
 		return fmt.Errorf("file changes: %w", err)
 	}
-	if err := c.show(ctx, c.review, panerun.Command{Argv: []string{c.tode, "--review", folder}, Dir: folder, Env: c.env}); err != nil {
+	if err := c.show(ctx, c.withReview, c.review, panerun.Command{Argv: []string{c.tode, "--review", folder}, Dir: folder, Env: c.env}); err != nil {
 		return fmt.Errorf("file changes: %w", err)
 	}
 	return nil
 }
 
-// reviewFolder is what the review column opens for a row: a crew's
-// worktree, where its changes are; for a Mate, which has none, the
-// project's first repo.
+// hideReview closes the review column, if it is open: its runner stops
+// terminal-code first, then the host closes the pane.
+func (c *consoleColumns) hideReview(ctx context.Context) error {
+	if c.review == "" {
+		return nil
+	}
+	if err := panerun.Send(ctx, c.review, panerun.Command{Exit: true}); err != nil && !errors.Is(err, panerun.ErrGone) {
+		return fmt.Errorf("file changes: %w", err)
+	}
+	return c.h.Close(ctx, roleReview)
+}
+
+// reviewFolder is the crew's worktree, which the review column opens.
 func reviewFolder(ws *store.Workspace, target console.StageTarget, meta map[string]string) (string, error) {
-	if target.Kind == console.StageCrew {
-		if wt := meta[spawn.MetaWorktree]; wt != "" {
-			// The meta records it relative to the workspace root.
-			if !filepath.IsAbs(wt) {
-				wt = filepath.Join(ws.Root(), wt)
-			}
-			if _, err := os.Stat(wt); err != nil {
-				return "", fmt.Errorf("the worktree of crew %s is gone", target.ID)
-			}
-			return wt, nil
-		}
+	wt := meta[spawn.MetaWorktree]
+	if wt == "" {
 		return "", fmt.Errorf("crew %s records no worktree", target.ID)
 	}
-	cfg, err := ws.LoadProject(target.ProjectID)
-	if err != nil {
-		return "", err
+	// The meta records it relative to the workspace root.
+	if !filepath.IsAbs(wt) {
+		wt = filepath.Join(ws.Root(), wt)
 	}
-	if len(cfg.Repos) == 0 {
-		return "", fmt.Errorf("project %s has no repo yet", target.ProjectID)
+	if _, err := os.Stat(wt); err != nil {
+		return "", fmt.Errorf("the worktree of crew %s is gone", target.ID)
 	}
-	return ws.RepoDir(cfg.Repos[0].Path), nil
+	return wt, nil
 }
 
 // stageRef resolves the Herdr identity of the agent a target names out
