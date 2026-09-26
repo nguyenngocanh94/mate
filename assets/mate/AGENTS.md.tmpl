@@ -145,7 +145,7 @@ Exit 2 is a usage mistake you made, exit 1 is a refusal or a real failure, and t
 
 ```text
 mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]
-mate crew dispatch [--workspace <dir>]
+mate crew dispatch [--workspace <dir>] [--example]
 mate crew list <project> [--workspace <dir>]
 mate crew stop <project> <id> [--discard] [--workspace <dir>]
 ```
@@ -159,10 +159,11 @@ Before it creates anything, `crew spawn` runs the check `brief check` runs (belo
 Without `--scout` it is a ship, and a `## Deliverable` is refused.
 `--task "<one line>"` is the label recorded in the crew's record and shown by `crew list`; without it the first line of the brief's `## Captain's words` is used.
 `--harness`, `--model` and `--effort` are the Crew's launch profile; section 7 says how to choose them.
-Without them the Crew runs the workspace default harness, which is Codex, on that harness's own model and effort.
+Without `--harness` the Crew runs the table's `default` profile on the workspace default harness, which is Codex, with a note on stderr; `--model` or `--effort` without `--harness` is refused (exit 2), because a model name belongs to one harness.
 An effort the harness does not take (Codex has no `max`) is recorded and left out of the launch, with a note on stderr.
-`crew dispatch` prints the captain's dispatch table, `{{.WorkspaceRoot}}/.mate/crew-dispatch.json`: each rule's condition and its profiles as the exact flags to pass.
-While that table exists, a spawn without `--harness` is refused (exit 2), and a malformed table refuses every spawn (exit 2, the reason on stderr) until the captain fixes it; tell the captain what it says.
+`crew dispatch` prints the dispatch table in force: each rule's condition and its profiles as the exact flags to pass.
+That is `{{.WorkspaceRoot}}/.mate/crew-dispatch.json` when the captain has written one, which replaces the built-in table whole, and the built-in table otherwise; `crew dispatch --example` prints the built-in table as JSON for the captain to copy and edit.
+A malformed table refuses every spawn (exit 2, the reason on stderr) until the captain fixes it, and is never replaced by the built-in one; tell the captain what it says.
 
 A successful spawn prints three lines:
 
@@ -545,9 +546,9 @@ Your own build constraints still go to the Crew as one `mate send` line, not int
 You yourself run on the `{{.Harness}}` harness; that has no bearing on which harness a Crew runs.
 
 **Choose the profile first.** Run `{{.MatevBin}} crew dispatch` before a spawn.
-With no table it says so, and you spawn without `--harness`, `--model` or `--effort`.
-With a table, match the task to the first rule whose condition fits, by your own judgment of the brief, and pass that rule's flags exactly; when the rule lists alternatives, pick one and say why in your note to the captain.
-No rule fits: use `default`.
+It prints the table in force: the captain's own, or the built-in one while they have not written theirs.
+Match the task to the first rule whose condition fits, by your own judgment of the brief, and pass that rule's flags exactly; when the rule lists alternatives, pick one and say why in your note to the captain.
+No rule fits: pass one of the `default` profiles the same way.
 The captain's own words for this task ("use opus", "keep it cheap") beat the table; the table beats your own preference.
 Never pick `max` effort unless the captain asked for it.
 Spawn one Crew per task, and one Crew per repo:

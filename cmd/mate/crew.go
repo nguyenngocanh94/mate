@@ -42,7 +42,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
-	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the workspace default)")
+	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the dispatch table's default profile)")
 	modelFlag := fs.String("model", "", "model the harness runs, as it names it (default: the harness's own)")
 	effortFlag := fs.String("effort", "", "reasoning effort: low, medium, high, xhigh or max (default: the harness's own)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")
@@ -89,8 +89,12 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	if err != nil {
 		return err
 	}
-	if err := checkDispatch(w, req); err != nil {
+	req, note, err := applyDispatch(w, req)
+	if err != nil {
 		return err
+	}
+	if note != "" {
+		fmt.Fprintf(stderr, "note: %s\n", note)
 	}
 	res, err := spawn.SpawnCrew(context.Background(), w, spawn.LiveDeps(), req)
 	if errors.Is(err, spawn.ErrRepoRefused) {

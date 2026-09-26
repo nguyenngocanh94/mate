@@ -16,7 +16,8 @@
 // own judgment and passes concrete --harness, --model and --effort to
 // `mate crew spawn`. Nothing here matches a rule. This package only checks
 // that every profile is one the app can launch, so a table with a typo is
-// reported rather than silently launched around.
+// reported rather than silently launched around. A workspace without the
+// file is governed by the built-in table (builtin.go).
 package dispatch
 
 import (
@@ -64,9 +65,11 @@ type Rule struct {
 	Why  string
 }
 
-// Table is a loaded, checked dispatch table.
+// Table is a loaded, checked dispatch table. Path is empty and BuiltIn true
+// for the table compiled into mate (builtin.go).
 type Table struct {
 	Path    string
+	BuiltIn bool
 	Rules   []Rule
 	Default []Profile
 }
@@ -75,7 +78,7 @@ type Table struct {
 func Path(mateDir string) string { return filepath.Join(mateDir, FileName) }
 
 // Load reads and checks the table at path. ok is false, with no error,
-// when there is no table: spawns then use the workspace default as before.
+// when there is no file: Resolve then falls back to the built-in table.
 func Load(path string) (Table, bool, error) {
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {

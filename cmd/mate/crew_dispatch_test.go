@@ -52,31 +52,81 @@ func TestCrewSpawnParsesModelAndEffort(t *testing.T) {
 	}
 }
 
-// With a dispatch table in the workspace, a crew is never launched on the
-// workspace default by omission: the Mate chose a profile from the table,
-// or it has to say which harness (firstmate's fm-spawn.sh contract).
-func TestCrewDispatchTableRequiresAnExplicitHarness(t *testing.T) {
-	w := dispatchWorkspace(t, sampleTable)
-	err := checkDispatch(w, spawn.SpawnCrewRequest{Project: "shop", Crew: "k3"})
-	var ue *usageError
-	if !errors.As(err, &ue) || !strings.Contains(err.Error(), "--harness") || !strings.Contains(err.Error(), "mate crew dispatch") {
-		t.Fatalf("err = %v, want a usage error naming --harness and the table", err)
-	}
-	if err := checkDispatch(w, spawn.SpawnCrewRequest{Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow}); err != nil {
-		t.Fatalf("an explicit profile was refused: %v", err)
+// A spawn that names its harness keeps its profile exactly as given,
+// whatever the table says.
+func TestAnExplicitProfileIsKept(t *testing.T) {
+	want := spawn.SpawnCrewRequest{Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow}
+	for _, table := range []string{sampleTable, ""} {
+		got, note, err := applyDispatch(dispatchWorkspace(t, table), want)
+		if err != nil || note != "" || got != want {
+			t.Fatalf("table %q: got %+v note %q err %v, want the request unchanged", table, got, note, err)
+		}
 	}
 }
 
-func TestNoDispatchTableKeepsTheWorkspaceDefault(t *testing.T) {
-	if err := checkDispatch(dispatchWorkspace(t, ""), spawn.SpawnCrewRequest{}); err != nil {
-		t.Fatalf("no table refused a default spawn: %v", err)
+// A spawn with no --harness runs the table's default profile on the
+// workspace's default harness (codex unless the captain changed it), and
+// says so; without a file of its own the workspace uses the built-in table.
+func TestNoHarnessTakesTheTablesDefault(t *testing.T) {
+	for _, tc := range []struct {
+		name, table string
+		want        spawn.SpawnCrewRequest
+		source      string
+	}{
+		{"built-in", "", spawn.SpawnCrewRequest{Harness: harness.KindCodex, Model: "gpt-6-luna", Effort: harness.EffortHigh}, "built-in"},
+		{"workspace", sampleTable, spawn.SpawnCrewRequest{Harness: harness.KindCodex, Effort: harness.EffortMedium}, dispatch.FileName},
+	} {
+		got, note, err := applyDispatch(dispatchWorkspace(t, tc.table), spawn.SpawnCrewRequest{})
+		if err != nil || got != tc.want {
+			t.Fatalf("%s: got %+v err %v, want %+v", tc.name, got, err, tc.want)
+		}
+		if !strings.Contains(note, tc.source) || !strings.Contains(note, "--harness codex") {
+			t.Fatalf("%s: note %q does not name the table and the profile", tc.name, note)
+		}
 	}
 }
 
-// A malformed table is reported and corrected, never launched around.
+// The default alternative on the workspace's own default harness wins, so a
+// captain who set crew_harness: claude gets the Claude default.
+func TestTheDefaultFollowsTheWorkspaceHarness(t *testing.T) {
+	w := dispatchWorkspace(t, "")
+	raw, err := os.ReadFile(w.WorkspaceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(raw), "crew_harness: codex", "crew_harness: claude", 1)
+	if edited == string(raw) {
+		t.Fatalf("workspace.yaml has no crew_harness: codex line:\n%s", raw)
+	}
+	if err := os.WriteFile(w.WorkspaceFile(), []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.LoadConfig(); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := applyDispatch(w, spawn.SpawnCrewRequest{})
+	want := spawn.SpawnCrewRequest{Harness: harness.KindClaude, Model: "sonnet", Effort: harness.EffortHigh}
+	if err != nil || got != want {
+		t.Fatalf("got %+v err %v, want %+v", got, err, want)
+	}
+}
+
+// A model name belongs to one harness, so half a profile is refused.
+func TestModelOrEffortWithoutHarnessIsRefused(t *testing.T) {
+	for _, req := range []spawn.SpawnCrewRequest{{Model: "opus"}, {Effort: harness.EffortHigh}} {
+		_, _, err := applyDispatch(dispatchWorkspace(t, ""), req)
+		var ue *usageError
+		if !errors.As(err, &ue) || !strings.Contains(err.Error(), "--harness") {
+			t.Fatalf("%+v: err = %v, want a usage error naming --harness", req, err)
+		}
+	}
+}
+
+// A malformed table is reported and corrected, never launched around, and
+// never quietly replaced by the built-in one.
 func TestAMalformedDispatchTableStopsEverySpawn(t *testing.T) {
 	w := dispatchWorkspace(t, `{"rules": [{"when": "x", "use": {"harness": "codex", "effort": "max"}}]}`)
-	err := checkDispatch(w, spawn.SpawnCrewRequest{Harness: harness.KindCodex})
+	_, _, err := applyDispatch(w, spawn.SpawnCrewRequest{Harness: harness.KindCodex})
 	var ue *usageError
 	if !errors.Is(err, dispatch.ErrInvalid) || !errors.As(err, &ue) {
 		t.Fatalf("err = %v, want the table's own refusal, exit 2", err)
@@ -106,20 +156,30 @@ func TestCrewDispatchPrintsTheTableAsFlags(t *testing.T) {
 	}
 }
 
-func TestCrewDispatchWithoutATableSaysSoAndShowsAStart(t *testing.T) {
+// Without a file of its own the workspace shows the built-in table, says
+// how to replace it, and --example prints that table as JSON that loads.
+func TestCrewDispatchWithoutATableShowsTheBuiltIn(t *testing.T) {
 	w := dispatchWorkspace(t, "")
 	var out, errw bytes.Buffer
 	if err := run([]string{"crew", "dispatch", "--workspace", w.Root()}, &out, &errw); err != nil {
 		t.Fatalf("crew dispatch: %v", err)
 	}
-	if !strings.Contains(out.String(), "no crew dispatch table") || !strings.Contains(out.String(), filepath.Join(".mate", "crew-dispatch.json")) {
-		t.Fatalf("output = %q", out.String())
+	for _, want := range []string{
+		"crew dispatch: built-in",
+		filepath.Join(".mate", "crew-dispatch.json"),
+		"rule 1: A ship that is a small change",
+		"use --harness claude --model sonnet --effort medium",
+		"or  --harness codex --model gpt-6-luna --effort medium",
+		"default: --harness codex --model gpt-6-luna --effort high",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
 	}
 	out.Reset()
 	if err := run([]string{"crew", "dispatch", "--example"}, &out, &errw); err != nil {
 		t.Fatalf("crew dispatch --example: %v", err)
 	}
-	// The example is itself a valid table.
 	p := filepath.Join(t.TempDir(), dispatch.FileName)
 	if err := os.WriteFile(p, out.Bytes(), 0o644); err != nil {
 		t.Fatal(err)

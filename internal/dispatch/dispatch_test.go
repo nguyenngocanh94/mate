@@ -92,3 +92,76 @@ func TestProfileFlags(t *testing.T) {
 		t.Fatalf("flags = %q", got)
 	}
 }
+
+// The built-in table is the captain's five rules, in their order, each with
+// a Claude and a Codex profile of the same weight.
+func TestTheBuiltInTableIsTheCaptains(t *testing.T) {
+	tbl, err := Resolve(t.TempDir())
+	if err != nil || !tbl.BuiltIn || tbl.Path != "" {
+		t.Fatalf("Resolve without a file: %+v %v", tbl, err)
+	}
+	flags := func(ps []Profile) []string {
+		out := make([]string, len(ps))
+		for i, p := range ps {
+			out[i] = p.Flags()
+		}
+		return out
+	}
+	want := [][]string{
+		{"--harness claude --model sonnet --effort medium", "--harness codex --model gpt-6-luna --effort medium"},
+		{"--harness claude --model sonnet --effort high", "--harness codex --model gpt-6-luna --effort high",
+			"--harness claude --model opus --effort medium", "--harness codex --model gpt-5.6-terra --effort medium"},
+		{"--harness claude --model opus --effort high", "--harness codex --model gpt-5.6-terra --effort high"},
+		{"--harness claude --model opus --effort high", "--harness codex --model gpt-6-sol --effort high"},
+		{"--harness claude --model sonnet --effort medium", "--harness codex --model gpt-6-luna --effort medium"},
+	}
+	if len(tbl.Rules) != len(want) {
+		t.Fatalf("%d rules, want %d", len(tbl.Rules), len(want))
+	}
+	for i, r := range tbl.Rules {
+		if got := flags(r.Use); strings.Join(got, "|") != strings.Join(want[i], "|") {
+			t.Errorf("rule %d (%s) = %v, want %v", i+1, r.When, got, want[i])
+		}
+	}
+	for i, prefix := range []string{"A ship that is a small", "A ship that is a medium", "A ship that is a large", "A scout that", "A light scout"} {
+		if !strings.HasPrefix(tbl.Rules[i].When, prefix) {
+			t.Errorf("rule %d = %q, want it to start %q", i+1, tbl.Rules[i].When, prefix)
+		}
+	}
+}
+
+// A workspace file replaces the built-in table whole; a malformed one is
+// an error, not a fall back.
+func TestAWorkspaceTableReplacesTheBuiltIn(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(Path(dir), []byte(`{"default": {"harness": "claude"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tbl, err := Resolve(dir)
+	if err != nil || tbl.BuiltIn || len(tbl.Rules) != 0 || tbl.Path != Path(dir) {
+		t.Fatalf("Resolve = %+v, %v", tbl, err)
+	}
+	if err := os.WriteFile(Path(dir), []byte(`{"rules": []}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve(dir); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("malformed table: err = %v, want ErrInvalid", err)
+	}
+}
+
+func TestDefaultForPrefersTheWorkspaceHarness(t *testing.T) {
+	tbl, _ := Resolve(t.TempDir())
+	for kind, want := range map[string]string{
+		"codex":  "--harness codex --model gpt-6-luna --effort high",
+		"claude": "--harness claude --model sonnet --effort high",
+		"other":  "--harness codex --model gpt-6-luna --effort high",
+	} {
+		p, ok := tbl.DefaultFor(kind)
+		if !ok || p.Flags() != want {
+			t.Errorf("DefaultFor(%s) = %s, want %s", kind, p.Flags(), want)
+		}
+	}
+	if _, ok := (Table{}).DefaultFor("codex"); ok {
+		t.Error("a table with no default returned one")
+	}
+}

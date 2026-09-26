@@ -826,12 +826,15 @@ Quyết định:
 - Effort harness không nhận (Codex không có `max`) được ghi `effort=` vào meta nhưng không truyền, có note trên stderr (hợp đồng record-and-omit của firstmate).
 - Bảng `.mate/crew-dispatch.json` theo đúng schema firstmate: `rules[]` với `when` bằng lời, `use` là một profile hoặc mảng lựa chọn, `why` tuỳ chọn; `default` cùng dạng. Không có quota/typed resolution.
 - Binary không bao giờ khớp rule. Mate đọc `mate crew dispatch` (in bảng thành flag) và tự chọn; lời captain cho từng task thắng bảng, bảng thắng ý Mate; không tự chọn `max`.
-- Có bảng thì spawn thiếu `--harness` bị từ chối (exit 2); bảng hỏng (JSON sai, harness lạ, effort sai hoặc harness không nhận, model như flag, field lạ) chặn mọi spawn tới khi sửa.
+- Bảng hỏng (JSON sai, harness lạ, effort sai hoặc harness không nhận, model như flag, field lạ) chặn mọi spawn tới khi sửa (exit 2), không lùi về bảng built-in.
+- Bảng built-in (captain chốt 2026-09-26, `internal/dispatch/builtin.go`) áp cho workspace chưa có file; file của workspace thay nó hoàn toàn. Năm rule, mỗi rule một profile Claude và một Codex cùng sức: ship nhỏ sonnet/luna medium; ship vừa sonnet/luna high hoặc opus/terra medium; ship lớn opus/terra high; scout code + nghiên cứu opus/sol high; scout nhẹ sonnet/luna medium. Tên Codex theo catalogue: `gpt-6-luna`, `gpt-5.6-terra`, `gpt-6-sol`. `default` là profile ship vừa, sonnet/luna high.
+- Spawn thiếu `--harness` chạy profile `default` của bảng trên harness mặc định của workspace, có note trên stderr; `--model`/`--effort` mà thiếu `--harness` bị từ chối (exit 2). `crew dispatch --example` in bảng built-in dạng JSON.
 - Meta ghi `model=`, `effort=`; query, `crew list` (cột HARNESS: `codex gpt-5.5/high`) và detail console hiện chúng.
 
 | # | Task | Xong khi |
 | --- | --- | --- |
 | 49 | `harness`: `Effort`, `ParseModel`, argv hai adapter; `spawn`: request/meta/result; `internal/dispatch`: đọc và kiểm bảng; CLI `--model`, `--effort`, `crew dispatch [--example]`, gate khi có bảng; manual Mate §7 và skill harness-adapters. | Unit cho từng lớp; golden manual; hai CLI thật nhận đúng flag (`claude -p --model haiku --effort low`, `codex exec -m gpt-6-sol -c model_reasoning_effort="low"` in `reasoning effort: low`). `make check` xanh. Đã xong 2026-09-25. |
+| 51 | Bảng built-in, `Resolve`, `DefaultFor`; spawn thiếu `--harness` lấy default; manual §7 và mục crew lifecycle. | Unit cho bảng và gate; golden manual; codex nhận `gpt-6-luna`, `gpt-5.6-terra`, `gpt-6-sol` với `model_reasoning_effort="medium"`, claude nhận `--model sonnet --effort medium`. `make check` xanh. Đã xong 2026-09-26. |
 | 50 | Acceptance live: Mate đọc bảng, spawn hai crew khác profile theo hai task khác độ khó, `crew list` và meta khớp. | Evidence `docs/evidence/m12-crew-dispatch-<ngày>.md`. |
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.
