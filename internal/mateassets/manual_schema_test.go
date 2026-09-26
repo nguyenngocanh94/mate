@@ -253,3 +253,16 @@ func TestManualNamesCrewsAfterTheirTask(t *testing.T) {
 		t.Errorf("the manual still uses the counter id %q in an example", m)
 	}
 }
+
+// TestManualKeepsEachSupervisionCheckItsOwnCommand pins the rule a live Mate
+// broke on 2026-09-26: it wrapped section 9's check in a 28-round `for`
+// loop over two Crews, and the captain's line sat queued behind it for
+// minutes, because a harness takes the next line only between commands.
+func TestManualKeepsEachSupervisionCheckItsOwnCommand(t *testing.T) {
+	sec := section(t, renderedManual(t), "## 9. Supervision, review and delivery")
+	for _, want := range []string{"Each check is its own command", "never put the check inside a `for` or `while` loop", "only between two of your commands"} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("section 9 does not say %q", want)
+		}
+	}
+}

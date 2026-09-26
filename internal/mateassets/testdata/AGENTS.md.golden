@@ -607,6 +607,9 @@ sleep 20; /usr/local/bin/mate state shop <id>
 ```
 
 Run it in the foreground, as the one command it is: a bare `sleep` on its own is refused by some harnesses, and a wait moved to the background is not waiting.
+Each check is its own command, and you run the next one yourself: never put the check inside a `for` or `while` loop, never chain several `sleep`s, never wait on more than one Crew in one command.
+The captain's next line reaches you only between two of your commands, so one command that waits for minutes locks them out for minutes; that was measured, a Mate looping for nine minutes while the captain's message sat queued behind it.
+To watch several Crews, check them in turn, one command each.
 Repeat that while the state says `working` or `spawned`.
 Real work takes minutes, so expect to run it many times over; each run costs one line of output, and that is the whole cost of supervising.
 Stop repeating when the state says something else, and act on it: `needs-decision` means answer it, `wait-mate` means review it, `blocked` means the watcher says the Crew cannot speak - peek it and go to section 12.
