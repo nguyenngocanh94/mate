@@ -74,6 +74,7 @@ There is no interrupt key available to you, so a looping or unresponsive Crew is
    Run `mate brief check` on it.
 3. Stop the old Crew. Use `mate crew stop shop <id>` first; if it refuses because the branch is unlanded, keep it - do not reach for `--discard` to make a refusal go away.
 4. Spawn the replacement with the new brief, with the same `--repo` as the old Crew, and `--scout` again if it was a scout.
+   Its profile follows why the old Crew failed, not the old Crew's profile by habit: `crew-dispatch` section 7.
 5. Update `/ws/.mate/projects/shop/mate/backlog.md`: the old id closed with what happened, the new id under In flight.
 
 A low context reading is not stuck.

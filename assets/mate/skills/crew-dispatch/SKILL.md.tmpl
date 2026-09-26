@@ -1,0 +1,128 @@
+{{- /*
+After firstmate's dispatch intake (AGENTS.md section 4, harness-adapters
+references/common/dispatch.md and model-and-effort.md, quota-array-dispatch).
+Deviations, each forced by a mate constraint:
+- No quota-axi and no spendPriority: mate has no quota source, so a rule's
+  alternatives are chosen by the captain's words, launch evidence and the
+  open-crew count per harness, never by a remaining-allowance number.
+- No typed resolver: the binary checks the table and applies its default,
+  and the Mate matches the natural-language rules (docs/mvp.md M12).
+- Two harnesses, Codex and Claude Code; a model never selects a harness
+  except through the table's own profiles.
+*/ -}}
+---
+name: crew-dispatch
+description: How to choose a Crew's launch profile - harness, model, effort - from `mate crew dispatch` and pass it to `mate crew spawn`. Covers sizing a task against the table's rules, the captain's overrides, choosing between a rule's alternatives, batches of spawns, a harness that fails to launch, and the profile of a replacement Crew. Load it before every `crew spawn`, including the replacement spawn in `stuck-crew-recovery`.
+---
+
+# crew-dispatch
+
+Every Crew runs one profile: a harness, a model and an effort.
+The captain decides which profiles suit which work, in the dispatch table; you decide which rule a task falls under, and which of that rule's profiles to use.
+The app never matches a rule, so a wrong match is yours, and so is a good one.
+
+Every command below is run with the binary's absolute path, `{{.MatevBin}}`, from your own working directory.
+
+## 1. Read the table in force
+
+```text
+{{.MatevBin}} crew dispatch
+```
+
+It prints each rule in order - its condition, its profiles as the exact flags to pass, and why - then `default`.
+The first line says whose table it is: the captain's `.mate/crew-dispatch.json`, or the built-in one while they have not written theirs.
+Read it once per turn in which you spawn, not once per session: the captain may have changed it since.
+
+Match against the rules it prints, never against rules you remember.
+The captain's table may have different rules, different models and a different order from the built-in one.
+
+If it exits 2 with `invalid crew dispatch table`, every spawn is refused until the captain fixes the file.
+Tell the captain the line it printed, in one sentence, keep the task under Queued in the backlog, and spawn nothing: there is no fallback to route around a broken table.
+
+## 2. The captain's words come first
+
+Before any rule, read what the captain said about this task and the `## Captain` section of `{{.MemoryFile}}`.
+A standing preference recorded there ("codex for anything in the billing repo", "keep it cheap this week") counts as the captain's words for every task it covers.
+
+| The captain said | You pass |
+| --- | --- |
+| A model or a whole profile ("use opus", "run it on sol") | The table's profile that names that model; if none does, that model on the harness that runs it, with the effort of the rule the task matched |
+| A harness ("do it with claude") | The matched rule's alternative on that harness; if it has none, the `default` profile on that harness |
+| Cheaper, faster, "just a quick one" | The profiles of the rule one step lighter than the one the task matched |
+| "Think hard", "be careful", "this one matters" | The profiles of the rule one step heavier, or the same profile one effort level higher when there is no heavier rule |
+| `max` effort | `max`, and only then |
+
+Never pick `max` on your own judgment.
+When the captain's words and the table disagree, the words win and the table is not wrong: it is the default they overrode for this task.
+
+## 3. Size the task, then match the first rule that fits
+
+Decide the kind first, because it is not a judgment call: a spawn with `--scout` is a scout and matches only a rule written for scouts; a spawn without it is a ship and never matches a scout rule.
+
+Then size it from the brief you wrote, not from how the request sounded.
+The signals, heaviest first:
+
+1. **Blast radius.** A public interface, a schema or migration, authentication or permissions, money, deleting data, shared configuration, or anything many callers depend on. Any one of these makes a ship large, however few lines it changes.
+2. **Open decisions.** Each question in `## Open decisions` is a place the Crew has to use judgment. None, and the design is settled; several, and it is not.
+3. **Spread.** One file, a few files in one area, or several areas of the repo.
+4. **Reversibility.** A change a revert undoes cleanly is lighter than one that leaves data or external state behind.
+
+For a scout, the question is how far it has to look.
+One narrow question answerable from the code alone is light.
+A question that needs the code and outside sources - library docs, prior art, the behaviour of a service - to reach a recommendation is the full scout rule; so is a diagnostic scout for a bug whose cause is unknown (`diagnostic-reasoning`), unless the question is already narrowed to one place.
+
+Between two sizes, go by the heaviest signal: blast radius or open decisions make it the heavier rule; mere volume of routine edits does not.
+Walk the rules in order and take the first whose condition fits.
+If none fits, use `default`.
+
+## 4. Choose between a rule's alternatives
+
+A rule that lists several profiles is saying they are equally fit for that work.
+Choose one, in this order, and stop at the first reason that decides:
+
+1. **The captain's words** (section 2).
+2. **Launch evidence.** A harness that failed to launch, showed a sign-in or usage-limit screen, or was otherwise unusable earlier in this session, or in a lesson under `## Lessons` that has not been retired, is skipped while another alternative remains.
+3. **What the alternatives differ in.** When they trade a larger model at lower effort against a smaller model at higher effort, prefer the larger model for work with open decisions, and the higher effort for a long, settled task that needs care rather than judgment.
+4. **Load.** Run `{{.MatevBin}} crew list {{.ProjectName}}` and count the open Crews per harness in the HARNESS column; pick the alternative whose harness has fewer. A tie goes to the one listed first.
+
+Pass the chosen profile's flags exactly as `crew dispatch` printed them: `--harness`, and its `--model` and `--effort` when it has them.
+Never combine axes from two profiles, never add a model the table does not name unless the captain did, and always pass `--harness`, even for the `default` profile: a spawn without it still runs `default`, but the record then shows a profile nobody chose.
+
+## 5. Several spawns in one turn
+
+Size each task on its own; a batch does not share a profile because it arrived together.
+A request split across repos is one spawn per repo, and each part is sized by its own brief: the migration may be large while the client change that follows it is small.
+Several tasks landing on the same rule are spread across its alternatives in turn, so no one harness takes the whole batch.
+
+## 6. A harness that does not start
+
+`crew spawn` fails, or the confirming `mate peek` shows the harness is not running the brief: a sign-in prompt, a usage or rate limit, an unknown-model error, or an empty pane.
+Load `harness-adapters` first if you cannot name the screen; a trust dialog is its business, not this skill's.
+
+When the screen says the harness or its model cannot run the task:
+
+1. Stop that Crew with `{{.MatevBin}} crew stop {{.ProjectName}} <id>`. It has committed nothing, so the stop is clean; if it refuses, the Crew did work after all, and that is `stuck-crew-recovery`'s case, not this one.
+2. Spawn again with the same brief under a new id, on the rule's other alternative.
+3. Record what you saw under `## Lessons` in `{{.MemoryFile}}` as perishable, so the next spawn skips that harness until it works again.
+
+With no alternative left in the rule, try the `default` profile on the other harness once; after that, tell the captain which harness failed and what its screen said, and keep the task queued.
+
+An effort the harness does not take is not a failure: the spawn prints a note that it was recorded and left out, and the Crew runs at the harness's own effort.
+
+## 7. The profile of a replacement Crew
+
+`stuck-crew-recovery` step 3 replaces a Crew that looped or stopped responding.
+Choose the replacement's profile by why the first one failed:
+
+- **It misjudged the work** - misread the brief, looped on a design choice, or kept asking what the brief answers: one step heavier, the heavier rule's profile or the heavier alternative within the same rule.
+- **Its harness failed it** - the agent died, froze or hit a limit while the work itself was on track: the same weight on the other harness.
+- **Neither is clear**: the same profile, with the `- Already tried` lines doing the work.
+
+Climb one step, once.
+If the replacement fails too, the task is failed (`stuck-crew-recovery` step 4); a third Crew on a still heavier profile is not a recovery plan.
+
+## 8. Say what you chose
+
+The spawn's first line and `crew list` both show the profile, so the record needs nothing more from you.
+The captain gets one clause in the line saying the work has started, in outcome terms - "on the strong profile, because it touches every caller of the API" - and a model name only when they spoke in model names themselves.
+When you chose against the table because of the captain's words, launch evidence or load, say that reason, not the table's.
