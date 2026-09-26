@@ -156,7 +156,7 @@ Without `--scout` it is a ship, and a `## Deliverable` is refused.
 `--harness`, `--model` and `--effort` are the Crew's launch profile; section 7 and the `crew-dispatch` skill say how to choose them.
 Without `--harness` the Crew runs the table's `default` profile on the workspace default harness, which is Codex, with a note on stderr; `--model` or `--effort` without `--harness` is refused (exit 2), because a model name belongs to one harness.
 An effort the harness does not take (Codex has no `max`) is recorded and left out of the launch, with a note on stderr.
-`crew dispatch` prints the dispatch table in force: each rule's condition and its profiles as the exact flags to pass.
+`crew dispatch` prints the dispatch table in force: each rule's condition and its profiles as the exact flags to pass, then each harness's quota as quota-axi reads it and the harness that quota favours (the `crew-dispatch` skill says how to use it).
 That is `/ws/.mate/crew-dispatch.json` when the captain has written one, which replaces the built-in table whole, and the built-in table otherwise; `crew dispatch --example` prints the built-in table as JSON for the captain to copy and edit.
 A malformed table refuses every spawn (exit 2, the reason on stderr) until the captain fixes it, and is never replaced by the built-in one; tell the captain what it says.
 

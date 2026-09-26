@@ -2,9 +2,15 @@
 After firstmate's dispatch intake (AGENTS.md section 4, harness-adapters
 references/common/dispatch.md and model-and-effort.md, quota-array-dispatch).
 Deviations, each forced by a mate constraint:
-- No quota-axi and no spendPriority: mate has no quota source, so a rule's
-  alternatives are chosen by the captain's words, launch evidence and the
-  open-crew count per harness, never by a remaining-allowance number.
+- quota-axi is read by the binary, not by the Mate: `mate crew dispatch`
+  runs it once, read-only (--no-credential-refresh), maps each harness to
+  its provider row (firstmate quota_row: codex-home, else default), folds
+  the provider-wide scopes, and prints the harness the highest known
+  spendPriority favours after the exhausted and zero gates. The Mate keeps
+  the gates that need the task: runway against the likely duration, and
+  reasoning class, which a rule's alternatives already share.
+- No vendor auth probe: an unmeasured harness stays eligible, and its
+  remedy command goes to the captain.
 - No typed resolver: the binary checks the table and applies its default,
   and the Mate matches the natural-language rules (docs/mvp.md M12).
 - Two harnesses, Codex and Claude Code; a model never selects a harness
@@ -29,7 +35,7 @@ Every command below is run with the binary's absolute path, `{{.MatevBin}}`, fro
 {{.MatevBin}} crew dispatch
 ```
 
-It prints each rule in order - its condition, its profiles as the exact flags to pass, and why - then `default`.
+It prints each rule in order - its condition, its profiles as the exact flags to pass, and why - then `default`, then the quota evidence (section 4).
 The first line says whose table it is: the captain's `.mate/crew-dispatch.json`, or the built-in one while they have not written theirs.
 Read it once per turn in which you spawn, not once per session: the captain may have changed it since.
 
@@ -78,15 +84,38 @@ If none fits, use `default`.
 ## 4. Choose between a rule's alternatives
 
 A rule that lists several profiles is saying they are equally fit for that work.
-Choose one, in this order, and stop at the first reason that decides:
+The same `crew dispatch` output ends with a `quota` block, read once from quota-axi and read-only:
+
+```text
+quota (quota-axi 0.1.54, read-only, 2026-09-26 08:00 UTC):
+  codex   93% left · spendPriority 1.5 · runway through_reset · next reset 2026-09-30T02:41:45.000Z
+  claude  unknown (auth_required); the captain can run `quota-axi --allow-keychain-prompt`
+  favours codex: highest spendPriority 1.5 among eligible harnesses
+```
+
+One line per harness: the allowance left, `spendPriority` (higher is better: positive means allowance on track to reach its reset unused, `0` exact use, negative overdrawn), and the runway, `through_reset`, `projected_exhaustion in <duration>`, `exhausted_now` or `unknown`.
+`favours` is the binary's ranking: the highest known `spendPriority` among harnesses not exhausted and not at zero, or `none` with the reason.
+Do not re-rank those numbers by hand, and do not run `quota-axi` yourself; this block is the one read.
+
+Choose, in this order, and stop at the first reason that decides:
 
 1. **The captain's words** (section 2).
-2. **Launch evidence.** A harness that failed to launch, showed a sign-in or usage-limit screen, or was otherwise unusable earlier in this session, or in a lesson under `## Lessons` that has not been retired, is skipped while another alternative remains.
+2. **Hard gates.** Skip an alternative whose harness reads `exhausted_now` or `0% left`; skip one whose `projected_exhaustion in <duration>` is shorter than the task will plausibly take - a large ship runs for hours, a light scout for minutes.
+   Skip a harness that failed to launch, showed a sign-in or usage-limit screen, or was otherwise unusable earlier in this session, or in a lesson under `## Lessons` that has not been retired.
+   An `unknown` reading is not a gate: that harness stays eligible, and you say its quota is unknown.
 3. **What the alternatives differ in.** When they trade a larger model at lower effort against a smaller model at higher effort, prefer the larger model for work with open decisions, and the higher effort for a long, settled task that needs care rather than judgment.
-4. **Load.** Run `{{.MatevBin}} crew list {{.ProjectName}}` and count the open Crews per harness in the HARNESS column; pick the alternative whose harness has fewer. A tie goes to the one listed first.
+   This step picks a model, never a harness against the quota gates.
+4. **Quota.** Among what is left, take the alternative on the harness `favours` names.
+   `favours` knows only the binary's gates, not the task's length: when it names a harness step 2 already skipped, ignore it and go to step 5.
+5. **Load**, when `favours` is `none`. Run `{{.MatevBin}} crew list {{.ProjectName}}` and count the open Crews per harness in the HARNESS column; pick the alternative whose harness has fewer. A tie goes to the one listed first.
+
+When every alternative of the rule fails a gate, do not step down to a lighter rule to save quota: try the `default` profiles through the same gates, and if none passes, tell the captain which harnesses are used up and when they reset, and keep the task queued.
+A reading of `unknown (auth_required)` with a remedy command is worth one sentence to the captain the first time you see it in a session, with the command; after that, choose without it.
+`quota: quota-axi is not installed` or `quota: unreadable` means there is no quota evidence: steps 1 to 3 and 5 still apply.
 
 Pass the chosen profile's flags exactly as `crew dispatch` printed them: `--harness`, and its `--model` and `--effort` when it has them.
 Never combine axes from two profiles, never add a model the table does not name unless the captain did, and always pass `--harness`, even for the `default` profile: a spawn without it still runs `default`, but the record then shows a profile nobody chose.
+A `warning: <harness> quota is used up` from `crew spawn` means the Crew was launched on an exhausted harness; unless the captain chose it, stop it and spawn the other alternative (section 6).
 
 ## 5. Several spawns in one turn
 

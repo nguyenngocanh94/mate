@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/dispatch"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/process"
+	"github.com/nguyenngocanh94/mate/internal/quota"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -85,7 +90,63 @@ func cmdCrewDispatch(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	writeDispatchTable(stdout, t)
+	snap, qerr := readQuota(context.Background())
+	writeQuota(stdout, snap, qerr)
 	return nil
+}
+
+// readQuota is the one quota-axi read a dispatch or a spawn makes; tests
+// replace it so no suite depends on this machine's vendor accounts. It is
+// a plain variable because this package's tests run serially (none calls
+// t.Parallel); a parallel test must not swap it.
+var readQuota = func(ctx context.Context) (quota.Snapshot, error) {
+	return quota.Read(ctx, process.ExecRunner{}, time.Now())
+}
+
+// writeQuota prints the quota evidence for choosing between a rule's
+// alternatives (skill crew-dispatch section 4). No quota-axi, or an
+// unreadable one, is said in one line and never fails the command.
+func writeQuota(out io.Writer, snap quota.Snapshot, err error) {
+	switch {
+	case errors.Is(err, quota.ErrNotInstalled):
+		fmt.Fprintln(out, "\nquota: quota-axi is not installed; alternatives are chosen without quota evidence (install: npm install -g quota-axi)")
+		return
+	case err != nil:
+		fmt.Fprintf(out, "\nquota: unreadable (%v); alternatives are chosen without quota evidence\n", err)
+		return
+	}
+	fmt.Fprintf(out, "\nquota (quota-axi %s, read-only, %s):\n", snap.Version, snap.Read.UTC().Format("2006-01-02 15:04 UTC"))
+	for _, r := range snap.Readings {
+		fmt.Fprintf(out, "  %s\n", r.Line())
+	}
+	if kind, why, ok := snap.Favoured(); ok {
+		fmt.Fprintf(out, "  favours %s: %s\n", kind, why)
+	} else {
+		fmt.Fprintf(out, "  favours none: %s\n", why)
+	}
+}
+
+// spawnQuotaBudget bounds the spawn's quota read; past it the spawn goes on
+// with no warning.
+const spawnQuotaBudget = 5 * time.Second
+
+// quotaWarning is the spawn's one quota check: a harness quota-axi measures
+// as exhausted, or at zero, is warned about and still launched, because the
+// captain's words may have chosen it; "" when there is nothing to say.
+func quotaWarning(kind harness.Kind) string {
+	// Advisory only, so it gets a short budget: a slow vendor must never
+	// hold up a launch for the full dispatch read.
+	ctx, cancel := context.WithTimeout(context.Background(), spawnQuotaBudget)
+	defer cancel()
+	snap, err := readQuota(ctx)
+	if err != nil {
+		return ""
+	}
+	r, ok := snap.Reading(kind)
+	if !ok || r.Eligible() {
+		return ""
+	}
+	return fmt.Sprintf("%s quota is used up (quota-axi: %s); the Crew may stop mid-task - another alternative of its rule avoids that", kind, r.Line())
 }
 
 // writeDispatchTable prints the table the way the Mate uses it: each rule's

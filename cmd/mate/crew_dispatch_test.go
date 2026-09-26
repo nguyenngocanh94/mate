@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/dispatch"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/quota"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -202,5 +205,82 @@ func TestHarnessCellNamesEachAxisThatWasSet(t *testing.T) {
 		if got := harnessCell(tc.c); got != tc.want {
 			t.Errorf("harnessCell(%+v) = %q, want %q", tc.c, got, tc.want)
 		}
+	}
+}
+
+// TestMain keeps every test in this package off the machine's quota-axi:
+// a test that wants a quota reading sets readQuota itself.
+func TestMain(m *testing.M) {
+	readQuota = func(context.Context) (quota.Snapshot, error) { return quota.Snapshot{}, quota.ErrNotInstalled }
+	os.Exit(m.Run())
+}
+
+func withQuota(t *testing.T, snap quota.Snapshot, err error) {
+	t.Helper()
+	prev := readQuota
+	readQuota = func(context.Context) (quota.Snapshot, error) { return snap, err }
+	t.Cleanup(func() { readQuota = prev })
+}
+
+func sampleQuota() quota.Snapshot {
+	sp := 1.5
+	return quota.Snapshot{Version: "0.1.54", Read: time.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC), Readings: []quota.Reading{
+		{Harness: harness.KindCodex, Provider: "codex", Known: true, PercentLeft: 93, SpendPriority: &sp, Runway: quota.RunwayThroughReset, Status: "fresh"},
+		{Harness: harness.KindClaude, Provider: "claude", PercentLeft: -1, Runway: quota.RunwayUnknown, Status: "auth_required", Remedy: "quota-axi --allow-keychain-prompt"},
+	}}
+}
+
+// `crew dispatch` ends with the quota evidence the skill ranks alternatives
+// by, and which harness it favours.
+func TestCrewDispatchShowsQuota(t *testing.T) {
+	withQuota(t, sampleQuota(), nil)
+	w := dispatchWorkspace(t, "")
+	var out, errw bytes.Buffer
+	if err := run([]string{"crew", "dispatch", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatalf("crew dispatch: %v", err)
+	}
+	for _, want := range []string{
+		"quota (quota-axi 0.1.54, read-only, 2026-09-26 08:00 UTC):",
+		"  codex   93% left · spendPriority 1.5 · runway through_reset",
+		"  claude  unknown (auth_required); the captain can run `quota-axi --allow-keychain-prompt`",
+		"  favours codex: highest spendPriority 1.5 among eligible harnesses",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
+	}
+}
+
+// Without quota-axi the table still prints, with one line saying so.
+func TestCrewDispatchWithoutQuotaAxiSaysSo(t *testing.T) {
+	w := dispatchWorkspace(t, "")
+	var out, errw bytes.Buffer
+	if err := run([]string{"crew", "dispatch", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatalf("crew dispatch: %v", err)
+	}
+	if !strings.Contains(out.String(), "quota: quota-axi is not installed") || !strings.Contains(out.String(), "rule 1:") {
+		t.Fatalf("output = %s", out.String())
+	}
+	withQuota(t, quota.Snapshot{}, errors.New("quota-axi --json: exit status 2"))
+	out.Reset()
+	if err := run([]string{"crew", "dispatch", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatalf("crew dispatch with a broken quota-axi failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "quota: unreadable (quota-axi --json: exit status 2)") {
+		t.Fatalf("output = %s", out.String())
+	}
+}
+
+// A spawn onto a used-up harness is warned about, never refused: the
+// captain's words may have chosen it.
+func TestQuotaWarningNamesAUsedUpHarness(t *testing.T) {
+	snap := sampleQuota()
+	snap.Readings[0].Runway = quota.RunwayExhausted
+	withQuota(t, snap, nil)
+	if w := quotaWarning(harness.KindCodex); !strings.Contains(w, "codex quota is used up") {
+		t.Fatalf("warning = %q", w)
+	}
+	if w := quotaWarning(harness.KindClaude); w != "" {
+		t.Fatalf("an unmeasured harness was warned about: %q", w)
 	}
 }
