@@ -3,7 +3,7 @@
 // review. The host creates each pane once, running `mate pane serve`, and
 // the Console then tells the pane what to show over a unix socket. The
 // runner swaps its one child program in place - `herdr agent attach` for
-// the stage, `tode --review <folder>` for the review - so a switch never
+// the stage, `fresh <worktree>` for the review - so a switch never
 // closes or re-splits a pane, and the column widths the host set at the
 // start stay as they are.
 //
@@ -80,7 +80,7 @@ type Server struct {
 	Owner int
 	// Occupants lists the processes on the pane's terminal other than the
 	// runner. A program may leave its display to a process of its own that
-	// outlives it - terminal-code's CLI exits once its viewer is up - so
+	// outlives it - terminal-code's CLI exited once its viewer was up - so
 	// what a column shows is everything on its tty, not just the child.
 	// nil when the runner has no tty.
 	Occupants func() []int

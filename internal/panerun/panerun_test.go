@@ -247,7 +247,7 @@ func TestTheRunnerEndsWhenItsConsoleIsGone(t *testing.T) {
 	}
 }
 
-// terminal-code's CLI exits once its viewer is up, and the viewer keeps
+// A CLI may exit once a viewer of its own is up - terminal-code's did - and the viewer keeps
 // the terminal. The column shows the program until the viewer is gone
 // too, the same command is still a no-op meanwhile, and a new command ends
 // the viewer before it starts.

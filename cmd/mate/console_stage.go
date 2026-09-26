@@ -23,7 +23,7 @@ import (
 // consoleColumns are the Console's sibling columns (docs/mvp.md M13): the
 // stage, which shows the agent of the row Enter was pressed on, and - only
 // while that row is a Crew - the review, which shows the crew's worktree
-// in terminal-code. Each column runs `mate pane serve` for its whole life;
+// in the Fresh editor. Each column runs `mate pane serve` for its whole life;
 // the Console tells it what to show over its socket, and the host never
 // re-splits a column once made.
 type consoleColumns struct {
@@ -33,8 +33,8 @@ type consoleColumns struct {
 	withReview []host.Column
 	dir        string
 	stage      string
-	review     string // "" when terminal-code is not installed
-	tode       string
+	review     string // "" when Fresh is not installed
+	editor     string
 	herdr      string
 	// env is what every column's program gets over the pane's own: the
 	// Console's PATH.
@@ -42,7 +42,7 @@ type consoleColumns struct {
 }
 
 // newConsoleColumns plans the columns for this Console: the stage always,
-// the review when terminal-code (`tode`) is installed.
+// the review when the Fresh editor (`fresh`) is installed.
 func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -62,16 +62,16 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 		return host.Column{Role: role, Argv: []string{exe, "pane", "serve", "--role", role, "--socket", socket, "--owner", owner}}
 	}
 	c.cols = []host.Column{column(roleStage, c.stage)}
-	if tode := findTool(getenv, "tode"); tode != "" && filepath.IsAbs(tode) {
-		c.tode, c.review = tode, filepath.Join(dir, roleReview+".sock")
+	if editor := findTool(getenv, "fresh"); filepath.IsAbs(editor) {
+		c.editor, c.review = editor, filepath.Join(dir, roleReview+".sock")
 		c.withReview = append(slices.Clip(c.cols), column(roleReview, c.review))
 	}
 	return c, nil
 }
 
 // toolDirs are where installers put a CLI when a pane's PATH, which
-// starts from login's, may not reach it: terminal-code's and herdr's
-// installers use ~/.local/bin (or $XDG_BIN_HOME), Homebrew the other two.
+// starts from login's, may not reach it: herdr's installer uses
+// ~/.local/bin (or $XDG_BIN_HOME), Homebrew (Fresh) the other two.
 func toolDirs(getenv func(string) string) []string {
 	dirs := []string{getenv("XDG_BIN_HOME")}
 	if home := getenv("HOME"); home != "" {
@@ -188,7 +188,9 @@ func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
 }
 
 // showReview opens a crew's worktree in the review column, making the
-// column if it is not there; nothing without terminal-code.
+// column if it is not there; nothing without Fresh. Fresh opens on the
+// folder with its explorer marking what git sees changed; its Review Diff
+// is one palette command away.
 func (c *consoleColumns) showReview(ctx context.Context, ws *store.Workspace, target console.StageTarget, meta map[string]string) error {
 	if c.review == "" {
 		return nil
@@ -197,14 +199,14 @@ func (c *consoleColumns) showReview(ctx context.Context, ws *store.Workspace, ta
 	if err != nil {
 		return fmt.Errorf("file changes: %w", err)
 	}
-	if err := c.show(ctx, c.withReview, c.review, panerun.Command{Argv: []string{c.tode, "--review", folder}, Dir: folder, Env: c.env}); err != nil {
+	if err := c.show(ctx, c.withReview, c.review, panerun.Command{Argv: []string{c.editor, folder}, Dir: folder, Env: c.env}); err != nil {
 		return fmt.Errorf("file changes: %w", err)
 	}
 	return nil
 }
 
 // hideReview closes the review column, if it is open: its runner stops
-// terminal-code first, then the host closes the pane.
+// the editor first, then the host closes the pane.
 func (c *consoleColumns) hideReview(ctx context.Context) error {
 	if c.review == "" {
 		return nil

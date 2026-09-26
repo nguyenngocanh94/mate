@@ -244,7 +244,7 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	r.consoleColumns = &consoleColumns{
 		h: layoutCounter{&r.layouts, &r.closedRoles}, dir: dir,
 		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
-		tode: "/opt/tode", herdr: "/opt/herdr",
+		editor: "/opt/fresh", herdr: "/opt/herdr",
 	}
 	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.review} {
 		ln, err := net.Listen("unix", socket)
@@ -368,8 +368,8 @@ func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 	if filepath.IsAbs(res.Worktree) {
 		wt = res.Worktree
 	}
-	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/tode", "--review", wt}) || review[0].Dir != wt {
-		t.Fatalf("review shown %+v, want terminal-code on the crew's worktree %s", review, wt)
+	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/fresh", wt}) || review[0].Dir != wt {
+		t.Fatalf("review shown %+v, want Fresh on the crew's worktree %s", review, wt)
 	}
 	if rec.layouts != 0 {
 		t.Fatalf("laid out %d times; the recorder's columns were all there", rec.layouts)

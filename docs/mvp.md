@@ -842,20 +842,20 @@ Quyết định:
 
 ### M13. Ba cột: console, agent, file changes
 
-Chốt 2026-09-26: console hẹp bên trái, terminal agent ở giữa, và - chỉ khi đang xem một crew - file changes bên phải bằng terminal-code (`tode`, zenbu-labs/terminal-code, VS Code trong terminal), mở thẳng vào worktree của crew.
-Mặc định là hai cột (captain chốt cùng ngày, sau khi dùng thử ba cột).
+Chốt 2026-09-26: console hẹp bên trái, terminal agent ở giữa, và - chỉ khi đang xem một crew - file changes bên phải bằng Fresh (`fresh`, editor terminal viết bằng Rust, cài qua `brew install fresh-editor`), mở thẳng vào worktree của crew.
+Mặc định là hai cột (captain chốt cùng ngày, sau khi dùng thử ba cột). Ban đầu cột file changes là terminal-code (`tode`); captain đổi sang Fresh cùng ngày vì terminal-code lag trên WezTerm và nặng (Chromium vẽ qua kitty graphics).
 
 Quyết định:
 
 - Mỗi cột bên phải là một pane host chạy `mate pane serve --role stage|review --socket <path> --owner <pid>` suốt đời cột (`internal/panerun`). Console nói cột hiện gì qua unix socket; runner thay chương trình con ngay trong pane. Không còn kill-pane, re-split, pkill hay resize mỗi lần đổi: độ rộng cột đặt một lần.
 - `host.Host` chỉ còn `Layout(columns)` và `Close`. Layout giữ cột của mình còn sống, làm lại cột bị đóng đúng chỗ (review bên phải stage, stage bên trái review), và từ chối pane lạ. WezTerm tách bằng cell (console 20%, 40–48 cột; review 45% phần còn lại). Ghostty chỉ tách đôi, nên sau khi tách nó `equalize_splits` rồi `resize_split` cột console, đo bề rộng thật của chính console để chỉnh (đo 2026-09-26: 175 cột → 41/66/66).
-- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`. Trên hàng Crew, cột file changes được dựng (nếu chưa có) và chạy `tode --review <worktree>`; trên hàng Mate nó đóng (runner dừng tode, host đóng pane). `Close(roles...)` đóng từng cột.
-- Lag trên WezTerm (captain báo 2026-09-26; Ghostty không lag): terminal-browser vẽ bằng kitty graphics, WezTerm 20240203 tốn 100–200% CPU mỗi lúc tode vẽ, idle 0%. `TERMINAL_BROWSER_RENDER_SCALE=1`, `TERMINAL_BROWSER_FPS=30`, `TERMINAL_BROWSER_FRAMES=file` không đổi đáng kể (đo 2026-09-26). Không sửa được phía mate.
-- terminal-code để lại viewer riêng trên tty (CLI thoát, viewer về ppid 1), nên cột là mọi tiến trình trên tty của nó, không chỉ con của runner: đổi nội dung thì dọn hết (TERM rồi KILL sau 2s), và cột chỉ về dòng chờ khi tty trống. Đo: đổi folder 0,2–1,5s, luôn một viewer.
+- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`. Trên hàng Crew, cột file changes được dựng (nếu chưa có) và chạy `fresh <worktree>`: explorer của Fresh đánh dấu file git thấy đổi, Review Diff nằm trong palette. Trên hàng Mate nó đóng (runner dừng Fresh, host đóng pane). Fresh chỉ lái được từ ngoài bằng token nó cấp cho terminal bên trong nó, nên mate không tự mở Review Diff; gõ phím qua host thì dễ vỡ (thử 2026-09-26: `ctrl+p` không mở palette, chữ vào thẳng buffer). `Close(roles...)` đóng từng cột.
+- Lag trên WezTerm với terminal-code (captain báo 2026-09-26; Ghostty không lag): terminal-browser vẽ bằng kitty graphics, WezTerm 20240203 tốn 100–200% CPU mỗi lúc nó vẽ; các biến `TERMINAL_BROWSER_*` không đổi đáng kể. Lý do đổi sang Fresh, vẽ bằng ký tự.
+- Cột là mọi tiến trình trên tty của nó, không chỉ con của runner (terminal-code để lại viewer riêng về ppid 1): đổi nội dung thì dọn hết (TERM rồi KILL sau 2s), và cột chỉ về dòng chờ khi tty trống.
 - Giữa hai chương trình runner khôi phục termios, rời alt screen, tắt mouse/paste, xoá ảnh kitty và RIS. Chương trình tự thoát thì giữ chữ nó in (lý do herdr từ chối) và chỉ tắt mode.
-- Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`tode` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
+- Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`fresh` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
 - Console thoát: gửi exit cho hai runner rồi `Close` (Ghostty giữ pane đã hết tiến trình, kể cả với `wait after command` false; đo 2026-09-26). Console chết đột ngột: runner tự thoát trong 1s khi pid console mất.
-- Không có terminal-code: chỉ có cột agent, status line chỉ lệnh cài.
+- Không có Fresh: chỉ có cột agent, status line chỉ lệnh cài.
 - `mate console` dựng cột agent lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
 
 | # | Task | Xong khi |
