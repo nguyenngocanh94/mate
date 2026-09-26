@@ -1,0 +1,39 @@
+write a detailed 800-word essay about the history of unix shells, no tools
+  computing. They are used to administer servers, automate builds, inspect logs, manage
+  containers, and connect tools in repeatable workflows. Newer shells, including fish,
+  emphasize discoverability and user-friendly defaults, while PowerShell applies shell
+  concepts to a different programming and system-management tradition.
+
+  Across these generations, the shell has balanced two roles: a quick place to issue commands
+  and a language for expressing repeatable work. Each influential shell added ideas that
+  users came to expect, from scripting and pipelines to history and completion. The result is
+  not one universal shell, but a family of interpreters shaped by different needs. Unix
+  shells endure because they make programs composable and let people turn a sequence of
+  commands into a tool of their own.
+
+  23:15
+
+
+› run: sleep 20 && echo done, then summarize
+
+
+• Ran sleep 20 && echo done
+  └ done
+
+• The command completed successfully and printed done.
+
+  23:16
+
+
+› run: sleep 25 && echo ok
+
+
+• I’ll run that command and report its output.
+
+• Working (5s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to c…
+
+
+› Ask Codex to do anything
+
+  GPT-6-Luna default fast · /private/tmp/claude-501/-Users-anh-Workspace-mate/1e8c3598-c347-…
+  ? for shortcuts                                                   ⚠ 1 warning · f2 to view

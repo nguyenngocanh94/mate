@@ -79,10 +79,18 @@ const (
 	// codexComposerGlyph is the glyph Codex draws at its composer.
 	codexComposerGlyph = "›"
 	// codexComposerTailLines is how far from the bottom the Codex composer
-	// sits, counted in non-empty lines: itself, then the model/cwd status
-	// footer. A `›`-prefixed option inside a dialog sits further up, which
-	// is what keeps the model picker and the trust dialog out of Empty.
-	codexComposerTailLines = 2
+	// may sit, counted in non-empty lines: itself, the model/cwd status
+	// footer, and the line codex-cli 0.157.1 draws under that footer - the
+	// `? for shortcuts` hint and a `⚠ 1 warning · f2 to view` count, either
+	// or both (measured 2026-09-26; 0.154.0 drew no such line, and a live
+	// Mate's every send to an idle Codex crew was refused as an unnamed
+	// screen until this was 3). A `›`-prefixed option inside a dialog sits
+	// further up - the model picker has its sibling options and a hint
+	// below it - which is what keeps it out of Empty; and the one dialog
+	// short enough to fit, the trust dialog, is named before this runs.
+	// Widening the window is fail-closed besides: a dialog option is never
+	// an empty composer, so the worst it can read as is Pending, a refusal.
+	codexComposerTailLines = 3
 	// busyTailLines bounds the busy scan to the bottom of the snapshot, so
 	// a transcript line that happens to quote a spinner or an interrupt
 	// hint does not make an idle pane look busy forever.
@@ -464,10 +472,11 @@ func isRule(line string) bool {
 }
 
 // locateCodexComposer finds the composer by where it sits: Codex draws no
-// box, but its composer is the last `›` line of the snapshot and only the
-// model/cwd status footer follows it. A `›` marking an option inside the
-// model picker or the trust dialog has its sibling options below it, which
-// puts it outside that window.
+// box, but its composer is the last `›` line of the snapshot and only its
+// footer follows it (codexComposerTailLines). A `›` marking an option inside
+// the model picker has its sibling options below it, which puts it outside
+// that window; the trust dialog's two options would fit, which is why
+// ClassifyComposer names that dialog first.
 func locateCodexComposer(lines []string) (string, bool) {
 	seen := 0
 	for i := len(lines) - 1; i >= 0; i-- {

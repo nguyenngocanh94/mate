@@ -15,7 +15,10 @@ import (
 // recent-unwrapped --lines 40 --format text` taken on 2026-09-17 against
 // Claude Code 2.1.274 and codex-cli 0.154.0, except the three
 // `claude_startup_splash*` captures, taken on 2026-09-19 against Claude Code
-// 2.1.278 through the Console's own session stream (docs/mvp.md task 24).
+// 2.1.278 through the Console's own session stream (docs/mvp.md task 24), and
+// the `codex_*_v157` captures, taken on 2026-09-26 against codex-cli 0.157.1
+// and Herdr 0.8.2 in a lab session - `codex_busy_visible_v157` with
+// `--source visible`, the read mate falls back to while Codex works.
 func capture(t *testing.T, name string) string {
 	t.Helper()
 	return captureFile(t, name+".txt")
@@ -155,6 +158,54 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			kind:   harness.KindCodex,
 			screen: "codex_modal",
 			want:   send.StateUnknown,
+		},
+		{
+			// codex-cli 0.157.1 draws a second footer line under the
+			// model/cwd one: the shortcuts hint and a warning count. A
+			// live Mate's every send to an idle Codex crew was refused as
+			// an unnamed screen because of it (2026-09-26).
+			name:     "codex 0.157 empty composer above a two-line footer",
+			kind:     harness.KindCodex,
+			screen:   "codex_empty_v157",
+			want:     send.StateEmpty,
+			evidence: "› Ask Codex to do anything",
+		},
+		{
+			// The screen that crew showed: a finished turn, its time and a
+			// tip above the composer.
+			name:     "codex 0.157 composer after a finished turn",
+			kind:     harness.KindCodex,
+			screen:   "codex_after_turn_v157",
+			want:     send.StateEmpty,
+			evidence: "› Ask Codex to do anything",
+		},
+		{
+			// Its two options and hint fit inside the composer window, so
+			// only naming the dialog first keeps it from reading as a
+			// composer holding "1. Trust and continue".
+			name:     "codex 0.157 trust dialog is not a composer",
+			kind:     harness.KindCodex,
+			screen:   "codex_trust_dialog_v157",
+			want:     send.StateUnknown,
+			evidence: "harness directory-trust dialog",
+		},
+		{
+			// Typing drops the hint and keeps the warning on that line.
+			name:     "codex 0.157 composer holding a half typed line",
+			kind:     harness.KindCodex,
+			screen:   "codex_pending_v157",
+			want:     send.StatePending,
+			pending:  "half typed",
+			evidence: "› half typed",
+		},
+		{
+			// herdr refuses a recent-unwrapped read of a working Codex, so
+			// this one is the `--source visible` read mate falls back to.
+			name:     "codex 0.157 mid turn, read from the visible screen",
+			kind:     harness.KindCodex,
+			screen:   "codex_busy_visible_v157",
+			want:     send.StateBusy,
+			evidence: "• Working (5s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to c…",
 		},
 		{
 			// A slash command typed but not yet submitted is the caller's

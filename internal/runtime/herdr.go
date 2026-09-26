@@ -1163,11 +1163,23 @@ func (h *Herdr) ReadAgentStyled(ctx context.Context, handle AgentHandle, lines i
 	return h.readAgent(ctx, handle, lines, "ansi")
 }
 
+// readAgent reads the agent's recent output unwrapped, or - while Herdr
+// refuses that because a harness drawn on the alternate screen is working
+// (HerdrAgentNotIdle, which is Codex for its whole turn) - the screen as it
+// is drawn, which is the read that refusal itself names. The visible screen
+// is the bottom of the same pane, rows wrapped at the pane width; it still
+// carries the composer and the in-flight line a caller decides from.
 func (h *Herdr) readAgent(ctx context.Context, handle AgentHandle, lines int, format string) (string, error) {
-	res, err := h.run(ctx, handle.Session.Name, []string{
-		"agent", "read", handle.Name, "--source", "recent-unwrapped",
-		"--lines", fmt.Sprintf("%d", lines), "--format", format,
-	})
+	read := func(source string) (process.Result, error) {
+		return h.run(ctx, handle.Session.Name, []string{
+			"agent", "read", handle.Name, "--source", source,
+			"--lines", fmt.Sprintf("%d", lines), "--format", format,
+		})
+	}
+	res, err := read("recent-unwrapped")
+	if herdrCodeOf(err) == HerdrAgentNotIdle {
+		res, err = read("visible")
+	}
 	if err != nil {
 		return "", err
 	}

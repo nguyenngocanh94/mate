@@ -1,0 +1,40 @@
+  default, it became familiar to generations of Unix and Unix-like users. Bash’s prominence
+write a detailed 800-word essay about the history of unix shells, no tools
+  also meant that scripts written for it became a major part of system administration and
+  software development.
+
+  Meanwhile, the C shell’s successor, tcsh, expanded its interactive features and improved
+  compatibility. Other shells emerged with different priorities. The Almquist shell, or ash,
+  was small and suitable for systems with limited resources. Dash, a descendant of ash,
+  became a fast implementation of the POSIX shell language and is used in some Linux systems
+  for startup scripts. Zsh, first released in 1990 by Paul Falstad, combined ideas from
+  several earlier shells and gained a reputation for extensive customization, powerful
+  completion, and sophisticated interactive features.
+
+  Standards have helped maintain a common foundation amid this variety. POSIX specifies a
+  portable shell language and behavior, drawing heavily on the Bourne shell and related
+  developments. A script written to POSIX conventions can often run across different Unix-
+  like systems, while a script that depends on Bash, zsh, or ksh extensions may need that
+  particular interpreter. This distinction is why scripts often begin with a line identifying
+  which shell should run them.
+
+  Today, shells remain central even as graphical interfaces and cloud services have changed
+  computing. They are used to administer servers, automate builds, inspect logs, manage
+  containers, and connect tools in repeatable workflows. Newer shells, including fish,
+  emphasize discoverability and user-friendly defaults, while PowerShell applies shell
+  concepts to a different programming and system-management tradition.
+
+  Across these generations, the shell has balanced two roles: a quick place to issue commands
+  and a language for expressing repeatable work. Each influential shell added ideas that
+  users came to expect, from scripting and pipelines to history and completion. The result is
+  not one universal shell, but a family of interpreters shaped by different needs. Unix
+  shells endure because they make programs composable and let people turn a sequence of
+  commands into a tool of their own.
+
+  23:15
+                                          Tip: Use /agents to open the agent command center.
+
+› Ask Codex to do anything
+
+  GPT-6-Luna default fast · /private/tmp/claude-501/-Users-anh-Workspace-mate/1e8c3598-c347-…
+  ? for shortcuts                                                   ⚠ 1 warning · f2 to view

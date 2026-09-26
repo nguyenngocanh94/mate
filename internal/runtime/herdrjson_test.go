@@ -141,6 +141,8 @@ func TestParseCLIErrorFromLiveCaptures(t *testing.T) {
 		{"error-agent-not-found-attach.json", HerdrAgentNotFound, observability.CodeNotFound},
 		{"error-pane-not-found-get.json", HerdrPaneNotFound, observability.CodeNotFound},
 		{"error-server-not-running.json", HerdrServerNotRunning, observability.CodeRuntimeUnavailable},
+		// Captured 2026-09-26 from a working codex-cli 0.157.1.
+		{"error-agent-not-idle.json", HerdrAgentNotIdle, observability.CodeTargetBlocked},
 	}
 	for _, tc := range cases {
 		tc := tc
