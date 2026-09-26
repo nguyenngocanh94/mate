@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
+	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/panerun"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -475,3 +476,22 @@ type colsHost struct{ f func([]host.Column) }
 
 func (h colsHost) Layout(_ context.Context, cols []host.Column) error { h.f(cols); return nil }
 func (colsHost) Close(context.Context, ...string) error               { return nil }
+
+// A scout changes no code and writes its report under `.mate/`: the review
+// opens the workspace's `.mate` directory, not its worktree.
+func TestConsoleStageOpensDotMateForAScout(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "sc", BriefText: brieftest.Scout("Find out why the cart empties.", "What empties it?"), Scout: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rec := newRecordingColumns(t)
+	if err := consoleStage(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "sc", ProjectID: "shop"}); err != nil {
+		t.Fatal(err)
+	}
+	review := rec.of(roleReview)
+	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/fresh", w.StateDir()}) || review[0].Dir != w.StateDir() {
+		t.Fatalf("review shown %+v, want Fresh on %s", review, w.StateDir())
+	}
+}

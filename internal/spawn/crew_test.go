@@ -142,6 +142,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaSession:    w.Session(),
 		spawn.MetaWorktree:   ".worktrees/shop-k3",
 		spawn.MetaBranch:     "mate/k3",
+		spawn.MetaKind:       "ship",
 		store.MetaRepo:       "shop",
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",

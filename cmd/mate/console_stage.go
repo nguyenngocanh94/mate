@@ -217,8 +217,13 @@ func (c *consoleColumns) hideReview(ctx context.Context) error {
 	return c.h.Close(ctx, roleReview)
 }
 
-// reviewFolder is the crew's worktree, which the review column opens.
+// reviewFolder is what the review column opens for a crew: a ship's
+// worktree, where its changes are, or for a scout, which changes no code
+// and writes its report under `.mate/`, the workspace's `.mate` directory.
 func reviewFolder(ws *store.Workspace, target console.StageTarget, meta map[string]string) (string, error) {
+	if spawn.CrewIsScout(ws, target.ProjectID, target.ID, meta) {
+		return ws.StateDir(), nil
+	}
 	wt := meta[spawn.MetaWorktree]
 	if wt == "" {
 		return "", fmt.Errorf("crew %s records no worktree", target.ID)

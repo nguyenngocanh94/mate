@@ -8,7 +8,7 @@ Mỗi board có một golden cùng tên trong `internal/ui/console/testdata/gold
 
 mate là pane bên trái, khoảng 20% cửa sổ, rộng 32–48 cột.
 Bên phải là cột agent của host (WezTerm, Ghostty), dựng lúc mở console (M13): Enter trên hàng Mate/Crew cho nó chạy `herdr agent attach <agent>`.
-Chỉ khi hàng là Crew mới có thêm cột file changes, Fresh (`fresh <worktree>`) trên worktree của crew; Enter trên hàng Mate đóng cột đó.
+Chỉ khi hàng là Crew mới có thêm cột file changes, Fresh: trên worktree của crew với ship, trên `.mate/` của workspace với scout (report của scout nằm ở đó); Enter trên hàng Mate đóng cột đó.
 mate không vẽ terminal của agent, không PTY, không session header.
 Không có title bar, chữ "mate console", đường dẫn workspace, đồng hồ, khung cửa sổ.
 
