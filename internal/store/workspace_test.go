@@ -177,3 +177,17 @@ func TestInitSeedsTheWorkspaceDoc(t *testing.T) {
 		t.Fatalf("second Init rewrote the captain's file: %q", got)
 	}
 }
+
+// TestInitCreatesAMissingDirectory: `mate init <dir>` on a directory that
+// does not exist yet makes it, as `git init <dir>` does, instead of failing
+// with a bare lstat error.
+func TestInitCreatesAMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "new", "ws")
+	w, err := store.Init(dir)
+	if err != nil {
+		t.Fatalf("Init(%s): %v", dir, err)
+	}
+	if _, err := os.Stat(w.WorkspaceFile()); err != nil {
+		t.Fatalf("no workspace file after Init: %v", err)
+	}
+}
