@@ -111,14 +111,26 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	}
 	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv})
 	notice := ""
+	noticeClient, noticeErr := consoleNoticeClient(os.Getenv)
+	if noticeErr != nil {
+		notice = noticeErr.Error()
+	}
 	if split && h != nil {
 		if _, err := h.EnsureSplit(ctx); err != nil {
 			// Said on the status line: stderr is under the alt screen by
 			// the time anyone could read it.
-			notice = "no next pane: " + err.Error()
+			if notice != "" {
+				notice += "; "
+			}
+			notice += "no next pane: " + err.Error()
 		}
 	}
-	model := console.New(load, consoleAction(ws, deps)).
+	action := consoleAction(ws, deps)
+	if noticeClient != nil {
+		action = consoleNoticeAction(ws, deps, noticeClient, action)
+	}
+	model := console.New(load, action).
+		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, h)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).

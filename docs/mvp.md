@@ -839,4 +839,8 @@ Quyết định:
 | 53 | `internal/quota`: đọc `quota-axi --json --no-credential-refresh` (schema 5 và 6, floor 0.1.34), map codex→`codex` (account `codex-home`, rồi `default`), claude→`claude`, gộp các scope toàn provider (captain chốt 2026-09-26: chỉ xét theo provider, không xét scope từng model), gate `exhausted_now`/0%, xếp theo spendPriority đã biết, unknown không bao giờ là 0. `crew dispatch` in khối quota và harness được ưu tiên; `crew spawn` cảnh báo (không chặn) khi harness đã cạn. Skill `crew-dispatch` §4: lời captain → gate cứng (cạn, runway ngắn hơn task, launch lỗi) → model hay effort → quota → tải. | Unit với snapshot thật 0.1.34 và fixture schema 6; test CLI không đụng quota-axi của máy; binary thật in đúng khối quota khi có và khi thiếu quota-axi. `make check` xanh. Đã xong 2026-09-26. |
 | 50 | Acceptance live: Mate đọc bảng, spawn hai crew khác profile theo hai task khác độ khó, `crew list` và meta khớp. | Evidence `docs/evidence/m12-crew-dispatch-<ngày>.md`. |
 
+### Thử nghiệm: Jev notice advisor
+
+Opt-in bằng `MATE_JEV_API_KEY_FILE`: trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
+
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

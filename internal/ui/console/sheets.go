@@ -311,7 +311,7 @@ func (m Model) harnessSheetLines(p framePlan) []gline {
 // ---------- a diff ----------
 
 func (m Model) diffSheetLines(p framePlan) []gline {
-	raw := diffTextLines(m.diff.text)
+	raw := m.diffLines(p.w)
 	out := make([]gline, 0, len(raw))
 	for _, t := range raw[clampInt(m.diff.top, 0, max0(len(raw)-1)):] {
 		out = append(out, gl().pad(1).add(t, diffLineTok(t)).cut(p.w, m.g))

@@ -8,6 +8,8 @@ import "strings"
 
 // diffFlow is the open diff; its zero value is closed.
 type diffFlow struct {
+	title  string // optional title for another read-only text result
+	wrap   bool   // prose results wrap; code diffs retain their columns
 	open   bool
 	crew   string
 	branch string
@@ -41,6 +43,9 @@ func (m Model) closeDiff() Model {
 
 // diffTitle is "diff · <crew> · <branch>"; the rule cuts what does not fit.
 func (m Model) diffTitle() string {
+	if m.diff.title != "" {
+		return m.diff.title
+	}
 	parts := []string{"diff"}
 	if m.diff.crew != "" {
 		parts = append(parts, shortID(m.diff.crew, m.g))
@@ -72,9 +77,25 @@ func (m Model) onDiffKey(key string) Model {
 }
 
 func (m Model) scrollDiff(delta int) Model {
-	n := len(diffTextLines(m.diff.text))
+	n := len(m.diffLines(m.w))
 	m.diff.top = clampInt(m.diff.top+delta, 0, max0(n-1))
 	return m
+}
+
+func (m Model) diffLines(width int) []string {
+	lines := diffTextLines(m.diff.text)
+	if !m.diff.wrap {
+		return lines
+	}
+	var out []string
+	for _, line := range lines {
+		if line == "" {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, wrapWords(line, maxInt(1, width-1))...)
+	}
+	return out
 }
 
 // RenderDiffOverlay draws a diff sheet at w x h on its own, uncoloured,
