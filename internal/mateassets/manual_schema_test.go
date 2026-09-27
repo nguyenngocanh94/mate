@@ -254,15 +254,29 @@ func TestManualNamesCrewsAfterTheirTask(t *testing.T) {
 	}
 }
 
-// TestManualKeepsEachSupervisionCheckItsOwnCommand pins the rule a live Mate
-// broke on 2026-09-26: it wrapped section 9's check in a 28-round `for`
-// loop over two Crews, and the captain's line sat queued behind it for
-// minutes, because a harness takes the next line only between commands.
-func TestManualKeepsEachSupervisionCheckItsOwnCommand(t *testing.T) {
-	sec := section(t, renderedManual(t), "## 9. Supervision, review and delivery")
-	for _, want := range []string{"Each check is its own command", "never put the check inside a `for` or `while` loop", "only between two of your commands"} {
-		if !strings.Contains(sec, want) {
-			t.Errorf("section 9 does not say %q", want)
+// TestManualNeverHasTheMateWaitForACrew pins docs/mvp.md task 57: the
+// captain expects a Mate never to hold a long turn except to answer them. A
+// live Mate on 2026-09-26 and again on 2026-09-27 polled its Crews inside one
+// turn for nine minutes while the captain's messages sat queued, because the
+// manual taught a `sleep 20; mate state` loop for manual mode.
+func TestManualNeverHasTheMateWaitForACrew(t *testing.T) {
+	text := renderedManual(t)
+	if strings.Contains(text, "sleep 20") {
+		t.Error("the manual still teaches a sleep loop")
+	}
+	sec9 := section(t, text, "## 9. Supervision, review and delivery")
+	if !strings.Contains(sec9, "**You never wait for a Crew.**") {
+		t.Error("section 9 does not open with the rule against waiting")
+	}
+	sec10 := section(t, text, "## 10. Two modes and the sentinel")
+	for _, want := range []string{
+		"### Ending the turn\n",
+		"in either mode, after you spawn a Crew or answer one with `mate send`",
+		"they have typed nothing to you for 5 minutes",
+		"The captain typing to you puts the project in manual mode.",
+	} {
+		if !strings.Contains(sec10, want) {
+			t.Errorf("section 10 does not say %q", want)
 		}
 	}
 }

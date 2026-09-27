@@ -864,4 +864,25 @@ Quyết định:
 | 54 | `internal/panerun`, `mate pane serve`, `host.Layout`/`Close` cho WezTerm và Ghostty, console dựng và đóng cột, Enter hiện agent và file changes. | Unit cho runner (thay tại chỗ, no-op khi trùng, TERM rồi KILL, viewer tách rời, exit, owner mất), host (layout, idempotent, làm lại cột, pane lạ, thu hẹp Ghostty bằng đo), wiring console. Chạy thật trong Ghostty 1.3.1 và WezTerm: ba cột, Enter hiện lỗi herdr ở cột agent và Source Control của repo ở cột file changes, ctrl+c đóng hết cột và viewer. `make check` xanh. Đã xong 2026-09-26. |
 | 55 | Acceptance live với Mate và crew thật: Enter đổi qua lại, cột agent attach đúng agent, cột file changes mở ở crew và đóng ở Mate. | Evidence `docs/evidence/m13-columns-<ngày>.md`. |
 
+### M14. Mate không giữ lượt; mode theo captain
+
+Captain chốt 2026-09-27: Mate không có lượt chạy lâu, trừ khi đang trả lời câu captain hỏi.
+Đo 2026-09-26 và 2026-09-27 (Claude Code, project `hellovietnam`): Mate poll crew trong một lượt bằng vòng `for … sleep 20; mate state`, chín phút, tin của captain nằm trong hàng đợi ("Press up to edit queued messages").
+Manual cũ dạy vòng đó cho manual mode, vì ở manual mode không có gì đánh thức Mate.
+
+Thiết kế: mode theo captain.
+Captain gõ cho Mate thì manual (hook `mate-prompt` xoá `.auto` như trước), tin của crew nằm trong box.
+Mate đã trả lời (dòng Stop trong `sent.log` sau prompt cuối của captain) và captain không gõ gì thêm `store.QuietAfter` (5 phút) thì daemon bật lại `.auto`, ghi `auto mode on: …` vào `sent.log`, và digest đánh thức Mate với những gì còn mở.
+Phím `m` chọn manual thì giữ (`mate/.manual`), daemon không tự bật lại; chọn auto thì bỏ giữ.
+Mate Codex không có hook Stop nên không bao giờ tự bật lại; phím `m` vẫn bật được.
+Daemon xét mỗi `DefaultInterval` (90s), nên auto có thể về muộn tới 90s sau mốc 5 phút.
+
+| Task | Việc | Xong khi |
+| --- | --- | --- |
+| 57 | `autopilot` rearm theo `sent.log` (đọc dần theo offset), `store.SetMode`/`Held`, phím `m` giữ manual; `crew spawn`, `state`, `send` luôn kết thúc bằng dòng `turn:`; manual §4, §7, §9, §10 bỏ vòng poll, Mate kết thúc lượt ở mọi mode. | Unit: im lặng dưới 5 phút không bật, đủ 5 phút bật và digest vào Mate, Mate chưa trả lời không bật, gõ lại thì tính lại, giữ manual không bật, không có Stop không bật; test manual không còn `sleep 20`. `make check` xanh. Đã xong 2026-09-27. |
+| 58 | Acceptance live: Mate giao việc rồi kết thúc lượt, captain hỏi được ngay, 5 phút im lặng thì digest đánh thức Mate. | Evidence `docs/evidence/m14-turns-<ngày>.md`. |
+
+Kèm theo (2026-09-26/27, đã xong): codex-cli 0.157.1 thêm dòng footer thứ hai (`? for shortcuts`, `⚠ 1 warning · f2 to view`) nên mọi `mate send` tới crew Codex rảnh bị từ chối là màn hình lạ; composer Codex giờ tìm theo cấu trúc (dòng `›` cuối, không có hàng menu `N. …` bên dưới), không đếm dòng footer.
+Herdr 0.8.2 từ chối `agent read --source recent-unwrapped` khi Codex đang chạy (`agent_not_idle`); `Herdr.readAgent` đọc lại bằng `--source visible`.
+
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

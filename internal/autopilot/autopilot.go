@@ -43,6 +43,16 @@ type Deps struct {
 	Sleeper Sleeper
 	// Interval is the digest window; zero means DefaultInterval.
 	Interval time.Duration
+	// QuietAfter is how long the captain leaves a finished Mate alone
+	// before auto mode comes back on; zero means DefaultQuietAfter.
+	QuietAfter time.Duration
+}
+
+func (d Deps) quietAfter() time.Duration {
+	if d.QuietAfter > 0 {
+		return d.QuietAfter
+	}
+	return DefaultQuietAfter
 }
 
 func (d Deps) now() time.Time {
@@ -107,6 +117,10 @@ type Pilot struct {
 	ws   *store.Workspace
 	deps Deps
 
+	// talk is each project's sent.log as far as rearm has read it. Only
+	// the ticking goroutine touches it.
+	talk map[string]*talk
+
 	mu     sync.Mutex
 	seen   map[string]bool
 	cancel context.CancelFunc
@@ -116,7 +130,7 @@ type Pilot struct {
 // New builds a daemon over a workspace. It queues nothing until Start or
 // Tick is called.
 func New(ws *store.Workspace, deps Deps) *Pilot {
-	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool)}
+	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool), talk: make(map[string]*talk)}
 }
 
 // Start begins ticking in its own goroutine until Stop or a cancelled
@@ -235,20 +249,31 @@ func (p *Pilot) tickProject(ctx context.Context, project string) error {
 	p.mu.Lock()
 	p.seen[project] = true
 	p.mu.Unlock()
+	now := p.deps.now()
 	if !p.ws.Auto(project) {
-		// Manual. Nothing is queued. A digest still waiting from before
-		// the flag went off is the outbox's to withdraw: it re-reads the
-		// flag before it types, so the captain who took over is not
-		// answered by a machine. The cursor stays on disk, which is what
-		// makes turning auto back on resume rather than replay.
-		return nil
+		rearmed, err := p.rearm(project, now)
+		if err != nil {
+			return err
+		}
+		if !rearmed {
+			// Manual. Nothing is queued. A digest still waiting from
+			// before the flag went off is the outbox's to withdraw: it
+			// re-reads the flag before it types, so the captain who took
+			// over is not answered by a machine. The cursor stays on
+			// disk, which is what makes turning auto back on resume
+			// rather than replay.
+			return nil
+		}
 	}
+	return p.digest(ctx, project, now)
+}
 
+// digest is a tick of a project in auto mode.
+func (p *Pilot) digest(ctx context.Context, project string, now time.Time) error {
 	// The gather runs under the outbox's lock (Offer), because the cursor
 	// it reads is moved by the sender when a digest is marked sent, under
 	// that same lock. Reading it outside could see a digest's items as new
 	// a moment after the sender delivered them.
-	now := p.deps.now()
 	crewsDir := p.ws.CrewsDir(project)
 	_, queued, err := p.deps.Outbox.Offer(project, store.OutboxSourceDigest, func() (outbox.Request, bool, error) {
 		view, err := box.Load(p.ws, project)

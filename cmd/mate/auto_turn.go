@@ -3,44 +3,41 @@ package main
 import (
 	"fmt"
 	"io"
-
-	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// The auto-mode turn-end lines (docs/mvp.md task 31).
+// The turn-end lines (docs/mvp.md tasks 31 and 57).
 //
-// In auto mode the Mate is supposed to act and then end its turn, so that
-// the daemon (internal/autopilot) can wake it with a `digest:` line when a
-// Crew speaks. A Mate that keeps supervising inside one turn holds its own
-// composer Busy, the daemon's verified send is refused every cycle, and auto
-// mode degenerates into a slower manual mode. Measured 2026-09-19 (task 24):
-// the manual said so and the Mate did not comply in either run, because the
-// manual is read once at bootstrap and the tool output is read every time.
+// The Mate is supposed to act and then end its turn, in every mode: a Mate
+// inside a turn holds its own composer shut, so the captain's next line
+// queues behind it (measured 2026-09-26/27, a Mate polling two Crews for nine
+// minutes while the captain's messages waited), and the daemon's digest is
+// refused every cycle. A Crew's news reaches the captain's box at once, and
+// the Mate through a digest once the captain has been quiet for
+// autopilot.DefaultQuietAfter or has chosen auto mode.
 //
-// So the reminder goes where the Mate cannot miss it: as the last line of the
-// three commands it runs at exactly the moments it is tempted to keep going.
-// In manual mode none of them print anything extra, because there polling is
-// the Mate's job (manual section 9).
+// The manual says so and a Mate did not comply (task 24): the manual is read
+// once at bootstrap and the tool output every time. So the reminder is the
+// last line of the three commands a Mate runs at exactly the moments it is
+// tempted to keep going. They start with turnLinePrefix, which is what the
+// manual tells the Mate to look for.
 
-// autoSpawnLine ends `mate crew spawn` in auto mode.
-func autoSpawnLine(crew string) string {
-	return fmt.Sprintf("auto mode: end your turn now; the console will wake you with a digest when %s speaks. Do not poll.", crew)
+// turnLinePrefix starts every turn-end line.
+const turnLinePrefix = "turn: "
+
+// turnSpawnLine ends `mate crew spawn`.
+func turnSpawnLine(crew string) string {
+	return fmt.Sprintf(turnLinePrefix+"end it now; when %s speaks it reaches the captain's box, and you as a digest. Do not poll.", crew)
 }
 
-// autoStateLine ends `mate state` in auto mode.
-const autoStateLine = "auto mode: do not poll; end your turn and wait for the digest."
+// turnStateLine ends `mate state`.
+const turnStateLine = turnLinePrefix + "do not poll; end it and a digest will wake you when a crew needs you."
 
-// autoSendLine ends a Mate's `mate send` in auto mode.
-func autoSendLine(crew string) string {
-	return fmt.Sprintf("auto mode: end your turn; the digest will tell you when %s hands back.", crew)
+// turnSendLine ends a Mate's `mate send`.
+func turnSendLine(crew string) string {
+	return fmt.Sprintf(turnLinePrefix+"end it now; a digest will tell you when %s hands back.", crew)
 }
 
-// printAutoTurnEnd writes line to stdout when project is in auto mode, and
-// nothing otherwise. The flag is read at the moment of printing, not when the
-// command started: `crew spawn` can take minutes, and what the Mate should do
-// next depends on the mode it is in when it reads the output.
-func printAutoTurnEnd(stdout io.Writer, w *store.Workspace, project, line string) {
-	if w.Auto(project) {
-		fmt.Fprintln(stdout, line)
-	}
+// printTurnEnd writes line to stdout.
+func printTurnEnd(stdout io.Writer, line string) {
+	fmt.Fprintln(stdout, line)
 }

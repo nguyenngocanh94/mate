@@ -19,6 +19,7 @@ const (
 	mateDirName       = "mate"
 	mateMetaName      = "mate.meta"
 	autoFlagName      = ".auto"
+	manualHoldName    = ".manual"
 	autoCursorName    = ".auto-cursor"
 	outboxName        = ".outbox"
 	outboxLockName    = ".outbox.lock"
@@ -106,6 +107,13 @@ func (w *Workspace) MateMeta(project string) string {
 // AutoFlag is `projects/<project>/mate/.auto`; its presence means auto mode.
 func (w *Workspace) AutoFlag(project string) string {
 	return filepath.Join(w.MateDir(project), autoFlagName)
+}
+
+// ManualHold is `projects/<project>/mate/.manual`; its presence means the
+// captain chose manual mode with the console's `m` key, so the auto daemon
+// never turns auto mode back on by itself (internal/autopilot, Rearm).
+func (w *Workspace) ManualHold(project string) string {
+	return filepath.Join(w.MateDir(project), manualHoldName)
 }
 
 // AutoCursorFile is `projects/<project>/mate/.auto-cursor`; it records how

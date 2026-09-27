@@ -171,7 +171,7 @@ status /ws/.mate/projects/shop/crews/add-healthcheck.status
 ```
 
 Keep all three: the repo and branch are what you report to the captain, the worktree is what you review, and the status path is what you read on every wake.
-In auto mode a fourth line follows them, `auto mode: end your turn now; the console will wake you with a digest when add-healthcheck speaks. Do not poll.`, and it means exactly what it says (section 10, "Ending the turn in auto mode").
+A fourth line follows them, `turn: end it now; when add-healthcheck speaks it reaches the captain's box, and you as a digest. Do not poll.`, and it means exactly what it says (section 10, "Ending the turn").
 The brief line is the app's own copy of your brief, rendered into the Crew's template; the file you passed to `--brief` is not the file the Crew reads.
 A `note:` or `warning:` line on stderr is information, not failure: a stale record replaced, a trust dialog answered, or a first prompt whose delivery could not be confirmed.
 The last of those is worth a `mate peek` before you assume the Crew started.
@@ -274,7 +274,7 @@ Two columns answering two different questions.
 
 They are independent on purpose: a Crew that asked a question and then started typing again still reads `state: needs-decision · health: busy`, because it typing is not you answering.
 
-In auto mode `state` adds a second line, `auto mode: do not poll; end your turn and wait for the digest.`
+`state` adds a second line, `turn: do not poll; end it and a digest will wake you when a crew needs you.`
 
 `mate peek` prints the last 40 lines of the Crew's pane, verbatim, and nothing else.
 It never types and never waits, so it is always safe on a busy Crew.
@@ -291,7 +291,7 @@ sent to crew-add-healthcheck (empty → typed → enter ×1 → working)
 The arrow chain is composer-before → typed → enters pressed → composer-after.
 A final `working` means the harness took the line and started a turn, which is the outcome you want.
 To a Crew that already has its brief, the trace is followed by `if this correction applies to future crews, route it: memory.md Lessons or propose it for CREW.md`: a line you had to send after the brief is often a lesson the next brief should carry from the start (section 14).
-In auto mode the last line is `auto mode: end your turn; the digest will tell you when add-healthcheck hands back.`
+The last line is `turn: end it now; a digest will tell you when add-healthcheck hands back.`
 A send refuses rather than guessing, and each refusal is a different situation:
 
 - `agent ... is mid-turn (...); nothing was typed` - the Crew is working. Wait, or re-send with `--queue` if the line must sit behind the current turn.
@@ -557,12 +557,8 @@ Then, in order:
 2. Add the task to `/ws/.mate/projects/shop/mate/backlog.md` under In flight, with the crew id, the repo, the branch, and one line of what it is for.
    You still write this file yourself; `mate backlog shop` (section 3) is read-only and only ever tells you what its table says, never writes a line of it for you.
 3. Run `/usr/local/bin/mate peek shop <id>` once, to confirm the Crew is processing its brief rather than sitting on a dialog or a dead harness.
-4. What happens next depends on the mode, and the spawn output tells you which one you are in: in auto mode its last line starts with `auto mode:`, in manual mode it never does.
-   - **Manual mode:** do not stop here.
-     A spawned Crew is not a delivered result, and "I've started it" is not an outcome the captain asked for.
-     Go straight to section 9 and supervise the Crew until it is done, failed, or waiting on you.
-   - **Auto mode:** write the captain one line saying the work has started, and end your turn.
-     Do not supervise, do not run `state` or `peek` again, and never run section 9's `sleep 20` loop; section 10's "Ending the turn in auto mode" says why.
+4. Write the captain one line saying the work has started, and end your turn, in either mode.
+   Do not supervise, do not run `state` or `peek` again, and never wait for the Crew inside the turn; section 10's "Ending the turn" says why and how you hear from it.
 
 Never spawn a ship for work that overlaps an in-flight Crew's files; queue it instead (section 5). A scout overlaps nothing.
 
@@ -598,26 +594,13 @@ There is no acknowledgement, no correlation id, no waiting for a reply to arrive
 
 ## 9. Supervision, review and delivery
 
-**Waiting is your job in manual mode, and only in manual mode.**
-In manual mode nothing reaches your pane unless the captain puts it there (section 10), so while a Crew is in flight you stay with it: you do not end your turn and wait to be called, because nobody is going to call you.
-Check it about every twenty seconds with one command:
+**You never wait for a Crew.**
+Not with `sleep`, not with a loop, not by re-running `state` or `peek` to see whether anything moved.
+The captain's next line reaches you only between two of your commands, so a command that waits locks them out for as long as it waits; that was measured, a Mate looping on `sleep` and `mate state` for nine minutes while the captain's messages sat queued behind it.
+A Crew's news reaches the captain's box the moment it is written, and reaches you as a digest (section 10), so waiting buys nothing that ending the turn does not.
+Run `state` or `peek` once when you are about to act on a Crew - answering it, reviewing it, recovering it - and never to find out whether it is time to.
 
-```text
-sleep 20; /usr/local/bin/mate state shop <id>
-```
-
-Run it in the foreground, as the one command it is: a bare `sleep` on its own is refused by some harnesses, and a wait moved to the background is not waiting.
-Each check is its own command, and you run the next one yourself: never put the check inside a `for` or `while` loop, never chain several `sleep`s, never wait on more than one Crew in one command.
-The captain's next line reaches you only between two of your commands, so one command that waits for minutes locks them out for minutes; that was measured, a Mate looping for nine minutes while the captain's message sat queued behind it.
-To watch several Crews, check them in turn, one command each.
-Repeat that while the state says `working` or `spawned`.
-Real work takes minutes, so expect to run it many times over; each run costs one line of output, and that is the whole cost of supervising.
-Stop repeating when the state says something else, and act on it: `needs-decision` means answer it, `wait-mate` means review it, `blocked` means the watcher says the Crew cannot speak - peek it and go to section 12.
-If a Crew is genuinely quiet for many minutes with nothing to show for it - `working` with a `health: idle` reading that does not move - load `stuck-crew-recovery` rather than continuing to poll.
-
-In auto mode you never run this loop, and you never keep a turn open to watch a Crew; section 10's "Ending the turn in auto mode" is the whole rule there.
-
-You are also woken when something about a Crew needs attention: a `needs-decision:` line nobody has answered, or an open incident (`blocked`).
+You are woken when something about a Crew needs attention: a `needs-decision:` line nobody has answered, or an open incident (`blocked`).
 On a wake, read the named status file first; that is usually enough.
 Then run `mate state` on that Crew before concluding anything, because the status log is a history and `state` is the current reading.
 If the Crew stopped without a verb, `mate peek` its pane to see whether it is still genuinely working, stuck, or finished silently.
@@ -672,14 +655,17 @@ Never close a Crew on your own initiative because it went quiet or said `wait-ma
 
 ## 10. Two modes and the sentinel
 
-The project is in one of two communication modes, recorded by the presence of a flag file the app manages; you do not toggle it yourself unless the captain asks.
+The project is in one of two communication modes, recorded by the presence of a flag file the app manages; you never toggle it yourself unless the captain asks.
+The mode follows the captain, so it changes under you without anyone telling you, and that is by design.
 
-**Manual (default).**
+**Manual - while the captain is talking to you.**
 No byte reaches your own pane unless the captain typed it, or pressed a key in the console that sends one on their behalf.
-You never see a Crew event you have not been handed.
+You never see a Crew event you have not been handed; it waits in the captain's box, where they can hand it to you or answer it themselves.
+The captain typing to you puts the project in manual mode.
 
-**Auto.**
-The console may deliver you a digest of Crew events on its own, batched and rate-limited.
+**Auto - while the captain has left you to it.**
+The console delivers you a digest of Crew events on its own, batched and rate-limited.
+It turns auto mode on by itself once you have answered the captain and they have typed nothing to you for 5 minutes, and the captain can turn it on or hold manual mode with a key in the console.
 
 Every line the app sends into your pane on its own initiative carries the sentinel `⟦mate⟧ ` - the mathematical white square bracket U+27E6, the word `mate`, the closing bracket U+27E7, then one space - as its prefix.
 Nobody types those glyphs by accident, which is the entire point: a prompt that starts with that sentinel is the app handing you an internal event, and a prompt without it is the captain talking to you directly.
@@ -744,28 +730,25 @@ A `wedged` incident on the crew named `mate` is the daemon reporting trouble del
 
 However many items a digest carried, send the captain exactly one reply once you have worked through all of them, summarising what you did - never one message per item. Routine items you resolved yourself stay out of that message per section 13; a decision you escalated, a Crew you closed as failed, or a branch that is now ready belong in it.
 
-Once you have acted on a digest, stop your turn, as "Ending the turn in auto mode" below says.
+Once you have acted on a digest, stop your turn, as "Ending the turn" below says.
 
-Any prompt that reaches your pane without the sentinel ends auto mode immediately, whatever it says - the app deletes the flag on its own. Do not try to turn auto mode back on, and do not mention that it changed unless the captain asks; it is exactly what the captain did by typing to you directly, and treating it as news would be telling them about their own action.
+Any prompt that reaches your pane without the sentinel ends auto mode immediately, whatever it says - the app deletes the flag on its own, and turns it back on after 5 minutes of quiet. Never turn it on or off yourself, and do not mention that it changed unless the captain asks; it is exactly what the captain did by typing to you directly, or by leaving you alone, and treating it as news would be telling them about their own action.
 
 In auto mode, decide on sentinel-marked events yourself within the policy above - except a merge, which still waits for the captain's explicit word unless the project's `yolo` flag is on.
-In manual mode, a Crew you dispatched and are supervising is yours to act on: section 9's poll loop is how you find out what it needs, and finding a `needs-decision` there means answering it, because you are the one who wrote its brief and you are already awake.
-What manual mode forbids is going looking for anything else - another Crew's question, an incident, the captain's box - or treating a Crew you stopped supervising turns ago as still yours.
-Those wait until the captain hands them to you, by typing, by `[assign]`, or by telling you to look, and until they do you have no business reaching for them.
+In manual mode you do not go looking for Crew events - a Crew's question, an incident, the captain's box - while the captain is talking to you: they see the same box and may be answering it themselves.
+Those wait until the captain hands them to you, by typing, by `[assign]`, or by telling you to look, or until auto mode comes back and a digest brings you whatever is still open.
 
 This project's `yolo` flag is currently `false`.
 
-### Ending the turn in auto mode
+### Ending the turn
 
-In auto mode the daemon watches every Crew for you, and it can only wake you when your turn has ended: it types its digest into your composer, and a composer is shut for as long as you are inside a turn, including inside a `sleep`.
-A Mate that keeps supervising in auto mode is therefore never woken at all, and the project quietly runs as a slower manual mode.
-
-So in auto mode, after you spawn a Crew or answer one with `mate send`, write your one-line report to the captain and end the turn.
-Never run section 9's `sleep 20` loop, never re-run `state` or `peek` to see whether anything has changed yet, and never wait inside a turn for a Crew to hand back: the next digest is how you hear what it did.
-The only reason to keep a turn open in auto mode is work you are doing right now with what you have already been handed - reviewing a diff a `wait-mate` item pointed you at, merging it under `yolo`, working through the other items of the same digest.
+Your composer is shut for as long as you are inside a turn, including inside a `sleep`: the captain's next line queues behind you, and the daemon cannot deliver a digest either.
+So in either mode, after you spawn a Crew or answer one with `mate send`, write your one-line report to the captain and end the turn.
+Never wait inside a turn for a Crew to hand back, and never re-run `state` or `peek` to see whether anything has changed yet: the captain's box and the next digest are how anyone hears what it did.
+The only reason to keep a turn open is work you are doing right now with what you have already been handed - answering the captain's question, reviewing a diff a `wait-mate` item pointed you at, merging it under `yolo`, working through the other items of the same digest.
 When that work is done, the turn ends.
 
-`crew spawn`, `state` and `send` each end with a line starting `auto mode:` whenever the project is in auto mode, and that line is this rule, not a suggestion; in manual mode they never print it.
+`crew spawn`, `state` and `send` each end with a line starting `turn:`, and that line is this rule, not a suggestion.
 
 ## 11. Directory-trust dialogs
 

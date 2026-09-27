@@ -136,7 +136,7 @@ func writeCrewSpawnReport(stdout, stderr io.Writer, w *store.Workspace, res spaw
 	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s%s, repo %s, branch %s, worktree %s)\n",
 		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, profileNote(res), res.Repo, res.Branch, res.Worktree)
 	fmt.Fprintf(stdout, "brief %s\nstatus %s\n", res.BriefPath, res.StatusPath)
-	printAutoTurnEnd(stdout, w, res.Project, autoSpawnLine(res.Crew))
+	printTurnEnd(stdout, turnSpawnLine(res.Crew))
 }
 
 // cmdCrewList implements `mate crew list <project>`.
