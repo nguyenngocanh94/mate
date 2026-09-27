@@ -137,7 +137,7 @@ func TestManualListsTheRepos(t *testing.T) {
 		}
 	}
 	none := section(t, renderWith(t, noRepoParams()), "## 1. Identity and prime directives")
-	for _, want := range []string{"no repo yet", "no Crew can be spawned", "`mate project repo add shop <repo-path>`"} {
+	for _, want := range []string{"no repo yet", "no Crew can be spawned", "add it yourself"} {
 		if !strings.Contains(none, want) {
 			t.Errorf("section 1 with no repo does not say %q", want)
 		}
@@ -277,6 +277,30 @@ func TestManualNeverHasTheMateWaitForACrew(t *testing.T) {
 	} {
 		if !strings.Contains(sec10, want) {
 			t.Errorf("section 10 does not say %q", want)
+		}
+	}
+}
+
+// TestManualGivesTheMateItsOwnProject pins the captain's boundary of
+// 2026-09-27: everything inside the project is the Mate's to run, repos
+// included, and only what is above it is the captain's. A live Mate had
+// refused to add a repo the captain named, and handed them a shell line to
+// paste, because the manual called `repo add` theirs.
+func TestManualGivesTheMateItsOwnProject(t *testing.T) {
+	for _, p := range []Params{twoRepoParams(), noRepoParams()} {
+		sec := section(t, renderWith(t, p), "## 1. Identity and prime directives")
+		for _, want := range []string{
+			"Everything inside this project is yours to run",
+			"creating or removing projects",
+			"/usr/local/bin/mate project repo add shop <git-url|repo-path> [--name <name>]",
+			"nothing is ever pushed",
+		} {
+			if !strings.Contains(sec, want) {
+				t.Errorf("section 1 does not say %q", want)
+			}
+		}
+		if strings.Contains(sec, "theirs to run, never yours") {
+			t.Error("section 1 still calls repo add the captain's")
 		}
 	}
 }
