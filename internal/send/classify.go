@@ -2,6 +2,7 @@ package send
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -78,19 +79,13 @@ const (
 	claudeQueuedPlaceholder = "Press up to edit queued messages"
 	// codexComposerGlyph is the glyph Codex draws at its composer.
 	codexComposerGlyph = "›"
-	// codexComposerTailLines is how far from the bottom the Codex composer
-	// may sit, counted in non-empty lines: itself, the model/cwd status
-	// footer, and the line codex-cli 0.157.1 draws under that footer - the
-	// `? for shortcuts` hint and a `⚠ 1 warning · f2 to view` count, either
-	// or both (measured 2026-09-26; 0.154.0 drew no such line, and a live
-	// Mate's every send to an idle Codex crew was refused as an unnamed
-	// screen until this was 3). A `›`-prefixed option inside a dialog sits
-	// further up - the model picker has its sibling options and a hint
-	// below it - which is what keeps it out of Empty; and the one dialog
-	// short enough to fit, the trust dialog, is named before this runs.
-	// Widening the window is fail-closed besides: a dialog option is never
-	// an empty composer, so the worst it can read as is Pending, a refusal.
-	codexComposerTailLines = 3
+	// codexComposerScan is how far up from the bottom the Codex composer
+	// is looked for, in non-empty lines. It bounds the search, not the
+	// footer: Codex puts a status line under its composer, and 0.157.1 a
+	// second one (the `? for shortcuts` hint, a `⚠ 1 warning` count), and
+	// how many it draws there is not something to count on
+	// (locateCodexComposer).
+	codexComposerScan = busyTailLines
 	// busyTailLines bounds the busy scan to the bottom of the snapshot, so
 	// a transcript line that happens to quote a spinner or an interrupt
 	// hint does not make an idle pane look busy forever.
@@ -471,29 +466,59 @@ func isRule(line string) bool {
 	return n >= claudeRuleMin
 }
 
-// locateCodexComposer finds the composer by where it sits: Codex draws no
-// box, but its composer is the last `›` line of the snapshot and only its
-// footer follows it (codexComposerTailLines). A `›` marking an option inside
-// the model picker has its sibling options below it, which puts it outside
-// that window; the trust dialog's two options would fit, which is why
-// ClassifyComposer names that dialog first.
+// locateCodexComposer finds the composer as the last `›` line near the
+// bottom with nothing below it that belongs to a menu.
+//
+// Codex draws no box, and what it draws under the composer is chrome that
+// changes between releases: one status line on 0.154.0, a second hint and
+// warning line on 0.157.1, both measured. Counting those lines is what broke
+// every send to an idle crew on 0.157.1 (2026-09-26), so nothing here
+// depends on what the footer says or how tall it is.
+//
+// What separates the composer from a `›` that marks a menu's highlighted
+// option (the model picker, the trust dialog) is the menu itself: the
+// highlighted option is itself drawn `› N. label`, and its sibling options
+// `N. label`. A `›` line that is one, or has one below it, is not a
+// composer; a person's half-typed `1. do x` is then Unknown rather than
+// Pending, which refuses just the same.
+//
+// It is fail-closed by construction. Empty needs the text after the glyph to
+// be nothing, the measured placeholder, or faint; a menu option, a quoted
+// prompt in the transcript, or anything else a future Codex puts behind a
+// `›` has text, so a misread can only ever be Pending - a refusal - and
+// never a composer mate types into.
 func locateCodexComposer(lines []string) (string, bool) {
 	seen := 0
-	for i := len(lines) - 1; i >= 0; i-- {
+	for i := len(lines) - 1; i >= 0 && seen < codexComposerScan; i-- {
 		trimmed := strings.TrimSpace(lines[i])
 		if trimmed == "" {
 			continue
 		}
 		seen++
-		if seen > codexComposerTailLines {
+		if isCodexMenuOption(trimmed) {
 			return "", false
 		}
 		if rest, ok := strings.CutPrefix(trimmed, codexComposerGlyph); ok {
+			if isCodexMenuOption(strings.TrimSpace(rest)) {
+				// The highlighted row of a menu whose other options are
+				// all above it.
+				return "", false
+			}
 			return rest, true
 		}
 	}
 	return "", false
 }
+
+// isCodexMenuOption reports whether a trimmed line is a sibling option of a
+// Codex menu: `2. Quit`, `3. gpt-5.6-luna   Fast and affordable ...`.
+func isCodexMenuOption(trimmed string) bool {
+	return codexMenuOption.MatchString(trimmed)
+}
+
+// codexMenuOption is a numbered menu row, as every measured Codex menu draws
+// its options: digits, a dot, a space, a label.
+var codexMenuOption = regexp.MustCompile(`^[0-9]+\. \S`)
 
 // claudeBusy is the Claude in-flight signature: the spinner line, or the
 // queued-message placeholder in the composer. Nothing else.

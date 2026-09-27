@@ -466,3 +466,66 @@ func manyLines(n int) string {
 	}
 	return out
 }
+
+// TestClassifyCodexComposerIgnoresFooterHeight is the property the 0.157.1
+// break was missing: whatever chrome a future Codex stacks under its
+// composer, an idle composer is still found, and a menu is still not one.
+// The screens are the measured 0.157.1 capture with lines added under its
+// footer, so everything above the footer is real.
+func TestClassifyCodexComposerIgnoresFooterHeight(t *testing.T) {
+	base := strings.TrimRight(capture(t, "codex_empty_v157"), "\r\n")
+	for extra := 0; extra <= 4; extra++ {
+		screen := base
+		for i := 0; i < extra; i++ {
+			screen += "\n  some future footer line " + strings.Repeat("·", i+1)
+		}
+		got, err := send.ClassifyComposer(harness.KindCodex, screen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.State != send.StateEmpty {
+			t.Fatalf("%d extra footer line(s): state = %q, want empty", extra, got.State)
+		}
+	}
+}
+
+// TestClassifyCodexComposerFailsClosedOnMenus pins the other half: a `›`
+// with menu options below it is never a composer, and a `›` line of any
+// other kind can at worst be read as pending text, which is a refusal.
+func TestClassifyCodexComposerFailsClosedOnMenus(t *testing.T) {
+	tests := []struct {
+		name   string
+		screen string
+		want   send.ComposerState
+	}{
+		{
+			name:   "a two-option menu with its hint",
+			screen: "  Pick one\n\n› 1. Continue\n  2. Stop\n\n  enter confirm · esc back",
+			want:   send.StateUnknown,
+		},
+		{
+			name:   "a menu whose highlighted row is its last option",
+			screen: "  Pick one\n\n  1. Continue\n› 2. Stop\n\n  enter confirm · esc back\n  status line",
+			want:   send.StateUnknown,
+		},
+		{
+			name:   "an unnumbered dialog option",
+			screen: "  Allow this command?\n\n› Yes, run it\n  No, tell Codex what to do\n\n  enter confirm",
+			want:   send.StatePending,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := send.ClassifyComposer(harness.KindCodex, tc.screen)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.State != tc.want {
+				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
+			}
+			if got.State == send.StateEmpty {
+				t.Fatal("a menu was read as an empty composer")
+			}
+		})
+	}
+}
