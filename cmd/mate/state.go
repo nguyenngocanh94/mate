@@ -56,14 +56,14 @@ func cmdState(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// writeStateReport prints the one state line and, in auto mode, the line
+// writeStateReport prints the one state line and then the line
 // telling the Mate not to poll (auto_turn.go). The state line stays the
-// first line whatever the mode, so anything that reads it keeps working.
+// first line, so anything that reads it keeps working.
 func writeStateReport(stdout io.Writer, w *store.Workspace, project, crew string, result crewstate.Result) {
 	fmt.Fprint(stdout, result.Line())
 	fmt.Fprint(stdout, tokensSuffix(w, project, crew))
 	fmt.Fprintln(stdout)
-	printAutoTurnEnd(stdout, w, project, autoStateLine)
+	printTurnEnd(stdout, turnStateLine)
 }
 
 // tokensSuffix is `mate state`'s own addition to crewstate.Result.Line()

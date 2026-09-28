@@ -15,7 +15,10 @@ import (
 // recent-unwrapped --lines 40 --format text` taken on 2026-09-17 against
 // Claude Code 2.1.274 and codex-cli 0.154.0, except the three
 // `claude_startup_splash*` captures, taken on 2026-09-19 against Claude Code
-// 2.1.278 through the Console's own session stream (docs/mvp.md task 24).
+// 2.1.278 through the Console's own session stream (docs/mvp.md task 24), and
+// the `codex_*_v157` captures, taken on 2026-09-26 against codex-cli 0.157.1
+// and Herdr 0.8.2 in a lab session - `codex_busy_visible_v157` with
+// `--source visible`, the read mate falls back to while Codex works.
 func capture(t *testing.T, name string) string {
 	t.Helper()
 	return captureFile(t, name+".txt")
@@ -155,6 +158,54 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			kind:   harness.KindCodex,
 			screen: "codex_modal",
 			want:   send.StateUnknown,
+		},
+		{
+			// codex-cli 0.157.1 draws a second footer line under the
+			// model/cwd one: the shortcuts hint and a warning count. A
+			// live Mate's every send to an idle Codex crew was refused as
+			// an unnamed screen because of it (2026-09-26).
+			name:     "codex 0.157 empty composer above a two-line footer",
+			kind:     harness.KindCodex,
+			screen:   "codex_empty_v157",
+			want:     send.StateEmpty,
+			evidence: "› Ask Codex to do anything",
+		},
+		{
+			// The screen that crew showed: a finished turn, its time and a
+			// tip above the composer.
+			name:     "codex 0.157 composer after a finished turn",
+			kind:     harness.KindCodex,
+			screen:   "codex_after_turn_v157",
+			want:     send.StateEmpty,
+			evidence: "› Ask Codex to do anything",
+		},
+		{
+			// Its two options and hint fit inside the composer window, so
+			// only naming the dialog first keeps it from reading as a
+			// composer holding "1. Trust and continue".
+			name:     "codex 0.157 trust dialog is not a composer",
+			kind:     harness.KindCodex,
+			screen:   "codex_trust_dialog_v157",
+			want:     send.StateUnknown,
+			evidence: "harness directory-trust dialog",
+		},
+		{
+			// Typing drops the hint and keeps the warning on that line.
+			name:     "codex 0.157 composer holding a half typed line",
+			kind:     harness.KindCodex,
+			screen:   "codex_pending_v157",
+			want:     send.StatePending,
+			pending:  "half typed",
+			evidence: "› half typed",
+		},
+		{
+			// herdr refuses a recent-unwrapped read of a working Codex, so
+			// this one is the `--source visible` read mate falls back to.
+			name:     "codex 0.157 mid turn, read from the visible screen",
+			kind:     harness.KindCodex,
+			screen:   "codex_busy_visible_v157",
+			want:     send.StateBusy,
+			evidence: "• Working (5s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to c…",
 		},
 		{
 			// A slash command typed but not yet submitted is the caller's
@@ -414,4 +465,67 @@ func manyLines(n int) string {
 		out += "filler\n"
 	}
 	return out
+}
+
+// TestClassifyCodexComposerIgnoresFooterHeight is the property the 0.157.1
+// break was missing: whatever chrome a future Codex stacks under its
+// composer, an idle composer is still found, and a menu is still not one.
+// The screens are the measured 0.157.1 capture with lines added under its
+// footer, so everything above the footer is real.
+func TestClassifyCodexComposerIgnoresFooterHeight(t *testing.T) {
+	base := strings.TrimRight(capture(t, "codex_empty_v157"), "\r\n")
+	for extra := 0; extra <= 4; extra++ {
+		screen := base
+		for i := 0; i < extra; i++ {
+			screen += "\n  some future footer line " + strings.Repeat("·", i+1)
+		}
+		got, err := send.ClassifyComposer(harness.KindCodex, screen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.State != send.StateEmpty {
+			t.Fatalf("%d extra footer line(s): state = %q, want empty", extra, got.State)
+		}
+	}
+}
+
+// TestClassifyCodexComposerFailsClosedOnMenus pins the other half: a `›`
+// with menu options below it is never a composer, and a `›` line of any
+// other kind can at worst be read as pending text, which is a refusal.
+func TestClassifyCodexComposerFailsClosedOnMenus(t *testing.T) {
+	tests := []struct {
+		name   string
+		screen string
+		want   send.ComposerState
+	}{
+		{
+			name:   "a two-option menu with its hint",
+			screen: "  Pick one\n\n› 1. Continue\n  2. Stop\n\n  enter confirm · esc back",
+			want:   send.StateUnknown,
+		},
+		{
+			name:   "a menu whose highlighted row is its last option",
+			screen: "  Pick one\n\n  1. Continue\n› 2. Stop\n\n  enter confirm · esc back\n  status line",
+			want:   send.StateUnknown,
+		},
+		{
+			name:   "an unnumbered dialog option",
+			screen: "  Allow this command?\n\n› Yes, run it\n  No, tell Codex what to do\n\n  enter confirm",
+			want:   send.StatePending,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := send.ClassifyComposer(harness.KindCodex, tc.screen)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.State != tc.want {
+				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
+			}
+			if got.State == send.StateEmpty {
+				t.Fatal("a menu was read as an empty composer")
+			}
+		})
+	}
 }

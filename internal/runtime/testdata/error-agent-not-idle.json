@@ -1,0 +1,1 @@
+{"error":{"code":"agent_not_idle","message":"cannot read 40 lines while w1:p1 is working: its alternate-screen history can only be captured by scrolling while idle. Wait and retry, or use --source visible"},"id":"cli:agent:read"}

@@ -1,0 +1,40 @@
+---
+name: crew-spawn
+description: Read before spawning a Crew.
+---
+
+## 7. Spawn
+
+You yourself run on the `claude-code` harness; that has no bearing on which harness a Crew runs.
+
+**Choose the profile first.** Load the `crew-dispatch` skill and run `/usr/local/bin/mate crew dispatch` before every spawn.
+It prints the table in force, the captain's own or the built-in one, and the skill says how a task is matched to a rule and which of the rule's profiles to pass.
+The captain's own words for this task ("use opus", "keep it cheap") beat the table; the table beats your own preference.
+Never pick `max` effort unless the captain asked for it.
+Spawn one Crew per task, and one Crew per repo:
+
+```text
+/usr/local/bin/mate crew spawn shop <id> --repo <repo> --brief /ws/.mate/projects/shop/mate/briefs/<id>.md [<profile flags>] --task "<one line>"
+/usr/local/bin/mate crew spawn shop <id> --repo <repo> --brief /ws/.mate/projects/shop/mate/briefs/<id>.md --scout [<profile flags>] --task "<one line>"
+```
+
+The first form spawns a ship; the second, with `--scout`, a scout, whose brief must carry a `## Deliverable` (section 4).
+`--repo <repo>` names the one repo the Crew works in, from section 1's list or `mate project repo list shop`: required when the project has two or more repos, and optional with one, where it defaults to that one; pass it anyway, so the record says which.
+With no repo at all there is nothing to spawn into: tell the captain, ask them to add the repo (section 1), and keep the task under Queued in `/ws/.mate/projects/shop/mate/backlog.md` until they have.
+A request split across repos (section 5) is one spawn per repo, each with its own id, brief and `--repo`.
+When one depends on the other, spawn the one it depends on and queue the other with `blocked-by: <id>` until that branch has landed; otherwise spawn both in the same turn.
+
+That command creates a worktree, launches a harness and answers its trust dialog, so it regularly takes a minute or more.
+If whatever runs it for you asks for a timeout, give it at least five minutes; do not kill it and retry, because a half-finished spawn leaves a record you then have to clean up.
+
+Then, in order:
+
+1. Record the three printed lines - repo, branch, worktree, status path - where you can find them again.
+2. Add the task to `/ws/.mate/projects/shop/mate/backlog.md` under In flight, with the crew id, the repo, the branch, and one line of what it is for.
+   You still write this file yourself; `mate backlog shop` (section 3) is read-only and only ever tells you what its table says, never writes a line of it for you.
+3. Run `/usr/local/bin/mate peek shop <id>` once, to confirm the Crew is processing its brief rather than sitting on a dialog or a dead harness.
+4. Write the captain one line saying the work has started, and end your turn, in either mode.
+   Do not supervise, do not run `state` or `peek` again, and never wait for the Crew inside the turn; section 10's "Ending the turn" says why and how you hear from it.
+
+Never spawn a ship for work that overlaps an in-flight Crew's files; queue it instead (section 5). A scout overlaps nothing.
+

@@ -63,18 +63,21 @@ func cmdUsage(args []string, stdout, stderr io.Writer) error {
 // ledgerRow is one line of the ledger table: the Mate's own row, built by
 // mateLedgerRow, or one task's row of `v_task_ledger`.
 type ledgerRow struct {
-	ID       string
-	State    string
-	Turns    int64
-	In       int64
-	Cached   int64
-	Out      int64
-	Total    int64
-	Cost     sql.NullFloat64
-	CtxPct   sql.NullFloat64
-	Asked    int64
-	WaitedMs int64
-	Span     string
+	ID         string
+	State      string
+	Turns      int64
+	In         int64
+	Cached     int64
+	CacheRead  int64
+	CacheWrite int64
+	Context    sql.NullInt64
+	Out        int64
+	Total      int64
+	Cost       sql.NullFloat64
+	CtxPct     sql.NullFloat64
+	Asked      int64
+	WaitedMs   int64
+	Span       string
 }
 
 // printLedger is the no-crew form: the Mate's row first (mvp.md M5 task
@@ -97,7 +100,7 @@ func printLedger(ctx context.Context, handle *db.DB, w *store.Workspace, stdout 
 
 	dbRows, err := handle.SQL().QueryContext(ctx, `
 		SELECT crew, turns, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens,
-		       cost, context_pct, question_count, waited_ms, spawned_at, closed_at
+		       cost, context_pct, context_tokens_last, question_count, waited_ms, spawned_at, closed_at
 		  FROM v_task_ledger WHERE project = ? ORDER BY spawned_at`, project)
 	if err != nil {
 		return err
@@ -107,15 +110,16 @@ func printLedger(ctx context.Context, handle *db.DB, w *store.Workspace, stdout 
 		var crew string
 		var turns, in, cacheRead, cacheWrite, out, asked, waited int64
 		var cost, ctxPct sql.NullFloat64
+		var ctxTokens sql.NullInt64
 		var spawnedAt, closedAt sql.NullString
 		if err := dbRows.Scan(&crew, &turns, &in, &cacheRead, &cacheWrite, &out,
-			&cost, &ctxPct, &asked, &waited, &spawnedAt, &closedAt); err != nil {
+			&cost, &ctxPct, &ctxTokens, &asked, &waited, &spawnedAt, &closedAt); err != nil {
 			return err
 		}
 		rows = append(rows, ledgerRow{
 			ID: crew, State: stateByID[crew], Turns: turns,
 			In: in, Cached: cacheRead + cacheWrite, Out: out, Total: in + cacheRead + cacheWrite + out,
-			Cost: cost, CtxPct: ctxPct, Asked: asked, WaitedMs: waited,
+			Cost: cost, CtxPct: ctxPct, Context: ctxTokens, CacheRead: cacheRead, CacheWrite: cacheWrite, Asked: asked, WaitedMs: waited,
 			Span: spanWord(spawnedAt, closedAt),
 		})
 	}
@@ -146,6 +150,7 @@ func mateLedgerRow(ctx context.Context, handle *db.DB, project string) (ledgerRo
 		return row, err
 	}
 	row.Cached = cacheRead + cacheWrite
+	row.CacheRead, row.CacheWrite = cacheRead, cacheWrite
 	row.Total = row.In + row.Cached + row.Out
 
 	if err := handle.SQL().QueryRowContext(ctx, `
@@ -161,14 +166,15 @@ func mateLedgerRow(ctx context.Context, handle *db.DB, project string) (ledgerRo
 		return row, err
 	}
 
-	if err := handle.SQL().QueryRowContext(ctx, `
-		SELECT CASE WHEN p.context_window > 0 THEN 100.0 * u.context_tokens_after / p.context_window ELSE NULL END
-		  FROM turn u JOIN pricing p ON p.model = u.model
-		 WHERE u.actor_id = ?
-		 ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1`, actorID).
-		Scan(&row.CtxPct); err != nil && err != sql.ErrNoRows {
+	if usage, ok, err := handle.LatestContext(ctx, actorID, ""); err != nil {
 		return row, err
+	} else if ok {
+		row.Context = sql.NullInt64{Int64: usage.Tokens, Valid: true}
+		if usage.Pct != nil {
+			row.CtxPct = sql.NullFloat64{Float64: *usage.Pct, Valid: true}
+		}
 	}
+
 	return row, nil
 }
 
@@ -189,16 +195,16 @@ func spanWord(spawnedAt, closedAt sql.NullString) string {
 // (query.HumanizeTokens, query.HumanizeCost), with a totals footer.
 func printLedgerTable(stdout io.Writer, rows []ledgerRow) {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tSTATE\tTURNS\tIN\tCACHED\tOUT\tTOTAL\tCOST\tCTX%\tASKED\tWAITED\tSPAWN→CLOSE")
+	fmt.Fprintln(tw, "ID\tSTATE\tTURNS\tIN\tCACHE-READ\tCACHE-WRITE\tOUT\tTOTAL\tCOST\tCTX\tCTX%\tASKED\tWAITED\tSPAWN→CLOSE")
 
 	var totalTurns, totalIn, totalCached, totalOut, totalTotal, totalAsked, totalWaited int64
 	var totalCost float64
 	haveCost := false
 	for _, r := range rows {
-		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 			r.ID, dashIfEmpty(r.State), r.Turns,
-			query.HumanizeTokens(r.In), query.HumanizeTokens(r.Cached), query.HumanizeTokens(r.Out), query.HumanizeTokens(r.Total),
-			costWord(r.Cost), ctxWord(r.CtxPct), r.Asked, waitedWord(r.WaitedMs), r.Span)
+			query.HumanizeTokens(r.In), query.HumanizeTokens(r.CacheRead), query.HumanizeTokens(r.CacheWrite), query.HumanizeTokens(r.Out), query.HumanizeTokens(r.Total),
+			costWord(r.Cost), contextWord(r.Context), ctxWord(r.CtxPct), r.Asked, waitedWord(r.WaitedMs), r.Span)
 		totalTurns += r.Turns
 		totalIn += r.In
 		totalCached += r.Cached
@@ -294,4 +300,12 @@ func printCrewTurns(ctx context.Context, handle *db.DB, stdout io.Writer, projec
 		fmt.Fprintf(stdout, "no turns recorded for %s\n", crew)
 	}
 	return nil
+}
+
+// contextWord keeps missing usage distinct from a measured zero.
+func contextWord(v sql.NullInt64) string {
+	if !v.Valid {
+		return "?"
+	}
+	return query.HumanizeTokens(v.Int64)
 }

@@ -110,6 +110,9 @@ func TestProjectTasksEqualTheTaskLedger(t *testing.T) {
 	if tools == 0 {
 		t.Error("the fixture crew ran tools; a ledger reporting none is not reading them")
 	}
+	if task.Harness != "codex" {
+		t.Errorf("harness = %q, want the crew's actor.harness codex", task.Harness)
+	}
 
 	// The Mate's block is computed from `turn` because no task row exists
 	// for a Mate - the same reason cmd/mate's mateLedgerRow exists.
@@ -195,6 +198,61 @@ func TestTaskPageCarriesTurnsStatusLinesAndAnsweredQuestions(t *testing.T) {
 
 	if got.Branch.Name != fixtureBranch || !got.Branch.Exists {
 		t.Errorf("branch = %+v, want %s, present", got.Branch, fixtureBranch)
+	}
+}
+
+func TestMatePageGroupsModelCallsIntoPromptExchanges(t *testing.T) {
+	f := newFixture(t)
+	var got MateResponse
+	f.get(t, "/api/projects/"+fixtureProject+"/mate", http.StatusOK, &got)
+	var want int64
+	if err := f.read.SQL().QueryRow(`SELECT COUNT(*) FROM (
+		SELECT session_id,harness_turn_ref FROM turn WHERE actor_id=?
+		GROUP BY session_id,harness_turn_ref)`, timeline.MateActorID(fixtureProject)).Scan(&want); err != nil {
+		t.Fatal(err)
+	}
+	if int64(len(got.Exchanges)) < want || want == 0 {
+		t.Fatalf("mate page has %d exchanges, database has %d prompt ids", len(got.Exchanges), want)
+	}
+	var calls int64
+	var request, reply, crewQuestion, crewAnswer bool
+	for i, exchange := range got.Exchanges {
+		calls += exchange.ModelCalls
+		if i > 0 && got.Exchanges[i-1].StartedAt > exchange.StartedAt {
+			t.Errorf("exchanges are out of order at %d", i)
+		}
+		if strings.Contains(exchange.Prompt, "Add a Buy button") && exchange.Source == "captain" {
+			request = true
+			if exchange.ModelCalls != 0 || exchange.Response != "" {
+				t.Errorf("unmatched captain request should remain visible without invented work: %+v", exchange)
+			}
+		}
+		if strings.Contains(exchange.Response, "buybtn is ready") {
+			reply = true
+		}
+		if exchange.Source == "crew" && strings.Contains(exchange.Prompt, "checkout page URL") {
+			crewQuestion = true
+			for _, activity := range exchange.Activities {
+				if activity.Kind == "crew.answer" && activity.Crew == fixtureCrew &&
+					strings.Contains(activity.Text, "pages/checkout-express.html") {
+					crewAnswer = true
+				}
+			}
+		}
+	}
+	if calls != got.Mate.Turns {
+		t.Errorf("exchanges contain %d model calls, Mate ledger says %d", calls, got.Mate.Turns)
+	}
+	if !request || !reply || !crewQuestion || !crewAnswer {
+		t.Errorf("Mate exchanges lost input, reply or crew answer: request=%t reply=%t question=%t answer=%t",
+			request, reply, crewQuestion, crewAnswer)
+	}
+}
+
+func TestCrewDigestShowsTheQuestionWithoutTransportInstructions(t *testing.T) {
+	got := readablePrompt(`digest: 1 item(s) — ios16 needs-decision: "Debug or Release?" — status files under /tmp/work/crews; act per AGENTS.md section 10`)
+	if got != `ios16 asks: "Debug or Release?"` {
+		t.Errorf("readablePrompt = %q", got)
 	}
 }
 
@@ -352,6 +410,7 @@ func TestAnUnknownProjectOrCrewIs404WithAReason(t *testing.T) {
 	f := newFixture(t)
 	for _, path := range []string{
 		"/api/projects/nosuch",
+		"/api/projects/nosuch/mate",
 		"/api/projects/nosuch/tasks/buybtn",
 		"/api/projects/" + fixtureProject + "/tasks/nosuch",
 		"/api/projects/" + fixtureProject + "/tasks/nosuch/diff",
@@ -479,4 +538,40 @@ func (f *fixture) inboxLen(t *testing.T) int {
 		t.Fatalf("the fixture's box must read: %s", reason)
 	}
 	return len(items)
+}
+
+func TestContextSurvivesUnknownPricingAndClearsOnFreshSession(t *testing.T) {
+	f := newFixture(t)
+	writer, err := db.Open(f.ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+	if _, err := writer.SQL().Exec(`DELETE FROM pricing`); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := f.server.sceneRows(context.Background(), fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := timeline.MateActorID(fixtureProject)
+	row := rows[id]
+	if row.ContextTokens == nil || *row.ContextTokens <= 0 || row.ContextPct != nil {
+		t.Fatalf("unpriced context: %+v", row)
+	}
+	meta, err := f.ws.ReadMateMeta(fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta["session_id"] = "fresh-session-without-usage"
+	if err := f.ws.WriteMateMeta(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = f.server.sceneRows(context.Background(), fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows[id].ContextTokens != nil || rows[id].ContextPct != nil {
+		t.Fatalf("borrowed old context: %+v", rows[id])
+	}
 }

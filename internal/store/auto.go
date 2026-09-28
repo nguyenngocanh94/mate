@@ -7,7 +7,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// QuietAfter is how long the captain has to leave a Mate that has answered
+// them alone before the auto daemon turns auto mode back on (docs/mvp.md
+// task 57). It lives here, beside the flags it governs, so the daemon
+// (internal/autopilot) and the Mate's manual (internal/mateassets) quote the
+// same number.
+const QuietAfter = 5 * time.Minute
 
 // The auto daemon's digest cursor (docs/mvp.md section 5, task 19): how far
 // into each of a project's append-only files the daemon has already

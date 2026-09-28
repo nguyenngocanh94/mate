@@ -128,7 +128,10 @@ func mergeRefusal(code observability.Code, msg string) error {
 // landed, and writes `state=finished`. A teardown that fails after the merge
 // succeeded is reported as exactly that: the merge is not undone, and the
 // caller is told the crew is still open.
-func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew, caller string) (MergeResult, error) {
+// ReviewedCommit optionally pins a merge to the independently reviewed revision.
+type ReviewedCommit struct{ Head, Base string }
+
+func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew, caller string, reviewed ...ReviewedCommit) (MergeResult, error) {
 	if w == nil {
 		return MergeResult{}, errUsage("spawn: a workspace is required")
 	}
@@ -267,7 +270,19 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		return MergeResult{}, err
 	}
 	out.Before = before
-	if err := git.MergeFFOnly(ctx, repo, out.Branch); err != nil {
+	mergeTarget := out.Branch
+	if len(reviewed) > 0 {
+		tip, err := git.HeadCommit(ctx, repo, out.Branch)
+		if err != nil {
+			return MergeResult{}, err
+		}
+		if reviewed[0].Head == "" || tip != reviewed[0].Head || before != reviewed[0].Base {
+			return MergeResult{}, mergeRefusal(observability.CodeStateConflict, "review is stale; branch or base changed")
+		}
+		// Merge the object reviewed, even if the branch advances during git.
+		mergeTarget = reviewed[0].Head
+	}
+	if err := git.MergeFFOnly(ctx, repo, mergeTarget); err != nil {
 		return MergeResult{}, err
 	}
 	after, err := git.HeadCommit(ctx, repo, repoCfg.DefaultBranch)

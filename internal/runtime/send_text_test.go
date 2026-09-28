@@ -42,8 +42,8 @@ func TestHerdrSendTextResolvesThePaneLiveBeforeTyping(t *testing.T) {
 		t.Fatalf("herdr calls = %d, want the resolve and the send: %#v", len(argvs), argvs)
 	}
 	got := strings.Join(argvs[1], " ")
-	if !strings.Contains(got, "pane send-text w9:p9 say PONG") {
-		t.Fatalf("argv = %q, want the literal text sent to the live pane", got)
+	if !strings.Contains(got, "pane send-text w9:p9 \x1b[200~say PONG\x1b[201~") {
+		t.Fatalf("argv = %q, want bracketed paste sent to the live pane", got)
 	}
 	if strings.Contains(got, "enter") || strings.Contains(got, "send-keys") {
 		t.Fatalf("send-text submitted the line: %q", got)
@@ -76,7 +76,7 @@ func TestHerdrSendTextRefusesTextThatIsNotOneLine(t *testing.T) {
 		return process.Result{}, nil
 	}})
 	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab"}, Name: "mate-shop"}
-	for _, text := range []string{"", "two\nlines", "carriage\rreturn", "bell\a"} {
+	for _, text := range []string{"", "two\nlines", "carriage\rreturn", "bell\a", "escape\x1b[201~"} {
 		err := rt.SendText(context.Background(), h, text)
 		var coded *observability.Error
 		if !errors.As(err, &coded) || coded.Code != observability.CodeUsage {

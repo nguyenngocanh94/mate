@@ -552,7 +552,7 @@ func (f *Fake) SendKeys(_ context.Context, handle AgentHandle, keys []string) er
 func (f *Fake) SendText(_ context.Context, handle AgentHandle, text string) error {
 	f.mu.Lock()
 	f.record("SendText")
-	if err := checkSendText(text); err != nil {
+	if err := ValidateSendText(text); err != nil {
 		f.mu.Unlock()
 		return err
 	}

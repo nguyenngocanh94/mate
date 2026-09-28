@@ -39,6 +39,27 @@ func (p *pass) ingestTranscripts(ctx context.Context) error {
 			return err
 		}
 	}
+	archives, err := p.ing.ws.MateSessionArchives(p.project)
+	if err != nil {
+		return err
+	}
+	current := p.mate.Meta
+	for _, meta := range archives {
+		if meta[MetaSessionID] == current[MetaSessionID] && meta["finalized"] != "true" {
+			continue
+		}
+		p.mate.Meta = meta
+		loc, reason := p.locateMate()
+		p.mate.Meta = current
+		loc.Finalized = meta["finalized"] == "true" && loc.Path == meta[MetaTranscript] && loc.Source == LocatorMeta
+		if reason != "" {
+			p.unresolved(p.mate.ActorID, string(loc.Kind), reason)
+			continue
+		}
+		if err := p.ingestOneTranscript(ctx, loc); err != nil {
+			return err
+		}
+	}
 	for _, crew := range p.crews {
 		loc, reason := p.locateCrew(ctx, crew)
 		if reason != "" {
@@ -53,7 +74,11 @@ func (p *pass) ingestTranscripts(ctx context.Context) error {
 }
 
 func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
-	data, err := os.ReadFile(loc.Path)
+	if loc.Kind != harness.KindCodex && loc.Kind != harness.KindClaude {
+		p.unresolved(loc.ActorID, string(loc.Kind), unresolvedNoHarness)
+		return nil
+	}
+	tb, err := p.ing.cachedTranscript(loc)
 	if err != nil {
 		if os.IsNotExist(err) {
 			p.unresolved(loc.ActorID, string(loc.Kind), unresolvedNoFile)
@@ -61,15 +86,6 @@ func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
 		}
 		return err
 	}
-	parser, err := transcriptParser(loc.Kind)
-	if err != nil {
-		p.unresolved(loc.ActorID, string(loc.Kind), unresolvedNoHarness)
-		return nil
-	}
-	// A zero state and the whole file: the parser is pure over the bytes it
-	// is handed, so this is the same parse a resume would have produced with
-	// a correctly carried state, without the risk of carrying one wrongly.
-	tb := parser.ParseTranscript(harness.TranscriptParseState{}, data)
 
 	sessionID := loc.SessionID
 	if sessionID == "" {
@@ -79,7 +95,26 @@ func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
 	p.b.session(pendingSession{
 		ID: rowID, ActorID: loc.ActorID, HarnessSession: loc.SessionID, TranscriptPath: loc.Path,
 	})
+	unchanged, err := p.transcriptPreviouslyRecorded(ctx, loc, tb)
+	if err != nil {
+		return err
+	}
+	since, err := p.legacyTranscriptOffset(ctx, loc)
+	if err != nil {
+		return err
+	}
 	p.b.cursor(loc.Path, tb.ConsumedBytes)
+	if err := p.ingestTelemetry(ctx, loc, rowID, tb); err != nil {
+		return err
+	}
+	if unchanged {
+		results := resultsByCall(tb)
+		for _, call := range tb.ToolCalls {
+			p.rememberToolCommand(loc, call, results)
+		}
+		return nil
+	}
+	mark := transcriptFactMark{len(p.b.turns), len(p.b.actions), len(p.b.events), len(p.b.usage)}
 
 	switch loc.Kind {
 	case harness.KindClaude:
@@ -88,6 +123,7 @@ func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
 		p.codexTurns(loc, rowID, tb)
 	}
 	p.compactions(loc, rowID, tb)
+	p.filterTranscriptFacts(loc, rowID, tb, since, mark)
 	return nil
 }
 
@@ -334,6 +370,9 @@ func (m codexMarks) taskCompleteAt(offset int64) (codexMark, bool) {
 func scanCodexMarks(tb harness.TranscriptBatch) codexMarks {
 	marks := codexMarks{taskComplete: map[int64]codexMark{}, lastTokenUsage: map[int64]int64{}}
 	for _, rec := range tb.Records {
+		if !strings.Contains(rec.RawJSON, `"task_started"`) && !strings.Contains(rec.RawJSON, `"task_complete"`) && !strings.Contains(rec.RawJSON, `"token_count"`) {
+			continue
+		}
 		var env struct {
 			Type    string `json:"type"`
 			Payload struct {
@@ -446,6 +485,11 @@ func (p *pass) toolAction(loc Located, sessionRow, turnID string,
 		})
 	}
 	p.b.action(action)
+	p.rememberToolCommand(loc, call, results)
+}
+
+func (p *pass) rememberToolCommand(loc Located, call harness.TranscriptToolCall, results map[string]harness.TranscriptToolResult) {
+	_, summary, class := toolTarget(loc.Kind, call)
 
 	// A crew's status lines have no timestamp of their own; the shell command
 	// that wrote one does. Every shell command a crew ran is remembered here
@@ -499,6 +543,9 @@ func commitSha(command, output string) (string, bool) {
 // marker is the only thing that distinguishes them.
 func (p *pass) compactions(loc Located, sessionRow string, tb harness.TranscriptBatch) {
 	for _, rec := range tb.Records {
+		if !strings.Contains(rec.RawJSON, `"compacted"`) && !strings.Contains(rec.RawJSON, `"compact_boundary"`) && !strings.Contains(rec.RawJSON, `"isCompactSummary"`) {
+			continue
+		}
 		var probe struct {
 			Type             string          `json:"type"`
 			Subtype          string          `json:"subtype"`

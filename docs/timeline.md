@@ -1,6 +1,6 @@
 # Timeline
 
-Schema version: **2**.
+Schema version: **3**.
 
 This is the contract of `.mate/mate.db` and of `internal/timeline`.
 The database is derived: every row here is read out of `crews/<id>.status`, `sent.log`, `incidents.log`, the `.meta` files, the harness transcripts or git, and `mate reindex <workspace>` rebuilds all of it from those sources.
@@ -19,6 +19,68 @@ It exists because a transcript's trailing message group may still grow, so the i
 
 `turn.harness_turn_ref` carries the harness's own larger unit - Claude's `promptId`, Codex's `task_started` turn id - beside the per-call turn.
 A turn row is one model call in both harnesses; the harness turn is one prompt and everything it caused, and it is what groups a crew's calls into "the work the Mate's answer set off".
+
+`telemetry_cursor` stores the native observer adapter's byte offset and JSON
+correlation state in the same transaction as its facts. It also records the
+actor/session, source size/mtime, last observer heartbeat, and parser error.
+`mate reindex` clears this table along with the derived facts. A prefix hash in
+the state detects source replacement (including a larger replacement); a
+replacement or truncation emits a visible gap instead of silently treating the
+remaining bytes as an append.
+
+Unchanged transcripts reuse a normalized parser cache; growing Codex sources
+append a parsed tail using the adapter's cumulative-usage and prompt state.
+Committed file metadata
+and the ledger cursor allow ingest to skip rewriting historical turns/actions;
+status timestamps and commit sightings are still reconstructed from the cached
+commands. A restart can rebuild the cache without duplicating facts. Native
+Codex telemetry tails only complete appended JSONL records; partial or malformed
+lines keep their byte position for a later pass. Late results retain their
+wrapper/process correlations across restarts.
+
+### Crew diagnostic evidence
+
+Events named `telemetry.*` carry the versioned `internal/telemetry.Fact` shape:
+session and prompt identity where observed, source byte reference, occurrence
+and observation times, and whether a measurement came from native records or
+the normalized fallback. They are diagnostic evidence and are excluded from
+the coordination story and scene; `StoryQuery.IncludeTelemetry` exposes them
+in the raw story when explicitly requested.
+
+Kinds include `prompt`, `turn_started`, `turn_completed`, `response`,
+`execution`, `tool_call`, `tool_result`, `progress`, `context`, `activity`,
+`capability`, and `gap`. `telemetry.profile` contains the source launch profile
+from `store.HarnessProfile`, including archived launch snapshots. It records
+configured documents, while `context`/`instruction_input` records instruction
+bytes/hash actually observed in the transcript. Neither is an exact token
+measurement of an individual file. Private reasoning text is never copied.
+
+Native Codex responses retain response IDs and cache-separated usage. A later
+`token_count` with the identical cumulative counters adds an alias observation
+with `ledger_ref_offset`; consumers collapse observations by response ID and
+prefer the linked one. **`turn` remains the only additive token ledger.**
+Summing response evidence alongside it would double-count. Unmatched response
+evidence remains visible; pending alias state is bounded with an explicit gap.
+
+Native command observations preserve execution/process IDs, command/cwd,
+known start/end/duration, status and nullable exit code. Wrapper success never
+overrides a failed native command. Polls are linked only when a literal process
+ID is recoverable; nested structured command output supplies exact new-output
+bytes. Unknown output progress, truncation, timestamps, wrapper ancestry and
+child usage remain unknown. Output hashes and bounded excerpts provide evidence
+without copying a second full transcript. Claude uses existing normalized
+response/tool facts and explicitly reports unavailable native process/timing
+coverage.
+
+Read-only-source measurement on 2026-09-28: a real workspace with 35 located
+transcripts (about 191 MB when first measured) ingested into an isolated database
+in 6.25 seconds with a cold parser cache and 1.73 seconds on the next pass while
+sources were still growing. This measures observer ingest, not harness latency.
+The native extractor separately consumed a 9.5 MB Crew rollout in 404 ms and
+recovered all 363 response aliases, 162 commands including 10 failures, 153 polls
+with measured new-output bytes, and 42 file changes. These are local measurements,
+not a universal overhead bound. The turn-event index in schema 3 prevents the
+causality projection from scanning all native evidence once per model call.
 
 ## 2. Locator rules
 

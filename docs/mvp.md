@@ -91,9 +91,16 @@ Học từ firstmate, giữ đúng bốn cơ chế và không thêm:
 | Chiều | Cơ chế |
 | --- | --- |
 | Crew → Mate | `echo "state: một dòng" >> $MATE_STATUS`. Ba verb crew được dùng: `working`, `needs-decision`, `wait-mate` (mục 4b). Báo thưa. Nội dung dài nằm trong file, status là con trỏ. |
-| Mate → Crew | `mate send <crew> "một dòng"` gõ vào pane crew, kiểm chứng composer trống trước, retry Enter cho tới khi composer trống. Dài hơn thì ghi file và trỏ crew đọc. |
+| Mate → Crew | `mate send <crew> "một dòng"` paste vào pane crew với bracketed paste, kiểm chứng composer trống trước, retry Enter có kiểm tra toàn bộ bản nháp. Dài hơn thì ghi file và trỏ crew đọc. |
 | Đọc crew | `mate peek <crew>` đọc 40 dòng cuối pane. `mate state <crew>` trả một dòng state deterministic từ busy regex của pane và dòng status cuối. |
 | Đánh thức Mate | Observer trong console theo dõi status file, hash pane, busy regex, inventory Herdr. Chỉ đánh dấu là đáng chú ý khi có verb `needs-decision`/`wait-mate` hoặc khi chính nó mở incident (`blocked`). |
+
+Sửa lỗi gửi 2026-09-28: `mate send` lưu lần gửi vào `crews/<id>.send.json` trước khi nhập,
+dưới khóa riêng cho crew. Chạy lại cùng lệnh chỉ phục hồi bằng Enter khi phiên crew, nguồn gửi
+và toàn bộ bản nháp còn khớp; không nhập lại nội dung. Composer trống sau một lần gửi chưa xác nhận
+không tự cho phép gửi lại. Nội dung khác, phiên mới, ảnh chụp thiếu hoặc dialog đều từ chối phục hồi.
+`unknown` sau Enter và `busy → busy` không chứng minh gửi thành công; không ghi `sent.log` cho chúng.
+Đây là biên nhận lần nhập, không phải inbox bền vững hay xác nhận crew đã xử lý công việc.
 
 Câu hỏi của crew không có vòng đời.
 Crew append `needs-decision:` rồi dừng turn.
@@ -534,7 +541,8 @@ internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất 
 internal/spawn/          start Mate, spawn Crew
 internal/brief/          schema brief M7: tên section, `brief check`, `brief append`
 internal/facts/          `project facts`: chỉ metadata git, không mở file nào
-internal/host/           host-pane attach: WezTerm/Ghostty Stage (M10)
+internal/host/           the Console's sibling columns: WezTerm/Ghostty Layout (M10, M13)
+internal/panerun/        the program each column runs; swaps what it shows (M13)
 internal/runtime/        copy v1
 internal/harness/        copy v1
 internal/process/        copy v1
@@ -837,10 +845,114 @@ Quyết định:
 | 51 | Bảng built-in, `Resolve`, `DefaultFor`; spawn thiếu `--harness` lấy default; manual §7 và mục crew lifecycle. | Unit cho bảng và gate; golden manual; codex nhận `gpt-6-luna`, `gpt-5.6-terra`, `gpt-6-sol` với `model_reasoning_effort="medium"`, claude nhận `--model sonnet --effort medium`. `make check` xanh. Đã xong 2026-09-26. |
 | 52 | Skill `crew-dispatch` cho Mate: đọc bảng mỗi lượt spawn, lời captain trước bảng, định cỡ task (blast radius, open decisions, độ lan, khả năng revert), chọn giữa các alternative (lời captain → bằng chứng launch → model lớn hay effort cao → tải theo `crew list`), batch, harness không khởi động được, profile của crew thay thế. Manual §2/§7 và `stuck-crew-recovery` bước 3 trỏ vào skill. | Golden skill và manual; `make check` xanh. Đã xong 2026-09-26. |
 | 53 | `internal/quota`: đọc `quota-axi --json --no-credential-refresh` (schema 5 và 6, floor 0.1.34), map codex→`codex` (account `codex-home`, rồi `default`), claude→`claude`, gộp các scope toàn provider (captain chốt 2026-09-26: chỉ xét theo provider, không xét scope từng model), gate `exhausted_now`/0%, xếp theo spendPriority đã biết, unknown không bao giờ là 0. `crew dispatch` in khối quota và harness được ưu tiên; `crew spawn` cảnh báo (không chặn) khi harness đã cạn. Skill `crew-dispatch` §4: lời captain → gate cứng (cạn, runway ngắn hơn task, launch lỗi) → model hay effort → quota → tải. | Unit với snapshot thật 0.1.34 và fixture schema 6; test CLI không đụng quota-axi của máy; binary thật in đúng khối quota khi có và khi thiếu quota-axi. `make check` xanh. Đã xong 2026-09-26. |
+| 56 | Crew id đặt theo task (captain chốt 2026-09-26): kebab-case 2–24 ký tự (`fix-cart-total`, `scout-login-timeout`), không đếm kiểu `k3`/`p1`/`m1`. Một luật trong `internal/names` (`ValidCrew`, `CrewPattern`) cho store và backlog; id cũ như `k3` vẫn hợp lệ. 24 vì agent Herdr là `crew-<id>` trong 32 ký tự. Manual §4 dạy Mate đặt tên, mọi ví dụ trong manual và skill dùng tên có nghĩa. | Unit cho luật; test manual không còn id đếm; golden. `make check` xanh. Đã xong 2026-09-26. |
 | 50 | Acceptance live: Mate đọc bảng, spawn hai crew khác profile theo hai task khác độ khó, `crew list` và meta khớp. | Evidence `docs/evidence/m12-crew-dispatch-<ngày>.md`. |
+
+### M13. Ba cột: console, agent, file changes
+
+Chốt 2026-09-26: console hẹp bên trái, terminal agent ở giữa, và - chỉ khi đang xem một crew - file changes bên phải bằng Fresh (`fresh`, editor terminal viết bằng Rust, cài qua `brew install fresh-editor`), mở thẳng vào worktree của crew.
+Mặc định là hai cột (captain chốt cùng ngày, sau khi dùng thử ba cột). Ban đầu cột file changes là terminal-code (`tode`); captain đổi sang Fresh cùng ngày vì terminal-code lag trên WezTerm và nặng (Chromium vẽ qua kitty graphics).
+
+Quyết định:
+
+- Mỗi cột bên phải là một pane host chạy `mate pane serve --role stage|review --socket <path> --owner <pid>` suốt đời cột (`internal/panerun`). Console nói cột hiện gì qua unix socket; runner thay chương trình con ngay trong pane. Không còn kill-pane, re-split, pkill hay resize mỗi lần đổi: độ rộng cột đặt một lần.
+- `host.Host` chỉ còn `Layout(columns)` và `Close`. Layout giữ cột của mình còn sống, làm lại cột bị đóng đúng chỗ (review bên phải stage, stage bên trái review), và từ chối pane lạ. WezTerm tách bằng cell (console 20%, 40–48 cột; review 45% phần còn lại). Ghostty chỉ tách đôi, nên sau khi tách nó `equalize_splits` rồi `resize_split` cột console, đo bề rộng thật của chính console để chỉnh (đo 2026-09-26: 175 cột → 41/66/66).
+- Enter trên hàng Mate/Crew: cột agent chạy `herdr … agent attach … --takeover`. Trên hàng Crew, cột file changes được dựng (nếu chưa có) và chạy `fresh <worktree>` với ship, `fresh <workspace>/.mate` với scout (scout không đổi code, report nằm trong `.mate/`; captain chốt 2026-09-26). Kind của crew nằm ở `kind=ship|scout` trong meta từ spawn; crew cũ chưa có key này được đọc từ bản brief của app (có `## Deliverable` là scout). Với ship, explorer của Fresh đánh dấu file git thấy đổi, Review Diff nằm trong palette. Trên hàng Mate nó đóng (runner dừng Fresh, host đóng pane). Fresh chỉ lái được từ ngoài bằng token nó cấp cho terminal bên trong nó, nên mate không tự mở Review Diff; gõ phím qua host thì dễ vỡ (thử 2026-09-26: `ctrl+p` không mở palette, chữ vào thẳng buffer). `Close(roles...)` đóng từng cột.
+- Lag trên WezTerm với terminal-code (captain báo 2026-09-26; Ghostty không lag): terminal-browser vẽ bằng kitty graphics, WezTerm 20240203 tốn 100–200% CPU mỗi lúc nó vẽ; các biến `TERMINAL_BROWSER_*` không đổi đáng kể. Lý do đổi sang Fresh, vẽ bằng ký tự.
+- Cột là mọi tiến trình trên tty của nó, không chỉ con của runner (terminal-code để lại viewer riêng về ppid 1): đổi nội dung thì dọn hết (TERM rồi KILL sau 2s), và cột chỉ về dòng chờ khi tty trống.
+- Giữa hai chương trình runner khôi phục termios, rời alt screen, tắt mouse/paste, xoá ảnh kitty và RIS. Chương trình tự thoát thì giữ chữ nó in (lý do herdr từ chối) và chỉ tắt mode.
+- Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`fresh` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
+- Console thoát: gửi exit cho hai runner rồi `Close` (Ghostty giữ pane đã hết tiến trình, kể cả với `wait after command` false; đo 2026-09-26). Console chết đột ngột: runner tự thoát trong 1s khi pid console mất.
+- Không có Fresh: chỉ có cột agent, status line chỉ lệnh cài.
+- `mate console` dựng cột agent lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 54 | `internal/panerun`, `mate pane serve`, `host.Layout`/`Close` cho WezTerm và Ghostty, console dựng và đóng cột, Enter hiện agent và file changes. | Unit cho runner (thay tại chỗ, no-op khi trùng, TERM rồi KILL, viewer tách rời, exit, owner mất), host (layout, idempotent, làm lại cột, pane lạ, thu hẹp Ghostty bằng đo), wiring console. Chạy thật trong Ghostty 1.3.1 và WezTerm: ba cột, Enter hiện lỗi herdr ở cột agent và Source Control của repo ở cột file changes, ctrl+c đóng hết cột và viewer. `make check` xanh. Đã xong 2026-09-26. |
+| 55 | Acceptance live với Mate và crew thật: Enter đổi qua lại, cột agent attach đúng agent, cột file changes mở ở crew và đóng ở Mate. | Evidence `docs/evidence/m13-columns-<ngày>.md`. |
+
+### M14. Mate không giữ lượt; mode theo captain
+
+Captain chốt 2026-09-27: Mate không có lượt chạy lâu, trừ khi đang trả lời câu captain hỏi.
+Đo 2026-09-26 và 2026-09-27 (Claude Code, project `hellovietnam`): Mate poll crew trong một lượt bằng vòng `for … sleep 20; mate state`, chín phút, tin của captain nằm trong hàng đợi ("Press up to edit queued messages").
+Manual cũ dạy vòng đó cho manual mode, vì ở manual mode không có gì đánh thức Mate.
+
+Thiết kế: mode theo captain.
+Captain gõ cho Mate thì manual (hook `mate-prompt` xoá `.auto` như trước), tin của crew nằm trong box.
+Mate đã trả lời (dòng Stop trong `sent.log` sau prompt cuối của captain) và captain không gõ gì thêm `store.QuietAfter` (5 phút) thì daemon bật lại `.auto`, ghi `auto mode on: …` vào `sent.log`, và digest đánh thức Mate với những gì còn mở.
+Phím `m` chọn manual thì giữ (`mate/.manual`), daemon không tự bật lại; chọn auto thì bỏ giữ.
+Mate Codex không có hook Stop nên không bao giờ tự bật lại; phím `m` vẫn bật được.
+Daemon xét mỗi `DefaultInterval` (90s), nên auto có thể về muộn tới 90s sau mốc 5 phút.
+
+| Task | Việc | Xong khi |
+| --- | --- | --- |
+| 57 | `autopilot` rearm theo `sent.log` (đọc dần theo offset), `store.SetMode`/`Held`, phím `m` giữ manual; `crew spawn`, `state`, `send` luôn kết thúc bằng dòng `turn:`; manual §4, §7, §9, §10 bỏ vòng poll, Mate kết thúc lượt ở mọi mode. | Unit: im lặng dưới 5 phút không bật, đủ 5 phút bật và digest vào Mate, Mate chưa trả lời không bật, gõ lại thì tính lại, giữ manual không bật, không có Stop không bật; test manual không còn `sleep 20`. `make check` xanh. Đã xong 2026-09-27. |
+| 59 | Captain chốt 2026-09-27: mọi thứ trong project là việc Mate tự chạy (repo, crew, brief, memory, backlog); trên project (tạo/xoá project, project khác, workspace, file của captain, `yolo`, mode) là của captain. `mate project repo add` nhận URL git: clone vào gốc workspace (không clone đè thư mục đã có), repo chưa có commit nào thì tạo commit rỗng đầu tiên trên default branch, không bao giờ push. Manual §1 dạy Mate tự thêm/bỏ repo khi captain chỉ tên. | Unit: clone remote rỗng có commit đầu, remote có lịch sử không bị đụng, từ chối clone đè, nhận dạng URL; test manual. Chạy thật với `git@github.com:nguyenngocanh94/hellovietnambackend.git` (repo rỗng) trong workspace tạm. `make check` xanh. Đã xong 2026-09-27. |
+| 58 | Acceptance live: Mate giao việc rồi kết thúc lượt, captain hỏi được ngay, 5 phút im lặng thì digest đánh thức Mate. | Evidence `docs/evidence/m14-turns-<ngày>.md`. |
+
+Kèm theo (2026-09-26/27, đã xong): codex-cli 0.157.1 thêm dòng footer thứ hai (`? for shortcuts`, `⚠ 1 warning · f2 to view`) nên mọi `mate send` tới crew Codex rảnh bị từ chối là màn hình lạ; composer Codex giờ tìm theo cấu trúc (dòng `›` cuối, không có hàng menu `N. …` bên dưới), không đếm dòng footer.
+Herdr 0.8.2 từ chối `agent read --source recent-unwrapped` khi Codex đang chạy (`agent_not_idle`); `Herdr.readAgent` đọc lại bằng `--source visible`.
+
+Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.
+
+### M15. Giới hạn chi phí context của Mate
+
+Captain chốt implement 2026-09-27; triển khai 2026-09-28, từ hai research note
+`docs/research/mate-token-2026-09-27.md` và `mate-coordination-cost-2026-09-27.md`.
+
+- Đo theo message id/call, không theo số record assistant. Tổng input gồm fresh,
+  cache-read, cache-write; output/thinking không được cộng trùng. Không suy chi phí
+  tiền hay quota từ tỷ lệ tổng token. CLI usage tách hai cache bucket; dashboard
+  và console hiện token context tuyệt đối cả khi chưa biết context window.
+- Mate Claude có profile riêng: settings nguồn project, strict MCP, built-in
+  tools Bash/Read/Write/Edit/Glob/Grep/Skill; model opus, effort medium; autocompact
+  300000 là lưới an toàn. `project.yaml` có `mate.model`, `mate.effort` để captain
+  ghi đè. Crew giữ profile dispatch riêng. Manual lõi ≤25 KiB; hợp đồng dài nằm
+  trong skill có trigger, giữ recall, phân quyền và quy tắc kết thúc lượt ở lõi.
+- Console xét refresh trước digest: context của đúng session hiện tại ≥150000,
+  auto bật và không held, Mate đã trả lời captain và im ≥5 phút, outbox trống,
+  composer trống. `mate.refresh_context` đổi ngưỡng; số âm tắt tự động. Codex
+  chưa có tín hiệu quiet tương đương nên không tự refresh.
+- Refresh là stow → checkpoint receipt → Stop thật → fresh start → recall;
+  không dùng resume. `mate mate refresh <project>` dùng cùng đường an toàn,
+  bỏ điều kiện ngưỡng/5 phút vì captain chủ động gọi. Restart thường vẫn resume.
+  Thiếu receipt, không có turn-end, file đổi sau receipt, captain nói thêm hoặc
+  giành lại manual thì giữ phiên cũ. Retry tự động cách nhau ít nhất 30 phút.
+  Maintenance flock ngăn console khác gửi assign/digest trong khi đổi phiên;
+  hàng đợi bền trên đĩa. Receipt gắn nonce, session và hash memory/backlog/PROJECT;
+  kiểm tra mọi crew mở còn có trong backlog. Nội dung bàn giao vẫn do Mate chịu
+  trách nhiệm, không có bộ kiểm tự động chứng minh mọi suy nghĩ đã được ghi.
+- Trước thay mate.meta, giữ provenance session trong `mate/sessions/*.meta`.
+  Sau Stop được xác nhận, copy transcript vào snapshot bất biến rồi mới đánh dấu
+  finalized. Reindex tính đủ cả call cuối của phiên đã đóng, không làm token biến
+  mất sau refresh. Transcript đang chạy vẫn chờ message id kế tiếp để chốt nhóm
+  cuối; context có thể trễ một call hoặc chưa có ở call đầu, không giả thành 0.
+- Scout report có Summary ≤6000 ký tự, gồm giới hạn và evidence. `mate report
+  <project> <crew> --summary` không fallback sang toàn bộ report nếu thiếu mục.
+  `mate diff` mặc định stat, `--full` vẫn là đường đọc toàn bộ patch.
+- `mate review <project> <crew> --id <reviewer> --harness ... --model ... --effort ...`
+  tạo scout riêng đọc full diff và acceptance evidence. Token vẫn thuộc Crew
+  ledger; Mate kết thúc lượt trong lúc reviewer làm. `review --check <reviewer>`
+  và `merge --review <reviewer>` từ chối khi SHA/base/brief/hand-back đổi, reviewer
+  chưa hand-back, hoặc verdict không pass. Merge dùng đúng reviewed SHA.
+  Tóm tắt của implementer hay diff stat không thay được review.
+- `mate backlog add|move|done` sửa một mục dưới lock, giữ nguyên câu hỏi/nội dung
+  nhiều dòng; Done giữ 10 mục, ghi archive trước khi bỏ mục khỏi file nóng.
+  Đây là ngoại lệ có chủ đích cho quy tắc cũ “app không sửa backlog”.
+- Chưa thêm daemon digest LLM riêng. Chỉ xét sau khi số liệu sau rollout cho
+  thấy cần; không coi ước lượng token/ngày của research là kết quả đã đo.
+
+| Task | Việc | Kiểm chứng |
+| --- | --- | --- |
+| 60 | Context tuyệt đối, cache buckets, profile Mate và lõi manual | Unit DB/CLI/UI/argv, golden manual và skills; live context trong evidence M15. |
+| 61 | Checkpoint/fresh recall, guard trạng thái và lưu transcript cũ | Unit failure paths, queue/maintenance, current-session threshold, reindex; live giữ nguyên câu hỏi đang chờ qua fresh session. |
+| 62 | Summary, backlog commands, reviewer riêng và merge theo SHA | Unit với git thật, schema brief và stale review; live reviewer phải phát hiện implementation sai dù hand-back ghi pass. |
+
+Rollout: build binary mới, đóng console cũ (sender cũ chưa biết maintenance lock); chạy `bin/mate mate refresh <project> --workspace <dir>`
+lúc Mate rảnh, rồi mở lại console bằng binary mới để daemon dùng điều kiện M15.
+Chỉ sửa AGENTS.md trên đĩa hoặc resume phiên cũ không chứng minh context đã nhỏ đi.
+Evidence: `docs/evidence/m15-context-2026-09-28.md`.
 
 ### Thử nghiệm: Jev notice advisor
 
 Opt-in bằng `MATE_JEV_API_KEY_FILE`: trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
-
-Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.

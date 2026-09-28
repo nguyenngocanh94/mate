@@ -321,3 +321,15 @@ func TestCallerFromEnvDefaultsToTheCaptain(t *testing.T) {
 		t.Fatalf("CallerFromEnv with no value = %q, want user", got)
 	}
 }
+
+func TestMergeCrewRejectsAStaleIndependentReview(t *testing.T) {
+	w, deps, res := mergeFixture(t, true)
+	commitInWorktree(t, res.Worktree, "feature.txt", "first\n")
+	before, reviewed := headOf(t, w, "main"), headOf(t, w, res.Branch)
+	commitInWorktree(t, res.Worktree, "feature.txt", "unreviewed\n")
+	_, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerMate, spawn.ReviewedCommit{Head: reviewed, Base: before})
+	if err == nil || !strings.Contains(err.Error(), "review is stale") {
+		t.Fatalf("merge: %v", err)
+	}
+	assertNothingChanged(t, w, res, before)
+}

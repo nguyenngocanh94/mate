@@ -96,9 +96,10 @@ func (d Deps) health() []HealthReading {
 // observer's poll loop), and internal/db has already refused a second
 // process.
 type Ingester struct {
-	ws   *store.Workspace
-	d    *db.DB
-	deps Deps
+	ws          *store.Workspace
+	d           *db.DB
+	deps        Deps
+	transcripts map[string]transcriptCache
 }
 
 // New builds an ingest over an opened workspace and a writable database.
@@ -198,6 +199,9 @@ func (i *Ingester) ingestProject(ctx context.Context, project string, shared *sq
 	if err = p.ingestMeta(ctx); err != nil {
 		return err
 	}
+	if err = p.ingestProfiles(ctx); err != nil {
+		return err
+	}
 	if err = p.ingestTranscripts(ctx); err != nil {
 		return err
 	}
@@ -219,14 +223,16 @@ func (i *Ingester) ingestProject(ctx context.Context, project string, shared *sq
 	if err = w.flush(ctx, b); err != nil {
 		return err
 	}
-	if err = p.fillThinking(ctx); err != nil {
-		return err
-	}
-	if err = p.linkCauses(ctx); err != nil {
-		return err
-	}
-	if err = p.updateCounters(ctx); err != nil {
-		return err
+	if w.insertedEvents > 0 {
+		if err = p.fillThinking(ctx); err != nil {
+			return err
+		}
+		if err = p.linkCauses(ctx); err != nil {
+			return err
+		}
+		if err = p.updateCounters(ctx); err != nil {
+			return err
+		}
 	}
 	if err = p.projectScene(ctx); err != nil {
 		return err

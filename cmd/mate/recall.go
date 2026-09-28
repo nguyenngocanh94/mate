@@ -19,6 +19,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/names"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -460,7 +461,7 @@ func recallBacklog(w *store.Workspace, project string) (recallPart, error) {
 // inFlightID is the structural match of an In flight entry: `- <id>` where
 // <id> is a crew id, followed by the end of the line, a space, a colon, a
 // comma or a parenthesis. What the rest of the line says is not read.
-var inFlightID = regexp.MustCompile(`^- ([a-z][a-z0-9]{1,15})(?:$|[\s:,(])`)
+var inFlightID = regexp.MustCompile(`^- (` + names.CrewPattern + `)(?:$|[\s:,(])`)
 
 // splitBacklog returns backlog.md without its Done section, how many
 // entries that section held, and the ids the In flight section names.

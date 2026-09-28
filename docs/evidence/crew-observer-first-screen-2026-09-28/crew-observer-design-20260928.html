@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crew observer · design</title>
+<style>
+/* Tokens copied from internal/dashboard/ui/app.css so the mock renders in the dashboard's own skin. */
+:root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--surface-2:#f2f1ed;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;--grid:#e1e0d9;--border:rgba(11,11,11,.1);--accent:#2a78d6;--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;--good:#0ca30c;--warning:#fab219;--serious:#ec835a;--critical:#d03b3b;--git:#7c5cbf;--radius:6px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--surface-2:#232321;--ink:#fff;--ink-2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--border:rgba(255,255,255,.1);--accent:#3987e5;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#c98500;--git:#9b7ee0}}
+:root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--surface-2:#232321;--ink:#fff;--ink-2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--border:rgba(255,255,255,.1);--accent:#3987e5;--series-1:#3987e5;--series-2:#d95926;--series-3:#199e70;--series-4:#c98500;--git:#9b7ee0}
+*,*::before,*::after{box-sizing:border-box}
+html{overflow-x:clip;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 var(--font)}
+main{max-width:1180px;margin:auto;padding:34px 24px 90px}
+:where(.grid,.flex,.kpi,.cards,.mock-answers,.mock-metrics,.bars,.facts,.legend)>*{min-width:0}
+:where(p,h1,h2,h3,h4,li,td,th,dd,figcaption,.chip,.badge,summary,span,code){overflow-wrap:anywhere}
+img,svg{max-width:100%;height:auto}
+a{color:var(--accent)}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.15;letter-spacing:-.03em;margin:16px 0 12px;max-width:960px}
+h2{font-size:24px;line-height:1.25;margin:0 0 12px;letter-spacing:-.01em}
+h3{font-size:17px;margin:14px 0 8px}
+p{margin:8px 0 14px}
+.eyebrow,.small{font:12px/1.6 var(--mono);color:var(--ink-2)}
+.lead{font-size:18px;max-width:900px;color:var(--ink)}
+.muted{color:var(--ink-2)}
+.section{margin-top:48px;scroll-margin-top:16px}
+.section>h2{padding-bottom:8px;border-bottom:1px solid var(--border)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.toolbar{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+button,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:7px 11px;cursor:pointer;max-width:100%}
+code{font-family:var(--mono);font-size:.88em}
+pre{margin:10px 0;padding:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);font:13px/1.55 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+td,th{padding:9px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--grid)}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:600;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.status{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-weight:600;font-size:12.5px}
+.status::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.ok{color:var(--good)}.part{color:#b7791f}.miss{color:var(--critical)}
+:root[data-theme="dark"] .part,:root:not([data-theme="light"]) .part{color:#e2a83a}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .part{color:#b7791f}}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:999px;font:12px/1.6 var(--mono);color:var(--ink-2);background:var(--surface-2)}
+.chip.acc{border-color:var(--accent);color:var(--accent)}
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:22px}
+.kpi>div{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;border-top:3px solid var(--accent)}
+.kpi b{display:block;font-size:26px;letter-spacing:-.02em;line-height:1.2;margin:4px 0 6px}
+.kpi span{font-size:13px;color:var(--ink-2);display:block}
+.kpi .status{margin-top:8px}
+figure{margin:0}
+figure img{display:block;width:100%;border:1px solid var(--border);border-radius:var(--radius);background:#0d0d0d}
+figcaption{font-size:13px;color:var(--ink-2);margin-top:8px}
+ul.tight{margin:6px 0 10px;padding-left:20px}ul.tight li{margin:5px 0}
+ol.tight{margin:6px 0 10px;padding-left:22px}ol.tight li{margin:6px 0}
+.co{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font:700 12px/1 var(--mono);flex:none;vertical-align:middle;margin-right:6px}
+.callouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin-top:14px}
+.callouts>div{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.note{font-size:13px;color:var(--ink-2)}
+form.q{background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:16px 18px;margin-top:14px}
+form.q label{display:flex;gap:10px;align-items:flex-start;margin:7px 0;cursor:pointer}
+form.q input[type=radio]{margin-top:4px}
+form.q textarea{width:100%;min-height:60px;font:inherit;background:var(--page);color:var(--ink);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-top:6px}
+.queued{font:13px var(--mono);color:var(--good);min-height:1.4em;margin-top:8px}
+.rec{border-left:3px solid var(--good);padding-left:10px}
+
+/* ------------------------------------------------------------- mock */
+.mock{background:var(--page);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 1px 0 var(--border);font-size:14px}
+.mock .topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.mock .brand{font-weight:700}
+.mock .crumbs a{color:var(--ink-2);text-decoration:underline;text-decoration-color:var(--grid)}
+.mock .live{margin-left:auto;font:12px var(--mono);border:1px solid var(--border);border-radius:5px;padding:3px 9px;color:var(--good)}
+.mock .page{padding:18px 16px 22px;max-width:1160px;margin:auto}
+.mock h1{font-size:22px;margin:0;letter-spacing:0}
+.mock h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin:0 0 10px;border:0;padding:0}
+.mock h3{font-size:14px;margin:0 0 6px}
+.mock .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mock .state{font-size:13px;color:var(--ink-2)}
+.mock .facts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2);margin:6px 0 0}
+.mock .card{padding:14px 16px;position:relative}
+.mock .block{margin-top:20px;position:relative}
+.mock .block>h2 .co,.mock .card>h2 .co{margin-right:8px}
+.mock-answers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.mock-answers .card{border-top:3px solid var(--accent)}
+.mock .big{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.15;margin:2px 0 4px;font-variant-numeric:tabular-nums}
+.mock .sub{font-size:12px;color:var(--ink-2);line-height:1.45}
+.mock .kv{display:flex;flex-direction:column;gap:5px;margin-top:8px;font-size:12.5px}
+.mock .kv b{font-weight:600}
+.meter{display:flex;height:12px;gap:2px;border-radius:3px;overflow:hidden;background:var(--surface-2);margin-top:8px}
+.meter i{display:block;height:100%}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 10px;font:11.5px var(--mono);color:var(--ink-2);margin-top:6px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.s1{background:var(--series-1)}.s2{background:var(--series-2)}.s3{background:var(--series-3)}.s4{background:var(--series-4)}
+.bars{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.bar{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.bar .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bar .track{height:8px;background:var(--surface-2);border-radius:2px;overflow:hidden}
+.bar .track i{display:block;height:100%}
+.bar .n{font:11.5px var(--mono);color:var(--ink-2);white-space:nowrap}
+.tablewrap table{min-width:720px}
+#dulieu .tablewrap table{min-width:980px}
+th{white-space:nowrap}
+.tl{overflow-x:auto}
+.tl svg{min-width:760px}
+.flow{overflow-x:auto}
+.flow svg{min-width:760px}
+.qlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;margin-top:12px}
+.qlist>div{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+@media (max-width:980px){.qlist{grid-template-columns:1fr}}
+.k-poll{background:var(--series-2)}.k-read{background:var(--series-1)}.k-test{background:var(--series-4)}.k-edit{background:var(--series-3)}.k-git{background:var(--git)}
+.k-unnamed{background:repeating-linear-gradient(135deg,var(--muted) 0 3px,transparent 3px 6px)}
+.kchip{display:inline-flex;align-items:center;gap:6px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);font:11.5px var(--mono);color:var(--ink-2);white-space:nowrap}
+.kchip i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.mock .link{color:var(--accent);text-decoration:none;font-size:12px;white-space:nowrap}
+.findings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.finding{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--serious);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:7px}
+.finding.info{border-left-color:var(--series-4)}
+.finding .t{font-weight:600;font-size:13.5px}
+.finding .d{font-size:12.5px;color:var(--ink-2)}
+.finding .u{font:11.5px var(--mono);color:var(--ink-2)}
+.finding .f{font-size:12px;color:var(--accent)}
+.tl{margin-top:10px}
+.tl svg{display:block;width:100%;height:auto}
+.tl .lbl{font:11px var(--mono);fill:var(--ink-2)}
+.tl .gridline{stroke:var(--grid);stroke-width:1}
+.tl .tokline{fill:none;stroke:var(--accent);stroke-width:2}
+.tl .seg{stroke:var(--page);stroke-width:1.5;opacity:.85}
+.tl .seg.k-unnamed{fill:var(--muted);opacity:.35}
+.tl .exec{fill:var(--series-3)}
+.tl .exec.failed{fill:var(--critical)}
+.tl .poll{fill:var(--series-2)}
+.tl .poll.failed{fill:var(--critical)}
+.tl .bracket{fill:none;stroke:var(--series-2);stroke-width:1.5}
+.tl .brlabel{font:10.5px var(--mono);fill:var(--series-2)}
+.tl .outbar{fill:var(--ink-2);opacity:.55}
+svg .k-poll{fill:var(--series-2)}svg .k-read{fill:var(--series-1)}svg .k-test{fill:var(--series-4)}svg .k-git{fill:var(--git)}svg .k-edit{fill:var(--series-3)}
+.mock .tablewrap{margin-top:8px}
+.mock table{font-size:12.5px}
+.mock th{font-size:10.5px}
+.mock td.lab{min-width:220px}
+.d5{display:inline-block;padding:0 5px;border:1px dashed var(--accent);border-radius:4px;color:var(--accent);font:10.5px var(--mono);vertical-align:middle;margin-left:4px}
+.mock .filters{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.mock .filters .kchip.on{border-color:var(--accent);color:var(--ink);background:var(--surface-2)}
+.mock .drawer{border:1px solid var(--accent);border-radius:var(--radius);background:var(--surface);padding:12px 14px;margin-top:10px}
+.mock .cmd{font:12px var(--mono);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:7px 9px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.mock .cmd b{color:var(--critical);font-weight:600}
+.mock .cov{font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--grid);padding-top:10px;margin-top:12px}
+.flow{margin-top:12px}
+.flow svg{display:block;width:100%;height:auto}
+.flow .box{fill:var(--surface);stroke:var(--border)}
+.flow .box.hot{stroke:var(--accent);stroke-width:1.5}
+.flow .t{font:600 12px var(--font);fill:var(--ink)}
+.flow .s{font:10.5px var(--mono);fill:var(--ink-2)}
+.flow .arrow{stroke:var(--ink-2);stroke-width:1.5;fill:none;marker-end:url(#arr)}
+.flow .b1{fill:var(--accent)}.flow .bt{font:700 10px var(--mono);fill:#fff}
+.flow .warn{fill:var(--critical);font:600 11px var(--font)}
+@media (max-width:980px){.kpi,.mock-answers{grid-template-columns:repeat(2,minmax(0,1fr))}.findings{grid-template-columns:1fr}.callouts{grid-template-columns:1fr}}
+@media (max-width:640px){.grid,.grid.three,.kpi,.mock-answers{grid-template-columns:1fr}main{padding:22px 16px 60px}.mock .page{padding:14px 12px}.legend{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="toolbar">
+    <div class="eyebrow">mate · design · 2026-09-28 · Crew observer trên dashboard · số liệu thật: <code>newWorkspace/hellovietnam</code> · Crew <code>ios7</code> (Codex 0.157.1 · gpt-6-sol · effort medium · 363 model calls)</div>
+    <button type="button" id="theme" aria-label="Đổi nền sáng tối">☼ / ☾</button>
+  </div>
+  <h1>Observer của Crew: bốn câu hỏi phải có câu trả lời ngay màn hình đầu</h1>
+  <p class="lead"><b>Feed được.</b> Ba trong bốn câu (token, tool call theo phần, lặp) đã có đủ dữ liệu trong khối <code>performance</code> mà working tree đang trả về, chỉ chưa được gom thành con số ở màn hình đầu. Câu thứ tư (bước suy luận tốn nhất) có số theo từng model call nhưng projector đang xếp hạng theo <em>tổng</em> token, nên "Most tokens" luôn trỏ vào một đoạn poll. Điểm yếu thật sự nằm ở tên đoạn: 71/184 đoạn của ios7 chưa gọi được tên, và chính các đoạn đó chứa 59% output và 69% thinking, vì Codex gói <code>apply_patch</code> trong wrapper JavaScript mà classifier chưa đọc.</p>
+  <div class="kpi">
+    <div><span>Tiêu thụ token</span><b>40,4M</b><span>233,9k fresh · 40,1M cache read · 68,7k output · 18,8k thinking (nằm trong output)</span><span class="status ok">Có sẵn</span></div>
+    <div><span>Tool call cho phần nào</span><b>360 call · 5 loại việc</b><span>Kiểm tra tiến trình 183 · chưa gọi tên 94 · đọc/tìm 46 · build/test 32 · git 5</span><span class="status part">Tính được, chưa hiện</span></div>
+    <div><span>Bị lặp bao nhiêu</span><b>17 chuỗi · 153 poll</b><span>123 poll không có output mới (80%) · các call poll tốn 20,6M = 51% token của Crew</span><span class="status part">Tính được, chưa hiện</span></div>
+    <div><span>Bước suy luận tốn nhất</span><b>call #301 · 2,7k</b><span>1,9k output + 790 thinking · 40,8 s · là bước <code>apply_patch</code> nhưng đang hiện "Tool wrapper"</span><span class="status part">Có số, chưa xếp hạng</span></div>
+  </div>
+  <p class="note" style="margin-top:12px">Nguồn: <code>GET http://127.0.0.1:7778/api/projects/hellovietnam/tasks/ios7</code> lúc 11:51 hôm nay (review server của bản working tree, DB tách riêng đọc transcript thật, xem <code>docs/evidence/crew-observability-2026-09-28.md</code>); <code>internal/diagnostics</code>, <code>internal/telemetry</code>, <code>internal/dashboard/ui/app.js</code>; screenshot chụp từ đúng trang đó ở 1440×1000. Dashboard 7777 mà console đang dùng là build cũ: response của nó <b>không có</b> khối <code>performance</code>.</p>
+</header>
+
+<section class="section" id="ketluan">
+  <h2>1. Kết luận theo từng câu hỏi</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Câu hỏi của captain</th><th>Hôm nay dashboard trả lời thế nào</th><th>Dữ liệu có chưa</th><th>Thiếu gì để trả lời ngay màn hình đầu</th></tr></thead>
+    <tbody>
+      <tr><td><b>Tiêu thụ bao nhiêu token</b></td><td>Đủ: tổng, 4 bucket, thinking, theo prompt, theo đoạn, theo call, 5 phút gần nhất, context cuối.</td><td><span class="status ok">Có sẵn</span></td><td>Chỉ thiếu giá cho <code>gpt-6-sol</code> trong <code>pricing.yaml</code> nên cost và context % là <code>?</code>.</td></tr>
+      <tr><td><b>Chạy bao nhiêu tool call, cho phần nào</b></td><td>Có tổng 360 và 184 hàng đoạn; không có bảng gom theo loại việc. Người đọc phải cuộn 184 hàng để tự cộng.</td><td><span class="status part">Tính được</span></td><td>Gom <code>segments[].kind</code> + <code>execution_ids</code> thành <code>tool_mix</code> (theo Crew và theo prompt). Đọc wrapper JS của Codex để 39% đoạn "không tên" có tên thật (đa số là <code>apply_patch</code> = sửa file).</td></tr>
+      <tr><td><b>Bị lặp bao nhiêu lần</b></td><td>Rải trong 27 finding "was polled N times" và cột Repeats từng hàng; không có một dòng tổng.</td><td><span class="status part">Tính được</span></td><td>Gom <code>processes[]</code> + đoạn <code>kind=poll</code> thành một dòng: 17 chuỗi · 153 poll · 123 không đổi · 20,6M token (51%). Đoạn poll không chồng nhau nên cộng được, khác với finding.</td></tr>
+      <tr><td><b>Suy luận bước nào tốn nhất</b></td><td>"Most tokens" xếp theo tổng token → cache read chi phối → luôn là một đoạn "Check process". Không có góc nhìn output + thinking.</td><td><span class="status part">Có số, chưa xếp hạng</span></td><td>Xếp hạng thứ hai theo output + thinking (call và đoạn), hiện cạnh xếp hạng theo context. Không cần collector mới.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section" id="hientrang">
+  <h2>2. Hiện trạng: trang Crew ở bản working tree (review server 7778)</h2>
+  <p>Đây là trang mà bản build hôm nay đã vẽ cho <code>ios7</code>. Nó đã đúng hướng của <code>docs/plans/crew-harness-observability-2026-09-28.md</code> mục 6.1 (đang làm gì, đáng xem, timeline, bảng đoạn, bằng chứng). Bốn câu hỏi của captain nằm trong đó nhưng phải đi tìm.</p>
+  <div class="grid three">
+    <figure><a href="crew-observer-before-top.png" target="_blank" rel="noopener"><img src="crew-observer-before-top.png" alt="Màn hình đầu hiện tại: Last recorded work, Worth a look" width="1440" height="1000"></a><figcaption>Màn hình đầu: token tổng có, "Most tokens" có nhưng là đoạn poll, findings là câu tiếng Anh dài với lệnh bị cắt. Bấm để xem cỡ thật.</figcaption></figure>
+    <figure><a href="crew-observer-before-timeline.png" target="_blank" rel="noopener"><img src="crew-observer-before-timeline.png" alt="Work over time của Prompt 3" width="1440" height="1000"></a><figcaption>Timeline Prompt 3: đường token cộng dồn, khối đoạn, tick lệnh. Chuỗi poll chỉ là các tick nhỏ, không có số lần.</figcaption></figure>
+    <figure><a href="crew-observer-before-segments.png" target="_blank" rel="noopener"><img src="crew-observer-before-segments.png" alt="Bảng Work segments" width="1440" height="1000"></a><figcaption>Bảng 184 đoạn, mỗi hàng 8 số. "Tool wrapper · command details unavailable" và "Activity not classified" lặp lại nhiều.</figcaption></figure>
+  </div>
+  <h3>Năm chỗ chưa đạt so với yêu cầu</h3>
+  <ol class="tight">
+    <li><b>Tool call theo phần</b> không có tổng: 360 tool call, 162 lệnh native, 153 poll, 207 wrapper chỉ đọc được bằng cách tự cộng từ 184 hàng.</li>
+    <li><b>Lặp</b> không có con số một dòng. 17 finding polling hiện cùng một câu, người đọc không biết tổng là 153 poll, 123 lần không có output mới, và 51% token của Crew nằm ở đó.</li>
+    <li><b>Bước tốn nhất</b> đang trả lời sai câu hỏi: xếp theo tổng token nên "Most tokens" là <em>Check process · process 85006 · 2.2M</em>, một đoạn chỉ sinh 496 output. Bước model thực sự suy luận nhiều nhất (call #301, 1,9k output + 790 thinking) không xuất hiện ở đâu.</li>
+    <li><b>Tên đoạn</b>: 71/184 đoạn (39%) là "Tool wrapper" hoặc "Activity not classified". Chúng chiếm 26,6% token nhưng 58,7% output và 68,5% thinking, tức là toàn bộ phần viết code. Lý do: Codex 0.157 gói lệnh trong JS (<code>text(await tools.apply_patch(…))</code>, <code>const r=await tools.exec_command({cmd:"cat >> …"})</code>) và classifier chưa đọc bên trong. Hai đoạn <code>cat &gt;&gt; File.swift &lt;&lt;'EOF'</code> còn bị gán nhầm là "Read / search".</li>
+    <li><b>Nhãn và câu</b> dài, tiếng Anh, lệnh bị cắt giữa chừng ("xcodebuild -project HelloVietnam.xcodeproj -scheme HelloVietnam -destin… was polled 11 times"). Mục 6.1 của plan yêu cầu câu có đối tượng, số lần và chi phí.</li>
+  </ol>
+</section>
+
+<section class="section" id="thietke">
+  <h2>3. Thiết kế đề xuất: trang Crew với "bốn câu trả lời" ở trên cùng</h2>
+  <p>Mock dưới đây vẽ bằng đúng token màu và chữ của <code>app.css</code>, chữ trong UI giữ tiếng Anh như dashboard hiện tại. Mọi con số là số thật của <code>ios7</code>; timeline Prompt 3 được vẽ từ timestamp thật của 37 đoạn, 44 lệnh, 25 poll và 65 model call. Các ô đánh số ①–⑧ được đối chiếu với dữ liệu ở mục 4. Nhãn có dấu <span class="d5">D5</span> chỉ có sau khi sửa classifier; hôm nay chúng hiện là "Tool wrapper · command details unavailable".</p>
+
+  <div class="mock" aria-label="Mock trang Crew observer">
+    <div class="topbar"><span class="brand">mate</span><span class="crumbs"><a>workspace</a> / <a>hellovietnam</a> / <a>ios7</a></span><span class="live">● live · 11:56:02</span></div>
+    <div class="page">
+      <div class="head"><h1>ios7</h1><span class="state">× gone · finished · merged</span><span class="kchip">⌘ codex 0.157.1</span><span class="kchip">gpt-6-sol · medium</span></div>
+      <div class="muted" style="margin-top:4px">M4a: create-trip flow boards 11-13 with MapKit search, drafts</div>
+      <div class="facts"><span>spawned 21:10:41 → closed 22:10:03 · 59m22s</span><span>3 prompts</span><span>363 model calls</span><span>360 tool calls</span><span>branch <code>mate/ios7</code> · gone (merged)</span><span>1 question · waited 1m02s</span></div>
+
+      <div class="mock-answers">
+        <div class="card"><h2><span class="co">1</span>Tokens</h2>
+          <div class="big">40.4M</div>
+          <div class="meter" aria-label="input, cache read, cache write, output"><i class="s1" style="width:2%"></i><i class="s2" style="width:95.5%"></i><i class="s4" style="width:2%"></i></div>
+          <div class="legend"><span><i class="s1"></i>fresh input 233.9k</span><span><i class="s2"></i>cache read 40.1M</span><span><i class="s3"></i>cache write 0</span><span><i class="s4"></i>output 68.7k</span></div>
+          <div class="kv"><span>thinking <b>18.8k</b> · inside output, not added</span><span>context after last call <b>193k</b> · window ? · cost ? <span class="sub">(no price for gpt-6-sol)</span></span><span>last 5 min <b>+0</b> · historical recording</span></div>
+          <div class="kv" style="border-top:1px solid var(--grid);padding-top:6px"><span>P1 21:10 · <b>3.2M</b> · 61 calls · 9m56s</span><span>P2 21:21 · <b>25.5M</b> · 237 calls · 33m34s</span><span>P3 21:56 · <b>11.7M</b> · 65 calls · 11m29s</span></div>
+        </div>
+        <div class="card"><h2><span class="co">2</span>Tool calls by work</h2>
+          <div class="big">360</div>
+          <div class="sub">162 native commands (10 failed) · 153 process polls · 207 wrappers · 42 file changes</div>
+          <div class="bars" aria-label="model calls and tokens per kind of work">
+            <div class="bar"><div class="row"><span class="kchip"><i class="k-poll"></i>Check process</span><span class="n">183 · 20.6M · 51%</span></div><span class="track"><i class="k-poll" style="width:51%"></i></span></div>
+            <div class="bar"><div class="row"><span class="kchip"><i class="k-unnamed"></i>Unnamed (wrapper JS)</span><span class="n">94 · 10.7M · 27%</span></div><span class="track"><i class="k-unnamed" style="width:27%"></i></span></div>
+            <div class="bar"><div class="row"><span class="kchip"><i class="k-read"></i>Read / search</span><span class="n">46 · 4.8M · 12%</span></div><span class="track"><i class="k-read" style="width:12%"></i></span></div>
+            <div class="bar"><div class="row"><span class="kchip"><i class="k-test"></i>Build / test</span><span class="n">32 · 3.6M · 9%</span></div><span class="track"><i class="k-test" style="width:9%"></i></span></div>
+            <div class="bar"><div class="row"><span class="kchip"><i class="k-git"></i>Git / handback</span><span class="n">5 · 0.7M · 2%</span></div><span class="track"><i class="k-git" style="width:2%"></i></span></div>
+          </div>
+          <div class="sub" style="margin-top:8px">Counts are model calls per kind; tokens belong to those calls. Output tokens tell a different story: unnamed 59% · read 17% · test 12% · poll 10%.</div>
+        </div>
+        <div class="card"><h2><span class="co">3</span>Repeats</h2>
+          <div class="big">17 chains · 153 polls</div>
+          <div class="sub">123 polls saw no new output (80%) · 30 processes were polled</div>
+          <div class="kv"><span>Poll calls: <b>183 calls · 20.6M tokens · 51% of the Crew</b> <span class="sub">(poll segments are disjoint, so this sum is exact)</span></span><span>Longest: <code>xcodebuild … TripUITests</code> polled 12× · 11 unchanged · 1m48s · 1.7M → <a class="link">open chain</a></span><span>Same content re-read: <b>0</b> · same-error retries: <b>0</b> · repair loops: <b>0</b></span><span>Repeats inside segments: <b>122</b> (all in poll segments)</span></div>
+        </div>
+        <div class="card"><h2><span class="co">4</span>Most expensive step</h2>
+          <h3>By output + thinking <span class="sub">(what the model wrote)</span></h3>
+          <div class="kv"><span><b>call #301</b> · 1.9k output + 790 thinking · 40.8s · context 168k · Prompt 3 21:57</span><span>segment: <b>Edit files · apply_patch</b><span class="d5">D5</span> after a 40 KB <code>rg</code> read → <a class="link">open</a></span><span>segment with most: <b>apply_patch ×5</b><span class="d5">D5</span> (P1) · 3.8k + 691 · 5 calls · 1m24s</span></div>
+          <h3 style="margin-top:10px">By context re-sent <span class="sub">(total tokens)</span></h3>
+          <div class="kv"><span><b>Check process · process 85006</b> · 2.2M · 12 calls · 10 repeats · 1m54s → <a class="link">open</a></span></div>
+        </div>
+      </div>
+
+      <div class="block"><h2><span class="co">5</span>Worth a look</h2>
+        <div class="findings">
+          <div class="finding"><span class="kchip">failure · warning</span><span class="t">xcodebuild -scheme HelloVietnam exited 65 nine times · 21:15 → 21:59</span><span class="d">Plus <code>rg</code> exit 1 once. Each xcodebuild failure carries a different error signature, so no identical retry was detected; 42 file changes were recorded across the run.</span><span class="u">tokens not linked to model calls (native commands)</span><span class="f">Recorded · Inspect commands and exit codes →</span></div>
+          <div class="finding info"><span class="kchip">repeat · info</span><span class="t">xcodebuild … TripUITests was polled 12 times · 11 without new output</span><span class="d">Polling calls used 2.0k fresh input + 1.7M cache read + 507 output over 1m48s. Polls are counted once and are not additional test runs; repetition alone does not establish waste.</span><span class="u">process 78617 · Prompt 2 21:50 → 21:51</span><span class="f">Recorded · Open the chain on the timeline →</span></div>
+          <div class="finding info"><span class="kchip">slow · info</span><span class="t">xcodebuild run of 1.9 min · longest of 10 runs above the 60 s threshold</span><span class="d">Measured from native command timing. No comparable-run baseline exists yet, so this is a threshold, not a claim of abnormal latency.</span><span class="u">tokens not linked · native execution</span><span class="f">Recorded · Inspect execution →</span></div>
+        </div>
+        <div class="sub" style="margin-top:8px">▸ Show 27 more findings · Findings can share the same calls; their token totals are not additive.</div>
+      </div>
+
+      <div class="block"><h2><span class="co">6</span>Work over time · Prompt 3 of 3</h2>
+        <div class="sub">21:56:41 · "Polish before merge: (1) step 2 shows empty 'Chơi / Ăn / Nghỉ' headers…" · 65 model calls · 11.7M tokens · 11m29s · task_complete</div>
+        <div class="tl" id="p3tl"></div>
+        <div class="legend" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><span><i class="k-poll"></i>Check process</span><span><i class="k-unnamed"></i>Unnamed (wrapper JS)</span><span><i class="k-read"></i>Read / search</span><span><i class="k-test"></i>Build / test</span><span><i class="k-git"></i>Git / handback</span><span><i style="background:var(--critical)"></i>failed command</span></div>
+        <div class="sub" style="margin-top:6px">Line: cumulative tokens · thin bars under it: output + thinking of each call · blocks: segments by kind · Commands: native executions · Polls: one tick per poll, bracket = chain with its count. The 1m02s decision wait happened in Prompt 2, so that lane is empty here. ▸ Prompt 2 (237 calls · 25.5M · 33m34s) · ▸ Prompt 1 (61 calls · 3.2M · 9m56s)</div>
+      </div>
+
+      <div class="block"><h2><span class="co">7</span>Tool mix by prompt</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Prompt</th><th class="num">Calls</th><th class="num">Tokens</th><th>Check process</th><th>Unnamed</th><th>Read / search</th><th>Build / test</th><th>Git</th><th class="num">Repeats</th><th class="num">Failed cmds</th></tr></thead>
+          <tbody>
+            <tr><td>P1 · brief</td><td class="num">61</td><td class="num">3.2M</td><td>24 · 1.4M</td><td>23 · 1.1M</td><td>8 · 0.4M</td><td>6 · 0.3M</td><td>—</td><td class="num">11</td><td class="num">4</td></tr>
+            <tr><td>P2 · presentation bug</td><td class="num">237</td><td class="num">25.5M</td><td>129 · 13.8M</td><td>54 · 6.1M</td><td>29 · 2.8M</td><td>21 · 2.3M</td><td>4 · 0.5M</td><td class="num">91</td><td class="num">5</td></tr>
+            <tr><td>P3 · polish</td><td class="num">65</td><td class="num">11.7M</td><td>30 · 5.4M</td><td>20 · 3.6M</td><td>9 · 1.6M</td><td>5 · 0.9M</td><td>1 · 0.2M</td><td class="num">20</td><td class="num">1</td></tr>
+            <tr><td><b>Crew</b></td><td class="num"><b>363</b></td><td class="num"><b>40.4M</b></td><td><b>183 · 20.6M</b></td><td><b>97 · 10.7M</b></td><td><b>46 · 4.8M</b></td><td><b>32 · 3.6M</b></td><td><b>5 · 0.7M</b></td><td class="num"><b>122</b></td><td class="num"><b>10</b></td></tr>
+          </tbody>
+        </table></div>
+        <div class="sub" style="margin-top:6px">Each model call belongs to exactly one segment, so rows and columns add up to the ledger. Failed commands per prompt are native exit codes; the P3 count is one xcodebuild exit 65.</div>
+      </div>
+
+      <div class="block"><h2><span class="co">8</span>Work segments</h2>
+        <div class="filters"><span class="kchip on">All 184</span><span class="kchip"><i class="k-poll"></i>Check process 30</span><span class="kchip"><i class="k-unnamed"></i>Unnamed 71</span><span class="kchip"><i class="k-read"></i>Read / search 46</span><span class="kchip"><i class="k-test"></i>Build / test 32</span><span class="kchip"><i class="k-git"></i>Git 5</span><span style="margin-left:auto" class="sub">Sort by <select><option>Output + thinking, highest first</option><option>Total tokens</option><option>Fresh input</option><option>Elapsed</option><option>Timeline order</option></select></span></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Segment</th><th>Kind</th><th>Prompt</th><th class="num">Calls</th><th class="num">Tool calls</th><th class="num">Fresh</th><th class="num">Cache</th><th class="num">Output</th><th class="num">Thinking</th><th class="num">Total</th><th class="num">Elapsed</th><th class="num">Repeats</th></tr></thead>
+          <tbody>
+            <tr><td class="lab">Edit files · <code>apply_patch</code> ×5 · TripViews.swift, TripService.swift<span class="d5">D5</span></td><td><span class="kchip"><i class="k-edit"></i>edit</span></td><td>P1 21:13</td><td class="num">5</td><td class="num">5</td><td class="num">4.4k</td><td class="num">281.6k</td><td class="num"><b>3.8k</b></td><td class="num"><b>691</b></td><td class="num">289.9k</td><td class="num">1m24s</td><td class="num">0</td></tr>
+            <tr><td class="lab">Edit files · <code>apply_patch</code> ×4<span class="d5">D5</span></td><td><span class="kchip"><i class="k-edit"></i>edit</span></td><td>P2 21:28</td><td class="num">4</td><td class="num">4</td><td class="num">5.0k</td><td class="num">338.6k</td><td class="num"><b>3.5k</b></td><td class="num"><b>654</b></td><td class="num">347.1k</td><td class="num">1m15s</td><td class="num">0</td></tr>
+            <tr><td class="lab">Mixed · <code>Promise.allSettled</code>(simulator ×2) → <code>apply_patch</code> ×3<span class="d5">D5</span></td><td><span class="kchip"><i class="k-unnamed"></i>mixed</span></td><td>P2 21:33</td><td class="num">4</td><td class="num">4</td><td class="num">7.6k</td><td class="num">407.2k</td><td class="num"><b>1.9k</b></td><td class="num"><b>1.0k</b></td><td class="num">416.7k</td><td class="num">60s</td><td class="num">0</td></tr>
+            <tr><td class="lab">Mixed · <code>git status</code> + <code>rg</code> (40 KB, truncated) → <code>apply_patch</code><span class="d5">D5</span></td><td><span class="kchip"><i class="k-unnamed"></i>mixed</span></td><td>P3 21:57</td><td class="num">2</td><td class="num">2</td><td class="num">10.7k</td><td class="num">315.3k</td><td class="num"><b>2.2k</b></td><td class="num"><b>802</b></td><td class="num">328.2k</td><td class="num">49s</td><td class="num">0</td></tr>
+            <tr><td class="lab">Edit files · <code>cat &gt;&gt; TripViews.swift &lt;&lt;'EOF'</code><span class="d5">D5</span> <span class="sub">(today: "Read / search")</span></td><td><span class="kchip"><i class="k-edit"></i>edit</span></td><td>P1 21:13</td><td class="num">1</td><td class="num">1</td><td class="num">498</td><td class="num">47.5k</td><td class="num"><b>2.3k</b></td><td class="num">16</td><td class="num">50.3k</td><td class="num">44s</td><td class="num">0</td></tr>
+            <tr><td class="lab">Edit files · <code>cat &gt;&gt; TripService.swift &lt;&lt;'EOF'</code><span class="d5">D5</span></td><td><span class="kchip"><i class="k-edit"></i>edit</span></td><td>P1 21:12</td><td class="num">1</td><td class="num">1</td><td class="num">416</td><td class="num">43.9k</td><td class="num"><b>2.1k</b></td><td class="num">93</td><td class="num">46.4k</td><td class="num">40s</td><td class="num">0</td></tr>
+          </tbody>
+        </table></div>
+        <div class="sub" style="margin-top:6px">… 178 more rows. Tokens belong to the model calls in each segment; no token cost is assigned to an individual command.</div>
+
+        <div class="drawer" aria-label="Evidence for the selected segment">
+          <h3>Mixed · git status + rg → apply_patch · Prompt 3 · 21:57:04 → 21:57:53 · 2 model calls · tool elapsed 1.2s</h3>
+          <div class="cmd">exec (wrapper JS) · completed · output <b>40,155 B · truncated</b> · next call's context +10,467 tokens
+const cmds=['git status --short --branch','rg -n "TripDraftView|placeButton|saveInitialButton…"', …]</div>
+          <div class="cmd">exec (wrapper JS) · completed · output 50 B
+text(await tools.apply_patch("*** Begin Patch\n*** Update File: /Users/anh/newWorkspace/.worktrees/hellovietnam-ios7/HelloVietnam/TripViews.swift …"))</div>
+          <div class="facts"><span>call #300 · 10.5k fresh · 157.6k cache · 232 output · 8.0s</span><span><b>call #301 · 10.5k fresh · 157.7k cache · 1.9k output · 790 thinking · 40.8s · context 168.2k</b></span><span class="small">source ~/.codex/sessions/2026/09/27/rollout-…01a0e334.jsonl:offset</span></div>
+        </div>
+
+        <div class="cov"><b>Recording:</b> observer 8s ago · ingest 8s ago · usage 13h47m ago · capabilities: prompt identity, response identity, native execution status, file changes, heartbeat · <b>Unnamed segments: 71 of 184 · 27% of tokens · 59% of output · 69% of thinking</b> · missing: launch profile (historical run), child-agent usage, wrapper parent identities, instruction token counts.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callouts">
+    <div><span class="co">1</span><div><b>Tokens.</b> Giữ card hiện tại, thêm thinking, context cuối và ba dòng theo prompt. Tất cả từ <code>ledger.tokens</code>, <code>prompt_turns[].tokens</code>, <code>turns[].context_tokens_after</code>.</div></div>
+    <div><span class="co">2</span><div><b>Tool calls by work.</b> Mới. Gom 184 đoạn theo <code>kind</code>: số model call, số execution, token và tỷ lệ. Thanh "Unnamed" phải hiện rõ để captain thấy phần chưa đo được.</div></div>
+    <div><span class="co">3</span><div><b>Repeats.</b> Mới. Một dòng tổng từ <code>processes[]</code> (polls, unchanged) và các đoạn <code>kind=poll</code>; đếm finding <code>repeated_read</code>, <code>repeated_error</code>, <code>repair_test_loop</code> kể cả khi bằng 0.</div></div>
+    <div><span class="co">4</span><div><b>Most expensive step.</b> Sửa. Hai xếp hạng: theo output + thinking (call và đoạn) và theo tổng token. Đổi chữ "Most tokens" thành "By context re-sent" để không nhầm với suy luận.</div></div>
+    <div><span class="co">5</span><div><b>Worth a look.</b> Giữ 3 thẻ, thêm chip loại (failure / repeat / slow / output / wait), viết câu theo mẫu mục 6.1: đối tượng, số lần, chi phí, khoảng thời gian.</div></div>
+    <div><span class="co">6</span><div><b>Work over time.</b> Giữ SVG, thêm màu theo kind, thanh output + thinking dưới đường token, và ngoặc "×n" cho mỗi chuỗi poll. Vẽ từ <code>segments[]</code>, <code>executions[]</code>, <code>turns[]</code> đã có.</div></div>
+    <div><span class="co">7</span><div><b>Tool mix by prompt.</b> Mới. Cùng phép gom của ② nhưng theo <code>prompt_id</code>; hàng cuối phải bằng ledger (363 call, 40,4M).</div></div>
+    <div><span class="co">8</span><div><b>Work segments.</b> Giữ bảng, thêm cột Kind, Prompt, Tool calls, Thinking; thêm lọc theo kind và sort "Output + thinking". Ngăn kéo bằng chứng và dòng coverage giữ nguyên, thêm tỷ lệ đoạn không tên.</div></div>
+  </div>
+</section>
+
+<section class="section" id="dulieu">
+  <h2>4. Feed được không? Ma trận dữ liệu cho từng thành phần</h2>
+  <p>Trạng thái tính trên bản working tree (đang chạy ở 7778). <span class="status ok">Có sẵn</span> = đã có trong JSON hôm nay. <span class="status part">Tính được</span> = có đủ dữ liệu gốc, chỉ thiếu phép gom hoặc xếp hạng trong projector/UI. <span class="status miss">Thiếu</span> = chưa có dữ liệu. Cột Codex và Claude nói riêng vì hai adapter khác nhau: Codex có record native (<code>CommandExecution</code> với process id, exit code, output bytes), Claude chỉ có tool call/result chuẩn hoá.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Thành phần UI</th><th>Nguồn dữ liệu</th><th>Codex</th><th>Claude</th><th>Trạng thái</th><th>Việc cần làm</th></tr></thead>
+    <tbody>
+      <tr><td>①</td><td>Token tổng, 4 bucket, thinking</td><td><code>turn</code> → <code>ledger.tokens</code>, <code>performance.tokens</code></td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>①</td><td>Token theo prompt</td><td><code>prompt_turns[].tokens</code> (Codex <code>turn_id</code>, Claude <code>promptId</code>)</td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>①</td><td>Context cuối, context %</td><td><code>turns[].context_tokens_after</code>; % cần <code>pricing.context_window</code></td><td>✓</td><td>✓</td><td><span class="status part">% thiếu giá</span></td><td>D7: thêm <code>gpt-6-sol</code> vào <code>pricing.yaml</code></td></tr>
+      <tr><td>①</td><td>Cost</td><td><code>ledger.cost</code> qua <code>pricing</code></td><td>✓</td><td>✓</td><td><span class="status part">Thiếu giá</span></td><td>D7</td></tr>
+      <tr><td>②</td><td>Tool call tổng · lệnh native · poll · wrapper</td><td><code>ledger.tool_count</code>; <code>executions[]</code> (<code>is_wrapper</code>, <code>poll</code>, <code>status</code>, <code>exit_code</code>)</td><td>✓ native</td><td>chỉ tool_call/result, không lệnh con</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>②⑦</td><td>Tool call theo loại việc (Crew và theo prompt)</td><td>gom <code>segments[].kind</code>, <code>call_ids</code>, <code>execution_ids</code>, <code>prompt_id</code></td><td>✓</td><td>✓ (kind theo tên tool Read/Edit/Bash/Grep)</td><td><span class="status part">Tính được</span></td><td>D1: <code>tool_mix</code> trong projector</td></tr>
+      <tr><td>②⑧</td><td>Tên đoạn cụ thể ("phần nào")</td><td><code>segments[].label</code> từ lệnh native; wrapper JS chưa đọc</td><td>39% đoạn ios7 không tên</td><td>tên tool luôn có</td><td><span class="status part">Có nhưng yếu</span></td><td>D5: đọc <code>tools.apply_patch</code>, <code>tools.exec_command</code>, heredoc, <code>Promise.allSettled</code></td></tr>
+      <tr><td>③</td><td>Chuỗi poll, số poll, output không đổi</td><td><code>processes[]</code>, finding <code>process_polling</code> (process id từ <code>CommandExecution</code>)</td><td>✓</td><td>✗ không có process id</td><td><span class="status ok">Có sẵn (Codex)</span></td><td>Claude: nhận diện poll theo lệnh lặp lại giống nhau, làm sau</td></tr>
+      <tr><td>③</td><td>Một dòng tổng lặp (17 · 153 · 123 · 20,6M)</td><td>gom <code>processes[]</code> + đoạn <code>kind=poll</code> (không chồng nhau nên cộng đúng)</td><td>✓</td><td>✗</td><td><span class="status part">Tính được</span></td><td>D3: <code>loops</code> trong projector</td></tr>
+      <tr><td>③</td><td>Đọc lại nội dung không đổi</td><td>finding <code>repeated_read</code>: cùng file/range/query + hash output, reset khi có file change</td><td>✓</td><td>✓ (có hash output)</td><td><span class="status ok">Có sẵn (0 trên ios7)</span></td><td>—</td></tr>
+      <tr><td>③</td><td>Retry cùng lỗi, vòng sửa–test</td><td><code>repeated_error</code>, <code>repair_test_loop</code> + <code>progress</code> (FileChange)</td><td>✓</td><td>chỉ <code>is_error</code>, không FileChange</td><td><span class="status ok">Có sẵn (Codex)</span></td><td>Claude: lấy file change từ Edit/Write, làm sau</td></tr>
+      <tr><td>③⑧</td><td>Repeats từng đoạn</td><td><code>segments[].repeat_count</code></td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>④</td><td>Bước tốn nhất theo output + thinking</td><td><code>turns[].tokens.output/.thinking</code>, <code>segments[].tokens</code>; chưa có xếp hạng</td><td>✓</td><td>✓</td><td><span class="status part">Tính được</span></td><td>D2: <code>top_output_segment_ids</code>, <code>top_output_call_ids</code> + sort trong UI</td></tr>
+      <tr><td>④</td><td>Bước ngốn context nhất</td><td><code>top_segment_ids</code> (theo total)</td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>đổi nhãn "Most tokens" → "By context re-sent"</td></tr>
+      <tr><td>⑥⑧</td><td>Thời gian: prompt, tool, poll, chờ, chưa phân bổ</td><td><code>time.*</code>, <code>segments[].elapsed_ms/tool_elapsed_ms</code>, <code>executions[].duration_ms</code></td><td>✓ native</td><td>call → result, không native</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>⑤⑧</td><td>Lệnh thật, exit code, output bytes, error signature</td><td><code>executions[]</code> (<code>exec_command</code>)</td><td>✓</td><td>✗ exit code; có <code>is_error</code></td><td><span class="status ok">Có sẵn (Codex)</span></td><td>—</td></tr>
+      <tr><td>⑤⑥</td><td>Chờ quyết định</td><td><code>questions</code>, finding <code>decision_wait</code></td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>⑧</td><td>Freshness: observer, ingest, usage</td><td><code>freshness</code> + <code>telemetry_cursor.observed_at</code></td><td>✓</td><td>✓</td><td><span class="status ok">Có sẵn</span></td><td>—</td></tr>
+      <tr><td>⑧</td><td>Launch profile: model, effort, hash file chỉ dẫn, commit</td><td><code>telemetry.profile</code> ghi lúc spawn</td><td>crew mới ✓ · run cũ ✗</td><td>như Codex</td><td><span class="status ok">Có sẵn cho crew mới</span></td><td>—</td></tr>
+      <tr><td>—</td><td>Đường ống live cho console đang dùng</td><td>console ghi <code>telemetry.*</code> + schema 3; dashboard 7777 là build cũ, không có <code>performance</code></td><td>—</td><td>—</td><td><span class="status miss">Thiếu trên 7777</span></td><td>D6: build mới, đóng console, migrate, mở lại (captain đã chọn hoãn)</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Hai bảo toàn giữ nguyên: token chỉ có một sổ cái là <code>turn</code> (usage native chỉ để nối, không cộng); token của finding không cộng được với nhau vì các finding có thể dùng chung call. Chỉ đoạn (segment) là phân hoạch của call, nên mọi phép gom ở ②③⑦ đều cộng về đúng 363 call và 40,4M.</p>
+</section>
+
+<section class="section" id="luong">
+  <h2>5. Dữ liệu đi từ đâu tới UI</h2>
+  <div class="flow"><svg viewBox="0 0 1000 150" role="img" aria-label="Luồng dữ liệu từ transcript tới UI: transcript, adapter, observer, mate.db, projector, UI">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>
+    <g id="src"><rect class="box" x="0" y="20" width="150" height="110" rx="6"/><title>Nguồn: transcript của harness</title><text class="t" x="12" y="42">Transcript</text><text class="s" x="12" y="62">Codex rollout .jsonl</text><text class="s" x="12" y="78">Claude session .jsonl</text><text class="s" x="12" y="100">ios7: 9,5 MB rollout</text><text class="s" x="12" y="116">162 CommandExecution</text></g>
+    <path class="arrow" d="M152 75H168"/>
+    <g id="adapter"><rect class="box hot" x="170" y="20" width="150" height="110" rx="6"/><title>internal/harness</title><text class="t" x="182" y="42">Adapter · harness</text><text class="s" x="182" y="62">ParseTranscript</text><text class="s" x="182" y="78">→ turn · action</text><text class="s" x="182" y="100">ParseCodexTelemetry</text><text class="s" x="182" y="116">NormalizedTelemetry</text></g>
+    <path class="arrow" d="M322 75H338"/>
+    <g id="observer"><rect class="box" x="340" y="20" width="150" height="110" rx="6"/><title>Observer trong console (internal/watch)</title><text class="t" x="352" y="42">Observer · console</text><text class="s" x="352" y="62">internal/watch</text><text class="s" x="352" y="78">Ingest mỗi 5 s</text><text class="s" x="352" y="100">ghi event telemetry.*</text><text class="s" x="352" y="116">+ telemetry_cursor</text></g>
+    <path class="arrow" d="M492 75H508"/>
+    <g id="db"><rect class="box" x="510" y="20" width="150" height="110" rx="6"/><title>mate.db, schema 3, chỉ console được ghi</title><text class="t" x="522" y="42">mate.db · schema 3</text><text class="s" x="522" y="62">turn (sổ cái token)</text><text class="s" x="522" y="78">action · question</text><text class="s" x="522" y="100">event telemetry.*</text><text class="s" x="522" y="116">chỉ console được ghi</text></g>
+    <path class="arrow" d="M662 75H678"/>
+    <g id="projector"><rect class="box hot" x="680" y="20" width="150" height="110" rx="6"/><title>internal/diagnostics, chạy trong mate dashboard (read-only)</title><text class="t" x="692" y="42">Projector</text><text class="s" x="692" y="62">dashboard · read-only</text><text class="s" x="692" y="78">diagnostics.Project</text><text class="s" x="692" y="100">segments · findings</text><text class="s" x="692" y="116">exec · processes</text></g>
+    <path class="arrow" d="M832 75H848"/>
+    <g id="ui"><rect class="box" x="850" y="20" width="150" height="110" rx="6"/><title>UI: app.js</title><text class="t" x="862" y="42">UI · app.js</text><text class="s" x="862" y="62">GET /api/projects/p</text><text class="s" x="862" y="78">/tasks/crew</text><text class="s" x="862" y="100">.performance{…}</text><text class="s" x="862" y="116">+ .turns · .questions</text></g>
+  </svg></div>
+  <div class="qlist">
+    <div><span class="co">1</span><div><b>Token</b>: 4 bucket + thinking đọc từ usage của từng response ở Adapter; <code>turn</code> là sổ cái duy nhất.</div></div>
+    <div><span class="co">2</span><div><b>Phần nào</b>: đoạn theo kind tạo ở Projector; D1 gom lại, D5 dạy Adapter/Projector đọc wrapper JS.</div></div>
+    <div><span class="co">3</span><div><b>Lặp</b>: cần process id và hash output từ record native (Codex có, Claude không), rồi Projector nối thành chuỗi.</div></div>
+    <div><span class="co">4</span><div><b>Tốn nhất</b>: xếp hạng ở Projector; D2 thêm xếp hạng theo output + thinking.</div></div>
+  </div>
+  <ul class="tight" style="margin-top:14px">
+    <li><b style="color:var(--critical)">7777 (console đang dùng)</b>: build cũ, không ghi telemetry, response không có <code>.performance</code>.</li>
+    <li><b>7778 (review)</b>: build working tree, DB tách riêng, đọc transcript thật. Đây là nguồn của mọi số trong trang này.</li>
+    <li>Chỉ observer trong console ghi DB; dashboard mở DB read-only và không migrate. Reindex dựng lại toàn bộ từ transcript, nên projector đổi được mà không mất dữ liệu.</li>
+    <li>Bảo toàn (gate trong plan mục 7): token theo call = theo đoạn = theo prompt = ledger, qua restart và reindex.</li>
+  </ul>
+</section>
+
+<section class="section" id="viec">
+  <h2>6. Việc cần làm để UI đề xuất chạy được</h2>
+  <div class="grid">
+    <div class="card"><h3>D1 · <code>tool_mix</code> trong projector <span class="chip">Go · nhỏ</span></h3><p>Gom đoạn theo <code>kind</code> cho cả Crew và từng prompt: số call, số execution, token 4 bucket + thinking, elapsed, repeats. Ghi contract vào <code>docs/dashboard.md</code>. Test bằng fixture ios7: 183 + 97 + 46 + 32 + 5 = 363.</p></div>
+    <div class="card"><h3>D2 · xếp hạng theo output + thinking <span class="chip">Go + UI · nhỏ</span></h3><p><code>top_output_segment_ids</code>, <code>top_output_call_ids</code> bên cạnh <code>top_segment_ids</code>. UI: card ④ hai dòng, sort "Output + thinking" trong bảng đoạn.</p></div>
+    <div class="card"><h3>D3 · <code>loops</code> một dòng <span class="chip">Go · nhỏ</span></h3><p>Từ <code>processes[]</code> và đoạn <code>kind=poll</code>: chuỗi (≥ ngưỡng 3), poll, unchanged, progress, tiến trình bị poll, token của call poll, số finding <code>repeated_read</code> / <code>repeated_error</code> / <code>repair_test_loop</code>.</p></div>
+    <div class="card"><h3>D4 · UI màn hình đầu <span class="chip">app.js + app.css · vừa</span></h3><p>Dải "bốn câu trả lời", chip kind và lọc, cột Kind/Prompt/Tool calls/Thinking, ngoặc ×n trên timeline, thanh output dưới đường token, chip loại cho finding, câu theo mẫu mục 6.1. Mở rộng <code>ui_observability_test.cjs</code>.</p></div>
+    <div class="card rec"><h3>D5 · đọc wrapper JS của Codex 0.157 <span class="chip">harness + diagnostics · vừa</span></h3><p><code>text(await tools.apply_patch(</code> → Edit files kèm tên file; <code>tools.exec_command({cmd:</code> → lệnh thật; <code>cat &gt;&gt; F &lt;&lt;'EOF'</code> → Edit files; <code>Promise.allSettled</code> → Mixed với danh sách. Mục tiêu đo được: đoạn không tên của ios7 từ 71 xuống dưới 18 (10%), kind "edit" xuất hiện. Đây là việc nâng giá trị nhiều nhất vì phần viết code đang vô hình.</p></div>
+    <div class="card"><h3>D6 · rollout cho console thật <span class="chip">thủ tục</span></h3><p>Build binary, đóng console (single-writer lock), migrate <code>mate.db</code> lên schema 3, mở lại console bằng binary mới để observer ghi telemetry, rồi mở lại 7777. Captain đã chọn giữ console hiện tại và xem ở 7778; cho đến khi làm D6, 7777 không có gì trong số này.</p></div>
+    <div class="card"><h3>D7 · <code>pricing.yaml</code> <span class="chip">config · nhỏ</span></h3><p>Thêm dòng <code>gpt-6-sol</code> (giá 4 bucket + <code>context_window</code>) để cost và context % thôi là <code>?</code>. Không đoán giá; thiếu giá vẫn phải là <code>?</code>.</p></div>
+    <div class="card"><h3>Crew Claude <span class="chip">giới hạn</span></h3><p>Adapter chuẩn hoá của Claude cho token, đoạn theo tên tool, đọc lại (có hash), thời gian call → result. Không có process id, exit code, FileChange native, nên card ③ hiện "chuỗi poll: không đo được cho harness này" thay vì 0. <code>freshness.missing</code> đã nói điều này; UI cần hiện ngay trong card.</p></div>
+  </div>
+  <p class="note">Thứ tự đề nghị: D1 → D2 → D3 → D4 trên dữ liệu đang có (không đụng collector, không đụng schema), rồi D5. D6 và D7 độc lập, làm lúc captain rảnh console.</p>
+</section>
+
+<section class="section" id="chot">
+  <h2>7. Cần captain chốt</h2>
+  <form class="q" data-lavish-question="q1" onsubmit="queueAnswer(event,'q1','Bước tốn nhất được định nghĩa là')">
+    <b>Q1. "Bước suy luận tốn nhất" nghĩa là gì trên UI?</b>
+    <label><input type="radio" name="q1" value="Hiện cả hai: theo output + thinking (dẫn đầu) và theo tổng token/context, ghi rõ nhãn mỗi loại"> <span class="rec">Hiện cả hai, dẫn đầu bằng output + thinking; tổng token ghi là "context re-sent" <span class="chip acc">khuyến nghị</span></span></label>
+    <label><input type="radio" name="q1" value="Chỉ theo output + thinking"> Chỉ theo output + thinking (phần model sinh ra)</label>
+    <label><input type="radio" name="q1" value="Chỉ theo tổng token như hiện nay"> Giữ như hôm nay: chỉ theo tổng token</label>
+    <button type="submit">Xếp hàng câu trả lời</button><div class="queued" aria-live="polite"></div>
+  </form>
+  <form class="q" data-lavish-question="q2" onsubmit="queueAnswer(event,'q2','Tool mix và loops tính ở')">
+    <b>Q2. Phép gom theo loại việc (D1, D3) tính ở đâu?</b>
+    <label><input type="radio" name="q2" value="Projector Go trong internal/diagnostics, có test và contract trong docs/dashboard.md"> <span class="rec">Projector Go (<code>internal/diagnostics</code>), có test bằng fixture ios7 và contract trong docs <span class="chip acc">khuyến nghị</span></span></label>
+    <label><input type="radio" name="q2" value="Client-side trong app.js"> Client-side trong <code>app.js</code>, không đổi API</label>
+    <button type="submit">Xếp hàng câu trả lời</button><div class="queued" aria-live="polite"></div>
+  </form>
+  <form class="q" data-lavish-question="q3" onsubmit="queueAnswer(event,'q3','Thứ tự làm')">
+    <b>Q3. Làm gì trước?</b>
+    <label><input type="radio" name="q3" value="D1-D4 trước trên dữ liệu có sẵn, D5 sau"> <span class="rec">D1–D4 trước (màn hình đầu trên dữ liệu có sẵn), D5 ngay sau <span class="chip acc">khuyến nghị</span></span></label>
+    <label><input type="radio" name="q3" value="D5 trước vì 39% đoạn không tên"> D5 trước, vì 39% đoạn không tên làm mọi con số "phần nào" chưa đáng tin</label>
+    <label><input type="radio" name="q3" value="Làm D1-D5 thành một đợt"> Một đợt D1–D5, review một lần</label>
+    <button type="submit">Xếp hàng câu trả lời</button><div class="queued" aria-live="polite"></div>
+  </form>
+  <form class="q" data-lavish-question="q4" onsubmit="queueAnswer(event,'q4','Trang so sánh nhiều Crew')">
+    <b>Q4. Có cần trang so sánh nhiều Crew (theo repo, plan mục 6.2) trong đợt này không?</b>
+    <label><input type="radio" name="q4" value="Chưa, chỉ trang Crew"> <span class="rec">Chưa, chỉ hoàn thiện trang Crew <span class="chip acc">khuyến nghị</span></span></label>
+    <label><input type="radio" name="q4" value="Có, thêm bảng Crew x 4 câu ở trang project"> Có: bảng Crew × 4 câu ở trang project, dùng cùng <code>tool_mix</code> và <code>loops</code></label>
+    <textarea name="note" placeholder="Ghi chú thêm (tuỳ chọn)"></textarea>
+    <button type="submit">Xếp hàng câu trả lời</button><div class="queued" aria-live="polite"></div>
+  </form>
+</section>
+
+<section class="section" id="kiemchung">
+  <h2>8. Kiểm chứng số liệu</h2>
+  <p>Mọi con số trong trang này tái tạo được từ review server 7778 (khi nó còn chạy) hoặc từ JSON đã lưu.</p>
+<pre>curl -s http://127.0.0.1:7778/api/projects/hellovietnam/tasks/ios7 &gt; ios7.json
+jq '.performance | {model_calls, tokens, prompts: (.prompt_turns|length), segments: (.segments|length), findings: (.findings|length)}' ios7.json
+# 363 · 40,409,527 · 3 · 184 · 30
+jq '.performance.segments | group_by(.kind) | map({kind: .[0].kind, calls: (map(.model_calls)|add), tokens: (map(.tokens.total)|add), execs: (map(.execution_ids|length)|add)})' ios7.json
+# poll 183/20.6M · wrapper 61/6.0M · read 46/4.8M · unknown 33/4.5M · test 32/3.6M · git 5/0.7M · mixed 3/0.3M
+jq '[.performance.executions[] | select(.poll)] | length' ios7.json                       # 153
+jq '[.performance.processes[].unchanged_polls] | add' ios7.json                          # 123
+jq '.turns | sort_by(-(.tokens.output + .tokens.thinking)) | .[0] | {ordinal, tokens, duration_ms}' ios7.json   # #301
+jq '[.performance.executions[] | select(.status=="failed" and (.is_wrapper|not))] | map(.exit_code)' ios7.json  # 9× 65, 1× 1
+curl -s http://127.0.0.1:7777/api/projects/hellovietnam/tasks/ios7 | jq '.performance'  # null: build cũ</pre>
+</section>
+</main>
+
+<script type="application/json" id="p3data">{"at":"2026-09-27T14:56:41.372Z","span_ms":689178,"calls":[{"at":6,"t":157520,"o":299},{"at":23,"t":157707,"o":149},{"at":31,"t":157998,"o":244},{"at":72,"t":170182,"o":2739},{"at":82,"t":170479,"o":481},{"at":91,"t":171166,"o":286},{"at":106,"t":171789,"o":627},{"at":117,"t":172011,"o":236},{"at":137,"t":173290,"o":1140},{"at":147,"t":173523,"o":229},{"at":152,"t":173576,"o":25},{"at":158,"t":173673,"o":38},{"at":167,"t":173940,"o":165},{"at":171,"t":173993,"o":25},{"at":186,"t":174090,"o":38},{"at":197,"t":174187,"o":38},{"at":205,"t":174283,"o":38},{"at":214,"t":174379,"o":38},{"at":219,"t":174474,"o":38},{"at":226,"t":175032,"o":225},{"at":236,"t":175297,"o":197},{"at":245,"t":176342,"o":251},{"at":256,"t":177494,"o":368},{"at":264,"t":177581,"o":72},{"at":272,"t":177794,"o":165},{"at":279,"t":177847,"o":25},{"at":291,"t":177943,"o":38},{"at":301,"t":178041,"o":38},{"at":309,"t":178136,"o":38},{"at":318,"t":178233,"o":38},{"at":328,"t":178328,"o":38},{"at":338,"t":178424,"o":38},{"at":343,"t":178519,"o":38},{"at":354,"t":178969,"o":201},{"at":369,"t":179198,"o":144},{"at":377,"t":180075,"o":162},{"at":389,"t":183281,"o":150},{"at":402,"t":183881,"o":687},{"at":415,"t":184108,"o":156},{"at":423,"t":184161,"o":25},{"at":429,"t":184255,"o":38},{"at":440,"t":184609,"o":114},{"at":444,"t":184662,"o":25},{"at":457,"t":184757,"o":38},{"at":466,"t":184854,"o":38},{"at":476,"t":184949,"o":38},{"at":486,"t":185045,"o":38},{"at":496,"t":185141,"o":38},{"at":507,"t":185237,"o":38},{"at":515,"t":185331,"o":38},{"at":528,"t":185427,"o":38},{"at":536,"t":185524,"o":38},{"at":545,"t":185621,"o":38},{"at":554,"t":185769,"o":100},{"at":563,"t":187083,"o":251},{"at":571,"t":187986,"o":179},{"at":582,"t":188183,"o":115},{"at":598,"t":188621,"o":561},{"at":610,"t":190371,"o":232},{"at":630,"t":191070,"o":941},{"at":643,"t":191290,"o":203},{"at":652,"t":191542,"o":230},{"at":666,"t":192689,"o":272},{"at":680,"t":192914,"o":213},{"at":689,"t":193084,"o":112}],"segments":[{"s":0,"e":6,"k":"unknown","t":157520,"r":0,"c":1,"l":"Activity not classified · echo working: polishing draft flow"},{"s":6,"e":23,"k":"mixed","t":157707,"r":0,"c":1,"l":"Mixed activity"},{"s":23,"e":72,"k":"wrapper","t":328180,"r":0,"c":2,"l":"Tool wrapper · git status + rg → apply_patch"},{"s":72,"e":82,"k":"read","t":170479,"r":0,"c":1,"l":"Read / search · sed -n 286,314p project.pbxproj"},{"s":82,"e":91,"k":"read","t":171166,"r":0,"c":1,"l":"Read / search · python3 heredoc"},{"s":91,"e":137,"k":"wrapper","t":517090,"r":0,"c":3,"l":"Tool wrapper · command details unavailable"},{"s":137,"e":147,"k":"test","t":173523,"r":0,"c":1,"l":"Build / test · xcodebuild"},{"s":147,"e":158,"k":"poll","t":347249,"r":0,"c":2,"l":"Check process · process 62278"},{"s":158,"e":167,"k":"test","t":173940,"r":0,"c":1,"l":"Build / test · xcodebuild"},{"s":167,"e":219,"k":"poll","t":1045406,"r":4,"c":6,"l":"Check process · process 68365"},{"s":219,"e":226,"k":"read","t":175032,"r":0,"c":1,"l":"Read / search · rg --files DerivedData"},{"s":226,"e":236,"k":"read","t":175297,"r":0,"c":1,"l":"Read / search · xcresulttool get test-results"},{"s":236,"e":245,"k":"read","t":176342,"r":0,"c":1,"l":"Read / search · xcresulttool export object"},{"s":245,"e":256,"k":"wrapper","t":177494,"r":0,"c":1,"l":"Tool wrapper · command details unavailable"},{"s":256,"e":264,"k":"unknown","t":177581,"r":0,"c":1,"l":"Activity not classified · rm .tmp-polish-hierarchy.txt"},{"s":264,"e":272,"k":"test","t":177794,"r":0,"c":1,"l":"Build / test · xcodebuild"},{"s":272,"e":343,"k":"poll","t":1425471,"r":6,"c":8,"l":"Check process · process 34358"},{"s":343,"e":354,"k":"read","t":178969,"r":0,"c":1,"l":"Read / search · rg --files DerivedData"},{"s":354,"e":369,"k":"unknown","t":179198,"r":0,"c":1,"l":"Activity not classified · xcresulttool export attachments"},{"s":369,"e":377,"k":"wrapper","t":180075,"r":0,"c":1,"l":"Tool wrapper · command details unavailable"},{"s":377,"e":389,"k":"read","t":183281,"r":0,"c":1,"l":"Read / search · find .tmp-polish-shots"},{"s":389,"e":402,"k":"git","t":183881,"r":0,"c":1,"l":"Git / handback · git add"},{"s":402,"e":415,"k":"test","t":184108,"r":0,"c":1,"l":"Build / test · xcodebuild"},{"s":415,"e":429,"k":"poll","t":368416,"r":0,"c":2,"l":"Check process · process 22352"},{"s":429,"e":440,"k":"test","t":184609,"r":0,"c":1,"l":"Build / test · xcodebuild"},{"s":440,"e":554,"k":"poll","t":2222317,"r":10,"c":12,"l":"Check process · process 85006"},{"s":554,"e":563,"k":"unknown","t":187083,"r":0,"c":1,"l":"Activity not classified · xcresulttool export attachments"},{"s":563,"e":571,"k":"unknown","t":187986,"r":0,"c":1,"l":"Activity not classified · python3 heredoc"},{"s":571,"e":582,"k":"read","t":188183,"r":0,"c":1,"l":"Read / search · find .tmp-polish-final"},{"s":582,"e":598,"k":"wrapper","t":188621,"r":0,"c":1,"l":"Tool wrapper · command details unavailable"},{"s":598,"e":610,"k":"unknown","t":190371,"r":0,"c":1,"l":"Activity not classified · 2 targets"},{"s":610,"e":630,"k":"unknown","t":191070,"r":0,"c":1,"l":"Activity not classified · python3 heredoc"},{"s":630,"e":643,"k":"unknown","t":191290,"r":0,"c":1,"l":"Activity not classified · python3 heredoc"},{"s":643,"e":652,"k":"wrapper","t":191542,"r":0,"c":1,"l":"Tool wrapper · command details unavailable"},{"s":652,"e":666,"k":"read","t":192689,"r":0,"c":1,"l":"Read / search · python3 heredoc"},{"s":666,"e":680,"k":"unknown","t":192914,"r":0,"c":1,"l":"Activity not classified · echo wait-mate: ready"},{"s":680,"e":689,"k":"unknown","t":193084,"r":0,"c":1,"l":"Activity not recorded"}],"execs":[{"s":6,"e":6,"f":false},{"s":23,"e":23,"f":false},{"s":23,"e":23,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":31,"e":31,"f":false},{"s":82,"e":82,"f":false},{"s":91,"e":91,"f":false},{"s":116,"e":116,"f":false},{"s":116,"e":116,"f":false},{"s":116,"e":116,"f":false},{"s":116,"e":116,"f":false},{"s":146,"e":151,"f":false},{"s":166,"e":218,"f":true},{"s":226,"e":226,"f":false},{"s":236,"e":236,"f":false},{"s":245,"e":245,"f":false},{"s":263,"e":263,"f":false},{"s":271,"e":342,"f":false},{"s":354,"e":354,"f":false},{"s":369,"e":369,"f":false},{"s":388,"e":388,"f":false},{"s":402,"e":402,"f":false},{"s":414,"e":416,"f":false},{"s":439,"e":554,"f":false},{"s":563,"e":563,"f":false},{"s":571,"e":571,"f":false},{"s":582,"e":582,"f":false},{"s":598,"e":598,"f":false},{"s":598,"e":598,"f":false},{"s":598,"e":598,"f":false},{"s":609,"e":609,"f":false},{"s":609,"e":609,"f":false},{"s":630,"e":630,"f":false},{"s":643,"e":643,"f":false},{"s":652,"e":652,"f":false},{"s":652,"e":652,"f":false},{"s":652,"e":652,"f":false},{"s":666,"e":666,"f":false},{"s":680,"e":680,"f":false}],"polls":[{"s":157,"pid":"62278","f":false},{"s":181,"pid":"68365","f":false},{"s":192,"pid":"68365","f":false},{"s":200,"pid":"68365","f":false},{"s":209,"pid":"68365","f":false},{"s":219,"pid":"68365","f":true},{"s":286,"pid":"34358","f":false},{"s":296,"pid":"34358","f":false},{"s":304,"pid":"34358","f":false},{"s":313,"pid":"34358","f":false},{"s":323,"pid":"34358","f":false},{"s":333,"pid":"34358","f":false},{"s":343,"pid":"34358","f":false},{"s":429,"pid":"22352","f":false},{"s":452,"pid":"85006","f":false},{"s":461,"pid":"85006","f":false},{"s":471,"pid":"85006","f":false},{"s":481,"pid":"85006","f":false},{"s":491,"pid":"85006","f":false},{"s":502,"pid":"85006","f":false},{"s":510,"pid":"85006","f":false},{"s":523,"pid":"85006","f":false},{"s":531,"pid":"85006","f":false},{"s":540,"pid":"85006","f":false},{"s":551,"pid":"85006","f":false}],"pollTokens":{"62278":173673,"68365":871413,"34358":1247624,"22352":184255,"85006":2037655}}</script>
+<script>
+(function () {
+  // Theme toggle: same tokens and switching rule as the dashboard's app.css.
+  var root = document.documentElement;
+  document.getElementById("theme").addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    root.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+
+  // Prompt 3 timeline, drawn from the recorded timestamps embedded above.
+  var d = JSON.parse(document.getElementById("p3data").textContent);
+  var span = d.span_ms / 1000, W = 1000, L = 84, R = 14, PW = W - L - R, H = 300;
+  var x = function (s) { return L + Math.max(0, Math.min(1, s / span)) * PW; };
+  var NS = "http://www.w3.org/2000/svg";
+  var svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Prompt 3: cumulative tokens, output per call, segments by kind, commands, poll chains, decisions");
+  function n(tag, attrs, text) {
+    var el = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  var t0 = Date.parse(d.at);
+  function clock(s) { var dt = new Date(t0 + s * 1000); return dt.toLocaleTimeString("vi-VN", { hour12: false }); }
+  function fmt(v) { return v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + "k" : String(v); }
+  var yTok = { top: 18, h: 78 }, yOut = { top: 100, h: 26 }, ySeg = { top: 134, h: 30 }, yCmd = 178, yPoll = 206, yDec = 240;
+  [["Tokens", yTok.top + 12], ["Output", yOut.top + 10], ["Segments", ySeg.top + 18], ["Commands", yCmd + 9], ["Polls", yPoll + 9], ["Decisions", yDec + 9]].forEach(function (p) {
+    svg.appendChild(n("text", { x: 0, y: p[1], "class": "lbl" }, p[0]));
+  });
+  for (var i = 0; i <= 4; i++) {
+    var s = span * i / 4;
+    svg.appendChild(n("line", { x1: x(s), x2: x(s), y1: yTok.top, y2: yDec + 14, "class": "gridline" }));
+    svg.appendChild(n("text", { x: x(s), y: H - 10, "class": "lbl", "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle" }, clock(s)));
+  }
+  // Segments by kind.
+  d.segments.forEach(function (s, i) {
+    var k = s.k === "poll" || s.k === "read" || s.k === "test" || s.k === "git" ? "k-" + s.k : "k-unnamed";
+    var r = n("rect", { id: "p3seg" + i, x: x(s.s), y: ySeg.top, width: Math.max(1.5, x(s.e) - x(s.s)), height: ySeg.h, "class": "seg " + k });
+    r.appendChild(n("title", {}, s.l + " · " + s.c + " calls · " + fmt(s.t) + " tokens" + (s.r ? " · " + s.r + " repeats" : "")));
+    svg.appendChild(r);
+  });
+  // Cumulative token line and per-call output bars.
+  var total = d.tokens || d.calls.reduce(function (a, c) { return a + c.t; }, 0), cum = 0, path = "M " + L + " " + (yTok.top + yTok.h);
+  var maxOut = Math.max.apply(null, d.calls.map(function (c) { return c.o; }));
+  d.calls.forEach(function (c) {
+    cum += c.t;
+    var y = yTok.top + yTok.h - yTok.h * Math.min(1, cum / total);
+    path += " H " + x(c.at).toFixed(1) + " V " + y.toFixed(1);
+    var h = Math.max(1, yOut.h * c.o / maxOut);
+    var b = n("rect", { x: x(c.at) - 1.5, y: yOut.top + yOut.h - h, width: 3, height: h, "class": "outbar" });
+    b.appendChild(n("title", {}, "call at +" + c.at + "s · " + c.o + " output + thinking · " + fmt(c.t) + " total"));
+    svg.appendChild(b);
+  });
+  path += " H " + x(span);
+  svg.appendChild(n("path", { d: path, "class": "tokline" }));
+  svg.appendChild(n("text", { x: W - R, y: yTok.top + 12, "class": "lbl", "text-anchor": "end" }, fmt(total) + " cumulative"));
+  svg.appendChild(n("text", { x: W - R, y: yOut.top + 10, "class": "lbl", "text-anchor": "end" }, "max " + fmt(maxOut) + " (call #301)"));
+  // Native commands.
+  d.execs.forEach(function (e) {
+    var w = Math.max(2, x(e.e == null ? span : e.e) - x(e.s));
+    var r = n("rect", { x: x(e.s), y: yCmd, width: w, height: 12, "class": "exec" + (e.f ? " failed" : "") });
+    r.appendChild(n("title", {}, (e.f ? "failed · exit 65 · " : "") + "+" + e.s + "s → +" + (e.e == null ? "?" : e.e) + "s"));
+    svg.appendChild(r);
+  });
+  // Poll ticks and chain brackets with counts.
+  var groups = {};
+  d.polls.forEach(function (p) {
+    var r = n("rect", { x: x(p.s) - 1, y: yPoll, width: 2.5, height: 12, "class": "poll" + (p.f ? " failed" : "") });
+    r.appendChild(n("title", {}, "poll of process " + p.pid + " at +" + p.s + "s" + (p.f ? " · wrapper failed" : "")));
+    svg.appendChild(r);
+    (groups[p.pid] = groups[p.pid] || []).push(p.s);
+  });
+  Object.keys(groups).forEach(function (pid) {
+    var g = groups[pid]; if (g.length < 3) return;
+    var a = x(Math.min.apply(null, g)) - 3, b = x(Math.max.apply(null, g)) + 3;
+    svg.appendChild(n("path", { d: "M " + a + " " + (yPoll + 16) + " v 5 H " + b + " v -5", "class": "bracket" }));
+    var label = n("text", { x: (a + b) / 2, y: yPoll + 31, "class": "brlabel", "text-anchor": "middle" }, "×" + g.length + (d.pollTokens[pid] ? " · " + fmt(d.pollTokens[pid]) : ""));
+    svg.appendChild(label);
+  });
+  svg.appendChild(n("text", { x: L + 4, y: yDec + 10, "class": "lbl" }, "none in this prompt · the 1m02s wait was in Prompt 2 (21:20:35 → 21:21:37)"));
+  document.getElementById("p3tl").appendChild(svg);
+})();
+
+function queueAnswer(event, key, prefix) {
+  event.preventDefault();
+  var form = event.currentTarget;
+  var fd = new FormData(form);
+  var v = fd.get(key);
+  var note = (fd.get("note") || "").toString().trim();
+  var out = form.querySelector(".queued");
+  if (!v) { out.textContent = "Chọn một phương án trước."; return; }
+  var text = prefix + ": " + v + (note ? " · ghi chú: " + note : "");
+  if (window.lavish && window.lavish.queuePrompt) {
+    window.lavish.queuePrompt(text, { tag: "choice", text: key.toUpperCase() + ": " + v, element: form, queueKey: key, data: { question: key, answer: v, note: note } });
+    out.textContent = "Đã xếp hàng: " + v;
+  } else {
+    out.textContent = "Đã chọn (mở qua lavish-axi để gửi về agent): " + v;
+  }
+}
+</script>
+</body>
+</html>

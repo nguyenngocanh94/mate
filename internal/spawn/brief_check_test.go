@@ -131,3 +131,34 @@ func TestSpawnCrewAppendsCrewRules(t *testing.T) {
 		t.Error("the CREW.md comment reached the brief")
 	}
 }
+
+// A crew's meta records its task's shape, and CrewIsScout answers from it;
+// a crew spawned before `kind=` existed is read off its brief instead.
+func TestCrewKindIsRecordedAndRead(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	deps := fakeDeps(t, runtime.NewFake())
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "sc", BriefText: brieftest.Scout("Find out why the cart empties.", "What empties it?"), Scout: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "sh", BriefText: brieftest.Ship("Fix the cart."),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for crew, want := range map[string]string{"sc": "scout", "sh": "ship"} {
+		meta, err := w.ReadCrewMeta("shop", crew)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if meta[spawn.MetaKind] != want || spawn.CrewIsScout(w, "shop", crew, meta) != (want == "scout") {
+			t.Fatalf("%s: kind=%q scout=%v, want %s", crew, meta[spawn.MetaKind], spawn.CrewIsScout(w, "shop", crew, meta), want)
+		}
+		// An older record: no kind, only the brief.
+		delete(meta, spawn.MetaKind)
+		if got := spawn.CrewIsScout(w, "shop", crew, meta); got != (want == "scout") {
+			t.Fatalf("%s without kind: scout=%v, want %s", crew, got, want)
+		}
+	}
+}

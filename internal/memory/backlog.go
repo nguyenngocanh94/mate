@@ -1,8 +1,8 @@
 package memory
 
 // backlog.md's sections (docs/research/firstmate-memory-2026-09-24.md A3,
-// B12). The Mate writes the file; the app only seeds it and never touches it
-// again, and `mate backlog` is the live table it is reconciled against.
+// B12). The Mate owns its content; backlog add/move/done provide locked edits.
+// Bare `mate backlog` is the live table it is reconciled against.
 const (
 	BacklogInFlight = "In flight"
 	// BacklogHeld holds every question sent to the captain and every

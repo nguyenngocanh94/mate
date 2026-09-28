@@ -16,6 +16,8 @@ import (
 // strong and a reader deciding whether to trust a token total should be able
 // to see which one fired.
 type Located struct {
+	// Finalized is an immutable snapshot taken after a confirmed runtime stop.
+	Finalized bool
 	ActorID   string
 	Kind      harness.Kind
 	Path      string

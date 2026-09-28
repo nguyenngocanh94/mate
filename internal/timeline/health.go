@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
@@ -97,12 +99,22 @@ func (p *pass) fillThinking(ctx context.Context) error {
 }
 
 func (p *pass) fillTurnGaps(ctx context.Context) error {
+	actors := p.changedActivityActors()
+	if len(actors) == 0 {
+		return nil
+	}
+	args := []any{p.project}
+	for _, actor := range actors {
+		args = append(args, actor)
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(actors)), ",")
 	gap := p.ing.deps.thinkingGap()
 	rows, err := p.tx.QueryContext(ctx,
 		`SELECT t.id, t.actor_id, t.started_at, t.ended_at FROM turn t
 		   JOIN actor a ON a.id = t.actor_id
-		  WHERE a.project = ? AND t.started_at IS NOT NULL AND t.ended_at IS NOT NULL`,
-		p.project)
+		  WHERE a.project = ? AND t.started_at IS NOT NULL AND t.ended_at IS NOT NULL
+		  AND t.actor_id IN (`+placeholders+`)`,
+		args...)
 	if err != nil {
 		return err
 	}
@@ -144,10 +156,19 @@ func (p *pass) fillTurnGaps(ctx context.Context) error {
 }
 
 func (p *pass) fillBusyStretches(ctx context.Context) error {
+	actors := p.changedActivityActors()
+	if len(actors) == 0 {
+		return nil
+	}
+	args := []any{p.project, KindHealthChanged}
+	for _, actor := range actors {
+		args = append(args, actor)
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(actors)), ",")
 	rows, err := p.tx.QueryContext(ctx,
 		`SELECT actor_id, at, json_extract(payload, '$.to') FROM event
-		  WHERE project = ? AND kind = ? ORDER BY actor_id, at, id`,
-		p.project, KindHealthChanged)
+		  WHERE project = ? AND kind = ? AND actor_id IN (`+placeholders+`) ORDER BY actor_id, at, id`,
+		args...)
 	if err != nil {
 		return err
 	}
@@ -197,6 +218,29 @@ func (p *pass) fillBusyStretches(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// An appended response or late tool result can change only its actor's gaps.
+// Avoid re-scanning every historical Crew when one active Crew appends output.
+func (p *pass) changedActivityActors() []string {
+	actors := map[string]bool{}
+	for _, t := range p.b.turns {
+		actors[t.ActorID] = true
+	}
+	for _, a := range p.b.actions {
+		actors[a.ActorID] = true
+	}
+	for _, e := range p.b.events {
+		if e.Kind == KindHealthChanged {
+			actors[e.ActorID] = true
+		}
+	}
+	out := make([]string, 0, len(actors))
+	for actor := range actors {
+		out = append(out, actor)
+	}
+	sort.Strings(out)
+	return out
 }
 
 type span struct{ from, to time.Time }

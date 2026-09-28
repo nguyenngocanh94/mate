@@ -790,3 +790,75 @@ func storyLines(t *testing.T, f *fixture) []string {
 	}
 	return out
 }
+
+func TestReindexPreservesSpendFromARefreshedMateSession(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if err := f.ing.Ingest(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var before int64
+	if err := f.db.SQL().QueryRow(`SELECT sum(input_tokens+cache_read_tokens+cache_write_tokens+output_tokens) FROM turn WHERE actor_id=?`, timeline.MateActorID(fixtureProject)).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := f.ws.ReadMateMeta(fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ws.ArchiveMateSession(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	meta["session_id"] = "new-empty-session"
+	delete(meta, "transcript")
+	if err := f.ws.WriteMateMeta(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ing.Reindex(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var after int64
+	if err := f.db.SQL().QueryRow(`SELECT sum(input_tokens+cache_read_tokens+cache_write_tokens+output_tokens) FROM turn WHERE actor_id=?`, timeline.MateActorID(fixtureProject)).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if before == 0 || after != before {
+		t.Fatalf("refresh lost spend: %d -> %d", before, after)
+	}
+}
+
+func TestFrozenRefreshSnapshotCountsTheFinalCallExactlyOnce(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if err := f.ing.Ingest(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var before int
+	actor := timeline.MateActorID(fixtureProject)
+	if err := f.db.SQL().QueryRow(`SELECT count(*) FROM turn WHERE actor_id=?`, actor).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := f.ws.ReadMateMeta(fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Fixture transcript is a static captured file, satisfying the at-rest precondition.
+	if err := f.ws.FreezeMateSession(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	meta["session_id"] = "fresh-empty"
+	delete(meta, "transcript")
+	if err := f.ws.WriteMateMeta(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := f.ing.Reindex(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var after int
+		if err := f.db.SQL().QueryRow(`SELECT count(*) FROM turn WHERE actor_id=?`, actor).Scan(&after); err != nil {
+			t.Fatal(err)
+		}
+		if after != before+1 {
+			t.Fatalf("final group: before=%d after=%d", before, after)
+		}
+	}
+}

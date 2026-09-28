@@ -68,6 +68,9 @@ var (
 	// after every enter. The text reached the pane but not the model, which
 	// is precisely the failure `herdr agent prompt` hides.
 	ErrEnterSwallowed = errors.New("enter did not submit the line")
+	// ErrSubmissionUnconfirmed means input may have arrived, but neither a
+	// cleared composer nor an idle-to-busy transition proves submission.
+	ErrSubmissionUnconfirmed = errors.New("submission unconfirmed; do not retype")
 )
 
 // Runtime is the slice of runtime.Adapter a send needs. It is narrow on
@@ -93,6 +96,9 @@ var _ Runtime = runtime.Adapter(nil)
 type Deps struct {
 	Runtime Runtime
 	Sleep   func(ctx context.Context, d time.Duration) error
+	// BeforeType persists an attempt after readiness checks and before any
+	// bytes are sent. A failure prevents typing. Recovery never calls it.
+	BeforeType func() error
 }
 
 // Defaults measured by firstmate and carried over unchanged (bin/fm-send.sh,
@@ -122,6 +128,9 @@ const (
 // settle 300ms (1200ms for a slash command), up to three enters 400ms apart,
 // no marker, refuse a busy pane, no post-send wait.
 type Options struct {
+	// ResumePending is only for a caller holding a recorded attempt for this
+	// exact agent incarnation and payload. It never types, even if empty.
+	ResumePending bool
 	// QueueWhileBusy types into a pane that is mid-turn instead of
 	// refusing. The harness queues the line behind the running turn. It is
 	// off by default because a queued line is not an answered line, and a
@@ -169,6 +178,8 @@ type Report struct {
 	Before Classification
 	// Typed is whether the text reached the composer.
 	Typed bool
+	// Resumed means Enter was retried for a recorded, fully matched draft.
+	Resumed bool
 	// Settled is the pause taken between typing and the first enter.
 	Settled time.Duration
 	// Presses is how many enters were sent.
@@ -182,10 +193,11 @@ type Report struct {
 	Warnings []string
 }
 
-// Delivered reports whether the composer cleared, which is the only positive
-// evidence this package accepts that a line was submitted.
+// Delivered requires a cleared composer or an observed transition to busy.
+// Unknown and a pane that was already busy do not prove submission.
 func (r Report) Delivered() bool {
-	return r.Typed && r.After.State != StatePending
+	return (r.Typed || r.Resumed) && r.Presses > 0 &&
+		(r.After.State == StateEmpty || (r.After.State == StateBusy && r.Before.State != StateBusy))
 }
 
 // Send types one line into an agent's composer and verifies it was
@@ -209,6 +221,11 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		payload = Marker + text
 	}
 	report.Text = payload
+	// Reject terminal control bytes before a caller persists ownership of
+	// an attempt; an invalid input must not strand a recovery receipt.
+	if err := runtime.ValidateSendText(payload); err != nil {
+		return report, err
+	}
 
 	// The styled read, not the plain one: see the Runtime interface above.
 	screen, err := deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
@@ -221,6 +238,11 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	}
 	report.Before = before
 	report.Steps = append(report.Steps, Step{What: "classify", State: before.State, Evidence: before.Evidence})
+	if opts.ResumePending && (before.State != StatePending || !pendingMatches(kind, screen, payload)) {
+		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
+			"recorded send no longer matches the whole pending composer; inspect the pane, do not retype",
+			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
+	}
 
 	switch before.State {
 	case StateBusy:
@@ -230,6 +252,9 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 				map[string]any{"evidence": before.Evidence})
 		}
 	case StatePending:
+		if opts.ResumePending {
+			break
+		}
 		return report, sendError(observability.CodeStateConflict, ErrComposerPending,
 			fmt.Sprintf("agent %s has unsubmitted text in its composer (%q); mate will not type over it", target.Name, before.Pending),
 			map[string]any{"pending": before.Pending, "evidence": before.Evidence})
@@ -239,22 +264,45 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 
-	if err := deps.Runtime.SendText(ctx, target, payload); err != nil {
-		return report, err
+	if opts.ResumePending {
+		report.Resumed = true
+		report.Steps = append(report.Steps, Step{What: "resume", Detail: payload})
+	} else {
+		if deps.BeforeType != nil {
+			if err := deps.BeforeType(); err != nil {
+				return report, err
+			}
+		}
+		if err := deps.Runtime.SendText(ctx, target, payload); err != nil {
+			return report, err
+		}
+		report.Typed = true
+		report.Steps = append(report.Steps, Step{What: "type", Detail: payload})
 	}
-	report.Typed = true
-	report.Steps = append(report.Steps, Step{What: "type", Detail: payload})
 
 	report.Settled = opts.Settle
 	report.Steps = append(report.Steps, Step{What: "settle", Detail: opts.Settle.String()})
 	if err := sleep(ctx, deps, opts.Settle); err != nil {
 		return report, err
 	}
+	if opts.ResumePending {
+		// A human can edit during the settle interval. Do not submit the
+		// earlier snapshot's text without reading the composer again.
+		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
+		if err != nil {
+			return report, err
+		}
+	}
 
 	// Enter only, never the text again: a swallowed enter leaves the line in
 	// the composer, so retyping would submit it twice.
 	var after Classification
 	for attempt := 1; attempt <= opts.Retries; attempt++ {
+		if (attempt > 1 || opts.ResumePending) && !pendingMatches(kind, screen, payload) {
+			return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
+				"pending composer changed or cannot be fully read; no further Enter sent",
+				map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
+		}
 		if err := deps.Runtime.SendKeys(ctx, target, []string{"enter"}); err != nil {
 			return report, err
 		}
@@ -285,6 +333,11 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		return report, sendError(observability.CodeStateConflict, ErrEnterSwallowed,
 			fmt.Sprintf("typed into %s but %d enter(s) did not submit it; the line is still in the composer (%q)", target.Name, report.Presses, after.Pending),
 			map[string]any{"pending": after.Pending, "screen_tail": ScreenTail(StripSGR(screen), tailLines)})
+	}
+	if !report.Delivered() {
+		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
+			"text was typed but submission is unconfirmed; inspect the pane, do not retype",
+			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 
 	if opts.WaitForWorking {

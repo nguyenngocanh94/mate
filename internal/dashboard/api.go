@@ -21,7 +21,8 @@ import (
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/workspace", s.cached(s.handleWorkspace))
 	s.mux.HandleFunc("GET /api/projects/{project}", s.cached(s.handleProject))
-	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}", s.cached(s.handleTask))
+	s.mux.HandleFunc("GET /api/projects/{project}/mate", s.respond(s.handleMate, false))
+	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}", s.respond(s.handleTask, false))
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/turns/{turn}", s.cached(s.handleTurn))
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/diff", s.cached(s.handleDiff))
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
@@ -36,6 +37,12 @@ type builder func(ctx context.Context, r *http.Request, env envelope) (any, erro
 // number a client polls `/api/events?since=` with is exactly the number the
 // page it is looking at was computed from.
 func (s *Server) cached(build builder) http.HandlerFunc {
+	return s.respond(build, true)
+}
+
+// Live diagnostic clocks and the observer heartbeat advance without a new
+// event. Task snapshots therefore use the same response path without caching.
+func (s *Server) respond(build builder, cacheable bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		id, err := s.lastEventID(ctx)
@@ -44,7 +51,7 @@ func (s *Server) cached(build builder) http.HandlerFunc {
 			return
 		}
 		key := r.URL.Path + "?" + r.URL.RawQuery
-		if body, ok := s.cache.get(key, id); ok {
+		if body, ok := s.cache.get(key, id); cacheable && ok {
 			writeJSON(w, http.StatusOK, body)
 			return
 		}
@@ -64,7 +71,9 @@ func (s *Server) cached(build builder) http.HandlerFunc {
 			s.writeError(w, r, http.StatusInternalServerError, "the answer could not be encoded", err.Error())
 			return
 		}
-		s.cache.put(key, id, body)
+		if cacheable {
+			s.cache.put(key, id, body)
+		}
 		writeJSON(w, http.StatusOK, body)
 	}
 }
@@ -84,7 +93,7 @@ func (s *Server) handleWorkspace(ctx context.Context, _ *http.Request, env envel
 		card.Mate = MateCard{Harness: facts.harness, Running: facts.running()}
 		if sc, ok := scenes[timeline.MateActorID(ref.Name)]; ok {
 			card.Mate.State, card.Mate.Since = sc.State, sc.Since
-			card.Mate.TokensToday, card.Mate.ContextPct = sc.TokensToday, sc.ContextPct
+			card.Mate.TokensToday, card.Mate.ContextPct, card.Mate.ContextTokens = sc.TokensToday, sc.ContextPct, sc.ContextTokens
 		}
 		for _, sc := range scenes {
 			if sc.ActorKind != timeline.ActorCrew {
@@ -150,11 +159,36 @@ func (s *Server) handleTask(ctx context.Context, r *http.Request, env envelope) 
 	if err != nil {
 		return nil, err
 	}
+	performance, err := s.crewPerformance(ctx, actorID, ledger, turns, questions, s.deps.now())
+	if err != nil {
+		return nil, err
+	}
 	return TaskResponse{
 		envelope: env, Project: project, Crew: crew, Ledger: ledger,
 		Turns: turns, StatusLines: lines, Questions: questions,
-		Branch: s.branch(ctx, project, crew, ledger.Branch),
+		Branch:      s.branch(ctx, project, crew, ledger.Branch),
+		Performance: performance,
 	}, nil
+}
+
+func (s *Server) handleMate(ctx context.Context, r *http.Request, env envelope) (any, error) {
+	project, err := s.project(r)
+	if err != nil {
+		return nil, err
+	}
+	scenes, err := s.sceneRows(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	mate, err := s.mateBlock(ctx, project, scenes)
+	if err != nil {
+		return nil, err
+	}
+	exchanges, err := s.mateExchanges(ctx, project, mate.Running)
+	if err != nil {
+		return nil, err
+	}
+	return MateResponse{envelope: env, Project: project, Mate: mate, Exchanges: exchanges}, nil
 }
 
 func (s *Server) handleTurn(ctx context.Context, r *http.Request, env envelope) (any, error) {

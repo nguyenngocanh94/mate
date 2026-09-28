@@ -43,6 +43,12 @@ const (
 	// server is down (live 0.8.2, exit 1). The Herdr side is unavailable,
 	// not the target missing.
 	HerdrServerNotRunning = "server_not_running"
+	// HerdrAgentNotIdle is `agent read --source recent-unwrapped` of a
+	// working agent drawn on the alternate screen: Herdr can only scroll
+	// its history back while it is idle (live 0.8.2 against codex-cli
+	// 0.157.1, 2026-09-26). The agent is busy, not missing; the read that
+	// works meanwhile is `--source visible` (Herdr.readAgent).
+	HerdrAgentNotIdle = "agent_not_idle"
 )
 
 // MapHerdrError maps a Herdr CLI error.code onto the agent taxonomy in
@@ -56,7 +62,7 @@ func MapHerdrError(code string) observability.Code {
 		return observability.CodeNotFound
 	case HerdrAgentPaneNotFound:
 		return observability.CodeUsage
-	case HerdrAgentBlocked, HerdrAgentNotReady:
+	case HerdrAgentBlocked, HerdrAgentNotReady, HerdrAgentNotIdle:
 		return observability.CodeTargetBlocked
 	case HerdrTimeout:
 		return observability.CodeTimeout

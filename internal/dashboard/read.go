@@ -45,7 +45,10 @@ func (s *Server) lastEventID(ctx context.Context) (int64, error) {
 func (s *Server) sceneRows(ctx context.Context, project string) (map[string]SceneRow, error) {
 	rows, err := s.db.SQL().QueryContext(ctx, `
 		SELECT n.actor_id, n.actor_name, n.actor_kind, n.project, n.state, n.since,
-		       t.name, n.detail, n.tokens_today, n.context_pct
+		       t.name, n.detail, n.tokens_today,
+                   (SELECT CASE WHEN p.context_window > 0 THEN 100.0 * u.context_tokens_after / p.context_window END
+                    FROM turn u LEFT JOIN pricing p ON p.model=u.model WHERE u.actor_id=n.actor_id ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1),
+		       (SELECT u.context_tokens_after FROM turn u WHERE u.actor_id = n.actor_id ORDER BY u.started_at DESC, u.ordinal DESC LIMIT 1)
 		  FROM v_now n LEFT JOIN actor t ON t.id = n.target_actor_id
 		 WHERE n.project = ?`, project)
 	if err != nil {
@@ -57,15 +60,36 @@ func (s *Server) sceneRows(ctx context.Context, project string) (map[string]Scen
 		var r SceneRow
 		var state, since, target, detail sql.NullString
 		var pct sql.NullFloat64
+		var ctxTokens sql.NullInt64
 		if err := rows.Scan(&r.ActorID, &r.Actor, &r.ActorKind, &r.Project,
-			&state, &since, &target, &detail, &r.TokensToday, &pct); err != nil {
+			&state, &since, &target, &detail, &r.TokensToday, &pct, &ctxTokens); err != nil {
 			return nil, err
 		}
 		r.State, r.Since, r.Target, r.Detail = state.String, since.String, target.String, detail.String
 		r.ContextPct = nullFloat(pct)
+		if ctxTokens.Valid {
+			n := ctxTokens.Int64
+			r.ContextTokens = &n
+		}
 		out[r.ActorID] = r
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if meta, err := s.ws.ReadMateMeta(project); err == nil && meta["session_id"] != "" {
+		id := timeline.MateActorID(project)
+		if row, ok := out[id]; ok {
+			row.ContextTokens, row.ContextPct = nil, nil
+			if usage, known, err := s.db.LatestContext(ctx, id, meta["session_id"]); err == nil && known {
+				row.ContextTokens, row.ContextPct = &usage.Tokens, usage.Pct
+			}
+			out[id] = row
+		}
+	}
+	return out, nil
 }
 
 // actorFacts are the two things `v_now` has no column for and a card needs:
@@ -200,6 +224,11 @@ func (s *Server) tasks(ctx context.Context, project string, now time.Time) ([]Ta
 			return nil, err
 		}
 		out[i].ToolCount = n
+		facts, _, err := s.actorFacts(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Harness = facts.harness
 	}
 	return out, nil
 }
@@ -224,7 +253,8 @@ func (s *Server) task(ctx context.Context, project, crew string, now time.Time) 
 // would be showing the reader a number they cannot read.
 func (s *Server) turns(ctx context.Context, actorID string) ([]Turn, error) {
 	rows, err := s.db.SQL().QueryContext(ctx, `
-		SELECT u.id, u.ordinal, u.started_at, u.ended_at, u.trigger_event_id, e.kind,
+		SELECT u.id, u.session_id, u.harness_turn_ref, u.ordinal,
+		       u.started_at, u.ended_at, u.trigger_event_id, e.kind,
 		       u.outcome, u.model, u.input_tokens, u.cache_read_tokens, u.cache_write_tokens,
 		       u.output_tokens, u.thinking_tokens, u.context_tokens_after, u.tool_count,
 		       u.ref_path, u.ref_offset,
@@ -246,7 +276,8 @@ func (s *Server) turns(ctx context.Context, actorID string) ([]Turn, error) {
 		var startedAt, endedAt, triggerKind, outcome, model sql.NullString
 		var trigger sql.NullInt64
 		var pct sql.NullFloat64
-		if err := rows.Scan(&t.ID, &t.Ordinal, &startedAt, &endedAt, &trigger, &triggerKind,
+		if err := rows.Scan(&t.ID, &t.SessionID, &t.HarnessTurnRef, &t.Ordinal,
+			&startedAt, &endedAt, &trigger, &triggerKind,
 			&outcome, &model, &t.Tokens.Input, &t.Tokens.CacheRead, &t.Tokens.CacheWrite,
 			&t.Tokens.Output, &t.Tokens.Thinking, &t.ContextAfter, &t.ToolCount,
 			&t.Ref.Path, &t.Ref.Offset, &pct); err != nil {
@@ -276,7 +307,7 @@ func (s *Server) turnByID(ctx context.Context, actorID, turnID string) (Turn, er
 			return t, nil
 		}
 	}
-	return Turn{}, notFound("no turn %q recorded for this crew", turnID)
+	return Turn{}, notFound("no turn %q recorded for this actor", turnID)
 }
 
 // actions reads the tool calls of one turn.
@@ -451,7 +482,7 @@ func (s *Server) mateBlock(ctx context.Context, project string, scenes map[strin
 	out := Mate{Harness: facts.harness, Running: facts.running()}
 	if sc, ok := scenes[actorID]; ok {
 		out.State, out.Since, out.Target, out.Detail = sc.State, sc.Since, sc.Target, sc.Detail
-		out.TokensToday, out.ContextPct = sc.TokensToday, sc.ContextPct
+		out.TokensToday, out.ContextPct, out.ContextTokens = sc.TokensToday, sc.ContextPct, sc.ContextTokens
 	}
 	turns, tokens, cost, err := s.actorTotals(ctx, actorID)
 	if err != nil {

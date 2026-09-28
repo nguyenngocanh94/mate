@@ -29,3 +29,16 @@ func lockFile(f *os.File, exclusive bool) error {
 func unlockFile(f *os.File) error {
 	return syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 }
+
+// tryLockFile never waits behind an active refresh or delivery.
+func tryLockFile(f *os.File, exclusive bool) (bool, error) {
+	how := syscall.LOCK_SH
+	if exclusive {
+		how = syscall.LOCK_EX
+	}
+	err := syscall.Flock(int(f.Fd()), how|syscall.LOCK_NB)
+	if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
+		return false, nil
+	}
+	return err == nil, err
+}

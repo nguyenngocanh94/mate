@@ -44,7 +44,7 @@ var numberedHeading = regexp.MustCompile(`\n## \d+\. `)
 // match - and says so here rather than leaving the "verbatim" claim
 // unverifiable.
 func TestRenderAgentsSection10TeachesDigestGrammar(t *testing.T) {
-	got, err := Render(fixedParams())
+	got, err := RenderSkill("event-handling", fixedParams())
 	if err != nil {
 		t.Fatal(err)
 	}

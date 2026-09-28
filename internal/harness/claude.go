@@ -137,6 +137,19 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	case spec.ClaudeSessionID != "":
 		extra = append(extra, "--session-id", spec.ClaudeSessionID, "--settings", spec.ClaudeSettingsPath)
 	}
+	if spec.Role == RoleMate {
+		// A coordinator must not inherit the captain's unrelated development
+		// plugins, MCP servers and tools. Its project skills and explicit hook
+		// settings still load. Keep a stable prefix for prompt caching.
+		extra = append(extra, "--setting-sources", "project", "--strict-mcp-config",
+			"--tools", "Bash,Read,Write,Edit,Glob,Grep,Skill", "--autocompact", "300000")
+		if spec.Model == "" {
+			spec.Model = "opus"
+		}
+		if spec.Effort == "" {
+			spec.Effort = EffortMedium
+		}
+	}
 	profile, effortOmitted := profileArgs(KindClaude, spec.Model, spec.Effort)
 	extra = append(extra, profile...)
 	// dangerousPermissionNotes records why --dangerously-skip-permissions is

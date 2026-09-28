@@ -26,12 +26,12 @@ func cmdProjectRepo(args []string, stdout, stderr io.Writer) error {
 	}
 }
 
-// cmdProjectRepoAdd implements `mate project repo add <project> <repo-path>`.
+// cmdProjectRepoAdd implements `mate project repo add <project> <repo-path|git-url>`.
 func cmdProjectRepoAdd(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project repo add", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate project repo add <project> <repo-path> [--name <name>] [--default-branch <branch>] [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: mate project repo add <project> <repo-path|git-url> [--name <name>] [--default-branch <branch>] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	nameFlag := fs.String("name", "", "name of the repo inside the project (default: derived from its directory)")
@@ -51,13 +51,28 @@ func cmdProjectRepoAdd(args []string, stdout, stderr io.Writer) error {
 	if err := requireProject(w, project); err != nil {
 		return err
 	}
+	shown := repoPath
+	if isGitURL(repoPath) {
+		cloned, err := cloneRepo(stdout, w.Root(), repoPath, *nameFlag)
+		if err != nil {
+			return fmt.Errorf("project repo add %s: %w", project, err)
+		}
+		repoPath, shown = cloned, filepath.Base(cloned)
+	}
 	absRepo, err := filepath.Abs(repoPath)
 	if err != nil {
 		return err
 	}
-	repo, err := repoConfigFor(absRepo, repoPath, *nameFlag, *defaultBranchFlag)
+	repo, err := repoConfigFor(absRepo, shown, *nameFlag, *defaultBranchFlag)
 	if err != nil {
 		return err
+	}
+	made, err := ensureFirstCommit(absRepo, repo.DefaultBranch)
+	if err != nil {
+		return fmt.Errorf("project repo add %s: %w", project, err)
+	}
+	if made {
+		fmt.Fprintf(stdout, "%s had no commit; made an empty first commit on %s so crews can branch from it (nothing was pushed)\n", shown, repo.DefaultBranch)
 	}
 	added, err := w.AddRepo(project, repo)
 	if err != nil {

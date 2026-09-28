@@ -503,3 +503,26 @@ func TestStartDeliversAndStopEndsIt(t *testing.T) {
 		t.Fatalf("typed %#v, want the running loop to deliver once", typed)
 	}
 }
+
+func TestMaintenanceHoldsQueuedDeliveryUntilRefreshEnds(t *testing.T) {
+	f := newFixture(t)
+	release, ok, err := f.ws.TryMateMaintenance(project, true)
+	if err != nil || !ok {
+		t.Fatalf("lock: %v %v", ok, err)
+	}
+	defer release()
+	sender := outbox.New(f.ws, f.deps())
+	_, err = sender.Enqueue(project, outbox.Request{Source: store.OutboxSourceAssign, Key: "during-refresh", Text: "resolve: work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := sender.Attempt(context.Background(), project)
+	if err != nil || got.Delivered || len(f.rt.SentText) != 0 {
+		t.Fatalf("sent during refresh: %+v %v", got, err)
+	}
+	release()
+	got, err = sender.Attempt(context.Background(), project)
+	if err != nil || !got.Delivered {
+		t.Fatalf("lost queue after refresh: %+v %v", got, err)
+	}
+}

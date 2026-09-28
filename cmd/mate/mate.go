@@ -12,16 +12,18 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// cmdMate dispatches `mate mate <start|stop|status>`.
+// cmdMate dispatches `mate mate <start|stop|status|refresh>`.
 func cmdMate(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate mate <start|stop|status> <project> ...")
+		return newUsageError("usage: mate mate <start|stop|status|refresh> <project> ...")
 	}
 	switch args[0] {
 	case "start":
 		return cmdMateStart(args[1:], stdout, stderr)
 	case "stop":
 		return cmdMateStop(args[1:], stdout, stderr)
+	case "refresh":
+		return cmdMateRefresh(args[1:], stdout, stderr)
 	case "status":
 		return cmdMateStatus(args[1:], stdout, stderr)
 	default:
@@ -172,5 +174,31 @@ func cmdMateStatus(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	fmt.Fprintln(stdout, status.Line())
+	return nil
+}
+
+// cmdMateRefresh safely replaces the transcript; ordinary start still resumes.
+func cmdMateRefresh(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mate refresh", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	workspace := fs.String("workspace", "", "workspace directory")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return newUsageError("usage: mate mate refresh <project> [--workspace <dir>]")
+	}
+	w, err := resolveWorkspace(*workspace)
+	if err != nil {
+		return err
+	}
+	changed, err := contextRefresh(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), false)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return fmt.Errorf("refresh postponed: Mate has no current session or another refresh is running")
+	}
+	fmt.Fprintln(stdout, "Mate refreshed: checkpoint saved, fresh session started with recall")
 	return nil
 }

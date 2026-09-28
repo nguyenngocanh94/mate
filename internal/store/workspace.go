@@ -65,6 +65,11 @@ type Workspace struct {
 // workspace.yaml. It is idempotent for a directory that already has one: the
 // existing workspace is opened instead, so the stored session name survives.
 func Init(workspaceDir string) (*Workspace, error) {
+	// A directory that does not exist yet is made, as `git init <dir>`
+	// does; Open, which only reads, still refuses one.
+	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+		return nil, fmt.Errorf("store: create workspace %s: %w", workspaceDir, err)
+	}
 	root, err := resolveRoot(workspaceDir)
 	if err != nil {
 		return nil, err

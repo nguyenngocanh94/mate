@@ -1,0 +1,30 @@
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit
+`/feedback` to report the issue.
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit
+`/feedback` to report the issue.
+
+/status
+
+╭─────────────────────────────────────────────────────────────────────╮
+│  >_ OpenAI Codex (v0.157.1)                                         │
+│                                                                     │
+│  Server:               Local background server                      │
+│                                                                     │
+│  Model:                GPT-6-Sol (reasoning medium, summaries auto) │
+│  Model provider:       probe                                        │
+│  Directory:            /private/tmp/mate-enter-lab                  │
+│  Permissions:          Workspace (Ask for approval)                 │
+│  Agents.md:            <none>                                       │
+│  Collaboration mode:   Default                                      │
+│  Session:              01a0e6d9-c81e-7540-bd82-9cd6d8ce06b1         │
+│                                                                     │
+│  Token usage:          0 total  (0 input + 0 output)                │
+│  Limits:               data not available yet                       │
+╰─────────────────────────────────────────────────────────────────────╯
+
+
+› Ask Codex to do anything
+
+  GPT-6-Sol default · /private/tmp/mate-enter-lab · ← for agents

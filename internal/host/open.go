@@ -3,7 +3,6 @@ package host
 import (
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/process"
 )
@@ -14,12 +13,13 @@ type Options struct {
 	Env    func(string) string
 	// Pane is the host pane the console occupies. WezTerm reads WEZTERM_PANE
 	// when this is empty.
-	Pane string
-	// Percent is the right-hand split size for WezTerm. Zero means 70.
-	Percent   int
-	Herdr     string
+	Pane      string
 	WezTerm   string
 	Osascript string
+	// SelfCols reads the Console's own width now. Ghostty cannot split at a
+	// width, so it evens the columns and then narrows the Console by
+	// measuring; nil leaves the columns even.
+	SelfCols func() int
 }
 
 func (o Options) runner() process.Runner {
@@ -27,20 +27,6 @@ func (o Options) runner() process.Runner {
 		return o.Runner
 	}
 	return process.ExecRunner{}
-}
-
-func (o Options) herdr() string {
-	if o.Herdr != "" {
-		return o.Herdr
-	}
-	return "herdr"
-}
-
-func (o Options) percent() int {
-	if o.Percent > 0 {
-		return o.Percent
-	}
-	return 70
 }
 
 func (o Options) getenv(key string) string {
@@ -62,30 +48,27 @@ func Open(kind Kind, opt Options) Host {
 	}
 }
 
-func attachArgs(herdr, session, agent string) (string, []string) {
-	if herdr == "" {
-		herdr = "herdr"
+// AttachArgv is the program a stage column runs to show an agent.
+// --takeover: the stage is where the captain asked to see this agent, so it
+// takes the agent's terminal from any client still holding it - one the
+// captain attached elsewhere, or one left by an earlier console. Without
+// it herdr refuses ("already has an attached client") and the attach exits
+// at once.
+func AttachArgv(herdr, session, agent string) []string {
+	return []string{ResolveExec(orDefault(herdr, "herdr")), "--session", session, "agent", "attach", agent, "--takeover"}
+}
+
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
 	}
-	// --takeover: the stage is where the captain asked to see this agent,
-	// so it takes the agent's terminal from any client still holding it - a
-	// stage pane Ghostty has not closed yet, or one left by an earlier run.
-	// Without it herdr refuses ("already has an attached client") and the
-	// new pane exits at once.
-	return herdr, []string{"--session", session, "agent", "attach", agent, "--takeover"}
+	return s
 }
 
-func attachCommand(herdr, session, agent string) string {
-	name, args := attachArgs(herdr, session, agent)
-	return name + " " + strings.Join(args, " ")
-}
-
-// resolveExec returns an absolute path for name so Ghostty's login wrapper
+// ResolveExec returns an absolute path for name so Ghostty's login wrapper
 // (bash --noprofile --norc) can exec it. A name already absolute is kept.
 // LookPath failure leaves the name unchanged.
-func resolveExec(name string) string {
-	if name == "" {
-		name = "herdr"
-	}
+func ResolveExec(name string) string {
 	if filepath.IsAbs(name) {
 		return name
 	}
@@ -101,13 +84,4 @@ func resolveExec(name string) string {
 		return p
 	}
 	return abs
-}
-
-// ghosttyAttachCommand is AppleScript surface configuration.command.
-// Ghostty's embedding API always treats that field as a shell string
-// (`exec -l <command>` under login + bash --noprofile --norc). A "direct:"
-// prefix is the executable name, not a parser hint. The binary must be
-// an absolute path because that bash has no user PATH.
-func ghosttyAttachCommand(herdr, session, agent string) string {
-	return attachCommand(herdr, session, agent)
 }

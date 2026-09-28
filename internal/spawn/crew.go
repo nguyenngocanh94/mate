@@ -45,6 +45,9 @@ const (
 	MetaWorktree = "worktree"
 	// MetaBranch is the branch the worktree is checked out on.
 	MetaBranch = "branch"
+	// MetaKind is the task's shape, "ship" or "scout" (brief.Kind). A crew
+	// spawned before it was recorded has none; CrewIsScout reads its brief.
+	MetaKind = "kind"
 	// MetaState is the crew's declared state (mvp.md section 4b). Only the
 	// app writes it, and only three values ever land in it: `spawned` at
 	// spawn, `finished` or `failed` at `crew stop`, and `failed` when a
@@ -79,7 +82,7 @@ const DefaultBriefDeliveryTimeout = 30 * time.Second
 type SpawnCrewRequest struct {
 	// Project is the registered project the crew works in.
 	Project string
-	// Crew is the crew id: `[a-z][a-z0-9]{1,15}` (store.ValidateCrewID).
+	// Crew is the crew id, a kebab-case name of the task (names.ValidCrew).
 	Crew string
 	// Harness is the harness kind to launch. Empty means the workspace
 	// default for a Crew (Codex).
@@ -414,6 +417,9 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	if err != nil {
 		return CrewResult{}, err
 	}
+	if err := captureCrewHarnessProfile(ctx, w, deps, plan, launch, deps.now()); err != nil {
+		return CrewResult{}, fmt.Errorf("capture crew harness profile: %w", err)
+	}
 	launchedAt := deps.now()
 	handle, err := deps.Runtime.StartAgent(ctx, spec)
 	if err != nil {
@@ -456,6 +462,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		MetaSession:    session.Name,
 		MetaWorktree:   filepath.ToSlash(relWorktree),
 		MetaBranch:     plan.branch,
+		MetaKind:       planKind(plan).String(),
 		store.MetaRepo: plan.repoCfg.Name,
 		MetaSessionID:  sessionID,
 		MetaTranscript: "",
@@ -925,4 +932,29 @@ func newSessionID(fn func() string) string {
 		return fn()
 	}
 	return uuid.NewString()
+}
+
+func planKind(plan crewPlan) brief.Kind {
+	if plan.scout {
+		return brief.Scout
+	}
+	return brief.Ship
+}
+
+// CrewIsScout reports whether a crew's task is a scout: its meta's kind,
+// or, for a crew spawned before kind was recorded, the app's copy of its
+// brief carrying a `## Deliverable`, which only a scout brief may have.
+func CrewIsScout(w *store.Workspace, project, crew string, meta map[string]string) bool {
+	switch meta[MetaKind] {
+	case brief.Scout.String():
+		return true
+	case brief.Ship.String():
+		return false
+	}
+	raw, err := os.ReadFile(w.CrewBrief(project, crew))
+	if err != nil {
+		return false
+	}
+	_, found := brief.SectionText(string(raw), brief.Deliverable)
+	return found
 }

@@ -107,6 +107,10 @@ func TestUIMakesNoOffOriginRequest(t *testing.T) {
 		}
 		// Belt and braces: any bare http(s) URL outside a comment is worth
 		// failing on even if no pattern above claims it.
+		// createElementNS uses this standards namespace as an identifier;
+		// it does not load a resource. Request patterns above still reject
+		// this URL if it ever appears in an actual fetch/src position.
+		text = strings.ReplaceAll(text, "http://www.w3.org/2000/svg", "")
 		for _, scheme := range []string{"http://", "https://"} {
 			if i := strings.Index(text, scheme); i >= 0 {
 				t.Errorf("%s contains %q outside a comment at offset %d", path, scheme, i)

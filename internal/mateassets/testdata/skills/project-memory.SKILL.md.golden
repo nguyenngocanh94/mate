@@ -1,0 +1,63 @@
+---
+name: project-memory
+description: Read before recording project facts or curating memory.
+---
+
+## 14. Project memory
+
+Durable knowledge about a repo's code itself - build and test mechanics, architecture conventions, sharp edges - belongs in that repo's own committed `AGENTS.md`, not in any file you own.
+You do not write it there yourself; that would be editing the project, which rule 1 of section 1 forbids.
+A Crew commits it through the normal delivery path, as part of a task that already touches the relevant part of the code; the Crew template's project-memory rule already tells every ship Crew to, so you do not put it in a brief.
+
+**Your memory.** `/ws/.mate/projects/shop/mate/memory.md` holds knowledge that is yours, not the project's, in its two sections (section 2): `## Captain` for the captain's preferences, working style and authority boundaries, `## Lessons` for what you learned about running Crews, harnesses and the app here.
+Every entry is one line in this shape, and `mate remember` writes exactly it:
+
+```markdown
+## Captain
+- Speaks Vietnamese; answer and escalate in Vietnamese. (captain, 2026-09-17)
+
+## Lessons
+- Scout Crews commit their report files unless the brief says to keep every file under crews/<id>/ and commit nothing. (sent.log to rpi35 2026-09-18) <!--a:2026-09-24-->
+- Crew spawn fails with no pane or meta; stop after two tries and tell the captain. (expires: the spawn fix lands) (backlog Failed rpi34) <!--p:2026-09-24-->
+```
+
+The fact, then a perishable lesson's `(expires: <condition>)`, then the source in parentheses, then the tier marker.
+A `## Captain` entry carries no marker, because a preference does not expire.
+A lesson carries `<!--a:<date>-->`, and is stale 30 days after it was last reinforced; one whose truth ends with a checkable condition carries `<!--p:<date>-->` instead, and is stale after 7.
+The `stow` skill owns the tiers, and what a pass does with a stale entry.
+
+Write it when you learn it, not later:
+
+- the captain corrects how you work or states a preference: `remember --captain`;
+- you send a Crew a correction after its brief that future Crews need too: `remember --lesson`, and propose the rule to the captain for `/ws/.mate/projects/shop/CREW.md` (the output of `mate send` reminds you);
+- the captain states a rule for how Crews work: `remember --lesson`, aging, with no `--perishable`, and propose the exact line for `/ws/.mate/projects/shop/CREW.md`; it stays under `## Lessons` until the captain has added it, never under `## Captain`, because `## Captain` never reaches a brief and this rule must reach every one;
+- a task closes: `## Done` in `/ws/.mate/projects/shop/mate/backlog.md`, and route whatever it taught you (the output of `crew stop` reminds you);
+- you have read a scout report or a hand-back: `/ws/.mate/projects/shop/PROJECT.md` (below).
+
+Inspect, then update: read the section before you write, and when the finding duplicates, supersedes or disproves an entry, rewrite that entry in place rather than adding a second one.
+Rewrite and prune rather than append forever; a file that only grows ends up unread, or read and self-contradicting.
+Keep free-form notes free of temporary paths, moving versions, ephemeral identifiers, and copied state that will rot.
+Prefer a pointer to the file that owns a fact over a copy of what it says.
+Write a source relative to the project directory, the one holding `/ws/.mate/projects/shop/PROJECT.md`, `crews/` and `sent.log` - `crews/scout-release-version/report.md §Durable facts`, never the absolute path of the same file, and never a path outside the workspace; `memory check` refuses both.
+Run `mate memory check shop` after you edit the file by hand.
+
+**The project's context.** `/ws/.mate/projects/shop/PROJECT.md` is the project's context as you and the captain understand it, in five sections - `## What this project is`, `## Layout and state`, `## How to work here`, `## Research on file`, `## Captain's decisions` - and it is the first source of every brief's `## What we already know`.
+It is yours to extend, and a scout is how it grows: every scout report ends with a `## Durable facts` section, and when you have read a report, add to `/ws/.mate/projects/shop/PROJECT.md` whatever of those facts it does not already say, each with the report's path as its source, so the next brief can cite it without another scout.
+Correct it the same way when a hand-back's `Still open` says `## What we already know` was wrong.
+A line under `## Layout and state` or `## How to work here` says what a repo holds or how it runs, and that goes stale by commit, not by calendar.
+So its source ends with the anchor `mate project facts` printed for that repo when you recorded it, `<repo>:<branch>@<sha>`: `(crews/scout-release-version/report.md §Durable facts, shop:main@3f2a91c, 2026-09-24)`, or `shop:main@none` while the branch has no commit.
+A fact about two repos carries one anchor for each; a fact about no repo at all belongs under `## What this project is`, not here.
+`memory check` refuses such a line without an anchor for one of the project's repos, and warns when that repo's default branch has moved past it; the line is then a hint, and a brief that relies on it says so.
+A bare `<branch>@<sha>` written before the project could have several repos still passes while it has exactly one; rewrite it as `<repo>:<branch>@<sha>` when you next touch the line, because once the project has a second repo `memory check` refuses it.
+A product decision of the captain's goes under `## Captain's decisions`, in their words, with the date.
+
+**How memory reaches a brief.** A Crew reads neither file, so what it needs is copied, never pointed at:
+
+- `## What we already know` carries the substance of each relevant `/ws/.mate/projects/shop/PROJECT.md` line with its source and anchor, for example `- main has no commit and an empty tree (/ws/.mate/projects/shop/PROJECT.md, "Layout and state", shop:main@none).`
+- A `## Lessons` entry that applies to Crews goes into the brief's `## Build` as a constraint, or its `Out of scope:`, until the captain has put it in `/ws/.mate/projects/shop/CREW.md`; from then the app appends it to every brief and you drop it from yours.
+- `## Captain` never goes into a brief: it is about how you work, not about the task.
+
+**Your backlog.** `/ws/.mate/projects/shop/mate/backlog.md` is entirely your own notes: only you ever write it, the app never touches it, and nothing enforces that it agrees with reality except you reading it.
+It has four sections: `## In flight`, `## Held for the captain` (section 13), `## Queued` with each entry's `blocked-by:`, and `## Done`.
+Keep the 10 most recent `## Done` entries and move older ones to `/ws/.mate/projects/shop/mate/backlog-archive.md`, which no session start reads; `mate recall` leaves `## Done` itself out of a session start too, and counts it.
+`mate backlog shop` is the source of truth to reconcile it against - it is a live read of `.meta` and `.status`, so after any restart, trust its table over whatever `/ws/.mate/projects/shop/mate/backlog.md` said before you went away, and update the file to match (section 3).

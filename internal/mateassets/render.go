@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/assets"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 var (
@@ -18,7 +20,7 @@ var (
 // `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
 // `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
 // Code discovers a skill relative to its own working directory.
-var SkillNames = []string{"harness-adapters", "crew-dispatch", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow"}
+var SkillNames = []string{"harness-adapters", "crew-dispatch", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow", "mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
 // init keeps a malformed skill a build-time failure rather than a Mate that
@@ -69,6 +71,12 @@ type Params struct {
 	// crew's `.meta` and `.status` file lives. The Mate reads it, never
 	// writes it.
 	CrewsDir string
+}
+
+// QuietAfter is how long the captain's silence has to last before the
+// console turns auto mode back on, as the manual says it.
+func (Params) QuietAfter() string {
+	return fmt.Sprintf("%d minutes", int(store.QuietAfter/time.Minute))
 }
 
 // RepoParams is one repo of the project, as the manual lists it.

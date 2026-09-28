@@ -350,6 +350,16 @@ func (s *Sender) Attempt(ctx context.Context, project string) (Attempt, error) {
 			return items, false, nil
 		}
 		item := &items[index]
+		if item.Source != store.OutboxSourceStow {
+			release, acquired, err := s.ws.TryMateMaintenance(project, false)
+			if err != nil {
+				return items, false, err
+			}
+			if !acquired {
+				return items, false, nil
+			}
+			defer release()
+		}
 
 		// A line sent.log already holds was delivered by a sender that
 		// died before it could say so. Typing it again is the one mistake

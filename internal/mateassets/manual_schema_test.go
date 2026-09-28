@@ -16,11 +16,7 @@ import (
 
 func renderedManual(t *testing.T) string {
 	t.Helper()
-	got, err := Render(fixedParams())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(got)
+	return renderWith(t, fixedParams())
 }
 
 // schemaItem is a section 6 list item that opens with a `## Name`.
@@ -99,7 +95,24 @@ func renderWith(t *testing.T, p Params) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(got)
+	// Validate the complete, installed contract: core plus the sections now
+	// loaded on demand. Core presence and size have separate tests.
+	text := string(got)
+	for _, name := range []string{"mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory"} {
+		data, err := RenderSkill(name, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref := string(data)
+		start := strings.Index(ref, "\n## ") + 1
+		if start == 0 {
+			t.Fatalf("skill %s lacks its reference section", name)
+		}
+		heading := strings.SplitN(ref[start:], "\n", 2)[0]
+		old := section(t, text, heading)
+		text = strings.Replace(text, heading+old, ref[start:], 1)
+	}
+	return text
 }
 
 // TestManualFactsExampleIsTheRealOutput: the example in section 4 is what
@@ -137,7 +150,7 @@ func TestManualListsTheRepos(t *testing.T) {
 		}
 	}
 	none := section(t, renderWith(t, noRepoParams()), "## 1. Identity and prime directives")
-	for _, want := range []string{"no repo yet", "no Crew can be spawned", "`mate project repo add shop <repo-path>`"} {
+	for _, want := range []string{"no repo yet", "no Crew can be spawned", "add it yourself"} {
 		if !strings.Contains(none, want) {
 			t.Errorf("section 1 with no repo does not say %q", want)
 		}
@@ -153,7 +166,7 @@ func TestManualListsTheRepos(t *testing.T) {
 func TestManualTeachesOneCrewOneRepo(t *testing.T) {
 	text := renderWith(t, twoRepoParams())
 	for heading, wants := range map[string][]string{
-		"## 4. The `mate` command contract": {"[--repo <name>]", "repo shop, branch mate/k3", "<repo>:<branch>@<sha>", "shop:main@none"},
+		"## 4. The `mate` command contract": {"[--repo <name>]", "repo shop, branch mate/add-healthcheck", "<repo>:<branch>@<sha>", "shop:main@none"},
 		"## 5. Task intake":                 {"one Crew per repo"},
 		"## 7. Spawn":                       {"--repo <repo>", "required", "one Crew per repo", "blocked-by:"},
 		"## 14. Project memory":             {"<repo>:<branch>@<sha>", "shop:main@3f2a91c"},
@@ -194,7 +207,7 @@ var templateHeadings = func() map[string]bool {
 // the template defines, so a typo in prose is a test failure rather than a
 // Mate writing a section the check will not recognise.
 func TestEveryBriefHeadingMentionIsKnown(t *testing.T) {
-	known := map[string]bool{}
+	known := map[string]bool{"Summary": true}
 	for _, s := range brief.AllSections() {
 		known[s] = true
 	}
@@ -234,5 +247,73 @@ func TestManualNoLongerParaphrasesTheCaptain(t *testing.T) {
 	}
 	if !strings.Contains(section(t, text, "## 6. Writing the brief"), "verbatim, always") {
 		t.Error("section 6 does not say the captain's words are copied verbatim, always")
+	}
+}
+
+// TestManualNamesCrewsAfterTheirTask: the captain reads a crew's id in the
+// console, in crew list and in its branch, so the manual has the Mate name
+// it after the task and never teaches a counter by example.
+func TestManualNamesCrewsAfterTheirTask(t *testing.T) {
+	text := renderedManual(t)
+	sec := section(t, text, "## 4. The `mate` command contract")
+	for _, want := range []string{"it names the task", "`fix-cart-total`", "no counters such as `k3`, `p1` or `m1`", "2 to 24 characters"} {
+		if !strings.Contains(sec, want) {
+			t.Errorf("section 4 does not say %q", want)
+		}
+	}
+	counter := regexp.MustCompile("\\b[kpm][0-9]+\\b")
+	for _, m := range counter.FindAllString(strings.Replace(text, "no counters such as `k3`, `p1` or `m1`", "", 1), -1) {
+		t.Errorf("the manual still uses the counter id %q in an example", m)
+	}
+}
+
+// TestManualNeverHasTheMateWaitForACrew pins docs/mvp.md task 57: the
+// captain expects a Mate never to hold a long turn except to answer them. A
+// live Mate on 2026-09-26 and again on 2026-09-27 polled its Crews inside one
+// turn for nine minutes while the captain's messages sat queued, because the
+// manual taught a `sleep 20; mate state` loop for manual mode.
+func TestManualNeverHasTheMateWaitForACrew(t *testing.T) {
+	text := renderedManual(t)
+	if strings.Contains(text, "sleep 20") {
+		t.Error("the manual still teaches a sleep loop")
+	}
+	sec9 := section(t, text, "## 9. Supervision, review and delivery")
+	if !strings.Contains(sec9, "**You never wait for a Crew.**") {
+		t.Error("section 9 does not open with the rule against waiting")
+	}
+	sec10 := section(t, text, "## 10. Two modes and the sentinel")
+	for _, want := range []string{
+		"### Ending the turn\n",
+		"in either mode, after you spawn a Crew or answer one with `mate send`",
+		"they have typed nothing to you for 5 minutes",
+		"The captain typing to you puts the project in manual mode.",
+	} {
+		if !strings.Contains(sec10, want) {
+			t.Errorf("section 10 does not say %q", want)
+		}
+	}
+}
+
+// TestManualGivesTheMateItsOwnProject pins the captain's boundary of
+// 2026-09-27: everything inside the project is the Mate's to run, repos
+// included, and only what is above it is the captain's. A live Mate had
+// refused to add a repo the captain named, and handed them a shell line to
+// paste, because the manual called `repo add` theirs.
+func TestManualGivesTheMateItsOwnProject(t *testing.T) {
+	for _, p := range []Params{twoRepoParams(), noRepoParams()} {
+		sec := section(t, renderWith(t, p), "## 1. Identity and prime directives")
+		for _, want := range []string{
+			"Everything inside this project is yours to run",
+			"creating or removing projects",
+			"/usr/local/bin/mate project repo add shop <git-url|repo-path> [--name <name>]",
+			"nothing is ever pushed",
+		} {
+			if !strings.Contains(sec, want) {
+				t.Errorf("section 1 does not say %q", want)
+			}
+		}
+		if strings.Contains(sec, "theirs to run, never yours") {
+			t.Error("section 1 still calls repo add the captain's")
+		}
 	}
 }

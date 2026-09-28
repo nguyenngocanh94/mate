@@ -309,6 +309,9 @@ func (m Model) mateDetailFields(vw int) []detailField {
 	out = append(out, detailField{label: "crews", lines: one(crews)})
 	if mate.Tokens.IsKnown() {
 		out = append(out, detailField{label: "tokens", lines: text(tokensWord(mate.Tokens.Value.Total), tFg)})
+		if n := mate.Tokens.Value.ContextTokens; n != nil {
+			out = append(out, detailField{label: "context", lines: text(tokensWord(*n), tFg)})
+		}
 	}
 	out = append(out, detailField{label: "mode", lines: one(m.modeLine(proj))})
 	blocked := gl().add("no", tFg)

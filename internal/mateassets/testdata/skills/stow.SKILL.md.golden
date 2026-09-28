@@ -55,7 +55,7 @@ Marking rules:
 - A clock running out never makes a fact lapse: a stale entry is re-checked in step 7, and an entry whose truth still holds is refreshed, not lost.
 - A `pinned` entry carries no marker at all; every `aging` and `perishable` entry always carries its dated marker, whose letter names the tier.
 - Every entry is one line: the fact, a perishable entry's `(expires: <condition>)`, then its source in parentheses, then the marker.
-  The source is the captain and a date, or a path relative to the project directory (`crews/k1/report.md §Durable facts`, `sent.log to k3 2026-09-24`), never an absolute or temporary path.
+  The source is the captain and a date, or a path relative to the project directory (`crews/scout-login-timeout/report.md §Durable facts`, `sent.log to add-healthcheck 2026-09-24`), never an absolute or temporary path.
 - `mate remember` writes a new entry in exactly that shape; when you rewrite one by hand, keep the shape, and `mate memory check` tells you if you did not.
 - Marker bytes count toward the budget: the pass's own bookkeeping is costed content, never free.
 - The file's header carries one pointer, `<!-- memory tiers: see the stow skill -->`; this skill is the single owner of tier semantics, marker spellings and clocks, and no memory file restates them.

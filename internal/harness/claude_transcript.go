@@ -64,8 +64,8 @@ import (
 //
 // A caller whose range is at rest - a session's final sync, after the agent has
 // been observed stopped - would use ParseTranscriptFinal instead, which flushes
-// that group. No such caller exists today; see its doc for the precondition
-// the parser cannot check itself and for why nothing currently meets it.
+// that group. The timeline uses this only for immutable snapshots created after context
+// refresh confirmed a runtime stop. Live transcripts still use the deferral.
 //
 // A trailing fragment with no newline is an active-file boundary: it is not
 // consumed and does not fail. The first complete line that cannot be classified
@@ -96,16 +96,10 @@ func (Claude) ParseTranscript(state TranscriptParseState, data []byte) Transcrip
 // ending in a partial line, or one a malformed line stopped early, keeps the
 // group back and names it in OpenSourceRef. That is necessary, not sufficient.
 //
-// Use it only after the harness runtime has been positively stopped - observed
-// stopped, not asked to stop. **Nothing in this repository establishes that
-// today, so this method has no caller**: `crew done` makes no runtime call and
-// runs as the live Crew agent, and neither current stop path proves absence
-// (one confirms from a single ListAgents without inspecting, the other treats
-// an InspectAgent failure as absence, and both release the binding inside
-// their own success path). The port doc carries the three gates G5-12 must
-// meet to acquire a caller; until then every trigger uses ParseTranscript and
-// a session's last group stays pending, named in OpenSourceRef rather than
-// lost (ADR 0016 amendment item 6).
+// Use it only after the harness runtime has been positively stopped and
+// the bytes copied to an immutable snapshot. Context refresh supplies this
+// precondition through StopMate, FreezeMateSession and Located.Finalized;
+// a live transcript, even one whose composer looks idle, does not.
 //
 // TestClaudeParseTranscriptFinalCannotProveAtRestFromBytes is the executable
 // statement of this precondition.

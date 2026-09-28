@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|merge|backlog|events|reindex|usage|dashboard|console|--version> ...")
+			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|checkpoint|events|reindex|usage|dashboard|console|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -56,6 +56,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdRemember(args[1:], stdout, stderr)
 	case "memory":
 		return cmdMemory(args[1:], stdout, stderr)
+	case "checkpoint":
+		return cmdCheckpoint(args[1:], stdout, stderr)
 	case "recall":
 		return cmdRecall(args[1:], stdout, stderr)
 	case "hook":
@@ -66,6 +68,10 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdPeek(args[1:], stdout, stderr)
 	case "state":
 		return cmdState(args[1:], stdout, stderr)
+	case "review":
+		return cmdReview(args[1:], stdout, stderr)
+	case "report":
+		return cmdReport(args[1:], stdout, stderr)
 	case "diff":
 		return cmdDiff(args[1:], stdout, stderr)
 	case "merge":
@@ -82,6 +88,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdDashboard(args[1:], stdout, stderr)
 	case "console":
 		return cmdConsoleLaunch(args[1:], stdout, stderr)
+	case "pane":
+		return cmdPane(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {

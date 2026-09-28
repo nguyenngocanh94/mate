@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -14,14 +15,13 @@ import (
 )
 
 type wezTerm struct {
-	runner  process.Runner
-	bin     string
-	herdr   string
-	self    string
-	percent int
+	runner process.Runner
+	bin    string
+	self   string
 
-	mu   sync.Mutex
-	last StageHandle
+	mu sync.Mutex
+	// ours is the pane each column's role was made in, by this process.
+	ours map[string]string
 }
 
 func newWezTerm(opt Options) *wezTerm {
@@ -29,129 +29,125 @@ func newWezTerm(opt Options) *wezTerm {
 	if self == "" {
 		self = opt.getenv("WEZTERM_PANE")
 	}
-	bin := weztermCLI(opt, exec.LookPath, weztermBundles)
 	return &wezTerm{
-		runner:  opt.runner(),
-		bin:     bin,
-		herdr:   opt.herdr(),
-		self:    self,
-		percent: opt.percent(),
+		runner: opt.runner(),
+		bin:    weztermCLI(opt, exec.LookPath, weztermBundles),
+		self:   self,
+		ours:   map[string]string{},
 	}
 }
 
-func (w *wezTerm) EnsureSplit(ctx context.Context) (StageHandle, error) {
+// reviewShare is the review column's share of what the Console leaves, in
+// percent: the stage keeps the larger part, since an agent's transcript is
+// what the captain reads most.
+const reviewShare = 45
+
+func (w *wezTerm) Layout(ctx context.Context, cols []Column) error {
+	if err := validColumns(cols); err != nil {
+		return err
+	}
 	if w.self == "" {
-		return StageHandle{}, observability.NewError(observability.CodeUsage, "wezterm stage needs WEZTERM_PANE")
+		return observability.NewError(observability.CodeUsage, "wezterm columns need WEZTERM_PANE")
 	}
-	right, last, err := w.rightAndLast(ctx)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	present, err := w.present(ctx, len(cols))
 	if err != nil {
-		return StageHandle{}, err
+		return err
 	}
-	if right != "" && right == last.PaneID {
-		return last, nil
+	made := false
+	for i, col := range cols {
+		if present[col.Role] {
+			continue
+		}
+		id, err := w.makeColumn(ctx, cols, present, i)
+		if err != nil {
+			return err
+		}
+		w.ours[col.Role] = id
+		present[col.Role] = true
+		made = true
 	}
-	if right != "" {
-		return StageHandle{}, errForeignPane()
+	if made {
+		return w.activate(ctx)
 	}
-	id, err := w.split(ctx, nil)
-	if err != nil {
-		return StageHandle{}, err
-	}
-	return w.commit(ctx, id)
+	return nil
 }
 
-func (w *wezTerm) Stage(ctx context.Context, target StageTarget) (StageHandle, error) {
-	if err := target.Validate(); err != nil {
-		return StageHandle{}, err
+// Close kills the columns this process made. WezTerm closes a pane whose
+// program exits, so this only settles what the runners left.
+func (w *wezTerm) Close(ctx context.Context, roles ...string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for role, id := range w.ours {
+		if len(roles) > 0 && !slices.Contains(roles, role) {
+			continue
+		}
+		// A pane already gone makes kill-pane fail; that is the goal met.
+		_, _ = run(ctx, w.runner, w.bin, []string{"cli", "kill-pane", "--pane-id", id}, nil)
+		delete(w.ours, role)
 	}
-	if w.self == "" {
-		return StageHandle{}, observability.NewError(observability.CodeUsage, "wezterm stage needs WEZTERM_PANE")
+	return nil
+}
+
+// present walks the panes to the right of the Console, one per column, and
+// says which roles are there. A pane on that walk that this process did not
+// make is refused.
+func (w *wezTerm) present(ctx context.Context, n int) (map[string]bool, error) {
+	byID := map[string]string{}
+	for role, id := range w.ours {
+		byID[id] = role
 	}
-	right, last, err := w.rightAndLast(ctx)
-	if err != nil {
-		return StageHandle{}, err
+	present := map[string]bool{}
+	cur := w.self
+	for range n {
+		right, err := w.neighbor(ctx, cur)
+		if err != nil {
+			return nil, err
+		}
+		if right == "" {
+			break
+		}
+		role, ok := byID[right]
+		if !ok {
+			return nil, errForeignPane()
+		}
+		present[role] = true
+		cur = right
 	}
-	if right != "" && right != last.PaneID {
-		return StageHandle{}, errForeignPane()
-	}
-	if right != "" {
-		if err := w.kill(ctx, right); err != nil {
-			return StageHandle{}, err
+	return present, nil
+}
+
+// makeColumn splits a pane for cols[i]: to the left of the nearest column
+// to its right that is still there, else to the right of the one before
+// it, or of the Console.
+func (w *wezTerm) makeColumn(ctx context.Context, cols []Column, present map[string]bool, i int) (string, error) {
+	for j := i + 1; j < len(cols); j++ {
+		if present[cols[j].Role] {
+			return w.split(ctx, w.ours[cols[j].Role], "--left", []string{"--percent", strconv.Itoa(100 - reviewShare)}, cols[i].Argv)
 		}
 	}
-	herdr, args := attachArgs(w.herdr, target.Session, target.AgentName)
-	id, err := w.split(ctx, append([]string{herdr}, args...))
-	if err != nil {
-		return StageHandle{}, err
+	if i > 0 {
+		return w.split(ctx, w.ours[cols[i-1].Role], "--right", []string{"--percent", strconv.Itoa(reviewShare)}, cols[i].Argv)
 	}
-	return w.commit(ctx, id)
-}
-
-func (w *wezTerm) rightAndLast(ctx context.Context) (string, StageHandle, error) {
-	right, err := w.neighbor(ctx)
-	if err != nil {
-		return "", StageHandle{}, err
-	}
-	w.mu.Lock()
-	last := w.last
-	w.mu.Unlock()
-	return right, last, nil
-}
-
-func (w *wezTerm) commit(ctx context.Context, id string) (StageHandle, error) {
-	if err := w.activate(ctx); err != nil {
-		return StageHandle{}, err
-	}
-	h := StageHandle{PaneID: id}
-	w.mu.Lock()
-	w.last = h
-	w.mu.Unlock()
-	return h, nil
-}
-
-func (w *wezTerm) neighbor(ctx context.Context) (string, error) {
-	out, err := run(ctx, w.runner, w.bin, []string{
-		"cli", "get-pane-direction", "--pane-id", w.self, "Right",
-	}, nil)
-	if err != nil {
-		return "", err
-	}
-	return out, nil
-}
-
-func (w *wezTerm) kill(ctx context.Context, pane string) error {
-	_, err := run(ctx, w.runner, w.bin, []string{
-		"cli", "kill-pane", "--pane-id", pane,
-	}, nil)
-	return err
-}
-
-// Console widths (the console design): mate is the left ~20% of the
-// window, never narrower than consoleMinCols nor wider than consoleMaxCols.
-const (
-	consoleMinCols = 40
-	consoleMaxCols = 48
-	stageMinCols   = 10
-)
-
-func (w *wezTerm) split(ctx context.Context, prog []string) (string, error) {
-	size := []string{"--percent", strconv.Itoa(w.percent)}
-	if cols, ok := w.selfCols(ctx); ok {
-		keep := min(max(cols/5, consoleMinCols), consoleMaxCols)
+	// The first column takes all the Console gives up.
+	size := []string{"--percent", "80"}
+	if total, ok := w.selfCols(ctx); ok {
 		// One cell of the split is WezTerm's divider.
-		if stage := cols - keep - 1; stage >= stageMinCols {
-			size = []string{"--cells", strconv.Itoa(stage)}
+		if rest := total - consoleCols(total) - 1; rest >= columnMinCols {
+			size = []string{"--cells", strconv.Itoa(rest)}
 		}
 	}
-	cli := append([]string{
-		"cli", "split-pane",
-		"--pane-id", w.self,
-		"--right",
-	}, size...)
-	if len(prog) > 0 {
-		cli = append(cli, "--")
-		cli = append(cli, prog...)
-	}
+	return w.split(ctx, w.self, "--right", size, cols[i].Argv)
+}
+
+func (w *wezTerm) neighbor(ctx context.Context, pane string) (string, error) {
+	return run(ctx, w.runner, w.bin, []string{"cli", "get-pane-direction", "--pane-id", pane, "Right"}, nil)
+}
+
+func (w *wezTerm) split(ctx context.Context, from, side string, size, prog []string) (string, error) {
+	cli := append([]string{"cli", "split-pane", "--pane-id", from, side}, size...)
+	cli = append(append(cli, "--"), prog...)
 	return run(ctx, w.runner, w.bin, cli, nil)
 }
 
@@ -162,9 +158,8 @@ func (w *wezTerm) activate(ctx context.Context) error {
 	return err
 }
 
-// selfCols is the console pane's width now, from `cli list`. A kill of the
-// last stage has just given the console back the whole window, so this is
-// read at every split rather than once.
+// selfCols is the console pane's width now, from `cli list`: before the
+// first column exists, the whole window.
 func (w *wezTerm) selfCols(ctx context.Context) (int, bool) {
 	out, err := run(ctx, w.runner, w.bin, []string{"cli", "list", "--format", "json"}, nil)
 	if err != nil {

@@ -205,6 +205,8 @@ type TokenValue struct {
 	// ContextPct is nil, not zero, until the actor's most recent turn's
 	// model has a known context_window.
 	ContextPct *float64
+	// ContextTokens is the last observed prompt size; nil before the first call.
+	ContextTokens *int64
 }
 
 // CrewHealth is one observation of a Crew's pane and of Herdr's inventory,

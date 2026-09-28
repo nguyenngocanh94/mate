@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -264,5 +265,24 @@ func TestBacklogStateMatchesQueryLoad(t *testing.T) {
 	}
 	if len(gotState) != len(wantState) {
 		t.Fatalf("backlog reported %d open crews %v, query.Load reported %d %v", len(gotState), gotState, len(wantState), wantState)
+	}
+}
+
+func TestBacklogCLIEntriesRemainVisibleToRecall(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	if err := os.WriteFile(w.BacklogFile("shop"), []byte(memory.BacklogHeader()), 0644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errs bytes.Buffer
+	if err := run([]string{"backlog", "add", "shop", "checkout", "--section", "In flight", "--text", "Waiting for review.", "--workspace", w.Root()}, &out, &errs); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(w.BacklogFile("shop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, ids := splitBacklog(string(data))
+	if len(ids) != 1 || ids[0] != "checkout" {
+		t.Fatalf("recall lost new CLI entry: %s", data)
 	}
 }

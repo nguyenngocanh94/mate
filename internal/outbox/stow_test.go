@@ -249,3 +249,31 @@ func TestStowRefusalsQueueNothing(t *testing.T) {
 		})
 	}
 }
+
+func TestStrictStowRejectsEmptyComposerWithoutTurnEnd(t *testing.T) {
+	f := newFixture(t)
+	sleeper := &tickSleeper{clock: f.clock}
+	res, err := f.stowSender(harness.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Stowed {
+		t.Fatal("empty composer alone must not authorize a context refresh")
+	}
+}
+
+func TestStrictStowIgnoresMateMessagesToCrews(t *testing.T) {
+	f := newFixture(t)
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(n int) {
+		if n == 3 {
+			_ = f.ws.AppendSent(project, store.SentEntry{Source: store.SourceMate, Target: "crew-x", Text: "continue"})
+		}
+	}}
+	res, err := f.stowSender(harness.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Stowed {
+		t.Fatal("a crew message is not a Stop hook")
+	}
+}

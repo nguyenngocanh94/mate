@@ -72,6 +72,9 @@ func (e StoryEvent) Field(key string) string {
 
 // StoryQuery selects a slice of the story.
 type StoryQuery struct {
+	// IncludeTelemetry includes diagnostic evidence in the raw event stream.
+	// The narrated coordination story excludes it by default.
+	IncludeTelemetry bool
 	// Project is required: a story is one project's.
 	Project string
 	// SinceID returns only events after a known id, which is what a live
@@ -95,6 +98,9 @@ func Story(ctx context.Context, sqlDB *sql.DB, q StoryQuery) ([]StoryEvent, erro
 	                 task_name, turn_id, cause_event_id, cause_kind, payload, ref_path, ref_offset
 	            FROM v_story WHERE project = ?`
 	args := []any{q.Project}
+	if !q.IncludeTelemetry {
+		query += ` AND kind NOT LIKE 'telemetry.%'`
+	}
 	if q.SinceID > 0 {
 		query += ` AND id > ?`
 		args = append(args, q.SinceID)

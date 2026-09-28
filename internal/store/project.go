@@ -18,7 +18,16 @@ var ErrProjectExists = errors.New("store: project already registered")
 var ErrNoProject = errors.New("store: no such project")
 
 // ProjectConfig is `projects/<name>/project.yaml`.
+// MateConfig pins the coordinator profile independently of the captain's CLI.
+type MateConfig struct {
+	Model  string `yaml:"model,omitempty"`
+	Effort string `yaml:"effort,omitempty"`
+	// RefreshContext defaults to 150000; -1 disables automatic refresh.
+	RefreshContext int64 `yaml:"refresh_context,omitempty"`
+}
+
 type ProjectConfig struct {
+	Mate MateConfig `yaml:"mate,omitempty"`
 	// Repos are the git repositories the project owns, zero or more
 	// (docs/mvp.md M9). A crew works in exactly one of them.
 	Repos []RepoConfig `yaml:"repos"`
@@ -249,6 +258,47 @@ func (w *Workspace) Auto(project string) bool {
 	return err == nil
 }
 
+// Held reports whether the captain holds the project in manual mode, which
+// is the presence of `mate/.manual`.
+func (w *Workspace) Held(project string) bool {
+	if err := ValidateProjectName(project); err != nil {
+		return false
+	}
+	_, err := os.Stat(w.ManualHold(project))
+	return err == nil
+}
+
+// SetMode is the captain's own choice of mode, the console's `m` key: auto
+// turns `.auto` on and releases the hold; manual turns it off and holds it
+// off, so the daemon does not turn it back on after a quiet spell. The hold
+// is released before auto goes on and set before it goes off, so no reader
+// between the two writes sees a state the captain did not choose.
+func (w *Workspace) SetMode(project string, auto bool) error {
+	if err := ValidateProjectName(project); err != nil {
+		return err
+	}
+	if auto {
+		if err := w.removeFlag(w.ManualHold(project)); err != nil {
+			return err
+		}
+		return w.SetAuto(project, true)
+	}
+	if err := w.writeFile(w.ManualHold(project), nil, 0o644); err != nil {
+		return err
+	}
+	return w.SetAuto(project, false)
+}
+
+func (w *Workspace) removeFlag(path string) error {
+	if _, err := w.resolve(path); err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // SetAuto creates or removes `mate/.auto`.
 func (w *Workspace) SetAuto(project string, on bool) error {
 	if err := ValidateProjectName(project); err != nil {
@@ -256,13 +306,7 @@ func (w *Workspace) SetAuto(project string, on bool) error {
 	}
 	path := w.AutoFlag(project)
 	if !on {
-		if _, err := w.resolve(path); err != nil {
-			return err
-		}
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
+		return w.removeFlag(path)
 	}
 	return w.writeFile(path, nil, 0o644)
 }

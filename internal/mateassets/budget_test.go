@@ -19,19 +19,8 @@ const (
 	// this package stays free of harness.
 	codexProjectDocMaxBytes = 128 * 1024
 
-	// agentsManualBudget is what the rendered manual may occupy. The
-	// headroom under the cap is not slack - it is spent on two things the
-	// fixture below understates:
-	//
-	//  1. The real workspace root. The fixture renders `/ws`, three bytes,
-	//     and the manual repeats that path 26 times, so every extra
-	//     character of the workspace's own path costs 26 bytes here. A
-	//     workspace at /Users/someone/work/acme adds about 500.
-	//  2. Whatever Codex meters above the Mate's cwd. Those bytes come out
-	//     of the same cap before the manual gets any.
-	//
-	// 8 KiB covers both with room; the manual itself is ~29 KiB today.
-	agentsManualBudget = codexProjectDocMaxBytes - 8*1024
+	// Keep always-loaded instructions bounded; detailed contracts live in skills.
+	agentsManualBudget = 25 * 1024
 )
 
 func TestRenderedManualFitsCodexProjectDocBudget(t *testing.T) {
@@ -41,7 +30,7 @@ func TestRenderedManualFitsCodexProjectDocBudget(t *testing.T) {
 	}
 	if len(out) > agentsManualBudget {
 		t.Fatalf("the rendered Mate manual is %d bytes, over the %d-byte budget (Codex's cap is %d, and the rest is spent on the real workspace path and on whatever Codex meters above the Mate's cwd).\n"+
-			"Raise harness.CodexDefaultMaxBytes (and this constant with it) or cut prose from assets/mate/AGENTS.md.tmpl: past the cap, `mate start --harness codex` refuses outright.",
+			"Move action-specific instructions to skills; do not raise this core budget.",
 			len(out), agentsManualBudget, codexProjectDocMaxBytes)
 	}
 	t.Logf("rendered manual: %d bytes, %d under budget", len(out), agentsManualBudget-len(out))

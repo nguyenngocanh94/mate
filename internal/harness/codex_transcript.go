@@ -289,7 +289,7 @@ func (p *codexParse) add(rec codexEnvelope, raw string, offset int64, ordinal in
 			p.turnRef = ""
 			p.turnChanges = append(p.turnChanges, codexStateChange{offset: offset, turnRef: p.turnRef, model: p.model, lastCumul: p.lastCumul, hasCumulative: p.hasCumulative})
 			appendRecord(TranscriptKindContextEvent)
-		case "item_completed":
+		case "item_started", "item_completed":
 			if payload.TurnID == "" {
 				return &codexParseError{MalformedCodexShape, "item_completed has no turn_id"}
 			}

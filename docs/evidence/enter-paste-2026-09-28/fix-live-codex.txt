@@ -1,0 +1,83 @@
+=== RUN   TestLiveCodexDelayedPasteAndRecovery
+    live_paste_test.go:185: owned unsubmitted draft:
+        ╭───────────────────────────────────────────────╮
+        │ >_ OpenAI Codex (v0.157.1)                    │
+        │                                               │
+        │ model:     GPT-6-Sol   /model to change       │
+        │ directory: /private/tmp/mate-paste-1830673472 │
+        ╰───────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        › /status
+
+
+
+
+
+
+
+
+          GPT-6-Sol default · /private/tmp/mate-paste-1830673472
+    live_paste_test.go:201: bracketed paste clears under the same delay:
+        │                                                                     │
+        │  Server:               Local background server                      │
+        │                                                                     │
+        │  Model:                GPT-6-Sol (reasoning medium, summaries auto) │
+        │  Model provider:       probe                                        │
+        │  Directory:            /private/tmp/mate-paste-1830673472           │
+        │  Permissions:          Workspace (Ask for approval)                 │
+        │  Agents.md:            <none>                                       │
+        │  Collaboration mode:   Default                                      │
+        │  Session:              01a0e6fb-4d64-7851-aeb2-e10a27878b17         │
+        │                                                                     │
+        │  Token usage:          0 total  (0 input + 0 output)                │
+        │  Limits:               data not available yet                       │
+        ╰─────────────────────────────────────────────────────────────────────╯
+
+        /status
+
+        ╭─────────────────────────────────────────────────────────────────────╮
+        │  >_ OpenAI Codex (v0.157.1)                                         │
+        │                                                                     │
+        │  Server:               Local background server                      │
+        │                                                                     │
+        │  Model:                GPT-6-Sol (reasoning medium, summaries auto) │
+        │  Model provider:       probe                                        │
+        │  Directory:            /private/tmp/mate-paste-1830673472           │
+        │  Permissions:          Workspace (Ask for approval)                 │
+        │  Agents.md:            <none>                                       │
+        │  Collaboration mode:   Default                                      │
+        │  Session:              01a0e6fb-4d64-7851-aeb2-e10a27878b17         │
+        │                                                                     │
+        │  Token usage:          0 total  (0 input + 0 output)                │
+        │  Limits:               data not available yet                       │
+        ╰─────────────────────────────────────────────────────────────────────╯
+                                       Tip: Run /review to get a code review of your current changes.
+
+        › Ask Codex to do anything
+
+          GPT-6-Sol default · /private/tmp/mate-paste-1830673472
+          ← for agents · ? for shortcuts
+--- PASS: TestLiveCodexDelayedPasteAndRecovery (23.20s)
+PASS
+ok  	github.com/nguyenngocanh94/mate/internal/send	23.775s

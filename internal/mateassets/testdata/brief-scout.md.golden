@@ -77,6 +77,8 @@ It is outside this worktree on purpose, like the status file: the worktree is re
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
 Answer every question under `## Deliverable`, each under its own heading, and say plainly which ones you could not answer and why.
 The Mate never reads this repository, so the report is its only view of it: name files by path and line, quote commands exactly as you ran them, and keep what you observed apart from what you infer.
+Begin the report with a `## Summary` section of at most 6000 characters: findings, limitations or failed checks, recommendation, and paths to the supporting evidence. The summary must preserve uncertainty; it is a navigation aid, not proof of acceptance.
+
 End the report with a `## Durable facts` section: what almost any future task in this repository would need to know - its stack, its layout, how to build, test and run it, its current state - or `none` if this investigation found nothing of that kind.
 If your findings reveal work that should ship (e.g. you reproduced a bug and the fix is clear), say so in the report and propose the acceptance lines for it: one observable result per line, each with `verify:` and the command that proves it.
 A summary in the status line is not the deliverable.

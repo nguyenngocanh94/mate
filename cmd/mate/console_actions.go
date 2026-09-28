@@ -174,7 +174,7 @@ func toggleModeAction(ws *store.Workspace, project string) (string, error) {
 		return "", fmt.Errorf("%w: %s", store.ErrNoProject, project)
 	}
 	next := !ws.Auto(project)
-	if err := ws.SetAuto(project, next); err != nil {
+	if err := ws.SetMode(project, next); err != nil {
 		return "", err
 	}
 	mode := query.ModeFor(next)
@@ -182,7 +182,7 @@ func toggleModeAction(ws *store.Workspace, project string) (string, error) {
 		return fmt.Sprintf("%s is now %s; the daemon digests the inbox into the Mate's pane every %s",
 			project, mode, autopilot.DefaultInterval), nil
 	}
-	return fmt.Sprintf("%s is now %s; nothing is sent to the Mate without a keystroke", project, mode), nil
+	return fmt.Sprintf("%s is now %s and stays so until you press m again; nothing is sent to the Mate without a keystroke", project, mode), nil
 }
 
 // consoleHarness parses the harness the Console picked. It is parsed here
