@@ -43,6 +43,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
     ├── WORKSPACE.md                      quy tắc của người dùng cho mọi Mate
     ├── CREW.md                           quy tắc của người dùng cho mọi Crew, nối cuối mọi brief (M7)
     ├── pricing.yaml                      bảng giá token, dùng sau
+    ├── .env                              cấu hình riêng máy này, KEY=VALUE (MATE_JEV, MATE_JEV_API_KEY_FILE); tuỳ chọn
     └── projects/
         └── shop/
             ├── project.yaml              repos (name, path, default_branch), mode, yolo
@@ -955,4 +956,4 @@ Evidence: `docs/evidence/m15-context-2026-09-28.md`.
 
 ### Thử nghiệm: Jev notice advisor
 
-Opt-in bằng `MATE_JEV_API_KEY_FILE`: trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
+Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).

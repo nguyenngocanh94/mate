@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,14 +21,29 @@ type noticeClassifier interface {
 	Classify(context.Context, string) (notice.Result, error)
 }
 
-// A key file opts this console into remote classification. Its contents are
-// kept in this client only; no key is added to spawned agents' environments.
-func consoleNoticeClient(env func(string) string) (*notice.Client, error) {
-	path := env("MATE_JEV_API_KEY_FILE")
-	if path == "" {
+// The workspace's `.mate/.env` opts this console into remote classification:
+// `MATE_JEV=on` turns the action on for this workspace only, and
+// `MATE_JEV_API_KEY_FILE` names a key file, `~/` or relative to the
+// workspace root. The key is read here and stays in this client; no key is
+// added to spawned agents' environments. The process environment is not
+// consulted, so one workspace's switch never reaches another's console.
+func consoleNoticeClient(ws *store.Workspace) (*notice.Client, error) {
+	env, err := ws.LoadEnv()
+	if err != nil {
+		return nil, fmt.Errorf("Jev disabled: %w", err)
+	}
+	on, err := envSwitch(env["MATE_JEV"])
+	if err != nil {
+		return nil, fmt.Errorf("Jev disabled: MATE_JEV %w", err)
+	}
+	if !on {
 		return nil, nil
 	}
-	f, err := os.Open(path)
+	path := env["MATE_JEV_API_KEY_FILE"]
+	if path == "" {
+		return nil, errors.New("Jev disabled: MATE_JEV_API_KEY_FILE is not set in .mate/.env")
+	}
+	f, err := os.Open(keyFilePath(ws.Root(), path))
 	if err != nil {
 		return nil, errors.New("Jev disabled: cannot read MATE_JEV_API_KEY_FILE")
 	}
@@ -38,6 +54,32 @@ func consoleNoticeClient(env func(string) string) (*notice.Client, error) {
 		return nil, errors.New("Jev disabled: invalid API key file")
 	}
 	return notice.New(key), nil
+}
+
+// envSwitch reads an on/off setting; unset is off, anything else is a
+// mistake worth a message rather than a silent default.
+func envSwitch(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "off", "false", "0", "no":
+		return false, nil
+	case "on", "true", "1", "yes":
+		return true, nil
+	}
+	return false, errors.New("must be on or off")
+}
+
+// keyFilePath expands a leading `~/` and anchors a relative path at the
+// workspace root, the directory `.mate/.env` describes.
+func keyFilePath(root, path string) string {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, strings.TrimPrefix(path, "~"))
+		}
+	}
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(root, path)
 }
 
 // This wrapper receives no observer health and writes no state. One explicit

@@ -141,7 +141,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	}
 	// A Jev configuration problem is said on the same status line, after
 	// any pane message; the console stays usable either way.
-	noticeClient, noticeErr := consoleNoticeClient(os.Getenv)
+	noticeClient, noticeErr := consoleNoticeClient(ws)
 	if noticeErr != nil {
 		if notice != "" {
 			notice += "; "

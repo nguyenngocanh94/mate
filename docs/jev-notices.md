@@ -6,12 +6,15 @@ Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding 
 
 Lưu API key trong một file ngoài repo, chỉ user đọc được (`chmod 600`). Không đặt key trong workspace, command line hoặc file commit.
 
+Tính năng bật theo từng workspace, trong `.mate/.env` của workspace đó; console không đọc biến môi trường của process, nên workspace khác không bị bật theo:
+
 ```sh
-go build -o /tmp/mate-jev ./cmd/mate
-MATE_JEV_API_KEY_FILE="$HOME/.config/mate/jev-trial-api-key" /tmp/mate-jev console /path/to/workspace
+# <workspace>/.mate/.env
+MATE_JEV=on
+MATE_JEV_API_KEY_FILE=~/.config/mate/jev-trial-api-key
 ```
 
-Biến trên chứa **đường dẫn**, không chứa key. Bỏ biến để tắt. Không thay binary `mate` đang cài trên máy. Nếu file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
+`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Đặt `MATE_JEV=off` hoặc bỏ dòng để tắt; mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
 
 ## Kết quả có ý nghĩa gì?
 
@@ -55,6 +58,6 @@ MATE_LIVE=1 MATE_JEV_API_KEY_FILE="$HOME/.config/mate/jev-trial-api-key" \
   go test ./internal/notice -run TestLiveJevNotices -v -count=1
 ```
 
-Live test gửi các fixture **giả lập** trong `internal/notice/testdata/notices.json`, không đọc pane/workspace của người dùng. Kết quả đầu tiên: [evidence 2026-09-27](evidence/jev-notices-2026-09-27.md). Đây không phải live acceptance của toàn bộ luồng Herdr → console → API.
+Live test gửi các fixture **giả lập** trong `internal/notice/testdata/notices.json`, không đọc pane/workspace của người dùng. Biến môi trường `MATE_JEV_API_KEY_FILE` ở đây chỉ dành cho live test; console chỉ đọc `.mate/.env`. Kết quả đầu tiên: [evidence 2026-09-27](evidence/jev-notices-2026-09-27.md). Đây không phải live acceptance của toàn bộ luồng Herdr → console → API.
 
 Hợp đồng request/response theo [TypeSafe API reference](https://docs.typesafe.ai/api); hạn chế model theo [Jev jaggedness](https://docs.typesafe.ai/model-jaggedness/jev-1.13).
