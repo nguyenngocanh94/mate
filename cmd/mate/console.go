@@ -139,7 +139,21 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 			}
 		}
 	}
-	model := console.New(load, consoleAction(ws, deps)).
+	// A Jev configuration problem is said on the same status line, after
+	// any pane message; the console stays usable either way.
+	noticeClient, noticeErr := consoleNoticeClient(ws)
+	if noticeErr != nil {
+		if notice != "" {
+			notice += "; "
+		}
+		notice += noticeErr.Error()
+	}
+	action := consoleAction(ws, deps)
+	if noticeClient != nil {
+		action = consoleNoticeAction(ws, deps, noticeClient, action)
+	}
+	model := console.New(load, action).
+		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, columns)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).

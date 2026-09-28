@@ -11,6 +11,7 @@ const (
 	workspaceFileName = "workspace.yaml"
 	workspaceDocName  = "WORKSPACE.md"
 	pricingFileName   = "pricing.yaml"
+	envFileName       = ".env"
 	projectsDirName   = "projects"
 	projectFileName   = "project.yaml"
 	projectDocName    = "PROJECT.md"
@@ -56,6 +57,11 @@ func (w *Workspace) WorkspaceCrewDoc() string { return filepath.Join(w.StateDir(
 
 // PricingFile is `<root>/.mate/pricing.yaml`, unused before the token monitor.
 func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pricingFileName) }
+
+// EnvFile is `<root>/.mate/.env`, the workspace's settings for this machine
+// (docs/mvp.md section 3): `KEY=VALUE` lines that LoadEnv reads. Optional;
+// it holds switches and paths, never a secret itself.
+func (w *Workspace) EnvFile() string { return filepath.Join(w.StateDir(), envFileName) }
 
 // ProjectsDir is `<root>/.mate/projects`.
 func (w *Workspace) ProjectsDir() string { return filepath.Join(w.StateDir(), projectsDirName) }

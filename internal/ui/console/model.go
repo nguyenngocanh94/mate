@@ -58,6 +58,8 @@ const (
 	ActionResolve Action = "resolve"
 	ActionReply   Action = "reply"
 	ActionPeek    Action = "peek"
+	// ActionNotice asks the optional classifier for an advisory only.
+	ActionNotice Action = "explain_notice"
 	// The two recovery actions. They exist because a Mate is a live
 	// interactive agent sharing its composer with the reader: a key
 	// sequence that went astray can leave junk half-typed in it, and an
@@ -221,6 +223,8 @@ func unknownMsg(text string) footerMsg { return footerMsg{tone: toneUnknown, tex
 // Model is the Console's Bubble Tea model. Zero value is not usable; build
 // one with New.
 type Model struct {
+	noticeClassifier bool
+
 	load   LoadFunc
 	action ActionFunc
 

@@ -1,0 +1,36 @@
+─ acme › payments-api ───────────── !1 ─
+  👨‍💻 payments-api                       
+     ✻ running                          
+▌ 🤖 Add idempotency-key index          
+     ✻ working                          
+  ▸ Completed (1)           ! 1 failed  
+─ 🤖 Add idempotency-key index ─────────
+  agent    crew_01J9P6…B8DT             
+  harness  ✻ claude                     
+  status   working                      
+  last     agent.tool_call · 13s        
+  mate     👨‍💻 payments-api              
+  branch   mate/01J9P6Q6                
+  repo     repos/payments-api           
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+─ actions · 🤖 crew_01J9P6…B8DT ── esc ─
+▌ enter  Show in next pane              
+  x      Stop crew…             confirm 
+  ·      Repair binding…  no recorded … 
+  ·      Merge…    not waiting on merge 
+  d      Diff                           
+  ·      Copy agent id     no clipboard 
+  e      Explain notice (Jev)           
+                                        
+  No next pane: run mate console        
+  inside WezTerm or Ghostty, and Enter  
+  fills the pane beside it.             
+→ next pane · no host                   
+ ↑↓ move  enter run  or its key  esc    

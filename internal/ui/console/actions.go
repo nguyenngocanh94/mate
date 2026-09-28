@@ -542,6 +542,16 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	m.confirm = nil
 	m.actions = false
 	m.menu = nil
+	if msg.choice.action == ActionNotice {
+		if msg.err != nil {
+			m.msg = errMsg("Jev notice unavailable: " + msg.err.Error())
+			return m, nil
+		}
+		m = m.openDiff("", "", msg.text)
+		m.diff.title = "Jev notice · " + shortID(actionObject(msg.choice), m.g)
+		m.diff.wrap = true
+		return m, nil
+	}
 	// A diff's whole result is the overlay (diff.go): the text is a
 	// screenful, and the message line would show a truncated first line of
 	// it. A diff that *failed* still takes the message line - there is no
