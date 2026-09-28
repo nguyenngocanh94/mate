@@ -64,36 +64,68 @@ class Node {
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
 }
 
-const tokens = (input, cache = 0) => ({ input, cache_read: cache, cache_write: 0, output: 10, thinking: 4, total: input + cache + 10 });
+// Output and thinking default to small fixed values; a call that must rank
+// first by output + thinking passes its own.
+const tokens = (input, cache = 0, output = 10, thinking = 4) => ({ input, cache_read: cache, cache_write: 0, output, thinking, total: input + cache + output });
 const at = seconds => new Date(Date.UTC(2026, 8, 28, 10, 0, seconds)).toISOString();
+// One category per work kind, tokens additive because each call belongs to
+// exactly one of them. `instructions` has an execution but no attributed
+// call, so its tokens are null rather than 0.
+const baseOverview = coverage => ({
+  summary: "Run tests / build (1 call) · Wait / poll (1 call) · Research / inspect (1 call) · Read instructions (1 execution)",
+  rule: "prompt-work-v1/observed-operations", coverage, sequence: [],
+  categories: [
+    { kind: "wait", label: "Wait / poll", model_calls: 1, execution_count: 1, tokens: tokens(50, 300, 40, 20), elapsed_ms: null,
+      call_ids: ["call-3"], segment_ids: ["segment-poll"], execution_ids: ["exec-poll"], evidence: [] },
+    { kind: "test", label: "Run tests / build", model_calls: 1, execution_count: 1, tokens: tokens(10, 400), elapsed_ms: 10000,
+      call_ids: ["call-2"], segment_ids: ["segment-test"], execution_ids: ["exec-test"], evidence: [] },
+    { kind: "research", label: "Research / inspect", model_calls: 1, execution_count: 0, tokens: tokens(100, 200), elapsed_ms: null,
+      call_ids: ["call-1"], segment_ids: ["segment-read"], execution_ids: [], evidence: [] },
+    { kind: "instructions", label: "Read instructions", model_calls: 0, execution_count: 1, tokens: null, elapsed_ms: 200,
+      call_ids: [], segment_ids: [], execution_ids: [], evidence: [] }
+  ]
+});
+// Segment kinds use the work vocabulary the projector shares with prompt
+// overviews (docs/plans/2026-09-28-crew-observer-first-screen.md section 1):
+// the old `read` and `poll` kinds are `research` and `wait` on the wire.
 const fixture = () => ({
   project: "shop", crew: "test-build", generated_at: at(40), last_event_id: 1,
-  ledger: { text: "Investigate build", state: "at_desk_working", turns: 3, tokens: tokens(160, 900), tool_count: 4 },
+  ledger: { text: "Investigate build", state: "at_desk_working", turns: 3, tokens: tokens(160, 900), tool_count: 4, harness: "codex" },
   branch: { name: "mate/test-build", exists: true }, status_lines: [], questions: [],
   turns: [
-    { id: "call-1", ordinal: 1, started_at: at(0), ended_at: at(10), tokens: tokens(100, 200), outcome: "tool" },
-    { id: "call-2", ordinal: 2, started_at: at(10), ended_at: at(20), tokens: tokens(10, 400), outcome: "tool" },
-    { id: "call-3", ordinal: 3, started_at: at(20), ended_at: at(30), tokens: tokens(50, 300), outcome: "tool" }
+    { id: "call-1", ordinal: 1, started_at: at(0), ended_at: at(10), duration_ms: 10000, tokens: tokens(100, 200), outcome: "tool", tool_count: 1, context_tokens_after: 300 },
+    { id: "call-2", ordinal: 2, started_at: at(10), ended_at: at(20), duration_ms: 10000, tokens: tokens(10, 400), outcome: "tool", tool_count: 2, context_tokens_after: 410 },
+    { id: "call-3", ordinal: 3, started_at: at(20), ended_at: at(30), duration_ms: 10000, tokens: tokens(50, 300, 40, 20), outcome: "tool", tool_count: 1, context_tokens_after: 390 }
   ],
   performance: {
     version: "v1", generated_at: at(40), tokens: tokens(160, 900), model_calls: 3,
     current_segment_id: "segment-poll", top_segment_ids: ["segment-test"], top_finding_ids: ["finding-poll"],
+    top_output_segment_ids: ["segment-poll", "segment-read", "segment-test"], top_output_call_ids: ["call-3", "call-1", "call-2"],
     recent_window_ms: 300000, recent_tokens: tokens(160, 900),
     time: { prompt_elapsed_ms: 40000, tool_elapsed_ms: 20000, invocation_ms: 25000, unallocated_ms: 20000, decision_wait_ms: 0 },
     freshness: { last_observed_at: at(40), last_ingested_at: at(40), last_usage_at: at(30), stale: false,
-      capabilities: ["native execution"], missing: ["One child process has no response link"] },
+      capabilities: ["native execution status"], missing: ["One child process has no response link"] },
     prompt_turns: [{ id: "prompt-1", prompt: "<img src=x onerror=alert(1)> Run the build", prompt_at: at(0), started_at: at(0),
-      elapsed_ms: 40000, model_calls: 3, tokens: tokens(160, 900), segment_ids: ["segment-read", "segment-test", "segment-poll"], coverage: "native" }],
+      elapsed_ms: 40000, model_calls: 3, tokens: tokens(160, 900), segment_ids: ["segment-read", "segment-test", "segment-poll"], coverage: "native",
+      overview: baseOverview("Types inferred from recorded operations.") }],
     segments: [
-      { id: "segment-read", prompt_id: "prompt-1", label: "Read build config", kind: "read", started_at: at(0), ended_at: at(10), elapsed_ms: 10000,
+      { id: "segment-read", prompt_id: "prompt-1", label: "Read build config", kind: "research", started_at: at(0), ended_at: at(10), elapsed_ms: 10000,
         tokens: tokens(100, 200), model_calls: 1, call_ids: ["call-1"], execution_ids: [], repeat_count: 0, outcome: "completed" },
       { id: "segment-test", prompt_id: "prompt-1", label: "Run TripUITests", kind: "test", started_at: at(10), ended_at: at(20), elapsed_ms: 10000,
         tokens: tokens(10, 400), model_calls: 1, call_ids: ["call-2"], execution_ids: ["exec-wrapper", "exec-test"], repeat_count: 2, outcome: "failed" },
-      { id: "segment-poll", prompt_id: "prompt-1", label: "Check TripUITests progress", kind: "poll", started_at: at(20), elapsed_ms: 20000,
-        tokens: tokens(50, 300), model_calls: 1, call_ids: ["call-3"], execution_ids: ["exec-poll"], repeat_count: 3, outcome: "running" }
+      { id: "segment-poll", prompt_id: "prompt-1", label: "Check TripUITests progress", kind: "wait", started_at: at(20), elapsed_ms: 20000,
+        tokens: tokens(50, 300, 40, 20), model_calls: 1, call_ids: ["call-3"], execution_ids: ["exec-poll"], repeat_count: 3, outcome: "running" }
     ],
+    // The crew-level overview is the prompt overviews summed by the projector
+    // (one prompt here, so the same categories with a crew coverage line).
+    overview: baseOverview("Types inferred from recorded operations across 1 prompts."),
+    // One chain of three polls on process 77, two without new output; the
+    // finding counters are zero because nothing repeated a read or an error.
+    loops: { measured: true, chains: 1, polls: 3, unchanged_polls: 2, progress_polls: 1, unknown_polls: 0, processes_polled: 1,
+      poll_calls: 1, poll_tokens: tokens(50, 300, 40, 20), repeated_reads: 0, repeated_errors: 0, repair_loops: 0, segment_repeats: 5,
+      coverage: "Polling chains need native process identities; this harness reports them." },
     findings: [{ id: "finding-poll", kind: "process_polling", title: "TripUITests was polled 3 times", detail: "2 polls had no new output",
-      confidence: "observed", ongoing: true, count: 3, tokens: null, segment_ids: ["segment-poll"], call_ids: ["call-3"], execution_ids: ["exec-poll"],
+      severity: "info", confidence: "observed", ongoing: true, count: 3, tokens: null, segment_ids: ["segment-poll"], call_ids: ["call-3"], execution_ids: ["exec-poll"],
       evidence: [{ id: "source-1", kind: "execution", label: "Process 77", source_ref: { path: "rollout.jsonl", offset: 400 } }], review: "Review the wait interval" }],
     executions: [
       { id: "exec-wrapper", prompt_id: "prompt-1", tool: "exec", is_wrapper: true, status: "completed", output_bytes: null, new_output_bytes: null },
@@ -201,7 +233,10 @@ test("primary work labels keep wrapper JavaScript in evidence instead of the fir
   p.segments[2].execution_ids = ["exec-wrapper"];
   const app = await boot(body);
   const label = keyed(app.view, "data-focus", "current-work");
-  assert.equal(label.textContent, "Build / test · native command not linked");
+  // The fallback label comes from the shared KINDS table, so the `test` kind
+  // reads "Run tests / build" (the projector's workLabels), no longer the
+  // old "Build / test" wording of the retired segment vocabulary.
+  assert.equal(label.textContent, "Run tests / build · native command not linked");
   assert.doesNotMatch(label.textContent, /const r/);
 });
 
@@ -357,6 +392,144 @@ test("Mate overview works without a Crew performance blob and retains expanded c
   assert.equal(keyed(app.view, "data-detail", "exchange:exchange-1").open, true);
   assert.equal(keyed(app.view, "data-detail", "mate-overview:exchange-1:category:test").open, true);
   assert.equal(app.doc.activeElement.getAttribute("data-focus"), "detail:mate-overview:exchange-1:category:test");
+});
+
+test("header names the harness from the ledger and adds the observed version only when recorded", async () => {
+  const app = await boot();
+  const chips = app.view.querySelector(".head-chips");
+  assert.ok(chips, "harness chip rendered from ledger.harness");
+  assert.match(chips.textContent, /codex/);
+  assert.doesNotMatch(chips.textContent, /undefined|null/);
+  const body = fixture();
+  body.performance.runtime = { model: "m", effort: "high", harness_version: "0.157.1" };
+  const versioned = await boot(body);
+  assert.match(versioned.view.querySelector(".head-chips").textContent, /codex 0\.157\.1/);
+  assert.match(versioned.view.querySelector(".head-chips").textContent, /m · high/);
+});
+
+test("four answers use overview, loops and rankings without inventing numbers", async () => {
+  const app = await boot();
+  const strip = app.view.querySelector(".answers");
+  assert.ok(strip, "the four-answer strip is rendered");
+  assert.equal(strip.querySelectorAll("[data-answer]").length, 4);
+  const work = keyed(strip, "data-answer", "work");
+  assert.equal(work.querySelector(".big").textContent, "4", "the big number is the ledger's tool count");
+  assert.match(work.textContent, /1 native command \(1 failed\) · 1 process poll · 1 wrapper · file changes not recorded/);
+  const bars = work.querySelectorAll(".answer-bar");
+  assert.deepEqual(bars.map(bar => bar.querySelector(".kchip").textContent), ["Run tests / build", "Wait / poll", "Research / inspect", "Read instructions"],
+    "categories are ordered by tokens (420, 390, 310) with the unattributed one last");
+  assert.match(bars[0].textContent, /1 call · 1 cmd · 420 · 39\.3%/);
+  assert.match(bars[3].textContent, /usage not attributed/);
+  assert.doesNotMatch(bars[3].textContent, /\b0 tokens|0%/);
+  assert.equal(bars[3].querySelectorAll(".track").length, 0, "no bar is drawn for a category without attributed usage");
+  assert.equal(bars[0].querySelectorAll(".track").length, 1);
+  const repeats = keyed(strip, "data-answer", "repeats");
+  assert.match(repeats.textContent, /1 chain · 3 polls/);
+  assert.match(repeats.textContent, /2 polls saw no new output \(66\.7%\) · 1 process was polled/);
+  assert.match(repeats.textContent, /Poll calls: 1 · 390 tokens/);
+  assert.match(repeats.textContent, /Longest: .*TripUITests was polled 3 times.*3 polls · 2 unchanged/);
+  assert.match(repeats.textContent, /Same content re-read: 0 · same-error retries: 0 · repair loops: 0 · repeats inside segments: 5/);
+  const expensive = keyed(strip, "data-answer", "expensive");
+  assert.match(expensive.textContent, /By output \+ thinking/);
+  assert.match(expensive.textContent, /call #3 · 40 output \+ 20 thinking · 10s · context after 390/);
+  assert.match(expensive.textContent, /By context re-sent/);
+  assert.match(expensive.textContent, /Run TripUITests · 420 tokens · 1 call · 2 repeats · 10s/);
+  const tokensCard = keyed(strip, "data-answer", "tokens");
+  assert.match(tokensCard.textContent, /thinking 4 · inside output, not added/);
+  assert.match(tokensCard.textContent, /context after last call \? · window \? · cost \?/, "an unknown ledger value is a question mark, never a zero");
+  assert.match(tokensCard.textContent, /P1 .* · 1.1k · 3 calls · 40s/);
+  keyed(app.view, "data-focus", "answer-top-call").click();
+  await app.flush();
+  assert.equal(keyed(app.view, "data-segment", "segment-poll").open, true, "the top output call opens its own segment");
+  assert.equal(keyed(app.view, "data-segment", "segment-test").open, false);
+  assert.match(app.view.querySelector(".work-hotspot").textContent, /Most context re-sent:/);
+});
+
+test("unmeasured polling says so", async () => {
+  const body = fixture();
+  body.performance.loops = { measured: false, chains: 0, polls: 0, unchanged_polls: 0, progress_polls: 0, unknown_polls: 0, processes_polled: 0,
+    poll_calls: 0, poll_tokens: null, repeated_reads: 2, repeated_errors: 1, repair_loops: 0, segment_repeats: 5,
+    coverage: "Polling chains are not measurable for this harness (no native process identities); repeated reads and retries are still detected." };
+  const app = await boot(body);
+  const repeats = keyed(app.view.querySelector(".answers"), "data-answer", "repeats");
+  assert.match(repeats.textContent, /not measurable/);
+  assert.match(repeats.textContent, /native process identities/);
+  assert.doesNotMatch(repeats.textContent, /\d+ polls?\b/, "an unmeasured harness prints no poll count, not even 0");
+  assert.match(repeats.textContent, /Same content re-read: 2 · same-error retries: 1 · repair loops: 0/);
+  delete body.performance.loops;
+  delete body.performance.overview;
+  delete body.performance.top_output_call_ids;
+  delete body.performance.top_output_segment_ids;
+  const older = await boot(body);
+  const strip = older.view.querySelector(".answers");
+  assert.match(keyed(strip, "data-answer", "repeats").textContent, /Repeats not recorded yet/);
+  assert.match(keyed(strip, "data-answer", "work").textContent, /Work types not recorded yet/);
+  assert.match(keyed(strip, "data-answer", "expensive").textContent, /not ranked yet/);
+  assert.match(older.view.textContent, /Work types not recorded yet/);
+});
+
+test("kind filter and output sort", async () => {
+  const app = await boot();
+  const chip = keyed(app.view, "data-focus", "segment-kind:test");
+  assert.equal(chip.getAttribute("aria-pressed"), "false");
+  assert.match(chip.textContent, /Run tests \/ build/);
+  assert.match(keyed(app.view, "data-focus", "segment-kind:all").textContent, /All 3/);
+  chip.click();
+  assert.deepEqual(app.view.querySelectorAll("[data-segment]").map(node => node.getAttribute("data-segment")), ["segment-test"]);
+  assert.equal(keyed(app.view, "data-focus", "segment-kind:test").getAttribute("aria-pressed"), "true");
+  keyed(app.view, "data-focus", "segment-kind:all").click();
+  const select = keyed(app.view, "data-focus", "segment-sort");
+  select.value = "output";
+  select.emit("change");
+  assert.deepEqual(app.view.querySelectorAll("[data-segment]").map(node => node.getAttribute("data-segment")), ["segment-poll", "segment-read", "segment-test"],
+    "output + thinking ranks the poll segment first and keeps ties in time order");
+  const row = keyed(app.view, "data-segment", "segment-test");
+  assert.match(row.textContent, /Run tests \/ build/);
+  // The clock is local time, so only the prompt tag's shape is asserted.
+  assert.match(row.textContent, /P1 \d\d:\d\d/);
+  assert.match(row.textContent, /Tool calls2/);
+  assert.match(row.textContent, /Thinking4/);
+  assert.match(app.view.textContent, /Unclassified segments: 0 of 3/);
+});
+
+test("tool mix rows add up to the crew row", async () => {
+  const app = await boot();
+  const table = app.view.querySelector(".tool-mix");
+  assert.ok(table, "the tool mix table is rendered");
+  assert.ok(table.parentNode.className.includes("table-wrap"));
+  // The instructions category has executions but no attributed call, so it
+  // gets no column: it would be dashes in every row.
+  assert.deepEqual(table.querySelectorAll("th").map(node => node.textContent),
+    ["Prompt", "Calls", "Tokens", "Run tests / build", "Wait / poll", "Research / inspect", "Repeats", "Failed cmds"]);
+  const rows = table.querySelectorAll("tbody")[0].querySelectorAll("tr");
+  assert.equal(rows.length, 2, "one prompt row and the crew row");
+  assert.match(rows[0].textContent, /P1 · <img src=x onerror=alert…/, "the prompt is quoted as text, cut at 24 characters");
+  assert.match(rows[0].textContent, /1 · 390/);
+  assert.equal(rows[0].querySelectorAll("img").length, 0, "prompt markup remains text");
+  const crew = rows[rows.length - 1];
+  assert.deepEqual(crew.querySelectorAll("td").map(node => node.textContent), ["Crew", "3", "1.1k", "1 · 420", "1 · 390", "1 · 310", "5", "1"],
+    "the crew row is the ledger: 3 calls, 1.1k tokens, 5 repeats, 1 failed native command");
+  assert.match(app.view.textContent, /Each model call belongs to exactly one work type/);
+});
+
+test("timeline draws poll brackets with counts", async () => {
+  const body = fixture();
+  const p = body.performance;
+  p.executions.push(
+    { id: "exec-poll-2", prompt_id: "prompt-1", tool: "write_stdin", poll: true, process_id: "77", started_at: at(25), ended_at: at(26), status: "completed", output_bytes: 0, new_output_bytes: 0 },
+    { id: "exec-poll-3", prompt_id: "prompt-1", tool: "write_stdin", poll: true, process_id: "77", started_at: at(30), ended_at: at(31), status: "completed", output_bytes: 4, new_output_bytes: 4 });
+  p.processes[0].poll_ids = ["exec-poll", "exec-poll-2", "exec-poll-3"];
+  const app = await boot(body);
+  const svg = app.view.querySelector(".activity-timeline").querySelector("svg");
+  assert.ok(svg.querySelectorAll("text").some(node => /×3/.test(node.textContent)), "a chain of three polls is labelled with its count");
+  assert.equal(svg.querySelectorAll(".timeline-poll").length, 3);
+  assert.equal(svg.querySelectorAll(".timeline-bracket").length, 1);
+  assert.equal(svg.querySelectorAll(".timeline-output").length, 3, "one output bar per model call of the prompt");
+  assert.ok(svg.querySelectorAll("title").some(node => /call #3 · 60 output \+ thinking/.test(node.textContent)));
+  const legend = app.view.querySelector(".timeline-legend");
+  assert.deepEqual(legend.querySelectorAll(".item").map(node => node.textContent), ["Research / inspect", "Run tests / build", "Wait / poll", "failed command"]);
+  const finding = keyed(app.view, "data-focus", "finding:finding-poll");
+  assert.match(finding.querySelector(".finding-kind").textContent, /repeat · info/);
 });
 
 test("Mate refreshes observed execution time after a quiet five-second poll without inventing usage", async () => {

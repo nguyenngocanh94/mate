@@ -110,6 +110,9 @@ func TestProjectTasksEqualTheTaskLedger(t *testing.T) {
 	if tools == 0 {
 		t.Error("the fixture crew ran tools; a ledger reporting none is not reading them")
 	}
+	if task.Harness != "codex" {
+		t.Errorf("harness = %q, want the crew's actor.harness codex", task.Harness)
+	}
 
 	// The Mate's block is computed from `turn` because no task row exists
 	// for a Mate - the same reason cmd/mate's mateLedgerRow exists.

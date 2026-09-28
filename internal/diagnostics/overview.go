@@ -84,6 +84,33 @@ func (p *projection) makeOverviews() {
 		g := &p.out.PromptTurns[i]
 		g.Overview = p.promptOverview(g.ID, byPrompt[g.ID], byCall)
 	}
+	// The Crew overview is the same categories over every known prompt, so the
+	// two scopes cannot disagree. Prompts outside promptIndex have no
+	// observations here, exactly as workObservations skips them.
+	all := []workObservation{}
+	for _, g := range p.out.PromptTurns {
+		all = append(all, byPrompt[g.ID]...)
+	}
+	p.out.Overview = p.crewOverview(all, byCall)
+}
+
+func (p *projection) promptOverview(promptID string, observations []workObservation, callKinds map[string]map[string]bool) Overview {
+	return p.buildOverview(observations, callKinds, func(id string) bool { return p.callPrompt[id] == promptID })
+}
+
+func (p *projection) crewOverview(observations []workObservation, callKinds map[string]map[string]bool) Overview {
+	prompts := fmt.Sprintf(" across %d prompts.", len(p.out.PromptTurns))
+	if len(observations) == 0 {
+		out := EmptyOverview()
+		out.Coverage = "No linked activity has been recorded" + prompts
+		return out
+	}
+	out := p.buildOverview(observations, callKinds, func(string) bool { return true })
+	// The per-prompt sequences already carry order. Splicing every prompt into
+	// one Crew sequence would invent an order between unrelated prompts.
+	out.Sequence = []WorkStep{}
+	out.Coverage = strings.TrimSuffix(out.Coverage, ".") + prompts
+	return out
 }
 
 func (p *projection) workObservations() []workObservation {
@@ -162,7 +189,10 @@ func (p *projection) workObservations() []workObservation {
 	return out
 }
 
-func (p *projection) promptOverview(promptID string, observations []workObservation, callKinds map[string]map[string]bool) Overview {
+// buildOverview is the one classifier behind both scopes: include decides
+// which ledger calls this overview charges, so a prompt and the whole Crew
+// are the same categories over different call sets.
+func (p *projection) buildOverview(observations []workObservation, callKinds map[string]map[string]bool, include func(callID string) bool) Overview {
 	out := EmptyOverview()
 	if len(observations) == 0 {
 		return out
@@ -241,7 +271,7 @@ func (p *projection) promptOverview(promptID string, observations []workObservat
 	}
 	seenCalls := map[string]bool{}
 	for _, call := range p.in.Calls {
-		if p.callPrompt[call.ID] != promptID || seenCalls[call.ID] {
+		if !include(call.ID) || seenCalls[call.ID] {
 			continue
 		}
 		seenCalls[call.ID] = true

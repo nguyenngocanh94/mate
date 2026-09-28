@@ -49,6 +49,7 @@ func Project(in Input, opts Options) Performance {
 		PromptTurns: []Prompt{}, Segments: []Segment{}, Findings: []Finding{},
 		Executions: []Execution{}, Processes: []Process{}, TopSegmentIDs: []string{}, TopFindingIDs: []string{},
 		ObservedInputs: []ContextInput{}, Progress: []Evidence{},
+		TopOutputSegmentIDs: []string{}, TopOutputCallIDs: []string{},
 		RecentWindowMs: 300_000, Profile: in.Profile}
 	if in.LastIngestedAt != "" {
 		p.out.Freshness.LastIngestedAt = in.LastIngestedAt
@@ -395,6 +396,22 @@ func (p *projection) finish() {
 		}
 		p.out.TopSegmentIDs = append(p.out.TopSegmentIDs, s.ID)
 	}
+	// What the model itself produced, per segment and per call. Thinking is
+	// inside output for billing, so the sum ranks the step, never the ledger.
+	produced := func(t Tokens) int64 { return t.Output + t.Thinking }
+	segments := []rank{}
+	for _, s := range p.out.Segments {
+		segments = append(segments, rank{s.ID, produced(s.Tokens)})
+	}
+	p.out.TopOutputSegmentIDs = topIDs(segments, 5)
+	calls, seenCalls := []rank{}, map[string]bool{}
+	for _, c := range p.in.Calls {
+		if !seenCalls[c.ID] {
+			seenCalls[c.ID] = true
+			calls = append(calls, rank{c.ID, produced(c.Tokens)})
+		}
+	}
+	p.out.TopOutputCallIDs = topIDs(calls, 5)
 	sort.SliceStable(p.out.Findings, func(i, j int) bool {
 		a, b := p.out.Findings[i], p.out.Findings[j]
 		if a.Severity != b.Severity {
@@ -424,6 +441,31 @@ func (p *projection) finish() {
 	sort.SliceStable(p.out.PromptTurns, func(i, j int) bool {
 		return parse(p.out.PromptTurns[i].StartedAt).Before(parse(p.out.PromptTurns[j].StartedAt))
 	})
+	p.summarizeLoops()
+}
+
+type rank struct {
+	id  string
+	key int64
+}
+
+// topIDs keeps the n highest keys; ties fall back to the id so equal usage
+// still ranks the same way on every projection.
+func topIDs(items []rank, n int) []string {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].key != items[j].key {
+			return items[i].key > items[j].key
+		}
+		return items[i].id < items[j].id
+	})
+	out := []string{}
+	for i, item := range items {
+		if i == n {
+			break
+		}
+		out = append(out, item.id)
+	}
+	return out
 }
 
 func stamp(t time.Time) string {

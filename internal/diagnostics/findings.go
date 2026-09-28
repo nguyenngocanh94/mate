@@ -167,8 +167,8 @@ func (p *projection) detectReads() {
 		p.out.Findings = append(p.out.Findings, f)
 	}
 	for _, e := range p.out.Executions {
-		kind, _ := classify(e, p.opts.Worktree)
-		if (kind != "read" && kind != "instructions") || e.Poll || e.OutputHash == "" || e.OutputBytes == nil {
+		kind := executionKind(e)
+		if (kind != "research" && kind != "instructions") || e.Poll || e.OutputHash == "" || e.OutputBytes == nil {
 			continue
 		}
 		k := p.operationKey(e)

@@ -111,6 +111,15 @@ type Performance struct {
 	ObservedInputs   []ContextInput `json:"observed_inputs"`
 	Runtime          RuntimeProfile `json:"runtime"`
 	Progress         []Evidence     `json:"progress"`
+	// Overview is the prompt overviews summed over the whole Crew: same
+	// classifier, same categories, no sequence. Fields are appended, never
+	// inserted, so recorded JSON keeps its field order.
+	Overview Overview `json:"overview"`
+	// Ranked by output + thinking: cache reads dominate totals, so
+	// top_segment_ids mostly finds the longest context, not the costliest step.
+	TopOutputSegmentIDs []string    `json:"top_output_segment_ids"`
+	TopOutputCallIDs    []string    `json:"top_output_call_ids"`
+	Loops               LoopSummary `json:"loops"`
 }
 
 type RuntimeProfile struct {

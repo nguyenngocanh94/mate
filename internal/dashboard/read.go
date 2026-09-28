@@ -224,6 +224,11 @@ func (s *Server) tasks(ctx context.Context, project string, now time.Time) ([]Ta
 			return nil, err
 		}
 		out[i].ToolCount = n
+		facts, _, err := s.actorFacts(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Harness = facts.harness
 	}
 	return out, nil
 }

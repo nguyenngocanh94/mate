@@ -173,15 +173,66 @@ func (p *projection) makeExecutions() {
 	})
 }
 
+// normalizeTarget shows a path inside the worktree relative to it. An
+// absolute worktree must be a prefix of the path. The task record may hold
+// the worktree relative to the workspace instead; an absolute path is then
+// inside it when it passes through that directory, taken at its last
+// occurrence so a nested copy of the name cannot hide the real one.
 func normalizeTarget(path, worktree string) string {
 	if worktree == "" || !filepath.IsAbs(path) {
 		return path
 	}
-	rel, err := filepath.Rel(worktree, path)
-	if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return filepath.ToSlash(rel)
+	if filepath.IsAbs(worktree) {
+		rel, err := filepath.Rel(worktree, path)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(rel)
+		}
+		return path
+	}
+	dir := "/" + strings.Trim(filepath.ToSlash(filepath.Clean(worktree)), "/")
+	if strings.HasSuffix(path, dir) {
+		return "."
+	}
+	if i := strings.LastIndex(path, dir+"/"); i >= 0 {
+		return path[i+len(dir)+1:]
 	}
 	return path
+}
+
+// relativeToWorktree shortens every absolute path under the worktree inside
+// free text such as a shell command, the way normalizeTarget does for one
+// path. A path is a whole token that starts the text or follows whitespace,
+// a quote, "=", ":" or "("; a longer path that merely contains the
+// worktree's name is left alone, so operationKey never conflates unrelated
+// commands.
+func relativeToWorktree(text, worktree string) string {
+	if worktree == "" || text == "" {
+		return text
+	}
+	var out strings.Builder
+	for i := 0; i < len(text); {
+		if text[i] != '/' || (i > 0 && !tokenBoundary(text[i-1])) {
+			out.WriteByte(text[i])
+			i++
+			continue
+		}
+		end := i + 1
+		for end < len(text) && isPathByte(text[end]) {
+			end++
+		}
+		out.WriteString(normalizeTarget(text[i:end], worktree))
+		i = end
+	}
+	return out.String()
+}
+
+func tokenBoundary(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\'' || c == '"' || c == '`' || c == '=' || c == ':' || c == '('
+}
+
+func isPathByte(c byte) bool {
+	return c == '/' || c == '.' || c == '_' || c == '-' || c == '~' || c == '@' || c == '+' || c == '%' ||
+		c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
 }
 
 func isWrapper(tool string) bool {
@@ -189,105 +240,97 @@ func isWrapper(tool string) bool {
 	return t == "exec" || t == "functions.exec" || t == "wait" || t == "functions.wait" || t == "parallel" || t == "multi_tool_use.parallel"
 }
 
+// classifyCall names a ledger call's segment from the operations it owns.
+// Kinds come from executionWork, so segments and the work overview share one
+// vocabulary; targets are the concrete things operated on. Several kinds
+// make the call mixed and several targets are counted, never guessed.
 func classifyCall(executions []Execution, worktree string) (string, string, string) {
 	kinds, targets := map[string]bool{}, map[string]bool{}
 	for _, e := range executions {
-		if e.IsWrapper {
-			commands := literalCommands(e.Command)
-			if len(commands) > 1 {
-				for _, command := range commands {
-					inner := e
-					inner.Command, inner.Target, inner.Tool, inner.IsWrapper = command, "", "exec_command", false
-					kind, target := classify(inner, worktree)
-					kinds[kind] = true
-					if target != "" {
-						targets[target] = true
-					}
-				}
-				continue
-			}
+		for _, kind := range executionWork(e) {
+			kinds[kind] = true
 		}
-		kind, target := classify(e, worktree)
-		kinds[kind] = true
-		if target != "" {
+		for _, target := range classifyTargets(e, worktree) {
 			targets[target] = true
 		}
 	}
 	if len(kinds) == 0 {
-		return "unknown", "", "Activity not recorded"
+		return "unknown", "", workLabels["unknown"] + " · no operations recorded"
 	}
-	if len(kinds) > 1 {
-		return "mixed", "", "Mixed activity"
+	kind := "mixed"
+	if len(kinds) == 1 {
+		kind = sortedKeys(kinds)[0]
 	}
-	kind := sortedKeys(kinds)[0]
 	target := ""
 	if len(targets) == 1 {
 		target = sortedKeys(targets)[0]
 	} else if len(targets) > 1 {
 		target = fmt.Sprintf("%d targets", len(targets))
 	}
-	label := map[string]string{"instructions": "Load instructions", "read": "Read / search", "edit": "Edit files", "test": "Build / test", "debug": "Debug", "browser": "Browser", "git": "Git / handback", "communication": "Communicate", "poll": "Check process", "unknown": "Activity not classified", "wrapper": "Tool wrapper"}[kind]
+	label := workLabels[kind]
 	if target != "" {
 		label += " · " + short(target, 100)
 	}
 	return kind, target, label
 }
 
-var readCommand = regexp.MustCompile(`(?i)(^|[;\s"'])(cat|sed|head|tail|rg|grep|find|ls|read_file)(\s|$)`)
-
-func classify(e Execution, worktree string) (string, string) {
-	t := strings.ToLower(e.Tool)
-	command := displayCommand(e.Command)
-	c := strings.ToLower(command)
-	target := normalizeTarget(e.Target, worktree)
-	if target == "" || e.IsWrapper {
-		target = command
+// executionKind is the one work kind of an execution, or mixed when it
+// recorded several. Findings that need a pure read use it.
+func executionKind(e Execution) string {
+	kinds := uniqueKinds(executionWork(e))
+	if len(kinds) == 1 {
+		return sortedKeys(kinds)[0]
 	}
-	if worktree != "" {
-		target = strings.ReplaceAll(target, worktree+"/", "")
-	}
-	if e.Poll || strings.Contains(t, "write_stdin") || t == "wait" || t == "functions.wait" {
-		if e.ProcessID != "" {
-			return "poll", "process " + e.ProcessID
-		}
-		return "poll", "unlinked process"
-	}
-	if strings.Contains(c, "tools.write_stdin") {
-		return "poll", "unlinked process"
-	}
-	if e.IsWrapper && (strings.Contains(command, "tools.") || strings.HasPrefix(strings.TrimSpace(command), "{")) {
-		return "wrapper", "command details unavailable"
-	}
-	if strings.Contains(t, "browser") || strings.Contains(t, "playwright") || strings.Contains(t, "screenshot") {
-		return "browser", target
-	}
-	if strings.Contains(t, "edit") || strings.Contains(t, "write") || strings.Contains(t, "patch") || strings.Contains(c, "apply_patch") {
-		return "edit", target
-	}
-	// Test/build commands often pipe their logs through head or sed. The
-	// log filter does not turn the whole execution into a file read.
-	if buildCommand.MatchString(c) {
-		return "test", target
-	}
-	if strings.Contains(t, "read") || strings.Contains(t, "grep") || strings.Contains(t, "glob") || readCommand.MatchString(c) {
-		if strings.Contains(c+" "+strings.ToLower(target), "agents.md") || strings.Contains(c+" "+strings.ToLower(target), "skill.md") || strings.Contains(c+" "+strings.ToLower(target), "claude.md") {
-			return "instructions", target
-		}
-		return "read", target
-	}
-	if strings.Contains(c, "git ") {
-		return "git", target
-	}
-	if strings.Contains(t, "send_message") || strings.Contains(c, "mate send ") || strings.Contains(c, "mate handback") {
-		return "communication", target
-	}
-	if strings.Contains(c, "lldb") || strings.Contains(c, "gdb ") {
-		return "debug", target
-	}
-	return "unknown", target
+	return "mixed"
 }
 
-var buildCommand = regexp.MustCompile(`(?i)(^|[;\s"'])(go\s+(test|build)|pytest|xcodebuild|npm\s+(run\s+)?(test|build)|cargo\s+(test|build)|make\s+check|gradle)(\s|$)`)
+// classifyTargets names what one execution operated on: the process it
+// polled, the files its patch touched, the literal commands it ran, or the
+// path a tool was given. Wrapper JavaScript is never a target; an opaque
+// wrapper is named by the tools it invokes.
+func classifyTargets(e Execution, worktree string) []string {
+	tool := strings.ToLower(e.Tool)
+	if e.Poll || waitTool(tool) || (e.IsWrapper && wrapperInvokes(e.Command, "write_stdin")) {
+		if e.ProcessID != "" {
+			return []string{"process " + e.ProcessID}
+		}
+		return []string{"unlinked process"}
+	}
+	if !e.IsWrapper {
+		if strings.Contains(tool, "apply_patch") || strings.HasPrefix(strings.TrimSpace(e.Command), "apply_patch") {
+			if files := patchTargets(e.Command, worktree); len(files) > 0 {
+				return []string{strings.Join(files, ", ")}
+			}
+		}
+		target := normalizeTarget(e.Target, worktree)
+		if target == "" {
+			target = executionCommand(e)
+		}
+		if target = relativeToWorktree(target, worktree); target == "" {
+			return nil
+		}
+		return []string{target}
+	}
+	if wrapperInvokes(e.Command, "apply_patch") {
+		if files := patchTargets(e.Command, worktree); len(files) > 0 {
+			// The patch body is not scanned for commands: a line shaped like
+			// command: "…" inside the patched file is not a second target.
+			return []string{strings.Join(files, ", ")}
+		}
+	}
+	targets := []string{}
+	for _, command := range literalCommands(e.Command) {
+		targets = append(targets, relativeToWorktree(command, worktree))
+	}
+	if len(targets) > 0 {
+		return targets
+	}
+	if tools := invokedTools(e.Command); len(tools) > 0 {
+		return []string{strings.Join(tools, ", ")}
+	}
+	return []string{"command details unavailable"}
+}
+
 var commandLiteral = regexp.MustCompile(`(?:\bcmd|\bcommand)["']?\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')`)
 
 // Extract literal command values for display only. This is not a JavaScript
@@ -317,11 +360,17 @@ func literalCommands(raw string) []string {
 	commands := []string{}
 	for _, m := range matches {
 		if strings.HasPrefix(m[1], `"`) {
+			// JavaScript allows escapes Go rejects, such as \' in a
+			// double-quoted literal; those are decoded by hand, never dropped.
 			if command, err := strconv.Unquote(m[1]); err == nil {
 				commands = append(commands, command)
+			} else {
+				commands = append(commands, unescapeJS(strings.TrimSuffix(strings.TrimPrefix(m[1], `"`), `"`)))
 			}
 		} else {
-			commands = append(commands, strings.TrimSuffix(strings.TrimPrefix(m[1], "'"), "'"))
+			// A single-quoted literal escapes its own quotes (\'); left in
+			// place they would split a quoted jq or rg program into commands.
+			commands = append(commands, unescapeJS(strings.TrimSuffix(strings.TrimPrefix(m[1], "'"), "'")))
 		}
 	}
 	return commands
@@ -330,6 +379,16 @@ func literalCommands(raw string) []string {
 func executionLabel(e Execution) string {
 	command := executionCommand(e)
 	if e.IsWrapper && (strings.Contains(command, "tools.") || strings.HasPrefix(strings.TrimSpace(command), "{")) {
+		// A patch wrapper is named by the files it touches. The label has no
+		// worktree to shorten against, so file names stand in for the paths
+		// the evidence command keeps in full.
+		if files := patchTargets(e.Command, ""); wrapperInvokes(e.Command, "apply_patch") && len(files) > 0 {
+			names := []string{}
+			for _, file := range files {
+				names = appendUnique(names, filepath.Base(file))
+			}
+			return short("apply_patch · "+strings.Join(names, ", "), 88)
+		}
 		return "Tool wrapper " + e.Tool
 	}
 	if command == "" {
@@ -363,10 +422,7 @@ func short(s string, n int) string {
 // Keep commands exact (including flags, test targets, ranges and queries).
 // Only the known worktree root is normalized for a comparable repo path.
 func (p *projection) operationKey(e Execution) string {
-	command := e.Command
-	if p.opts.Worktree != "" {
-		command = strings.ReplaceAll(command, p.opts.Worktree+"/", "")
-	}
+	command := relativeToWorktree(e.Command, p.opts.Worktree)
 	return key(e.SessionID, e.Tool+"\x00"+e.Cwd+"\x00"+command+"\x00"+e.Target)
 }
 

@@ -151,6 +151,10 @@ type Task struct {
 	HandbackCount     int64    `json:"handback_count"`
 	WaitedMs          int64    `json:"waited_ms"`
 	ToolCount         int64    `json:"tool_count"`
+	// Harness is the crew's `actor.harness`, the same source the Mate card
+	// uses, so the page can name the harness even for a recording whose
+	// telemetry carries no version.
+	Harness string `json:"harness,omitempty"`
 }
 
 // InboxItem is one thing still waiting on a decision, flattened from

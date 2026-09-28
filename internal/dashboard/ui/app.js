@@ -81,6 +81,45 @@
     { key: "output", label: "output", slot: 4 }
   ];
 
+  // The work vocabulary the projector uses for segments and overview
+  // categories alike (internal/diagnostics/work.go's workLabels), so the
+  // segment table, the timeline, the tool-mix table and the filter chips all
+  // name work with the same words. The order is the order legends and
+  // filter chips list kinds in; the two the classifier could not name come
+  // last and are always shown as their own rows, never folded into another.
+  var KINDS = {
+    research: "Research / inspect",
+    instructions: "Read instructions",
+    write_code: "Write code / files",
+    edit_code: "Edit code / files",
+    review: "Review",
+    test: "Run tests / build",
+    coordination: "Coordinate",
+    wait: "Wait / poll",
+    response: "Respond",
+    mixed: "Mixed activity",
+    unknown: "Unclassified activity"
+  };
+
+  function kindLabel(kind) {
+    if (KINDS[kind]) return KINDS[kind];
+    return kind ? String(kind).replace(/_/g, " ") : KINDS.unknown;
+  }
+
+  // A finding's kind in one word, shown beside its severity so a reader can
+  // tell a failure from a repeat before reading the sentence.
+  var FINDING_KINDS = {
+    execution_failure: "failure",
+    process_polling: "repeat",
+    repeated_read: "repeat",
+    repeated_error: "repeat",
+    repair_test_loop: "repeat",
+    long_execution: "slow",
+    large_output: "output",
+    context_reset: "context",
+    decision_wait: "wait"
+  };
+
   // ------------------------------------------------------------ formatting
 
   function fmtTokens(n) { return humanizeTokens(n || 0); }
@@ -92,6 +131,20 @@
   function fmtPct(v) { return v == null ? "?" : goFixed(v, 1) + "%"; }
 
   function fmtMs(ms) { return ms == null ? "?" : humanizeDuration(ms); }
+
+  // fmtTokens prints 0 for an absent number, which is right for a bucket the
+  // harness reported as empty and wrong for a value it never reported at
+  // all: an unrecorded context size is "?", never 0.
+  function fmtKnown(v) { return v == null ? "?" : fmtTokens(v); }
+
+  function numText(v) { return v == null ? "?" : String(v); }
+
+  // count reads "1 call" and "3 calls". A number on the first screen is a
+  // sentence fragment, and "1 chains" is the kind of typo a reader stops at.
+  function count(n, word, plural) {
+    if (n == null) return "? " + (plural || word + "s");
+    return n + " " + (n === 1 ? word : (plural || word + "s"));
+  }
 
   // A timestamp on the wire is the database's own RFC3339 string. It is
   // shown as a local clock time, with the full string on hover, so the page
@@ -282,6 +335,7 @@
   var pollToken = 0;
   var detailState = Object.create(null);
   var segmentSort = "time";
+  var segmentKindFilter = "all";  // "all" or one work kind of KINDS
   var selectedFinding = "";
   var selectedSegment = "";
 
@@ -693,11 +747,13 @@
   function renderTask(body) {
     var out = el("div");
     var ledger = body.ledger || {};
-    out.appendChild(el("div", { class: "card-head" }, [
+    out.appendChild(el("div", { class: "card-head crew-head" }, [
       el("h1", { text: body.crew }),
-      stateSpan(ledger.state)
+      stateSpan(ledger.state),
+      runtimeChips(body)
     ]));
-    out.appendChild(el("p", { class: "muted", style: "margin:0 0 12px", text: ledger.text || "" }));
+    out.appendChild(el("p", { class: "muted", style: "margin:0 0 6px", text: ledger.text || "" }));
+    out.appendChild(crewFacts(body));
     out.appendChild(crewPerformance(body));
     out.appendChild(savedDetails("ledger", "Crew totals and branch", [ledgerHeader(ledger, body.branch || {})], "section diagnostics"));
     if ((body.status_lines || []).length) {
@@ -717,6 +773,56 @@
     out.appendChild(savedDetails("raw-calls", "Raw model calls and events (" + (body.turns || []).length + ")",
       [turnTimeline(body)], "section diagnostics"));
     return out;
+  }
+
+  // The harness and model the recording actually observed, as chips beside
+  // the crew name. They come from the observed runtime, never from the
+  // launch profile: a configured model is not proof of the model that
+  // answered, which is why recordingDetails keeps the two apart.
+  function runtimeChips(body) {
+    var p = body.performance;
+    var runtime = (p && p.runtime) || {};
+    var chips = [];
+    // The harness name comes from the launch profile when one was recorded
+    // and otherwise from the ledger's actor row; the version is only ever
+    // the one the recording itself reported.
+    var harness = (p && p.profile && p.profile.harness) || (body.ledger && body.ledger.harness) || "";
+    if (harness || runtime.harness_version) chips.push(el("span", { class: "kchip", title: "harness of this crew and the version observed in the recording",
+      text: [harness, runtime.harness_version].filter(Boolean).join(" ") }));
+    if (runtime.model) chips.push(el("span", { class: "kchip", title: "model and effort observed in the recording",
+      text: runtime.model + (runtime.effort ? " · " + runtime.effort : "") }));
+    return chips.length ? el("span", { class: "head-chips" }, chips) : null;
+  }
+
+  // One line of facts about the run: when it was spawned and closed, how
+  // many prompts, model calls and tool calls it made, whether its branch
+  // still exists, and how long it waited on decisions. Every value is the
+  // ledger's or the branch check's own; an unrecorded time says so.
+  // spawnSpanMs is how long the task has been alive: a closed task measures
+  // spawn to close, an open one uses the server's age, and a task with no
+  // spawn time has no span rather than a zero one.
+  function spawnSpanMs(t) {
+    if (t.closed && t.spawned_at && t.closed_at) return new Date(t.closed_at) - new Date(t.spawned_at);
+    return t.age_ms == null ? null : t.age_ms;
+  }
+
+  function crewFacts(body) {
+    var t = body.ledger || {};
+    var branch = body.branch || {};
+    var p = body.performance;
+    var span = spawnSpanMs(t);
+    var when = "spawned " + (clock(t.spawned_at) || "time unknown");
+    if (t.closed) when += " → closed " + (clock(t.closed_at) || "time unknown");
+    when += " · " + (t.closed ? "" : "open for ") + fmtMs(span);
+    return el("div", { class: "facts crew-facts" }, [
+      el("span", { title: (t.spawned_at || "") + (t.closed_at ? " → " + t.closed_at : ""), text: when }),
+      p ? el("span", { text: count((p.prompt_turns || []).length, "prompt") }) : null,
+      el("span", { text: count(t.turns, "model call") }),
+      el("span", { text: count(t.tool_count, "tool call") }),
+      el("span", { class: "mono", title: branch.reason || "", text: branch.name
+        ? "branch " + branch.name + " · " + (branch.exists ? "exists" : "gone") : "no branch" }),
+      el("span", { text: count(t.question_count, "question") + (t.waited_ms ? " · waited " + fmtMs(t.waited_ms) : "") })
+    ]);
   }
 
   // Crew diagnostics are projected from recorded facts. The UI never assigns
@@ -744,9 +850,36 @@
     if (!/\b(?:const|let|var)\s+\w+\s*=|\bawait\s+(?:tools|functions)\.|\bPromise\.(?:all|allSettled)\s*\(/.test(label)) return label;
     var native = (s.execution_ids || []).map(function (id) { return byID(p.executions, id); }).find(function (e) { return e && !e.is_wrapper && e.command; });
     if (native) return excerpt(native.command, 120);
-    var kinds = { instructions: "Load instructions", read: "Read / search", edit: "Edit files", test: "Build / test", debug: "Debug",
-      browser: "Browser", git: "Git / handback", communication: "Communicate", poll: "Check process", mixed: "Mixed activity", unknown: "Unclassified work" };
-    return (kinds[s.kind] || "Work segment") + " · native command not linked";
+    return kindLabel(s.kind) + " · native command not linked";
+  }
+
+  // kindChip names a kind with a swatch and the word. The swatch colour is
+  // assigned to the kind in app.css through data-kind; the word is always
+  // beside it, so colour is never the only signal.
+  function kindChip(kind) {
+    return el("span", { class: "kchip", "data-kind": kind || "unknown" }, [
+      el("i", { "aria-hidden": "true" }), txt(kindLabel(kind))
+    ]);
+  }
+
+  function findingKindChip(f) {
+    var word = FINDING_KINDS[f.kind] || (f.kind ? String(f.kind).replace(/_/g, " ") : "finding");
+    return el("span", { class: "kchip finding-kind", "data-finding": word, "data-severity": f.severity || "" }, [
+      el("i", { "aria-hidden": "true" }), txt(word + (f.severity ? " · " + f.severity : ""))
+    ]);
+  }
+
+  // promptTag is "P2 21:57": the prompt's 1-based position in the crew and
+  // the clock of the moment in question, the shorthand every table uses so
+  // a segment can be placed without reading the prompt text.
+  function promptTag(p, promptID, at, seconds) {
+    var index = (p.prompt_turns || []).findIndex(function (prompt) { return prompt.id === promptID; });
+    var time = clock(at);
+    return (index < 0 ? "P?" : "P" + (index + 1)) + (time ? " " + (seconds ? time : time.slice(0, 5)) : "");
+  }
+
+  function isFailedNative(e) {
+    return !e.is_wrapper && !e.poll && (e.status === "failed" || (e.exit_code != null && e.exit_code !== 0));
   }
 
   function segmentTokens(s, bucket) {
@@ -794,12 +927,14 @@
     ]);
     var out = el("div", { class: "crew-performance" });
     out.appendChild(currentWork(body, p));
+    out.appendChild(answersStrip(body, p));
     out.appendChild(findingsPanel(body, p));
     out.appendChild(el("section", { class: "section", "aria-label": "Prompt turn timelines" }, [
       el("h2", { text: "Work over time" }),
       el("p", { class: "actions-note", text: "Each prompt keeps its own sequence of work. Token steps are recorded model responses; commands and decision waits share the time axis." }),
       promptTimelines(body, p)
     ]));
+    out.appendChild(toolMix(body, p));
     out.appendChild(segmentTable(body, p));
     var unplaced = (p.executions || []).filter(function (e) { return !e.prompt_id && !e.call_id; });
     if (unplaced.length) out.appendChild(savedDetails("unplaced-executions", "Executions without a confirmed prompt (" + unplaced.length + ")", [
@@ -855,7 +990,7 @@
       el("span", {}, [txt("Usage "), ageNode(freshness.last_usage_at)])
     ]));
     if (top) card.appendChild(el("div", { class: "work-hotspot" }, [
-      el("span", { text: "Most tokens: " }),
+      el("span", { text: "Most context re-sent: " }),
       el("button", { class: "text-button", type: "button", "data-focus": "top-segment", text: segmentLabel(top, p) + " · " + (top.model_calls === 0 ? "usage pending" : fmtTokens(top.tokens && top.tokens.total)),
         onclick: function () { revealSegments([top.id]); } })
     ]));
@@ -867,6 +1002,211 @@
   function workMetric(label, value, note) {
     return el("div", { class: "work-metric" }, [el("span", { class: "metric-label", text: label }),
       el("strong", { class: "num", text: value }), el("span", { class: "metric-note", text: note })]);
+  }
+
+  // answersStrip is the first screen's four answers (design callouts ①–④):
+  // how many tokens, how many tool calls for which kind of work, how often
+  // the Crew repeated itself, and which step cost the most. Each card reads
+  // one projector field and says "not recorded yet" when that field is
+  // absent, so an older projection degrades to words rather than to zeros.
+  function answersStrip(body, p) {
+    return el("div", { class: "answers" }, [
+      tokensAnswer(body, p), workAnswer(body, p), repeatsAnswer(body, p), expensiveAnswer(body, p)
+    ]);
+  }
+
+  function answerCard(key, title, children) {
+    return el("section", { class: "card answer", "data-answer": key, "aria-label": title },
+      [el("h2", { text: title })].concat(children));
+  }
+
+  function tokensAnswer(body, p) {
+    var ledger = body.ledger || {};
+    var tokens = p.tokens || {};
+    var recent = p.recent_tokens;
+    var prompts = p.prompt_turns || [];
+    var children = [
+      el("div", { class: "big num", text: p.model_calls === 0 ? "not reported" : fmtTokens(tokens.total) }),
+      tokenMeter(tokens, { label: "buckets" }),
+      el("div", { class: "answer-lines" }, [
+        el("span", { text: "thinking " + fmtTokens(tokens.thinking) + " · inside output, not added" }),
+        el("span", { text: "context after last call " + fmtKnown(ledger.context_tokens_last) + " · window " + fmtPct(ledger.context_pct) + " · cost " + fmtCost(ledger.cost) }),
+        el("span", { text: ledger.closed ? "historical recording · no live window"
+          : "last " + fmtMs(p.recent_window_ms || 300000) + " " + (recent ? "+" + fmtTokens(recent.total) : "unknown") })
+      ])
+    ];
+    if (prompts.length) children.push(el("div", { class: "answer-lines answer-prompts" }, prompts.map(function (prompt, i) {
+      return el("button", { class: "text-button", type: "button", "data-focus": "answer-prompt:" + prompt.id,
+        title: "Open prompt " + (i + 1) + " on the timeline",
+        text: promptTag(p, prompt.id, prompt.prompt_at || prompt.started_at) + " · " +
+          (prompt.model_calls === 0 ? "usage pending" : fmtTokens(prompt.tokens && prompt.tokens.total)) + " · " +
+          count(prompt.model_calls || 0, "call") + " · " + fmtMs(prompt.elapsed_ms),
+        onclick: function () { revealPrompt(prompt.id); } });
+    })));
+    return answerCard("tokens", "Tokens", children);
+  }
+
+  function revealPrompt(id) {
+    detailState["prompt:" + id] = true;
+    draw();
+    var target = matchingNode("data-detail", "prompt:" + id);
+    if (target) target.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+
+  // executionCounts splits the recorded executions the way the ledger's tool
+  // count is read: native commands (and how many failed), process polls, and
+  // the wrappers the harness ran around them.
+  function executionCounts(p) {
+    var counts = { native: 0, failed: 0, polls: 0, wrappers: 0 };
+    (p.executions || []).forEach(function (e) {
+      if (e.poll) counts.polls++;
+      else if (e.is_wrapper) counts.wrappers++;
+      else { counts.native++; if (isFailedNative(e)) counts.failed++; }
+    });
+    return counts;
+  }
+
+  function byTokensDesc(a, b) {
+    var av = a.tokens ? Number(a.tokens.total) || 0 : -1;
+    var bv = b.tokens ? Number(b.tokens.total) || 0 : -1;
+    return bv - av;
+  }
+
+  function workAnswer(body, p) {
+    var ledger = body.ledger || {};
+    var counts = executionCounts(p);
+    var changes = Array.isArray(p.progress) ? count(p.progress.length, "file change") : "file changes not recorded";
+    var children = [
+      el("div", { class: "big num", text: numText(ledger.tool_count) }),
+      el("p", { class: "answer-sub", text: count(counts.native, "native command") + " (" + counts.failed + " failed) · " +
+        count(counts.polls, "process poll") + " · " + count(counts.wrappers, "wrapper") + " · " + changes })
+    ];
+    var overview = p.overview;
+    if (!overview) {
+      children.push(el("p", { class: "coverage-note", text: "Work types not recorded yet" }));
+      return answerCard("work", "Tool calls by work", children);
+    }
+    var total = Number(p.tokens && p.tokens.total) || 0;
+    // A category with no call, no execution and no usage was observed in no
+    // prompt at all; listing it would name work that never happened.
+    var categories = (overview.categories || []).filter(function (c) {
+      return c.model_calls || c.execution_count || c.tokens;
+    }).sort(byTokensDesc);
+    if (!categories.length) {
+      children.push(el("p", { class: "coverage-note", text: "No work observed yet" }));
+      return answerCard("work", "Tool calls by work", children);
+    }
+    children.push(el("div", { class: "answer-bars", "aria-label": "Model calls and tokens per work type" }, categories.map(function (category) {
+      var share = category.tokens && total > 0 ? 100 * (Number(category.tokens.total) || 0) / total : null;
+      // apply_patch edits and polls are calls without a native command, so a
+      // zero command count is left out rather than shown as a measurement.
+      var numbers = count(category.model_calls || 0, "call") +
+        (category.execution_count ? " · " + count(category.execution_count, "cmd") : "") + " · " +
+        (category.tokens ? fmtTokens(category.tokens.total) + " · " + fmtPct(share) : "usage not attributed");
+      return el("div", { class: "answer-bar", "data-kind": category.kind }, [
+        el("div", { class: "row" }, [kindChip(category.kind), el("span", { class: "n", text: numbers })]),
+        share == null ? null : el("span", { class: "track", role: "img", "aria-label": kindLabel(category.kind) + " " + fmtPct(share) + " of tokens" }, [
+          el("i", { style: "width:" + Math.max(0, Math.min(100, share)).toFixed(3) + "%" })])
+      ]);
+    })));
+    children.push(el("p", { class: "actions-note", text: "Counts are model calls per work type; tokens belong to those calls." }));
+    return answerCard("work", "Tool calls by work", children);
+  }
+
+  function processForFinding(p, f) {
+    var ids = f.execution_ids || [];
+    return (p.processes || []).find(function (item) {
+      return ids.some(function (id) {
+        return (item.poll_ids || []).indexOf(id) !== -1 || (item.execution_ids || []).indexOf(id) !== -1;
+      });
+    });
+  }
+
+  function repeatsAnswer(body, p) {
+    var loops = p.loops;
+    if (!loops) return answerCard("repeats", "Repeats", [el("p", { class: "coverage-note", text: "Repeats not recorded yet" })]);
+    var counters = el("span", { text: "Same content re-read: " + numText(loops.repeated_reads) + " · same-error retries: " + numText(loops.repeated_errors) +
+      " · repair loops: " + numText(loops.repair_loops) + " · repeats inside segments: " + numText(loops.segment_repeats) });
+    if (!loops.measured) {
+      // A harness without native process identities cannot have its polling
+      // counted; printing 0 chains would claim it never polled.
+      return answerCard("repeats", "Repeats", [
+        el("div", { class: "big", text: "not measurable" }),
+        el("p", { class: "answer-sub", text: loops.coverage || "Polling chains need native process identities, which this harness does not report; repeated reads and retries are still detected." }),
+        el("div", { class: "answer-lines" }, [counters])
+      ]);
+    }
+    var polls = Number(loops.polls) || 0;
+    var total = Number(p.tokens && p.tokens.total) || 0;
+    var lines = [el("span", { text: count(loops.unchanged_polls, "poll") + " saw no new output (" +
+      fmtPct(polls > 0 ? 100 * (Number(loops.unchanged_polls) || 0) / polls : null) + ") · " +
+      count(loops.processes_polled, "process was polled", "processes were polled") })];
+    if (loops.poll_tokens) lines.push(el("span", { text: "Poll calls: " + numText(loops.poll_calls) + " · " + fmtTokens(loops.poll_tokens.total) + " tokens · " +
+      fmtPct(total > 0 ? 100 * (Number(loops.poll_tokens.total) || 0) / total : null) + " of the Crew" }));
+    var longest = null;
+    (p.findings || []).forEach(function (f) {
+      if (f.kind === "process_polling" && (!longest || (f.count || 0) > (longest.count || 0))) longest = f;
+    });
+    if (longest) {
+      var process = processForFinding(p, longest);
+      lines.push(el("span", {}, [txt("Longest: "),
+        el("button", { class: "text-button", type: "button", "data-focus": "answer-longest-chain", text: excerpt(longest.title || longest.kind, 72),
+          onclick: function () { selectedFinding = longest.id; revealSegments(longest.segment_ids || [], true); } }),
+        txt(" · " + (process
+          ? count(process.polls, "poll") + " · " + numText(process.unchanged_polls) + " unchanged · " + fmtMs(process.elapsed_ms) +
+            (process.tokens ? " · " + fmtTokens(process.tokens.total) + " tokens" : "")
+          : "process record not linked"))]));
+    }
+    lines.push(counters);
+    return answerCard("repeats", "Repeats", [
+      el("div", { class: "big num", text: count(loops.chains, "chain") + " · " + count(loops.polls, "poll") }),
+      el("div", { class: "answer-lines" }, lines)
+    ]);
+  }
+
+  function segmentButton(p, s, focusKey) {
+    return el("button", { class: "text-button", type: "button", "data-focus": focusKey, text: segmentLabel(s, p),
+      onclick: function () { revealSegments([s.id]); } });
+  }
+
+  // The most expensive step is answered twice, because the two rankings
+  // answer different questions: output + thinking is what the model wrote,
+  // total tokens is the context it was sent again and again.
+  function expensiveAnswer(body, p) {
+    var lines = [];
+    var callIDs = p.top_output_call_ids;
+    var callID = (callIDs || [])[0];
+    if (!callIDs) lines.push(el("span", { class: "coverage-note", text: "calls not ranked yet" }));
+    else if (!callID) lines.push(el("span", { text: "no model call recorded" }));
+    else {
+      var call = byID(body.turns, callID);
+      var segment = (p.segments || []).find(function (s) { return (s.call_ids || []).indexOf(callID) !== -1; });
+      lines.push(el("span", {}, [
+        el("strong", { text: call ? "call #" + call.ordinal : "call not in this page's ledger" }),
+        call ? txt(" · " + fmtTokens(call.tokens && call.tokens.output) + " output + " + fmtTokens(call.tokens && call.tokens.thinking) + " thinking · " +
+          fmtMs(call.duration_ms) + " · context after " + fmtKnown(call.context_tokens_after) +
+          (segment ? " · " + promptTag(p, segment.prompt_id, call.started_at) : "")) : null
+      ]));
+      lines.push(el("span", {}, [txt("segment: "), segment ? segmentButton(p, segment, "answer-top-call") : txt("no segment holds this call")]));
+    }
+    var segmentIDs = p.top_output_segment_ids;
+    var top = byID(p.segments, (segmentIDs || [])[0]);
+    if (!segmentIDs) lines.push(el("span", { class: "coverage-note", text: "segments not ranked yet" }));
+    else if (top) lines.push(el("span", {}, [txt("segment with most: "), segmentButton(p, top, "answer-top-output-segment"),
+      txt(" · " + (top.model_calls === 0 ? "usage pending" : fmtTokens((Number(top.tokens && top.tokens.output) || 0) + (Number(top.tokens && top.tokens.thinking) || 0)) + " output + thinking") +
+        " · " + count(top.model_calls || 0, "call") + " · " + fmtMs(top.elapsed_ms))]));
+    var contextIDs = p.top_segment_ids;
+    var context = byID(p.segments, (contextIDs || [])[0]);
+    return answerCard("expensive", "Most expensive step", [
+      el("h3", { text: "By output + thinking" }),
+      el("div", { class: "answer-lines" }, lines),
+      el("h3", { text: "By context re-sent" }),
+      el("div", { class: "answer-lines" }, [context
+        ? el("span", {}, [segmentButton(p, context, "answer-top-context-segment"),
+          txt(" · " + (context.model_calls === 0 ? "usage pending" : fmtTokens(context.tokens && context.tokens.total) + " tokens") + " · " +
+            count(context.model_calls || 0, "call") + " · " + count(context.repeat_count, "repeat") + " · " + fmtMs(context.elapsed_ms))])
+        : el("span", { class: "coverage-note", text: contextIDs ? "no segment recorded" : "not ranked yet" })])
+    ]);
   }
 
   function findingsPanel(body, p) {
@@ -897,6 +1237,7 @@
         selectedFinding = f.id;
         revealSegments(f.segment_ids || [], true);
       } }, [
+      findingKindChip(f),
       el("span", { class: "finding-title", text: f.title || f.kind }),
       el("span", { class: "finding-detail", text: f.detail || "" }),
       el("span", { class: "finding-usage", text: usageText(f.tokens) }),
@@ -1079,6 +1420,21 @@
     return node;
   }
 
+  // The lanes of a prompt timeline, top to bottom: the cumulative token
+  // line, one output + thinking bar per call, the segments by kind, native
+  // commands, polls with their chains, and decision waits. Every y is a
+  // viewBox unit; the SVG scales to the card's width.
+  var LANES = {
+    tokens: { label: 22, top: 26, bottom: 96 },
+    output: { label: 118, top: 102, bottom: 126 },
+    segments: { label: 150, top: 132, height: 26 },
+    commands: { label: 174, top: 164, height: 11 },
+    polls: { label: 196, top: 188, height: 8, bracket: 199, count: 214 },
+    decisions: { label: 236, top: 226, height: 12 },
+    axis: 258,
+    height: 266
+  };
+
   function activityTimeline(body, p, prompt, segments) {
     var start = timestamp(prompt.prompt_at || prompt.started_at);
     var end = timestamp(prompt.ended_at);
@@ -1087,14 +1443,16 @@
     if (start == null || end == null || end <= start) return el("p", { class: "empty", text: "A shared time axis needs recorded start and end observations." });
     var width = 920, left = 92, right = 12, plotWidth = width - left - right;
     var x = function (at) { return left + Math.max(0, Math.min(1, (at - start) / (end - start))) * plotWidth; };
-    var svg = svgNode("svg", { viewBox: "0 0 920 206", role: "img", "aria-label": "Cumulative tokens, command spans and decision waits on one time axis" });
-    svg.appendChild(svgNode("text", { x: 0, y: 22, class: "timeline-label" }, "Tokens"));
-    svg.appendChild(svgNode("text", { x: 0, y: 143, class: "timeline-label" }, "Commands"));
-    svg.appendChild(svgNode("text", { x: 0, y: 170, class: "timeline-label" }, "Decisions"));
+    var svg = svgNode("svg", { viewBox: "0 0 " + width + " " + LANES.height, role: "img",
+      "aria-label": "Cumulative tokens, output per call, work segments by kind, command spans, poll chains and decision waits on one time axis" });
+    [["Tokens", LANES.tokens.label], ["Output", LANES.output.label], ["Segments", LANES.segments.label],
+      ["Commands", LANES.commands.label], ["Polls", LANES.polls.label], ["Decisions", LANES.decisions.label]].forEach(function (lane) {
+      svg.appendChild(svgNode("text", { x: 0, y: lane[1], class: "timeline-label" }, lane[0]));
+    });
     for (var tick = 0; tick <= 4; tick++) {
       var at = start + (end - start) * tick / 4;
-      svg.appendChild(svgNode("line", { x1: x(at), x2: x(at), y1: 26, y2: 181, class: "timeline-grid" }));
-      svg.appendChild(svgNode("text", { x: x(at), y: 200, "text-anchor": tick === 0 ? "start" : tick === 4 ? "end" : "middle", class: "timeline-label" }, clock(new Date(at).toISOString())));
+      svg.appendChild(svgNode("line", { x1: x(at), x2: x(at), y1: LANES.tokens.top, y2: LANES.decisions.top + LANES.decisions.height + 2, class: "timeline-grid" }));
+      svg.appendChild(svgNode("text", { x: x(at), y: LANES.axis, "text-anchor": tick === 0 ? "start" : tick === 4 ? "end" : "middle", class: "timeline-label" }, clock(new Date(at).toISOString())));
     }
     segments.forEach(function (s) {
       var from = timestamp(s.started_at), to = timestamp(s.ended_at);
@@ -1102,9 +1460,9 @@
       if (to == null) to = end;
       var selected = byID(p.findings, selectedFinding);
       var related = selectedSegment === s.id || (selected && (selected.segment_ids || []).indexOf(s.id) !== -1);
-      var rect = svgNode("rect", { x: x(from), y: 28, width: Math.max(1, x(to) - x(from)), height: 90,
-        class: "timeline-segment", "data-kind": s.kind, "data-highlight": related ? "true" : "false" });
-      rect.appendChild(svgNode("title", {}, segmentLabel(s, p) + " · " + usageText(s.tokens)));
+      var rect = svgNode("rect", { x: x(from), y: LANES.segments.top, width: Math.max(1, x(to) - x(from)), height: LANES.segments.height,
+        class: "timeline-segment", "data-kind": s.kind || "unknown", "data-highlight": related ? "true" : "false" });
+      rect.appendChild(svgNode("title", {}, kindLabel(s.kind) + " · " + segmentLabel(s, p) + " · " + usageText(s.tokens)));
       svg.appendChild(rect);
     });
     var callIDs = new Set();
@@ -1113,56 +1471,215 @@
       return (timestamp(a.ended_at || a.started_at) || 0) - (timestamp(b.ended_at || b.started_at) || 0);
     });
     var total = Number(prompt.tokens && prompt.tokens.total) || 1;
-    var cumulative = 0, path = "M " + left + " 114";
+    var floor = LANES.tokens.bottom, rise = LANES.tokens.bottom - LANES.tokens.top;
+    var cumulative = 0, path = "M " + left + " " + floor;
     calls.forEach(function (call) {
       var at = timestamp(call.ended_at || call.started_at);
       if (at == null) return;
       cumulative += Number(call.tokens && call.tokens.total) || 0;
-      path += " H " + x(at).toFixed(2) + " V " + (114 - 78 * Math.min(1, cumulative / total)).toFixed(2);
+      path += " H " + x(at).toFixed(2) + " V " + (floor - rise * Math.min(1, cumulative / total)).toFixed(2);
     });
     path += " H " + x(end);
-    svg.appendChild(svgNode("path", { d: path, class: "timeline-token-line" }));
-    svg.appendChild(svgNode("text", { x: width - right, y: 22, "text-anchor": "end", class: "timeline-label" }, fmtTokens(prompt.tokens && prompt.tokens.total)));
-    var executions = (p.executions || []).filter(function (e) { return e.prompt_id === prompt.id && !e.is_wrapper; });
-    executions.forEach(function (e) {
+    var line = svgNode("path", { d: path, class: "timeline-token-line" });
+    line.appendChild(svgNode("title", {}, "cumulative recorded tokens · " + fmtTokens(prompt.tokens && prompt.tokens.total) + " by the end of the prompt"));
+    svg.appendChild(line);
+    svg.appendChild(svgNode("text", { x: width - right, y: LANES.tokens.label, "text-anchor": "end", class: "timeline-label" }, fmtTokens(prompt.tokens && prompt.tokens.total)));
+    // Output + thinking per call: what the model wrote, scaled to the
+    // prompt's heaviest call, so the reasoning steps stand out from the
+    // cache reads the token line is dominated by.
+    var outputOf = function (call) { return (Number(call.tokens && call.tokens.output) || 0) + (Number(call.tokens && call.tokens.thinking) || 0); };
+    var maxOutput = calls.reduce(function (m, call) { return Math.max(m, outputOf(call)); }, 0);
+    calls.forEach(function (call) {
+      var at = timestamp(call.ended_at || call.started_at);
+      if (at == null) return;
+      var value = outputOf(call);
+      var h = maxOutput > 0 ? Math.max(1, (LANES.output.bottom - LANES.output.top) * value / maxOutput) : 1;
+      var bar = svgNode("rect", { x: (x(at) - 1.5).toFixed(2), y: (LANES.output.bottom - h).toFixed(2), width: 3, height: h.toFixed(2), class: "timeline-output" });
+      bar.appendChild(svgNode("title", {}, "call #" + call.ordinal + " · " + fmtTokens(value) + " output + thinking"));
+      svg.appendChild(bar);
+    });
+    if (maxOutput > 0) svg.appendChild(svgNode("text", { x: width - right, y: LANES.output.label, "text-anchor": "end", class: "timeline-label" }, "max " + fmtTokens(maxOutput)));
+    var executions = (p.executions || []).filter(function (e) { return e.prompt_id === prompt.id; });
+    executions.filter(function (e) { return !e.is_wrapper && !e.poll; }).forEach(function (e) {
       var from = timestamp(e.started_at), to = timestamp(e.ended_at);
       if (from == null) return;
       if (to == null && e.status !== "running" && e.status !== "in_progress") return;
-      var rect = svgNode("rect", { x: x(from), y: e.poll ? 144 : 130, width: Math.max(2, x(to == null ? end : to) - x(from)), height: e.poll ? 4 : 11,
-        class: "timeline-execution", "data-failed": e.exit_code != null && e.exit_code !== 0 ? "true" : "false" });
+      var rect = svgNode("rect", { x: x(from), y: LANES.commands.top, width: Math.max(2, x(to == null ? end : to) - x(from)), height: LANES.commands.height,
+        class: "timeline-execution", "data-failed": isFailedNative(e) ? "true" : "false" });
       rect.appendChild(svgNode("title", {}, (e.command || e.tool || "execution") + " · " + executionStatus(e)));
       svg.appendChild(rect);
+    });
+    // One tick per poll; three or more polls of the same process are a chain
+    // and get a bracket with their count, so repetition is legible without
+    // opening a finding.
+    var chains = Object.create(null);
+    executions.filter(function (e) { return e.poll; }).forEach(function (e) {
+      var from = timestamp(e.started_at);
+      if (from == null) return;
+      var change = e.new_output_bytes == null ? "new output unknown" : e.new_output_bytes === 0 ? "no new output" : fmtBytes(e.new_output_bytes) + " new output";
+      var tickRect = svgNode("rect", { x: (x(from) - 1).toFixed(2), y: LANES.polls.top, width: 2.5, height: LANES.polls.height, class: "timeline-poll",
+        "data-failed": e.status === "failed" || (e.exit_code != null && e.exit_code !== 0) ? "true" : "false" });
+      tickRect.appendChild(svgNode("title", {}, "poll of " + (e.process_id ? "process " + e.process_id : "an unlinked process") + " · " + (e.status || "status unknown") + " · " + change));
+      svg.appendChild(tickRect);
+      if (e.process_id) (chains[e.process_id] = chains[e.process_id] || []).push({ at: from, execution: e });
+    });
+    Object.keys(chains).forEach(function (pid) {
+      var polls = chains[pid];
+      if (polls.length < 3) return;
+      var ats = polls.map(function (poll) { return poll.at; });
+      var a = x(Math.min.apply(null, ats)) - 3, b = x(Math.max.apply(null, ats)) + 3;
+      var process = processForExecution(p, polls[0].execution);
+      var bracket = svgNode("path", { d: "M " + a.toFixed(2) + " " + LANES.polls.bracket + " v 4 H " + b.toFixed(2) + " v -4", class: "timeline-bracket" });
+      bracket.appendChild(svgNode("title", {}, "process " + pid + " polled " + polls.length + " times" +
+        (process ? " · " + numText(process.unchanged_polls) + " without new output" : "")));
+      svg.appendChild(bracket);
+      svg.appendChild(svgNode("text", { x: ((a + b) / 2).toFixed(2), y: LANES.polls.count, "text-anchor": "middle", class: "timeline-label timeline-bracket-label" },
+        "×" + polls.length + (process && process.tokens ? " · " + fmtTokens(process.tokens.total) : "")));
     });
     (body.questions || []).forEach(function (q) {
       var from = timestamp(q.asked_at), to = timestamp(q.answered_at);
       if (from == null || from > end || (to != null && to < start)) return;
-      var rect = svgNode("rect", { x: x(from), y: 160, width: Math.max(2, x(to == null ? end : to) - x(from)), height: 12, class: "timeline-wait" });
+      var rect = svgNode("rect", { x: x(from), y: LANES.decisions.top, width: Math.max(2, x(to == null ? end : to) - x(from)), height: LANES.decisions.height, class: "timeline-wait" });
       rect.appendChild(svgNode("title", {}, q.text || "Waiting for a decision"));
       svg.appendChild(rect);
     });
-    return el("div", { class: "activity-timeline" }, [svg,
-      el("p", { class: "actions-note", text: "Line: cumulative recorded tokens · blocks: work segments · command ticks: process polls. Select a segment below to see exact evidence." })]);
+    var present = Object.keys(KINDS).filter(function (kind) { return segments.some(function (s) { return (s.kind || "unknown") === kind; }); });
+    segments.forEach(function (s) { if (s.kind && !KINDS[s.kind] && present.indexOf(s.kind) === -1) present.push(s.kind); });
+    return el("div", { class: "activity-timeline" }, [svg, kindLegend(present),
+      el("p", { class: "actions-note", text: "Line: cumulative recorded tokens · bars: output + thinking of each call · blocks: work segments by kind · Commands: native executions · Polls: one tick per poll, a bracket marks a chain of three or more with its count. Select a segment below to see exact evidence." })]);
+  }
+
+  function kindLegend(kinds) {
+    var items = kinds.map(function (kind) {
+      return el("span", { class: "item" }, [el("span", { class: "swatch", "data-kind": kind, "aria-hidden": "true" }), txt(kindLabel(kind))]);
+    });
+    items.push(el("span", { class: "item" }, [el("span", { class: "swatch", "data-failed": "true", "aria-hidden": "true" }), txt("failed command")]));
+    return el("div", { class: "legend timeline-legend", "aria-label": "Kinds of work on this timeline" }, items);
+  }
+
+  // toolMix is design callout ⑦: the overview's categories per prompt. Each
+  // model call belongs to exactly one work type, so a row adds up to its
+  // prompt and the Crew row adds up to the ledger.
+  function toolMix(body, p) {
+    var section = el("section", { class: "section", "aria-label": "Tool mix by prompt" }, [el("h2", { text: "Tool mix by prompt" })]);
+    var prompts = p.prompt_turns || [];
+    if (!prompts.length) {
+      section.appendChild(el("p", { class: "empty", text: "Prompt boundaries have not been recorded." }));
+      return section;
+    }
+    var overview = p.overview;
+    if (!overview) section.appendChild(el("p", { class: "coverage-note", text: "Work types not recorded yet; calls, tokens, repeats and failed commands are still listed per prompt." }));
+    // A kind no model call was ever attributed to would be a column of
+    // dashes; the work card already names it with its execution count.
+    var kinds = ((overview && overview.categories) || []).filter(function (c) { return c.model_calls || c.tokens; })
+      .sort(byTokensDesc).map(function (c) { return c.kind; });
+    var head = [el("th", { text: "Prompt" }), el("th", { class: "n", text: "Calls" }), el("th", { class: "n", text: "Tokens" })]
+      .concat(kinds.map(function (kind) { return el("th", { class: "n" }, [kindChip(kind)]); }))
+      .concat([el("th", { class: "n", text: "Repeats" }), el("th", { class: "n", text: "Failed cmds" })]);
+    function row(label, calls, tokensText, categories, repeats, failed, className) {
+      var cells = [el("td", { "data-label": "Prompt", class: "tool-mix-prompt", text: label }),
+        el("td", { "data-label": "Calls", class: "n", text: calls }), el("td", { "data-label": "Tokens", class: "n", text: tokensText })];
+      kinds.forEach(function (kind) {
+        var category = categories ? categories.find(function (c) { return c.kind === kind; }) : null;
+        // No overview for the prompt is unknown ("?"); a kind the prompt
+        // never attributed a call to is nothing ("–"), not zero tokens.
+        var text = !categories ? "?" : !category || (!category.model_calls && !category.tokens) ? "–"
+          : (category.model_calls || 0) + " · " + (category.tokens ? fmtTokens(category.tokens.total) : "?");
+        cells.push(el("td", { "data-label": kindLabel(kind), class: "n", text: text }));
+      });
+      cells.push(el("td", { "data-label": "Repeats", class: "n", text: repeats }));
+      cells.push(el("td", { "data-label": "Failed cmds", class: "n", text: failed }));
+      return el("tr", { class: className }, cells);
+    }
+    var repeatsOf = function (segments) { return segments.reduce(function (sum, s) { return sum + (Number(s.repeat_count) || 0); }, 0); };
+    var tbody = el("tbody");
+    prompts.forEach(function (prompt, i) {
+      var segments = (p.segments || []).filter(function (s) { return s.prompt_id === prompt.id; });
+      var failed = (p.executions || []).filter(function (e) { return e.prompt_id === prompt.id && isFailedNative(e); }).length;
+      tbody.appendChild(row("P" + (i + 1) + " · " + excerpt(prompt.prompt || "Prompt text unavailable", 24), String(prompt.model_calls || 0),
+        prompt.model_calls === 0 ? "?" : fmtTokens(prompt.tokens && prompt.tokens.total),
+        prompt.overview ? prompt.overview.categories || [] : null, String(repeatsOf(segments)), String(failed), null));
+    });
+    tbody.appendChild(row("Crew", String(p.model_calls || 0), p.model_calls === 0 ? "?" : fmtTokens(p.tokens && p.tokens.total),
+      overview ? overview.categories || [] : null, String(repeatsOf(p.segments || [])),
+      String((p.executions || []).filter(isFailedNative).length), "tool-mix-crew"));
+    section.appendChild(el("div", { class: "table-wrap" }, [el("table", { class: "tool-mix" }, [el("thead", {}, [el("tr", {}, head)]), tbody])]));
+    section.appendChild(el("p", { class: "actions-note", text: "Each model call belongs to exactly one work type, so rows and columns add up to the ledger. Failed commands are native exit codes; repeats are the segments' own repeat counts." }));
+    return section;
+  }
+
+  // unclassifiedCoverage says how much of the recording the classifier could
+  // not name: mixed and unknown segments are listed as their own rows and
+  // counted here, never folded into another kind.
+  function unclassifiedCoverage(p) {
+    var segments = p.segments || [];
+    var unnamed = segments.filter(function (s) { return !s.kind || s.kind === "mixed" || s.kind === "unknown"; });
+    var sum = function (key) { return unnamed.reduce(function (acc, s) { return acc + (Number(s.tokens && s.tokens[key]) || 0); }, 0); };
+    var total = Number(p.tokens && p.tokens.total) || 0, output = Number(p.tokens && p.tokens.output) || 0;
+    return "Unclassified segments: " + unnamed.length + " of " + segments.length + " · " +
+      fmtPct(total > 0 ? 100 * sum("total") / total : null) + " of tokens · " + fmtPct(output > 0 ? 100 * sum("output") / output : null) + " of output";
   }
 
   function segmentTable(body, p) {
     var section = el("section", { class: "section", "aria-label": "Work segments" });
     var select = el("select", { "aria-label": "Sort work segments", "data-focus": "segment-sort" }, [
-      el("option", { value: "time", text: "Timeline order" }), el("option", { value: "input", text: "Fresh input, highest first" }),
+      el("option", { value: "time", text: "Timeline order" }), el("option", { value: "output", text: "Output + thinking, highest first" }),
+      el("option", { value: "input", text: "Fresh input, highest first" }),
       el("option", { value: "total", text: "Total tokens, highest first" }), el("option", { value: "elapsed", text: "Elapsed, longest first" })
     ]);
     select.value = segmentSort;
     select.addEventListener("change", function () { segmentSort = select.value; draw(); });
     section.appendChild(el("div", { class: "card-head segment-controls" }, [el("h2", { text: "Work segments" }), el("label", {}, [txt("Sort by "), select])]));
     section.appendChild(el("p", { class: "actions-note", text: "Tokens belong to model calls in each segment. Repeated visits remain separate; no token cost is assigned to an individual command." }));
-    var rows = (p.segments || []).slice();
-    if (segmentSort !== "time") rows.sort(function (a, b) {
-      var av = segmentSort === "elapsed" ? a.elapsed_ms : a.tokens && a.tokens[segmentSort];
-      var bv = segmentSort === "elapsed" ? b.elapsed_ms : b.tokens && b.tokens[segmentSort];
-      return (bv == null ? -1 : bv) - (av == null ? -1 : av);
-    });
-    if (!rows.length) section.appendChild(el("p", { class: "empty", text: "No model calls have been assigned to a work segment." }));
+    var all = p.segments || [];
+    section.appendChild(kindFilterChips(all));
+    var rows = all.filter(function (s) { return segmentKindFilter === "all" || (s.kind || "unknown") === segmentKindFilter; });
+    function sortValue(s) {
+      if (segmentSort === "elapsed") return s.elapsed_ms == null ? -1 : s.elapsed_ms;
+      if (!s.tokens) return -1;
+      if (segmentSort === "output") return (Number(s.tokens.output) || 0) + (Number(s.tokens.thinking) || 0);
+      return s.tokens[segmentSort] == null ? -1 : s.tokens[segmentSort];
+    }
+    if (segmentSort !== "time") rows.sort(function (a, b) { return sortValue(b) - sortValue(a); });
+    if (!rows.length) section.appendChild(el("p", { class: "empty", text: all.length ? "No segment matches this kind filter." : "No model calls have been assigned to a work segment." }));
     rows.forEach(function (s) { section.appendChild(segmentRow(body, p, s)); });
+    section.appendChild(el("p", { class: "coverage-note", text: unclassifiedCoverage(p) }));
     return section;
+  }
+
+  // Filter chips name every kind present with its count; "All" is the
+  // default. The pressed chip is marked by aria-pressed, not by colour alone.
+  function kindFilterChips(segments) {
+    var counts = Object.create(null);
+    segments.forEach(function (s) { var kind = s.kind || "unknown"; counts[kind] = (counts[kind] || 0) + 1; });
+    var wrap = el("div", { class: "chips segment-filters", role: "group", "aria-label": "Filter work segments by kind" });
+    function chip(key, label, n, kind) {
+      var b = el("button", { class: "chip", type: "button", "data-focus": "segment-kind:" + key,
+        "aria-pressed": segmentKindFilter === key ? "true" : "false",
+        onclick: function () { segmentKindFilter = key; draw(); } });
+      if (kind) b.appendChild(el("span", { class: "swatch", "data-kind": kind, "aria-hidden": "true" }));
+      b.appendChild(txt(label + " "));
+      b.appendChild(el("span", { class: "n", text: String(n) }));
+      return b;
+    }
+    wrap.appendChild(chip("all", "All", segments.length));
+    var kinds = Object.keys(KINDS).concat(Object.keys(counts).filter(function (kind) { return !KINDS[kind]; }));
+    kinds.forEach(function (kind) { if (counts[kind]) wrap.appendChild(chip(kind, kindLabel(kind), counts[kind], kind)); });
+    return wrap;
+  }
+
+  // segmentToolCalls sums the ledger's tool count over the segment's calls.
+  // A call the page does not hold makes the sum unknown, not smaller.
+  function segmentToolCalls(body, s) {
+    if (s.model_calls === 0) return "?";
+    var ids = s.call_ids || [];
+    var sum = 0;
+    for (var i = 0; i < ids.length; i++) {
+      var call = byID(body.turns, ids[i]);
+      if (!call || call.tool_count == null) return "?";
+      sum += Number(call.tool_count) || 0;
+    }
+    return String(sum);
   }
 
   function segmentRow(body, p, s) {
@@ -1176,14 +1693,16 @@
     var summary = details.querySelector("summary");
     append(summary, [el("div", { class: "segment-heading" }, [
       el("span", { class: "segment-label", text: segmentLabel(s, p) }),
-      el("span", { class: "segment-clock mono", title: s.started_at || "", text: clock(s.started_at) || "time unknown" }),
+      kindChip(s.kind),
+      el("span", { class: "segment-clock mono", title: s.started_at || "time unknown", text: promptTag(p, s.prompt_id, s.started_at, true) }),
       el("span", { class: "badge", text: s.outcome || "unknown" })]),
       el("div", { class: "segment-numbers" }, [
         segmentNumber("Fresh input", segmentTokens(s, "input")), segmentNumber("Cache read", segmentTokens(s, "cache_read")),
         segmentNumber("Cache write", segmentTokens(s, "cache_write")), segmentNumber("Output", segmentTokens(s, "output")),
-        segmentNumber("Total", segmentTokens(s, "total")),
+        segmentNumber("Thinking", segmentTokens(s, "thinking")), segmentNumber("Total", segmentTokens(s, "total")),
         el("span", { class: "segment-number" }, [el("span", { text: "Elapsed" }), elapsedNode(s.started_at, s.ended_at, s.elapsed_ms, s.id === p.current_segment_id)]),
-        segmentNumber("Calls", String(s.model_calls || 0)), segmentNumber("Repeats", s.repeat_count == null ? "?" : String(s.repeat_count))
+        segmentNumber("Calls", String(s.model_calls || 0)), segmentNumber("Tool calls", segmentToolCalls(body, s)),
+        segmentNumber("Repeats", s.repeat_count == null ? "?" : String(s.repeat_count))
       ])]);
     // Build expensive execution and call detail only while it is open.
     if (open) details.appendChild(segmentEvidence(body, p, s, f));
@@ -1276,7 +1795,8 @@
       el("div", { class: "facts" }, [el("span", { text: "Decision wait " + fmtMs(time.decision_wait_ms) }),
         el("span", { text: "Unallocated prompt time " + fmtMs(time.unallocated_ms) }),
         el("span", { text: "Summed invocation time " + fmtMs(time.invocation_ms) })]),
-      el("p", { class: "actions-note", text: "Concurrent tools and decision waits may overlap. Unallocated time is not a measurement of model latency. Usage changes only when the harness reports it." })
+      el("p", { class: "actions-note", text: "Concurrent tools and decision waits may overlap. Unallocated time is not a measurement of model latency. Usage changes only when the harness reports it." }),
+      el("p", { class: "coverage-note", text: unclassifiedCoverage(p) })
     ])];
     if (p.runtime) children.push(el("div", { class: "recording-body" }, [
       el("h3", { text: "Observed runtime" }),
@@ -1333,9 +1853,7 @@
   }
 
   function ledgerHeader(t, branch) {
-    var spawnToClose = t.closed && t.spawned_at && t.closed_at
-      ? new Date(t.closed_at) - new Date(t.spawned_at)
-      : (t.age_ms == null ? null : t.age_ms);
+    var spawnToClose = spawnSpanMs(t);
     return el("div", { class: "card" }, [
       el("div", { class: "facts" }, [
         el("span", { text: t.turns + " model calls" }),
@@ -1733,6 +2251,7 @@
       mateFilter = "all";
       detailState = Object.create(null);
       segmentSort = "time";
+      segmentKindFilter = "all";
       selectedFinding = "";
       selectedSegment = "";
     }

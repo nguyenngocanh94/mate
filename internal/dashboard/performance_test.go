@@ -43,6 +43,27 @@ func TestCrewPerformanceTotalsRepeatLedgerAndPreserveEvidence(t *testing.T) {
 			t.Fatal("synthetic thinking action leaked into measured executions")
 		}
 	}
+	// The task row stores the worktree relative to the workspace and the
+	// transcript was recorded under another root; a native execution's paths
+	// inside the worktree must still come out worktree-relative. Ledger
+	// wrapper targets are display strings the ingester already elided.
+	relative := 0
+	for _, e := range p.Executions {
+		if e.IsWrapper {
+			continue
+		}
+		for _, path := range []string{e.Cwd, e.Target} {
+			if strings.HasPrefix(path, "/") && strings.Contains(path, ".worktrees/shop-buybtn") {
+				t.Fatalf("native execution %s kept an absolute worktree path: cwd=%q target=%q", e.ID, e.Cwd, e.Target)
+			}
+		}
+		if e.Cwd == "." || (e.Target != "" && !strings.HasPrefix(e.Target, "/")) {
+			relative++
+		}
+	}
+	if relative == 0 {
+		t.Fatal("no native execution shows a worktree-relative cwd or target")
+	}
 	if len(p.Freshness.Missing) == 0 {
 		t.Fatal("historical fixture must disclose unavailable native coverage")
 	}

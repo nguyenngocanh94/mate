@@ -119,6 +119,7 @@ The UI shows newest exchanges first and reveals older ones in batches of 20.
 `tasks` is every crew the project has ever recorded, open and closed, oldest spawn first: one row of `v_task_ledger` each, with the crew's current `v_now` state, target and detail hung on it, plus two things no view carries.
 `tool_count` is `SUM(turn.tool_count)` for the crew, which the tier-3 ledger asks for and `v_task_ledger` has no column for.
 `age_ms` is `closed_at - spawned_at` for a closed task and `now - spawned_at` for an open one.
+`harness` is the crew's `actor.harness`, the same source the Mate card reads, so a page can name the harness of a recording whose telemetry carries no version.
 `closed` is true when the task has a `close_state` or a `closed_at`.
 
 `inbox` is `box.Inbox` flattened through `query.LoadBox`, oldest first, the same rows in the same order the console's rail draws.
@@ -168,7 +169,8 @@ A failed box read leaves `inbox` empty and puts the reason in `inbox_error` rath
       "question_count": 1,
       "handback_count": 1,
       "waited_ms": 86721,
-      "tool_count": 14
+      "tool_count": 14,
+      "harness": "codex"
     }
   ],
   "inbox": [
@@ -275,8 +277,9 @@ for billed token buckets. It never adds native response usage to ledger usage.
 | --- | --- |
 | `tokens`, `model_calls` | Exactly the Crew ledger's bucket totals and model-call count. |
 | `prompt_turns` | Native prompt ID scoped to its session, actual prompt and source locator, prompt timing, bucket totals, call count and `segment_ids`. A missing prompt ID leaves that call isolated. |
-| `segments` | Contiguous activity in call order, with `kind`, concrete `label`/`target`, `call_ids`, `execution_ids`, buckets, nullable elapsed/tool-union/invocation time, repeat count and versioned classification rule. Each ledger call is assigned once. A running execution before usage arrives can have zero attributed calls. |
+| `segments` | Contiguous activity in call order, with `kind` from the work vocabulary (`research`, `instructions`, `write_code`, `edit_code`, `review`, `test`, `coordination`, `wait`, `response`, `mixed`, `unknown`), concrete `label`/`target`, `call_ids`, `execution_ids`, buckets, nullable elapsed/tool-union/invocation time, repeat count and versioned classification rule. Each ledger call is assigned once. A running execution before usage arrives can have zero attributed calls. |
 | `current_segment_id`, `top_segment_ids` | Current observed work when identifiable, and up to five segments ranked by total tokens. A completed run has no current segment. |
+| `top_output_segment_ids`, `top_output_call_ids` | Up to five segments and up to five ledger calls ranked by output + thinking, ties by id. Total tokens mostly rank the longest context; these rank what the model itself wrote. |
 | `findings`, `top_finding_ids` | Versioned polling, repeated-read, repeated-error/repair, failed-command, long-execution, output/context and decision-wait observations. The first screen shows at most three. Findings include explanatory text, confidence, count, source evidence, related calls/segments/executions and a review suggestion. Their call sets can overlap; do not add their tokens together. |
 | `executions` | Native commands and observed tools, with exact command/cwd, native process/wrapper links when known, start/end, nullable duration/exit/output measurements, output hash/preview, polling and wrapper flags, and source locator. Wrapper success never overrides a nested native failure. |
 | `processes` | One process per session identity, actual job command when known, execution/poll IDs, unchanged/progress/unknown-output poll counts and tokens of the associated polling calls. Polls are not additional builds/tests. |
@@ -285,6 +288,8 @@ for billed token buckets. It never adds native response usage to ledger usage.
 | `freshness` | Separate last observed/ingested/usage stamps, age, stale flag, adapter capabilities and explicit missing-data reasons. `telemetry_cursor.observed_at` supplies the observer heartbeat even when no transcript bytes changed. |
 | `profile` | Recorded launch snapshot, if available: repo revision/dirty state, requested model/effort, harness and configured document hashes/sizes. Historical runs without a snapshot remain unknown. |
 | `runtime`, `observed_inputs`, `progress` | Actually reported model/effort/harness version, actually observed instruction-input hashes/bytes, and file-change evidence. Configured files and observed inputs are distinct; bytes are not exact billed token attribution. |
+| `overview` | The Crew-level work overview: the same categories as `prompt_turns[].overview` summed over every prompt by the same classifier. Category `tokens` add up to `tokens` and `model_calls` to `model_calls`; `sequence` is empty (the per-prompt sequences carry order) and `coverage` ends with "across N prompts". |
+| `loops` | How often the Crew repeated itself: `chains` (polling findings), `polls`/`unchanged_polls`/`progress_polls`/`unknown_polls`/`processes_polled` from `processes`, `poll_calls`/`poll_tokens` from `wait` segments (`null` when there is none), `repeated_reads`/`repeated_errors`/`repair_loops` finding counts and `segment_repeats` (Σ `repeat_count`). `measured` is true only with native execution status; otherwise every process number is 0 and `coverage` says polling chains are not measurable while repeated reads and retries still are. |
 
 Finding/process `tokens` is `null` if no model-call link is confirmed. A native
 execution with no confirmed wrapper parent remains visible in its prompt's
