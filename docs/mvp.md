@@ -91,9 +91,16 @@ Học từ firstmate, giữ đúng bốn cơ chế và không thêm:
 | Chiều | Cơ chế |
 | --- | --- |
 | Crew → Mate | `echo "state: một dòng" >> $MATE_STATUS`. Ba verb crew được dùng: `working`, `needs-decision`, `wait-mate` (mục 4b). Báo thưa. Nội dung dài nằm trong file, status là con trỏ. |
-| Mate → Crew | `mate send <crew> "một dòng"` gõ vào pane crew, kiểm chứng composer trống trước, retry Enter cho tới khi composer trống. Dài hơn thì ghi file và trỏ crew đọc. |
+| Mate → Crew | `mate send <crew> "một dòng"` paste vào pane crew với bracketed paste, kiểm chứng composer trống trước, retry Enter có kiểm tra toàn bộ bản nháp. Dài hơn thì ghi file và trỏ crew đọc. |
 | Đọc crew | `mate peek <crew>` đọc 40 dòng cuối pane. `mate state <crew>` trả một dòng state deterministic từ busy regex của pane và dòng status cuối. |
 | Đánh thức Mate | Observer trong console theo dõi status file, hash pane, busy regex, inventory Herdr. Chỉ đánh dấu là đáng chú ý khi có verb `needs-decision`/`wait-mate` hoặc khi chính nó mở incident (`blocked`). |
+
+Sửa lỗi gửi 2026-09-28: `mate send` lưu lần gửi vào `crews/<id>.send.json` trước khi nhập,
+dưới khóa riêng cho crew. Chạy lại cùng lệnh chỉ phục hồi bằng Enter khi phiên crew, nguồn gửi
+và toàn bộ bản nháp còn khớp; không nhập lại nội dung. Composer trống sau một lần gửi chưa xác nhận
+không tự cho phép gửi lại. Nội dung khác, phiên mới, ảnh chụp thiếu hoặc dialog đều từ chối phục hồi.
+`unknown` sau Enter và `busy → busy` không chứng minh gửi thành công; không ghi `sent.log` cho chúng.
+Đây là biên nhận lần nhập, không phải inbox bền vững hay xác nhận crew đã xử lý công việc.
 
 Câu hỏi của crew không có vòng đời.
 Crew append `needs-decision:` rồi dừng turn.

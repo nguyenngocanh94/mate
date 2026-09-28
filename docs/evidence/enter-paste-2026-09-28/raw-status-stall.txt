@@ -1,0 +1,30 @@
+› Review corrections (ui1-theme-review2 report, crews/ui1-theme-review2/report.md): (1) the
+  terracotta primary CTA in TripPalette.swift:92 is a capsule, but boards 11 and 13 show a
+  rounded rectangle; match the board corner radius. (2) the floating tab bar in
+  TripPalette.swift:162 has a 36 pt side inset; board 06 shows about 16-20 pt, match it.
+  Measure both on docs/design/board-06/11/13 PNGs, recapture the gallery on your own
+  simulator, regenerate gallery-design-side-by-side.png with the corrected components next
+  to boards 06, 11, 13, open it and check it yourself, rerun the full build and tests,
+  update the hand-back rows, then report wait-mate.
+
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit
+`/feedback` to report the issue.
+
+■ Conversation interrupted - tell the model what to do differently. Something went wrong? Hit
+`/feedback` to report the issue.
+
+
+› /status
+
+
+
+
+
+
+
+
+
+
+
+  GPT-6-Sol default · /private/tmp/mate-enter-lab

@@ -16,12 +16,14 @@ Never guess it from what you yourself run on; you run on `claude-code` and a Cre
 You have exactly three pane operations, and none of them sends a raw key:
 
 - `mate peek <project> <crew>` reads the last lines of the pane and changes nothing.
-- `mate send <project> <crew> "<one line>"` types one line and presses enter until the composer clears.
+- `mate send <project> <crew> "<one line>"` pastes one line and verifies submission. If its Enter stays swallowed, retry the exact same command: the app uses its saved attempt to verify the same Crew session and the whole pending text, then presses Enter without typing again.
 - `mate crew stop <project> <crew>` ends the agent and closes the pane.
 
 There is no interrupt key, no escape, no arrow key, and no bare enter.
 So "interrupt the Crew" in practice means one of: send a line the harness will accept mid-turn with `--queue`, or stop the Crew and spawn a fresh one with the same brief plus a note of what was already tried.
-Anything that would need a keystroke is an escalation to the captain, not something you improvise.
+For a saved send, use the verified retry above before escalating. Other raw keystrokes remain an escalation to the captain, not something you improvise. If retry cannot verify the saved draft, peek and report the evidence; never clear, replace, or blindly resend it.
+
+Check the send command's exit status before recording "sent" in the backlog. Do not hide it with `| tail` (unless pipefail is enabled), and do not update progress unconditionally after a failed or unconfirmed send. "Submission unconfirmed" is not success, even when text was typed.
 
 ## Composer states you will be told about
 
@@ -31,7 +33,7 @@ Anything that would need a keystroke is an escalation to the captain, not someth
 | --- | --- | --- |
 | busy / `working · source: pane` | the harness's mid-turn indicator | A turn is running. A send refuses unless you pass `--queue`. |
 | empty | an idle composer | Safe to send. |
-| pending | text sitting unsubmitted in the composer | Somebody else is typing there. Never type over it. |
+| pending | text sitting unsubmitted in the composer | Never type over it. Retry only your exact failed send; the app must match its saved attempt and the whole draft. |
 | unknown | anything else | A dialog, a scrolled transcript, or a harness that has not finished starting. Peek and read it. |
 
 An `unknown` reading is the one that needs this skill.

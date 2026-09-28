@@ -1,0 +1,8 @@
+=== RUN   TestLiveSendToClaudeThreeCases
+    live_test.go:124: started agent mate-shop in pane w6:p1 (session_id f2abbdaf-932c-4460-86ef-73827b23fd8f)
+    live_test.go:136: case a: text=say PONG | classify=pending <❯ Try "refactor <filepath>">
+    live_test.go:138: Send into an empty composer: state_conflict: agent mate-shop has unsubmitted text in its composer ("Try \"refactor <filepath>\""); mate will not type over it: composer holds unsubmitted text
+--- FAIL: TestLiveSendToClaudeThreeCases (43.25s)
+FAIL
+FAIL	github.com/nguyenngocanh94/mate/internal/send	43.560s
+FAIL

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -92,6 +93,16 @@ func resolveSendSource(fromFlag string) (string, error) {
 // appends the sent.log entry the box view (task 14) later reads. A refusal
 // or any resolution failure appends nothing.
 func sendToCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, project, crew, text, source string, opts send.Options) (send.Report, error) {
+	var report send.Report
+	err := w.WithCrewSend(project, crew, func(prior *store.CrewSendAttempt, save func(*store.CrewSendAttempt) error) error {
+		var err error
+		report, err = sendToCrewLocked(ctx, w, deps, project, crew, text, source, opts, prior, save)
+		return err
+	})
+	return report, err
+}
+
+func sendToCrewLocked(ctx context.Context, w *store.Workspace, deps spawn.Deps, project, crew, text, source string, opts send.Options, prior *store.CrewSendAttempt, save func(*store.CrewSendAttempt) error) (send.Report, error) {
 	resolved, err := resolveCrewHandle(ctx, w, deps, project, crew)
 	if err != nil {
 		return send.Report{}, err
@@ -104,9 +115,35 @@ func sendToCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, projec
 		return send.Report{}, observability.NewError(observability.CodeRuntimeUnavailable,
 			fmt.Sprintf("crew %s/%s's herdr session is not running", project, crew))
 	}
-	sendDeps := send.Deps{Runtime: deps.Runtime, Sleep: deps.Sleep}
+	obs, err := deps.Runtime.InspectAgent(ctx, resolved.Handle)
+	if err != nil {
+		return send.Report{}, err
+	}
+	if obs.Handle.Name != resolved.Handle.Name || obs.Handle.Tab.PaneID != resolved.Handle.Tab.PaneID {
+		return send.Report{}, observability.NewError(observability.CodeStateConflict, "crew agent moved; refusing send recovery")
+	}
+	meta, err := w.ReadCrewMeta(project, crew)
+	if err != nil {
+		return send.Report{}, err
+	}
+	identity, err := json.Marshal([]string{resolved.Handle.Session.Name, resolved.Handle.Session.SocketPath, resolved.Handle.Name,
+		resolved.Handle.Tab.PaneID, string(resolved.Kind), obs.SessionRef, meta[spawn.MetaSessionID], meta[spawn.MetaStartedAt], meta[spawn.MetaLaunchedAt]})
+	if err != nil {
+		return send.Report{}, err
+	}
+	payload := text
+	if opts.Marker {
+		payload = send.Marker + text
+	}
+	opts.ResumePending = prior != nil && prior.Identity == string(identity) && prior.Text == payload && prior.Source == source
+	sendDeps := send.Deps{Runtime: deps.Runtime, Sleep: deps.Sleep, BeforeType: func() error {
+		return save(&store.CrewSendAttempt{Identity: string(identity), Text: payload, Source: source})
+	}}
 	report, err := send.Send(ctx, sendDeps, resolved.Handle, resolved.Kind, text, opts)
 	if err != nil {
+		if errors.Is(err, send.ErrEnterSwallowed) {
+			err = fmt.Errorf("%w; the attempt is saved: retry the same mate send command to verify the whole draft and retry Enter only", err)
+		}
 		return report, err
 	}
 	if err := w.AppendSent(project, store.SentEntry{
@@ -116,7 +153,7 @@ func sendToCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, projec
 	}); err != nil {
 		return report, err
 	}
-	return report, nil
+	return report, save(nil)
 }
 
 // resolvedCrew is what resolveCrewHandle found for one crew. AgentRecorded
@@ -195,8 +232,12 @@ func printSendRefusalDetails(stderr io.Writer, err error) {
 // "working" because that is what it means to a human reading this line: the
 // harness picked the line up and is now mid-turn.
 func sendSummaryLine(r send.Report) string {
-	return fmt.Sprintf("sent to %s (%s → typed → enter ×%d → %s)",
-		r.Agent, composerLabel(r.Before.State), r.Presses, composerLabel(r.After.State))
+	action := "typed"
+	if r.Resumed {
+		action = "resumed saved draft"
+	}
+	return fmt.Sprintf("sent to %s (%s → %s → enter ×%d → %s)",
+		r.Agent, composerLabel(r.Before.State), action, r.Presses, composerLabel(r.After.State))
 }
 
 func composerLabel(s send.ComposerState) string {

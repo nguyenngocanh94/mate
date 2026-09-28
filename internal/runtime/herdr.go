@@ -1281,7 +1281,10 @@ func (h *Herdr) SendKeys(ctx context.Context, handle AgentHandle, keys []string)
 	return err
 }
 
-// SendText implements Adapter as `herdr pane send-text <pane> <text>`.
+// SendText pastes one line through `herdr pane send-text`. Claude and Codex
+// enable bracketed paste; explicit boundaries keep a delayed Codex consumer
+// from treating the subsequent Enter as part of its heuristic paste burst.
+// Validate the caller's text before adding our own terminal control bytes.
 //
 // Herdr addresses literal text by *pane*, not by agent name the way
 // send-keys does, so the pane is resolved live from `agent get <name>`
@@ -1295,7 +1298,7 @@ func (h *Herdr) SendText(ctx context.Context, handle AgentHandle, text string) e
 	if strings.TrimSpace(handle.Session.Name) == "" || strings.TrimSpace(handle.Name) == "" {
 		return observability.NewError(observability.CodeUsage, "send-text requires a named session and agent")
 	}
-	if err := checkSendText(text); err != nil {
+	if err := ValidateSendText(text); err != nil {
 		return err
 	}
 	obs, err := h.InspectAgent(ctx, handle)
@@ -1311,15 +1314,15 @@ func (h *Herdr) SendText(ctx context.Context, handle AgentHandle, text string) e
 		return observability.NewError(observability.CodeStateConflict,
 			fmt.Sprintf("agent %s is in pane %s, not the recorded pane %s; refusing to type into a pane that moved", handle.Name, pane, recorded))
 	}
-	_, err = h.run(ctx, handle.Session.Name, []string{"pane", "send-text", pane, text})
+	_, err = h.run(ctx, handle.Session.Name, []string{"pane", "send-text", pane, "\x1b[200~" + text + "\x1b[201~"})
 	return err
 }
 
-// checkSendText refuses text Herdr or the harness would turn into something
+// ValidateSendText refuses text Herdr or the harness would turn into something
 // other than one typed line: nothing at all, a newline (which submits, and
 // submitting is the caller's separate, verified step), or any other control
 // character except the 0x1f from-app marker mate prefixes deliberately.
-func checkSendText(text string) error {
+func ValidateSendText(text string) error {
 	if text == "" {
 		return observability.NewError(observability.CodeUsage, "send-text requires text")
 	}

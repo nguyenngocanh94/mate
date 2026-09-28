@@ -1,0 +1,25 @@
+│                                         │
+│ model:     GPT-6-Sol   /model to change │
+│ directory: /private/tmp/mate-enter-lab  │
+╰─────────────────────────────────────────╯
+
+  Tip: New Build faster with the Desktop app. Run 'codex app' or visit
+  https://chatgpt.com/codex?app-landing-page=true
+
+
+› Review corrections (ui1-theme-review2 report, crews/ui1-theme-review2/report.md): (1) the
+  terracotta primary CTA in TripPalette.swift:92 is a capsule, but boards 11 and 13 show a
+  rounded rectangle; match the board corner radius. (2) the floating tab bar in
+  TripPalette.swift:162 has a 36 pt side inset; board 06 shows about 16-20 pt, match it.
+  Measure both on docs/design/board-06/11/13 PNGs, recapture the gallery on your own
+  simulator, regenerate gallery-design-side-by-side.png with the corrected components next
+  to boards 06, 11, 13, open it and check it yourself, rerun the full build and tests,
+  update the hand-back rows, then report wait-mate.
+
+
+• Working (0s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  GPT-6-Sol default · /private/tmp/mate-enter-lab · ← for agents
