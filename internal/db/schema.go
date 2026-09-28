@@ -4,7 +4,7 @@ package db
 // same number docs/timeline.md prints at the top of its schema section; a
 // reader that finds a different one in `schema_version` is reading a file
 // this build does not understand.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 // migration is one ordered, all-or-nothing step. Each runs inside the same
 // transaction that records its version, so a half-applied schema cannot
@@ -20,6 +20,7 @@ type migration struct {
 var migrations = []migration{
 	{version: 1, stmts: schema1},
 	{version: 2, stmts: schema2},
+	{version: 3, stmts: schema3},
 }
 
 // schema1 is the M5 schema of docs/mvp.md. Times are RFC3339 with nanosecond
@@ -416,6 +417,27 @@ var schema2 = []string{
 // `schema_version` is not one of them: the schema is not derived from the
 // files, it is what the files are read into.
 var derivedTables = []string{
+	"telemetry_cursor",
 	"transition", "usage_sample", "incident", "question", "message",
 	"action", "turn", "event", "task", "session", "actor", "cursor", "pricing",
+}
+
+// Telemetry tails carry parser correlations alongside the cursor. Updating this
+// row and inserting its facts in one transaction makes late results replayable.
+var schema3 = []string{
+	// fillTriggers joins each response to its turn event. Native evidence
+	// increases event volume substantially; this must be an indexed lookup.
+	`CREATE INDEX event_turn_kind ON event(turn_id, kind)`,
+	`CREATE TABLE telemetry_cursor (
+		source_path TEXT PRIMARY KEY,
+		actor_id TEXT NOT NULL,
+		session_id TEXT NOT NULL,
+		byte_offset INTEGER NOT NULL DEFAULT 0,
+		state_json TEXT NOT NULL DEFAULT '{}',
+		source_size INTEGER NOT NULL DEFAULT 0,
+		source_mtime INTEGER NOT NULL DEFAULT 0,
+		observed_at TEXT NOT NULL,
+		error TEXT NOT NULL DEFAULT ''
+	)`,
+	`CREATE INDEX telemetry_cursor_actor ON telemetry_cursor(actor_id)`,
 }

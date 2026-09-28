@@ -43,6 +43,10 @@ type StowOptions struct {
 	// the captain may want the Mate gone now). Without it a busy Mate is
 	// stowed once its turn ends, as any queued line is.
 	RequireEmpty bool
+	// RequireCompletion forbids composer-only inference for automatic refresh.
+	RequireCompletion bool
+	// Text optionally adds a checkpoint receipt command to the stow request.
+	Text string
 }
 
 // StowResult is what a stow did. Exactly one of Stowed, Held and a Reason
@@ -122,15 +126,21 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		}
 	}
 
+	text := opts.Text
+	if text == "" {
+		text = memory.StowLine
+	}
 	queued, err := s.Enqueue(project, Request{
 		Source: store.OutboxSourceStow,
 		Key:    "stow@" + start.UTC().Format(time.RFC3339Nano),
-		Text:   memory.StowLine,
+		Text:   text,
 	})
 	if err != nil {
 		return out, err
 	}
 	id := queued.Item.ID
+	// Cancellation and errors must not leave a stale stow for a later session.
+	defer func() { _ = s.Withdraw(project, id, "stow request ended") }()
 	// The ceiling is kept twice: on the clock, and as a count of polls, so
 	// the wait is bounded even under a clock that does not move (tests) or
 	// polls that take longer than their interval (a slow Herdr).
@@ -184,7 +194,7 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		if kind == harness.KindCodex {
 			if rollout := s.codexRollout(project); rollout != "" {
 				if data, err := os.ReadFile(rollout); err == nil && harness.CodexTurnCompletedAfter(data, item.SentAt) {
-					if c, err := s.composer(ctx, handle, kind); err == nil && c.State != send.StateBusy {
+					if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
 						return done(StowResult{Stowed: true})
 					}
 				}
@@ -204,7 +214,7 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 				return out, err
 			}
 			if ended {
-				if c, err := s.composer(ctx, handle, kind); err == nil && c.State != send.StateBusy {
+				if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
 					return done(StowResult{Stowed: true})
 				}
 			}
@@ -215,7 +225,7 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 			empties = 0
 		case c.State == send.StateBusy:
 			sawBusy, empties = true, 0
-		case c.State == send.StateEmpty && (sawBusy || since >= quietPolls || s.deps.now().Sub(item.SentAt) >= stowQuiet):
+		case !opts.RequireCompletion && c.State == send.StateEmpty && (sawBusy || since >= quietPolls || s.deps.now().Sub(item.SentAt) >= stowQuiet):
 			empties++
 			if empties >= 2 {
 				return done(StowResult{Stowed: true})
@@ -269,7 +279,7 @@ func (s *Sender) answeredAfter(project string, item store.OutboxItem) (bool, err
 		switch {
 		case e.Source == store.SourceApp && e.Target == store.TargetMate && e.Text == want:
 			seen = true
-		case seen && e.Source == store.SourceMate:
+		case seen && e.Source == store.SourceMate && e.Target == store.SourceUser:
 			return true, nil
 		}
 	}

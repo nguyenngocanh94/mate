@@ -16,11 +16,7 @@ import (
 
 func renderedManual(t *testing.T) string {
 	t.Helper()
-	got, err := Render(fixedParams())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(got)
+	return renderWith(t, fixedParams())
 }
 
 // schemaItem is a section 6 list item that opens with a `## Name`.
@@ -99,7 +95,24 @@ func renderWith(t *testing.T, p Params) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(got)
+	// Validate the complete, installed contract: core plus the sections now
+	// loaded on demand. Core presence and size have separate tests.
+	text := string(got)
+	for _, name := range []string{"mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory"} {
+		data, err := RenderSkill(name, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref := string(data)
+		start := strings.Index(ref, "\n## ") + 1
+		if start == 0 {
+			t.Fatalf("skill %s lacks its reference section", name)
+		}
+		heading := strings.SplitN(ref[start:], "\n", 2)[0]
+		old := section(t, text, heading)
+		text = strings.Replace(text, heading+old, ref[start:], 1)
+	}
+	return text
 }
 
 // TestManualFactsExampleIsTheRealOutput: the example in section 4 is what
@@ -194,7 +207,7 @@ var templateHeadings = func() map[string]bool {
 // the template defines, so a typo in prose is a test failure rather than a
 // Mate writing a section the check will not recognise.
 func TestEveryBriefHeadingMentionIsKnown(t *testing.T) {
-	known := map[string]bool{}
+	known := map[string]bool{"Summary": true}
 	for _, s := range brief.AllSections() {
 		known[s] = true
 	}

@@ -315,7 +315,11 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume, env)
+	cfg, err := w.LoadProject(project)
+	if err != nil {
+		return StartResult{}, err
+	}
+	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume, env, cfg.Mate)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -332,13 +336,13 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	return settleAndRecord(ctx, w, deps, project, kind, mateDir, decision, session, tab, handle, sessionID, launchedAt)
+	return settleAndRecord(ctx, w, deps, project, kind, mateDir, decision, session, tab, handle, sessionID, launchedAt, launch)
 }
 
 // settleAndRecord takes a launched Mate agent the rest of the way: the
 // startup dialogs, readiness, and the mate.meta that makes it this
 // project's Mate. A fresh launch and an adopted interrupted one share it.
-func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle, handle runtime.AgentHandle, sessionID string, launchedAt time.Time) (StartResult, error) {
+func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle, handle runtime.AgentHandle, sessionID string, launchedAt time.Time, launches ...harness.LaunchSpec) (StartResult, error) {
 	resume, resumeNote := decision.Resume, decision.Note
 	trusted, err := ownHooks(deps, kind, mateDir)
 	if err != nil {
@@ -368,6 +372,14 @@ func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project
 		MetaStartedAt: startedAt.Format(time.RFC3339),
 		// See MetaLaunchedAt: a Codex Mate's rollout is adopted from it.
 		MetaLaunchedAt: launchedAt.Format(time.RFC3339),
+	}
+	if len(launches) > 0 {
+		if launches[0].Model() != "" {
+			meta[MetaModel] = launches[0].Model()
+		}
+		if launches[0].Effort() != "" {
+			meta[MetaEffort] = string(launches[0].Effort())
+		}
 	}
 	var resumedFrom string
 	if resume {
@@ -582,7 +594,7 @@ func writeCodexOverride(mateDir string) error {
 // directory, which is also where the manual is: the adapters require a
 // context path, so the path they are given is that same manual, never a
 // separate generated file.
-func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar) (harness.LaunchSpec, error) {
+func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
 	adapter, err := harness.AdapterFor(kind)
 	if err != nil {
 		return harness.LaunchSpec{}, err
@@ -599,6 +611,16 @@ func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mat
 		// identity. The Codex adapter pins CODEX_HOME itself.
 		Env:    launchEnv(env, kind),
 		Config: harness.Config{Kind: kind},
+	}
+	if len(profiles) > 0 {
+		spec.Model, err = harness.ParseModel(profiles[0].Model)
+		if err != nil {
+			return harness.LaunchSpec{}, err
+		}
+		spec.Effort, err = harness.ParseEffort(profiles[0].Effort)
+		if err != nil {
+			return harness.LaunchSpec{}, err
+		}
 	}
 	switch kind {
 	case harness.KindClaude:

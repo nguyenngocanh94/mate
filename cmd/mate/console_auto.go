@@ -101,7 +101,9 @@ func (f sleepFunc) Sleep(ctx context.Context, d time.Duration) error { return f(
 // consoleAutoPilot is the auto daemon over ws, queueing into ws's outbox and
 // making its one immediate attempt through a sender over the same handle.
 func consoleAutoPilot(ws *store.Workspace, deps spawn.Deps) *autopilot.Pilot {
-	return autopilot.New(ws, autopilot.Deps{Outbox: consoleOutbox(ws, deps)})
+	return autopilot.New(ws, autopilot.Deps{Outbox: consoleOutbox(ws, deps), Maintain: func(ctx context.Context, project string) (bool, error) {
+		return contextRefresh(ctx, ws, deps, project, true)
+	}})
 }
 
 // consoleMateHandle is outbox.HandleFunc over spawn.MateHandle: the recorded

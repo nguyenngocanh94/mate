@@ -18,7 +18,16 @@ var ErrProjectExists = errors.New("store: project already registered")
 var ErrNoProject = errors.New("store: no such project")
 
 // ProjectConfig is `projects/<name>/project.yaml`.
+// MateConfig pins the coordinator profile independently of the captain's CLI.
+type MateConfig struct {
+	Model  string `yaml:"model,omitempty"`
+	Effort string `yaml:"effort,omitempty"`
+	// RefreshContext defaults to 150000; -1 disables automatic refresh.
+	RefreshContext int64 `yaml:"refresh_context,omitempty"`
+}
+
 type ProjectConfig struct {
+	Mate MateConfig `yaml:"mate,omitempty"`
 	// Repos are the git repositories the project owns, zero or more
 	// (docs/mvp.md M9). A crew works in exactly one of them.
 	Repos []RepoConfig `yaml:"repos"`

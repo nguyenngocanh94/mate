@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestUsagePrintsTheLedgerWithMateFirstAndATotalsFooter(t *testing.T) {
 		t.Fatalf("usage printed %d line(s):\n%s", len(lines), out)
 	}
 	header := lines[0]
-	for _, col := range []string{"ID", "STATE", "TURNS", "IN", "CACHED", "OUT", "TOTAL", "COST", "CTX%", "ASKED", "WAITED"} {
+	for _, col := range []string{"ID", "STATE", "TURNS", "IN", "CACHE-READ", "CACHE-WRITE", "OUT", "TOTAL", "COST", "CTX%", "ASKED", "WAITED"} {
 		if !strings.Contains(header, col) {
 			t.Fatalf("header %q is missing column %q", header, col)
 		}
@@ -131,5 +132,33 @@ func TestUsageUnknownProjectIsAUsageError(t *testing.T) {
 	err := run([]string{"usage", "nope", "--workspace", w.Root()}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("usage on an unregistered project must fail")
+	}
+}
+
+func TestUsageAndConsoleKeepAbsoluteContextWithoutAModelWindow(t *testing.T) {
+	w := usageWorkspace(t)
+	handle, err := db.Open(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	if _, err := handle.SQL().Exec(`DELETE FROM pricing`); err != nil {
+		t.Fatal(err)
+	}
+	row, err := mateLedgerRow(context.Background(), handle, "shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !row.Context.Valid || row.Context.Int64 != 400 || row.CtxPct.Valid {
+		t.Fatalf("absolute context requires no pricing: %+v", row)
+	}
+	tokens, ok := mateTokens(handle, "shop")
+	if !ok || tokens.ContextTokens == nil || *tokens.ContextTokens != 400 || tokens.ContextPct != nil {
+		t.Fatalf("console lost absolute context: %+v", tokens)
+	}
+	var out strings.Builder
+	printLedgerTable(&out, []ledgerRow{row})
+	if !strings.Contains(out.String(), "CACHE-READ") || !strings.Contains(out.String(), "CACHE-WRITE") || !strings.Contains(out.String(), "CTX") {
+		t.Fatalf("usage must distinguish cache buckets and context:\n%s", out.String())
 	}
 }

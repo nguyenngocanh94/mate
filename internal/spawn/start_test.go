@@ -72,6 +72,8 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 		spawn.MetaSessionID:  "11111111-2222-3333-4444-555555555555",
 		spawn.MetaStartedAt:  "2026-09-17T10:00:00Z",
 		spawn.MetaLaunchedAt: "2026-09-17T10:00:00Z",
+		spawn.MetaModel:      "opus",
+		spawn.MetaEffort:     "medium",
 	}
 	for k, v := range want {
 		if meta[k] != v {
@@ -414,7 +416,7 @@ func TestStartMateForAProjectWithNoRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 	manual := startedManual(t, w)
-	if !strings.Contains(manual, "no repo yet") || !strings.Contains(manual, "mate project repo add shop <repo-path>") {
+	if !strings.Contains(manual, "no repo yet") || !strings.Contains(manual, "mate project repo add shop <git-url|repo-path>") {
 		t.Fatal("the manual of a project with no repo does not say so, or how one is added")
 	}
 }
@@ -561,5 +563,33 @@ func TestStartMateCleansUpAfterItsContextIsCancelled(t *testing.T) {
 	}
 	if _, statErr := os.Stat(w.MateMeta("shop")); !os.IsNotExist(statErr) {
 		t.Fatalf("a cancelled start left a mate.meta: %v", statErr)
+	}
+}
+
+func TestMateProfileComesFromProjectConfig(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	cfg, err := w.LoadProject("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Mate = store.MateConfig{Model: "sonnet", Effort: "high", RefreshContext: 170000}
+	if err := w.SaveProject("shop", cfg); err != nil {
+		t.Fatal(err)
+	}
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"}); err != nil {
+		t.Fatal(err)
+	}
+	meta := readMeta(t, w, "shop")
+	if meta[spawn.MetaModel] != "sonnet" || meta[spawn.MetaEffort] != "high" {
+		t.Fatal(meta)
+	}
+	argv := rt.StartArgv[0]
+	for flag, want := range map[string]string{"--model": "sonnet", "--effort": "high"} {
+		i := slices.Index(argv, flag)
+		if i < 0 || i+1 >= len(argv) || argv[i+1] != want {
+			t.Fatal(argv)
+		}
 	}
 }

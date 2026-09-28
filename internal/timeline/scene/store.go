@@ -56,7 +56,7 @@ func Load(ctx context.Context, q Querier, project string) ([]Actor, []Event, err
 
 	eventRows, err := q.QueryContext(ctx,
 		`SELECT id, at, kind, actor_id, subject_actor_id, task_actor_id, cause_event_id, payload
-		   FROM event WHERE project = ? ORDER BY at, id`, project)
+		   FROM event WHERE project = ? AND kind NOT LIKE 'telemetry.%' ORDER BY at, id`, project)
 	if err != nil {
 		return nil, nil, err
 	}

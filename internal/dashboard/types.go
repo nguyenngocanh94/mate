@@ -1,6 +1,9 @@
 package dashboard
 
-import "github.com/nguyenngocanh94/mate/internal/timeline"
+import (
+	"github.com/nguyenngocanh94/mate/internal/diagnostics"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
+)
 
 // The JSON shapes of docs/dashboard.md. Field order here is the field order
 // on the wire, and a field is added at the end rather than in the middle,
@@ -51,43 +54,46 @@ type Tokens struct {
 // captain, mate and the observer are in the story and not in the office
 // (docs/timeline.md section 7).
 type SceneRow struct {
-	ActorID     string   `json:"actor_id"`
-	Actor       string   `json:"actor"`
-	ActorKind   string   `json:"actor_kind"`
-	Project     string   `json:"project"`
-	State       string   `json:"state"`
-	Since       string   `json:"since,omitempty"`
-	Target      string   `json:"target,omitempty"`
-	Detail      string   `json:"detail,omitempty"`
-	TokensToday int64    `json:"tokens_today"`
-	ContextPct  *float64 `json:"context_pct"`
+	ActorID       string   `json:"actor_id"`
+	Actor         string   `json:"actor"`
+	ActorKind     string   `json:"actor_kind"`
+	Project       string   `json:"project"`
+	State         string   `json:"state"`
+	Since         string   `json:"since,omitempty"`
+	Target        string   `json:"target,omitempty"`
+	Detail        string   `json:"detail,omitempty"`
+	TokensToday   int64    `json:"tokens_today"`
+	ContextPct    *float64 `json:"context_pct"`
+	ContextTokens *int64   `json:"context_tokens"`
 }
 
 // MateCard is the Mate as a workspace card shows it (docs/mvp.md M6 tier 1).
 type MateCard struct {
-	Harness     string   `json:"harness"`
-	Running     bool     `json:"running"`
-	State       string   `json:"state"`
-	Since       string   `json:"since,omitempty"`
-	TokensToday int64    `json:"tokens_today"`
-	ContextPct  *float64 `json:"context_pct"`
+	Harness       string   `json:"harness"`
+	Running       bool     `json:"running"`
+	State         string   `json:"state"`
+	Since         string   `json:"since,omitempty"`
+	TokensToday   int64    `json:"tokens_today"`
+	ContextPct    *float64 `json:"context_pct"`
+	ContextTokens *int64   `json:"context_tokens"`
 }
 
 // Mate is the Mate as a project page shows it (tier 2): the card plus what
 // it has spent and what its most recent turn was.
 type Mate struct {
-	Harness     string   `json:"harness"`
-	Running     bool     `json:"running"`
-	State       string   `json:"state"`
-	Since       string   `json:"since,omitempty"`
-	Target      string   `json:"target,omitempty"`
-	Detail      string   `json:"detail,omitempty"`
-	TokensToday int64    `json:"tokens_today"`
-	ContextPct  *float64 `json:"context_pct"`
-	Turns       int64    `json:"turns"`
-	Tokens      Tokens   `json:"tokens"`
-	Cost        *float64 `json:"cost"`
-	LastTurn    *Turn    `json:"last_turn"`
+	Harness       string   `json:"harness"`
+	Running       bool     `json:"running"`
+	State         string   `json:"state"`
+	Since         string   `json:"since,omitempty"`
+	Target        string   `json:"target,omitempty"`
+	Detail        string   `json:"detail,omitempty"`
+	TokensToday   int64    `json:"tokens_today"`
+	ContextPct    *float64 `json:"context_pct"`
+	ContextTokens *int64   `json:"context_tokens"`
+	Turns         int64    `json:"turns"`
+	Tokens        Tokens   `json:"tokens"`
+	Cost          *float64 `json:"cost"`
+	LastTurn      *Turn    `json:"last_turn"`
 }
 
 // ProjectCard is one project on the workspace page.
@@ -175,9 +181,50 @@ type ProjectResponse struct {
 	InboxError string `json:"inbox_error,omitempty"`
 }
 
+// MateResponse is the project's Mate ledger and its prompt-level exchanges.
+type MateResponse struct {
+	envelope
+	Project   string         `json:"project"`
+	Mate      Mate           `json:"mate"`
+	Exchanges []MateExchange `json:"exchanges"`
+}
+
+// MateExchange is one prompt to the Mate and the work and reply it caused.
+// Calls groups model calls by (session, harness_turn_ref); a missing ref is
+// isolated as one call so unrelated work is never merged by a guess.
+type MateExchange struct {
+	ID           string               `json:"id"`
+	Source       string               `json:"source"`
+	Prompt       string               `json:"prompt"`
+	PromptAt     string               `json:"prompt_at"`
+	Response     string               `json:"response"`
+	ResponseAt   string               `json:"response_at,omitempty"`
+	StartedAt    string               `json:"started_at"`
+	EndedAt      string               `json:"ended_at"`
+	DurationMs   *int64               `json:"duration_ms"`
+	ModelCalls   int64                `json:"model_calls"`
+	ToolCalls    int64                `json:"tool_calls"`
+	Model        string               `json:"model,omitempty"`
+	Tokens       Tokens               `json:"tokens"`
+	ContextAfter int64                `json:"context_tokens_after"`
+	Activities   []MateActivity       `json:"activities"`
+	PromptRef    Ref                  `json:"prompt_ref"`
+	ResponseRef  Ref                  `json:"response_ref"`
+	Overview     diagnostics.Overview `json:"overview"`
+}
+
+type MateActivity struct {
+	At   string `json:"at"`
+	Kind string `json:"kind"`
+	Crew string `json:"crew,omitempty"`
+	Text string `json:"text"`
+}
+
 // Turn is one model call.
 type Turn struct {
 	ID             string   `json:"id"`
+	SessionID      string   `json:"-"`
+	HarnessTurnRef string   `json:"-"`
 	Ordinal        int64    `json:"ordinal"`
 	StartedAt      string   `json:"started_at,omitempty"`
 	EndedAt        string   `json:"ended_at,omitempty"`
@@ -231,13 +278,14 @@ type Branch struct {
 // TaskResponse is GET /api/projects/{project}/tasks/{crew}.
 type TaskResponse struct {
 	envelope
-	Project     string       `json:"project"`
-	Crew        string       `json:"crew"`
-	Ledger      Task         `json:"ledger"`
-	Turns       []Turn       `json:"turns"`
-	StatusLines []StatusLine `json:"status_lines"`
-	Questions   []Question   `json:"questions"`
-	Branch      Branch       `json:"branch"`
+	Project     string                  `json:"project"`
+	Crew        string                  `json:"crew"`
+	Ledger      Task                    `json:"ledger"`
+	Turns       []Turn                  `json:"turns"`
+	StatusLines []StatusLine            `json:"status_lines"`
+	Questions   []Question              `json:"questions"`
+	Branch      Branch                  `json:"branch"`
+	Performance diagnostics.Performance `json:"performance"`
 }
 
 // Action is one tool call inside a turn.

@@ -1,0 +1,66 @@
+---
+name: brief-writing
+description: Read before writing or appending a Crew brief.
+---
+
+## 6. Writing the brief
+
+Every Crew gets a brief written to a file before it is spawned, never dictated only in chat.
+The brief is the Crew's entire task description; it does not read your `memory.md` or `backlog.md`.
+
+Write it to `/ws/.mate/projects/shop/mate/briefs/<id>.md`, creating the `briefs/` directory if it is not there.
+Use that absolute path when you spawn: the file must resolve inside this workspace, and everything you write lives in your own directory, `/ws/.mate/projects/shop/PROJECT.md` aside (section 14).
+
+Your file is the brief's `# Task` and nothing else, written as exactly these sections, each a `##` heading, in this order:
+
+- `## Captain's words` - every word the captain said about this task, verbatim, always: their language, their spelling, their examples, no speaker label and no paraphrase, because the heading already says whose words they are and the Crew and your own review treat them as the contract.
+  When the words refer to a report, a decision or an earlier task ("as in last week's report"), copy the substance of it in below them, marked with where it came from, never just a pointer.
+  Never widen the words there into a general goal or a list of everything they might cover.
+- `## What we already know` - what you know about the Crew's repo and the task, one fact per line, each with its source: `/ws/.mate/projects/shop/PROJECT.md` and its section, a report by absolute path and section, that repo's `project facts` block, an earlier Crew's hand-back or diff, the captain.
+  Never invent the repository's state: you have not read it, and "inspect the existing app" for a repository with no files is a lie the Crew will find in its first minute.
+  The last line starts `Unknown:` and says what you do not know.
+- `## Build` - only the build instructions the captain's words require, one per line, and a line starting `Out of scope:` naming what deliberately stays out.
+  A generalization, consistency sweep, or extra hardening the captain did not ask for is follow-up work to note, not scope to add.
+  A product choice the captain's words do not settle never goes here; it goes in `## Open decisions`.
+- `## Acceptance` - one observable result per line, each traceable to `## Captain's words`, each with `verify:` and how to check it: the exact command when `/ws/.mate/projects/shop/PROJECT.md` or a report gives you one, otherwise "find the project's own check for this, run it, and quote the command and its output".
+- `## Open decisions` - `none`, or one choice per line: the question, the options you know of, and `decides: captain` or `decides: mate`.
+  The Crew stops at each one with `needs-decision:` and does not pick, even the obvious option; `decision-authority` says which ones are yours.
+- `## Deliverable` - scouts only: the questions the report must answer, one per line.
+  A diagnostic scout's must ask for what `diagnostic-reasoning` lists.
+
+A small ship brief, complete:
+
+```markdown
+## Captain's words
+Trang About phải hiện số phiên bản của app.
+
+## What we already know
+- The site is built with Hugo; `make build` writes it to public/ (/ws/.mate/projects/shop/PROJECT.md, "How to work here").
+- The version is the one line in VERSION at the repository root (report of scout scout-release-version, section 2).
+- Unknown: whether the About page is a layout template or a content file.
+
+## Build
+- Show the text of VERSION on the About page, as "Version <text>".
+- Out of scope: other pages, the footer, how VERSION is written.
+
+## Acceptance
+- The built About page contains "Version " followed by the text of VERSION. verify: `make build && grep -o 'Version [^<]*' public/about/index.html`
+- The site still builds. verify: `make build`; quote its last lines.
+
+## Open decisions
+none
+```
+
+A brief is for one Crew in one repo; the app already tells the Crew that repo's path, its default branch and its own branch.
+When the captain's request was split across repos (section 5), each brief carries the captain's words whole, says in `## What we already know` what the Crew in the other repo is doing and what this one may assume of it, and puts the other repo in `Out of scope:`.
+
+Run `/usr/local/bin/mate brief check /ws/.mate/projects/shop/mate/briefs/<id>.md` (with `--scout` for a scout) before you spawn, and fix every line it prints; `crew spawn` refuses the same brief anyway (section 4).
+
+The app wraps your sections in the Crew template, which already supplies the worker role, the worktree assertion, the rule that stops the Crew at every open decision, the status protocol, the hand-back a ship writes to `/ws/.mate/projects/shop/crews/<id>/handback.md`, the report path and report structure of a scout, the project-memory rule, the local-only definition of done, and the captain's CREW.md rules.
+Do not restate any of that; keep each section to what this task needs.
+
+**Later words.** When the captain adds to or changes a task that is in flight, pass their words, verbatim, to `mate brief append` (section 4); never paraphrase them into a `mate send`.
+Your own build constraints still go to the Crew as one `mate send` line, not into `## Captain's words`.
+
+**After a scout.** When the captain asks for work a scout's report recommends, the ship's brief carries the report's findings in `## What we already know` as substance with their source (`/ws/.mate/projects/shop/crews/<id>/report.md`, section n), takes its acceptance lines from the scout's proposed ones only where they trace back to the captain's words, and moves every question the report left open into `## Open decisions`.
+

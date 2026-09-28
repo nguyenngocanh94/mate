@@ -35,6 +35,8 @@ type Sleeper interface {
 
 // Deps are the daemon's collaborators. Outbox is required.
 type Deps struct {
+	// Maintain runs before digest delivery at a quiet session boundary.
+	Maintain func(context.Context, string) (bool, error)
 	// Outbox is where a digest is queued, and the sender that makes the
 	// one immediate attempt right after (task 30). The daemon types
 	// nothing itself.
@@ -121,16 +123,17 @@ type Pilot struct {
 	// the ticking goroutine touches it.
 	talk map[string]*talk
 
-	mu     sync.Mutex
-	seen   map[string]bool
-	cancel context.CancelFunc
-	done   chan struct{}
+	mu      sync.Mutex
+	seen    map[string]bool
+	notices map[string]Status
+	cancel  context.CancelFunc
+	done    chan struct{}
 }
 
 // New builds a daemon over a workspace. It queues nothing until Start or
 // Tick is called.
 func New(ws *store.Workspace, deps Deps) *Pilot {
-	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool), talk: make(map[string]*talk)}
+	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool), talk: make(map[string]*talk), notices: make(map[string]Status)}
 }
 
 // Start begins ticking in its own goroutine until Stop or a cancelled
@@ -193,7 +196,9 @@ func (p *Pilot) Snapshot() map[string]Status {
 		if err != nil {
 			continue
 		}
-		var status Status
+		p.mu.Lock()
+		status := p.notices[project]
+		p.mu.Unlock()
 		for _, item := range items {
 			if item.Source != store.OutboxSourceDigest {
 				continue
@@ -264,6 +269,20 @@ func (p *Pilot) tickProject(ctx context.Context, project string) error {
 			// rather than replay.
 			return nil
 		}
+	}
+	if p.deps.Maintain != nil {
+		changed, err := p.deps.Maintain(ctx, project)
+		p.mu.Lock()
+		if err != nil {
+			p.notices[project] = Status{Notice: err.Error(), NoticeAt: now}
+		} else if changed {
+			delete(p.notices, project)
+		}
+		p.mu.Unlock()
+		if changed {
+			return err
+		}
+		// A postponed refresh must not starve real crew work.
 	}
 	return p.digest(ctx, project, now)
 }

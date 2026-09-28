@@ -24,12 +24,12 @@ Every response carries two fields before anything else.
 {"generated_at": "2026-09-19T10:47:00.000000000Z", "last_event_id": 412}
 ```
 
-`last_event_id` is `MAX(event.id)` over the whole workspace: the one freshness signal this database has, because the ingest only ever appends.
+`last_event_id` is `MAX(event.id)` over the whole workspace: the cursor for newly recorded events.
 It is the number to hand back to `/api/events?since=`, so a page always polls from the exact id the data it is showing was computed at.
 
 `generated_at` is when the snapshot behind the bytes was computed, not when they were served.
-Responses are cached per `last_event_id`: while the id stands still every endpoint returns the bytes it already built, and when it moves every cached answer is dropped at once.
-A repeated request therefore repeats `generated_at` too, which is the honest reading - nothing in it has changed since.
+Workspace, project, model-call and diff responses are cached per `last_event_id`: while the id stands still they return the bytes already built, and when it moves every cached answer is dropped at once.
+Crew task and Mate conversation responses are rebuilt on each request: running execution clocks and recording-heartbeat age can change without a new event. Usage is never extrapolated between harness records. The events endpoint is also uncached.
 
 A timestamp is the database's own string: RFC3339 with nanoseconds, in UTC (`db.TimeFormat`).
 It is passed through and never reformatted, so a value on the page and a row in the database compare byte for byte.
@@ -104,7 +104,17 @@ Tier 2: the Mate above, the task table below, the inbox beside it.
 `mate` is the card's block plus what the Mate has spent and what it last did.
 There is no `task` row for a Mate - its turns belong to the project and not to any one task (docs/timeline.md) - so `turns`, `tokens` and `cost` are computed from `turn` directly, with the same all-zeroes-is-not-a-price guard `v_task_ledger` uses.
 This is the same SQL `cmd/mate/usage.go`'s `mateLedgerRow` runs, and the unit tests compare the two number for number.
-`last_turn` is `null` for a Mate that has taken no turn yet, and otherwise the full turn object of section 4.
+`last_turn` is `null` for a Mate that has taken no model call yet, and otherwise the full model-call object of section 4.
+The project page links to `GET /api/projects/{project}/mate`. Its `exchanges`
+are prompt-level interactions: one captain message, crew digest, or app prompt
+and the Mate's response. Calls are grouped by `(session_id,
+harness_turn_ref)`, so a prompt spanning several model calls appears once.
+An inbound message with no call still appears with `model_calls: 0` and an
+empty response. The prompt and response come from `sent.log` through the
+`message` table; hook echoes are excluded as duplicate prompts. Selected
+events and messages to Crew appear as human-readable activities. `turns` in
+the Mate summary remains the count of model calls used for token accounting.
+The UI shows newest exchanges first and reveals older ones in batches of 20.
 
 `tasks` is every crew the project has ever recorded, open and closed, oldest spawn first: one row of `v_task_ledger` each, with the crew's current `v_now` state, target and detail hung on it, plus two things no view carries.
 `tool_count` is `SUM(turn.tool_count)` for the crew, which the tier-3 ledger asks for and `v_task_ledger` has no column for.
@@ -179,7 +189,9 @@ A failed box read leaves `inbox` empty and puts the reason in `inbox_error` rath
 
 ## 4. `GET /api/projects/{project}/tasks/{crew}`
 
-Tier 3, the top of the page: the ledger, then every turn in the order it happened, then what the crew said and asked, then the branch.
+Tier 3 leads with the current activity, up to three evidence-linked findings,
+prompt-level timelines and the segments using the most tokens. Model calls,
+status lines, questions and the branch remain available as supporting evidence.
 
 `ledger` is the same task object as tier 2's row.
 
@@ -251,6 +263,68 @@ A branch that is gone is not an error: the crew was torn down and its work lande
   "branch": {"name": "mate/buybtn", "exists": true}
 }
 ```
+
+### Crew performance projection
+
+The task response also carries `performance` (`version: crew-observability-v1`).
+The observer records `telemetry.*` facts in the derived event store; this read-only
+projection uses their native prompt/execution identities and the existing ledger
+for billed token buckets. It never adds native response usage to ledger usage.
+
+| Field | Meaning |
+| --- | --- |
+| `tokens`, `model_calls` | Exactly the Crew ledger's bucket totals and model-call count. |
+| `prompt_turns` | Native prompt ID scoped to its session, actual prompt and source locator, prompt timing, bucket totals, call count and `segment_ids`. A missing prompt ID leaves that call isolated. |
+| `segments` | Contiguous activity in call order, with `kind`, concrete `label`/`target`, `call_ids`, `execution_ids`, buckets, nullable elapsed/tool-union/invocation time, repeat count and versioned classification rule. Each ledger call is assigned once. A running execution before usage arrives can have zero attributed calls. |
+| `current_segment_id`, `top_segment_ids` | Current observed work when identifiable, and up to five segments ranked by total tokens. A completed run has no current segment. |
+| `findings`, `top_finding_ids` | Versioned polling, repeated-read, repeated-error/repair, failed-command, long-execution, output/context and decision-wait observations. The first screen shows at most three. Findings include explanatory text, confidence, count, source evidence, related calls/segments/executions and a review suggestion. Their call sets can overlap; do not add their tokens together. |
+| `executions` | Native commands and observed tools, with exact command/cwd, native process/wrapper links when known, start/end, nullable duration/exit/output measurements, output hash/preview, polling and wrapper flags, and source locator. Wrapper success never overrides a nested native failure. |
+| `processes` | One process per session identity, actual job command when known, execution/poll IDs, unchanged/progress/unknown-output poll counts and tokens of the associated polling calls. Polls are not additional builds/tests. |
+| `time` | Prompt elapsed, union of tool spans, sum of invocation durations, union of decision waits, and time not explained by measured tool/wait spans. Lanes overlap. None is called API latency or total thinking time. Missing measurements are `null`. Legacy synthesized `thinking` actions are excluded. |
+| `recent_tokens`, `recent_window_ms` | Actual usage reported in the last five minutes, never an interpolated burn rate. |
+| `freshness` | Separate last observed/ingested/usage stamps, age, stale flag, adapter capabilities and explicit missing-data reasons. `telemetry_cursor.observed_at` supplies the observer heartbeat even when no transcript bytes changed. |
+| `profile` | Recorded launch snapshot, if available: repo revision/dirty state, requested model/effort, harness and configured document hashes/sizes. Historical runs without a snapshot remain unknown. |
+| `runtime`, `observed_inputs`, `progress` | Actually reported model/effort/harness version, actually observed instruction-input hashes/bytes, and file-change evidence. Configured files and observed inputs are distinct; bytes are not exact billed token attribution. |
+
+Finding/process `tokens` is `null` if no model-call link is confirmed. A native
+execution with no confirmed wrapper parent remains visible in its prompt's
+execution lane; nearby timestamps do not establish token attribution. Repeated
+reads require identical query/range and output hash, and reset after a recorded
+file change or changed output. Retries with intervening file changes are shown
+as repair sequences; missing file state is never treated as unchanged code.
+Detector thresholds live in `diagnostics.Options` and are exercised by numeric
+and false-positive fixtures.
+
+### Work overview for every prompt
+
+Both `performance.prompt_turns[].overview` for Crew and
+`exchanges[].overview` for Mate use the same projection. The collapsed prompt
+shows a short summary and work-type labels; opening it shows the observed
+sequence, usage by type, execution time and source evidence.
+
+The types include research/inspection, writing files, editing files, review,
+tests/builds, coordination, waiting/polling and reading instructions.
+Classification uses actual tool operations, literal commands and native file
+changes. A request to run tests does not establish that tests ran. An edit is
+not automatically called a bug fix. Unclassified work remains explicit.
+
+`overview.categories` contain `kind`, `label`, `model_calls`,
+`execution_count`, nullable `tokens`/`elapsed_ms`, related call/segment/execution
+IDs and self-contained command/source `evidence`. Each model call belongs to
+exactly one category. A call covering several kinds belongs to `mixed`; its
+usage is not divided among tools. The other categories can still show those
+tools as evidence with unattributed usage. Category token buckets add up to
+the prompt ledger. Execution intervals can overlap across categories.
+
+`overview.sequence` retains successive observed types, including returns such
+as test → edit → test. One operation containing several types becomes one
+mixed step; it does not invent an order among parallel tools. `rule` identifies
+the classifier and `coverage` explains the available evidence.
+
+Mate grouping uses confirmed native response aliases when a legacy call has
+no prompt ID. Otherwise that call stays isolated. Native prompts and their
+work remain visible before the first usage record; message-only prompts show
+an empty overview until activity arrives. The overview adds no model calls.
 
 ## 5. `GET /api/projects/{project}/tasks/{crew}/turns/{turn}`
 
@@ -344,7 +418,7 @@ Otherwise it waits up to `wait` seconds, polling the database once a second, and
 `now` are the `v_now` rows of the actors that moved, so one call refreshes both the story and the scene.
 `v_now` has no "changed since" of its own, so which actors moved is read off `transition` - the table the view's scene columns already come from - as the distinct actors with a transition whose `event_id > since`.
 
-This endpoint is not cached: every other endpoint answers "what is true now", which is a function of the generation, while this one answers "what happened after the id you hold", which is a function of the caller's cursor.
+This endpoint is not cached: it answers "what happened after the id you hold", which depends on the caller's cursor. Crew task snapshots are also uncached because heartbeat age and running durations advance without events; the remaining endpoints use the event generation cache.
 
 ```json
 {
@@ -402,6 +476,7 @@ The three tiers are one document, routed on the hash, so a link to a task surviv
 | --- | --- |
 | `#/` | workspace: one card per project - mode, the Mate's harness, running/stopped, scene state, since, tokens today, context %, crews counted by state, `N waiting` |
 | `#/p/<project>` | project: the Mate panel, the task table (filter chips, default `open`), the inbox beside it |
+| `#/p/<project>/mate` | Mate: prompt-level questions, replies, decisions and outcomes; filter by captain, crew or system |
 | `#/p/<project>/t/<crew>` | task: the ledger header, the turn timeline, status lines, questions, the branch diff |
 
 A project or crew name is `encodeURIComponent`-ed into the hash, and a turn id into the path of `/turns/{turn}` (section 5).

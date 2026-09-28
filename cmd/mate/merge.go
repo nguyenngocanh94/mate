@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
@@ -26,6 +27,7 @@ func cmdMerge(args []string, stdout, stderr io.Writer) error {
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: mate merge <project> <crew> [--workspace <dir>]")
 	}
+	reviewFlag := fs.String("review", "", "require a passing review of this exact branch and contract")
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
@@ -39,7 +41,15 @@ func cmdMerge(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	project, crew := fs.Arg(0), fs.Arg(1)
-	res, err := spawn.MergeCrew(context.Background(), w, spawn.LiveDeps(), project, crew, spawn.CallerFromEnv())
+	var reviewed []spawn.ReviewedCommit
+	if *reviewFlag != "" {
+		fp, _, err := checkReview(context.Background(), w, gitx.New(), project, crew, *reviewFlag)
+		if err != nil {
+			return err
+		}
+		reviewed = append(reviewed, spawn.ReviewedCommit{Head: fp["head"], Base: fp["base"]})
+	}
+	res, err := spawn.MergeCrew(context.Background(), w, spawn.LiveDeps(), project, crew, spawn.CallerFromEnv(), reviewed...)
 	if err != nil {
 		// Including the one failure that is not a refusal: a teardown that
 		// failed after the fast-forward landed. MergeCrew's error already

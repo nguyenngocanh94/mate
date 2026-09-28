@@ -15,7 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// cmdDiff implements `mate diff <project> <crew> [--stat] [--workspace <dir>]`
+// cmdDiff implements `mate diff <project> <crew> [--stat|--full] [--workspace <dir>]`
 // (docs/mvp.md task 21): the review surface for one crew's branch, read-only.
 //
 // It is the one command a reader - or a Mate about to decide whether a ship
@@ -30,10 +30,11 @@ func cmdDiff(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate diff <project> <crew> [--stat] [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: mate diff <project> <crew> [--stat|--full] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	statFlag := fs.Bool("stat", false, "print git's own change summary instead of the patch")
+	statFlag := fs.Bool("stat", true, "print git's change summary (default)")
+	fullFlag := fs.Bool("full", false, "print the full patch for direct review")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -45,7 +46,7 @@ func cmdDiff(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	text, err := crewDiffText(context.Background(), w, gitx.New(), fs.Arg(0), fs.Arg(1), *statFlag)
+	text, err := crewDiffText(context.Background(), w, gitx.New(), fs.Arg(0), fs.Arg(1), *statFlag && !*fullFlag)
 	if err != nil {
 		return err
 	}

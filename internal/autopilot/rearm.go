@@ -36,7 +36,7 @@ func (t *talk) read(ws *store.Workspace, project string) error {
 		switch {
 		case e.Source == store.SourceUser && e.Target == store.TargetMate:
 			t.asked = e.Time
-		case e.Source == store.SourceMate:
+		case e.Source == store.SourceMate && e.Target == store.SourceUser:
 			t.answered = e.Time
 		}
 	}

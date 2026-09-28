@@ -10,16 +10,16 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// cmdBacklog implements `mate backlog <project> [--all] [--workspace <dir>]`
-// (docs/mvp.md task 23): a read-only table of a project's crews, meant for
-// the Mate to reconcile its own hand-kept `backlog.md` against after a
-// restart. The app never writes backlog.md (mvp.md section 6, M4 decisions);
-// this command is the whole of what task 23 promised in its place.
+// cmdBacklog reads the live crew table or edits one durable backlog entry.
 func cmdBacklog(args []string, stdout, stderr io.Writer) error {
+	if len(args) > 0 && (args[0] == "add" || args[0] == "move" || args[0] == "done") {
+		return cmdBacklogEdit(args, stdout, stderr)
+	}
 	fs := flag.NewFlagSet("backlog", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
@@ -178,4 +178,34 @@ func formatAge(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%dd", int(d.Hours()/24))
 	}
+}
+
+func cmdBacklogEdit(args []string, stdout, stderr io.Writer) error {
+	action := args[0]
+	fs := flag.NewFlagSet("backlog "+action, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	workspace := fs.String("workspace", "", "workspace directory")
+	section := fs.String("section", memory.BacklogQueued, "In flight, Held for the captain, Queued, or Done")
+	text := fs.String("text", "", "one complete entry; preserve captain questions verbatim")
+	if err := fs.Parse(reorderArgs(fs, args[1:])); err != nil {
+		return err
+	}
+	if fs.NArg() != 2 {
+		return newUsageError("usage: mate backlog " + action + " <project> <id> [--section <section>] [--text <text>] [--workspace <dir>]")
+	}
+	if action == "done" {
+		*section = memory.BacklogDone
+	}
+	w, err := resolveWorkspace(*workspace)
+	if err != nil {
+		return err
+	}
+	if err := requireProject(w, fs.Arg(0)); err != nil {
+		return err
+	}
+	if err := w.EditBacklog(fs.Arg(0), action, fs.Arg(1), *section, *text); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "backlog %s: %s → %s\n", action, fs.Arg(1), *section)
+	return nil
 }

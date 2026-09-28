@@ -894,3 +894,61 @@ Kèm theo (2026-09-26/27, đã xong): codex-cli 0.157.1 thêm dòng footer thứ
 Herdr 0.8.2 từ chối `agent read --source recent-unwrapped` khi Codex đang chạy (`agent_not_idle`); `Herdr.readAgent` đọc lại bằng `--source visible`.
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.
+
+### M15. Giới hạn chi phí context của Mate
+
+Captain chốt implement 2026-09-27; triển khai 2026-09-28, từ hai research note
+`docs/research/mate-token-2026-09-27.md` và `mate-coordination-cost-2026-09-27.md`.
+
+- Đo theo message id/call, không theo số record assistant. Tổng input gồm fresh,
+  cache-read, cache-write; output/thinking không được cộng trùng. Không suy chi phí
+  tiền hay quota từ tỷ lệ tổng token. CLI usage tách hai cache bucket; dashboard
+  và console hiện token context tuyệt đối cả khi chưa biết context window.
+- Mate Claude có profile riêng: settings nguồn project, strict MCP, built-in
+  tools Bash/Read/Write/Edit/Glob/Grep/Skill; model opus, effort medium; autocompact
+  300000 là lưới an toàn. `project.yaml` có `mate.model`, `mate.effort` để captain
+  ghi đè. Crew giữ profile dispatch riêng. Manual lõi ≤25 KiB; hợp đồng dài nằm
+  trong skill có trigger, giữ recall, phân quyền và quy tắc kết thúc lượt ở lõi.
+- Console xét refresh trước digest: context của đúng session hiện tại ≥150000,
+  auto bật và không held, Mate đã trả lời captain và im ≥5 phút, outbox trống,
+  composer trống. `mate.refresh_context` đổi ngưỡng; số âm tắt tự động. Codex
+  chưa có tín hiệu quiet tương đương nên không tự refresh.
+- Refresh là stow → checkpoint receipt → Stop thật → fresh start → recall;
+  không dùng resume. `mate mate refresh <project>` dùng cùng đường an toàn,
+  bỏ điều kiện ngưỡng/5 phút vì captain chủ động gọi. Restart thường vẫn resume.
+  Thiếu receipt, không có turn-end, file đổi sau receipt, captain nói thêm hoặc
+  giành lại manual thì giữ phiên cũ. Retry tự động cách nhau ít nhất 30 phút.
+  Maintenance flock ngăn console khác gửi assign/digest trong khi đổi phiên;
+  hàng đợi bền trên đĩa. Receipt gắn nonce, session và hash memory/backlog/PROJECT;
+  kiểm tra mọi crew mở còn có trong backlog. Nội dung bàn giao vẫn do Mate chịu
+  trách nhiệm, không có bộ kiểm tự động chứng minh mọi suy nghĩ đã được ghi.
+- Trước thay mate.meta, giữ provenance session trong `mate/sessions/*.meta`.
+  Sau Stop được xác nhận, copy transcript vào snapshot bất biến rồi mới đánh dấu
+  finalized. Reindex tính đủ cả call cuối của phiên đã đóng, không làm token biến
+  mất sau refresh. Transcript đang chạy vẫn chờ message id kế tiếp để chốt nhóm
+  cuối; context có thể trễ một call hoặc chưa có ở call đầu, không giả thành 0.
+- Scout report có Summary ≤6000 ký tự, gồm giới hạn và evidence. `mate report
+  <project> <crew> --summary` không fallback sang toàn bộ report nếu thiếu mục.
+  `mate diff` mặc định stat, `--full` vẫn là đường đọc toàn bộ patch.
+- `mate review <project> <crew> --id <reviewer> --harness ... --model ... --effort ...`
+  tạo scout riêng đọc full diff và acceptance evidence. Token vẫn thuộc Crew
+  ledger; Mate kết thúc lượt trong lúc reviewer làm. `review --check <reviewer>`
+  và `merge --review <reviewer>` từ chối khi SHA/base/brief/hand-back đổi, reviewer
+  chưa hand-back, hoặc verdict không pass. Merge dùng đúng reviewed SHA.
+  Tóm tắt của implementer hay diff stat không thay được review.
+- `mate backlog add|move|done` sửa một mục dưới lock, giữ nguyên câu hỏi/nội dung
+  nhiều dòng; Done giữ 10 mục, ghi archive trước khi bỏ mục khỏi file nóng.
+  Đây là ngoại lệ có chủ đích cho quy tắc cũ “app không sửa backlog”.
+- Chưa thêm daemon digest LLM riêng. Chỉ xét sau khi số liệu sau rollout cho
+  thấy cần; không coi ước lượng token/ngày của research là kết quả đã đo.
+
+| Task | Việc | Kiểm chứng |
+| --- | --- | --- |
+| 60 | Context tuyệt đối, cache buckets, profile Mate và lõi manual | Unit DB/CLI/UI/argv, golden manual và skills; live context trong evidence M15. |
+| 61 | Checkpoint/fresh recall, guard trạng thái và lưu transcript cũ | Unit failure paths, queue/maintenance, current-session threshold, reindex; live giữ nguyên câu hỏi đang chờ qua fresh session. |
+| 62 | Summary, backlog commands, reviewer riêng và merge theo SHA | Unit với git thật, schema brief và stale review; live reviewer phải phát hiện implementation sai dù hand-back ghi pass. |
+
+Rollout: build binary mới, đóng console cũ (sender cũ chưa biết maintenance lock); chạy `bin/mate mate refresh <project> --workspace <dir>`
+lúc Mate rảnh, rồi mở lại console bằng binary mới để daemon dùng điều kiện M15.
+Chỉ sửa AGENTS.md trên đĩa hoặc resume phiên cũ không chứng minh context đã nhỏ đi.
+Evidence: `docs/evidence/m15-context-2026-09-28.md`.

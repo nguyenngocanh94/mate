@@ -417,6 +417,9 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	if err != nil {
 		return CrewResult{}, err
 	}
+	if err := captureCrewHarnessProfile(ctx, w, deps, plan, launch, deps.now()); err != nil {
+		return CrewResult{}, fmt.Errorf("capture crew harness profile: %w", err)
+	}
 	launchedAt := deps.now()
 	handle, err := deps.Runtime.StartAgent(ctx, spec)
 	if err != nil {

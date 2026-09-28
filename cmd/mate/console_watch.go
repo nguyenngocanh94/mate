@@ -223,6 +223,13 @@ func withTokens(snap query.Snapshot, ws *store.Workspace) query.Snapshot {
 	for p := range snap.Projects {
 		project := &snap.Projects[p]
 		if tok, ok := mateTokens(handle, project.ProjectID); ok {
+			meta, err := ws.ReadMateMeta(project.ProjectID)
+			if err == nil && meta[spawn.MetaSessionID] != "" {
+				tok.ContextTokens, tok.ContextPct = nil, nil
+				if usage, known, err := handle.LatestContext(context.Background(), timeline.MateActorID(project.ProjectID), meta[spawn.MetaSessionID]); err == nil && known {
+					tok.ContextTokens, tok.ContextPct = &usage.Tokens, usage.Pct
+				}
+			}
 			project.Mate.Tokens = query.KnownField(tok)
 		}
 		for c := range project.Crews {
@@ -250,7 +257,7 @@ func crewTokens(handle *db.DB, project, crew string) (query.TokenValue, bool) {
 	if err != nil {
 		return query.TokenValue{}, false
 	}
-	return tokenValue(total, cost, contextPct), true
+	return tokenContext(handle, actorID, tokenValue(total, cost, contextPct)), true
 }
 
 // mateTokens reads the Mate's row of `v_now`: tokens_today and
@@ -269,7 +276,7 @@ func mateTokens(handle *db.DB, project string) (query.TokenValue, bool) {
 	if err != nil {
 		return query.TokenValue{}, false
 	}
-	return tokenValue(total, sql.NullFloat64{}, contextPct), true
+	return tokenContext(handle, actorID, tokenValue(total, sql.NullFloat64{}, contextPct)), true
 }
 
 func tokenValue(total int64, cost, contextPct sql.NullFloat64) query.TokenValue {
@@ -296,4 +303,11 @@ func composerWord(state send.ComposerState) crewstate.Composer {
 	default:
 		return crewstate.ComposerUnknown
 	}
+}
+
+func tokenContext(handle *db.DB, actorID string, value query.TokenValue) query.TokenValue {
+	if c, ok, err := handle.LatestContext(context.Background(), actorID, ""); err == nil && ok {
+		value.ContextTokens, value.ContextPct = &c.Tokens, c.Pct
+	}
+	return value
 }
