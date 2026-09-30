@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -123,16 +122,16 @@ func TestConsoleWatcherOpensRuntimeLostForAKilledAgent(t *testing.T) {
 // behind it can be re-read.
 func TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
-	spawnFakeCrew(t, w, deps, "shop", "k3")
 	down := observability.NewError(observability.CodeRuntimeUnavailable,
-		"the Herdr session mate-shop is not running; nothing can be typed into crew-k3")
+		"herdr is not running; start or resume the Mate with s to bring it back (session mate-shop)")
 	watcher := watch.New(w, watch.Deps{
 		Runtime: deps.Runtime,
-		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.Kind, error) {
-			return runtime.AgentHandle{}, "", down
-		},
+		Handle:  consoleCrewHandle(w, deps),
+		Session: func(context.Context) error { return down },
 	})
-	_ = watcher.Poll(context.Background())
+	if err := watcher.Poll(context.Background()); err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
 
 	snap, err := query.Load(context.Background(), w)
 	if err != nil {

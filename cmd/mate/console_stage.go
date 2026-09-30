@@ -177,7 +177,7 @@ func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) conso
 		if err != nil {
 			return err
 		}
-		if err := herdrRunning(ctx, ws, deps, target); err != nil {
+		if err := herdrSession(ctx, ws, deps); err != nil {
 			return err
 		}
 		if err := c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env}); err != nil {
@@ -190,36 +190,47 @@ func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) conso
 	}
 }
 
-// herdrRunning refuses to attach to an agent whose Herdr session is not
-// running. `herdr agent attach` against a dead server prints its own error
-// and exits nonzero: the stage column would keep that text on screen as a
-// stray terminal, and nothing on the Console would explain it (measured
+// herdrSession refuses to attach to an agent whose Herdr session is not up.
+// `herdr agent attach` against a dead server prints its own error and exits
+// nonzero: the stage column would keep that text on screen as a stray
+// terminal, and nothing on the Console would explain it (measured
 // 2026-09-30, after a Herdr server was lost to a machine restart). The
 // session is asked first - LookupSession never starts a server - so the
 // refusal lands on the Console's status line and no column is touched.
 //
-// Only the runtime-unavailable failure is reworded; every other error the
-// handle resolution can raise (an unreadable meta, a wrong-session refusal)
-// travels as its own sentence.
-func herdrRunning(ctx context.Context, ws *store.Workspace, deps spawn.Deps, target console.StageTarget) error {
-	var err error
-	switch target.Kind {
-	case console.StageMate:
-		_, _, err = spawn.MateHandle(ctx, ws, deps, target.ProjectID)
-	case console.StageCrew:
-		_, _, err = spawn.CrewHandle(ctx, ws, deps, target.ProjectID, target.ID)
-	default:
-		return nil
-	}
-	if err == nil {
-		return nil
-	}
-	var coded *observability.Error
-	if !errors.As(err, &coded) || coded.Code != observability.CodeRuntimeUnavailable {
+// It asks through the runtime adapter the Console already pointed at the
+// `herdr` binary the stage column runs (findTool's, which can reach
+// ~/.local/bin when the Console's PATH cannot). Asking by the bare name
+// instead made the check and the attach disagree about whether Herdr exists
+// at all, and refused an attach that would have worked.
+//
+// Only a session that is positively down is reworded to a stopped session.
+// A different runtime failure - the executable would not run, a transport
+// fault - is its own sentence: the attach is a separate subprocess and may
+// still be the path that works.
+func herdrSession(ctx context.Context, ws *store.Workspace, deps spawn.Deps) error {
+	spec, err := spawn.SessionSpec(deps, ws)
+	if err != nil {
 		return err
 	}
-	return observability.WrapError(observability.CodeRuntimeUnavailable,
-		"herdr is not running; start or resume the Mate to bring it back", err)
+	_, running, err := deps.Runtime.LookupSession(ctx, spec)
+	if err != nil {
+		if runtime.IsServerNotRunning(err) {
+			return herdrDown(spec.Name)
+		}
+		return err
+	}
+	if !running {
+		return herdrDown(spec.Name)
+	}
+	return nil
+}
+
+// herdrDown is the one sentence both the stage refusal and the observer's
+// runtime notice use for a session that is positively not up.
+func herdrDown(session string) error {
+	return observability.NewError(observability.CodeRuntimeUnavailable,
+		fmt.Sprintf("herdr is not running; start or resume the Mate with s to bring it back (session %s)", session))
 }
 
 // showReview opens a crew's worktree in the review column, making the

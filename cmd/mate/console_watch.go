@@ -44,6 +44,7 @@ func consoleWatcher(dir string, deps spawn.Deps) (*watch.Watcher, error) {
 	return watch.New(ws, watch.Deps{
 		Runtime: deps.Runtime,
 		Handle:  consoleCrewHandle(ws, deps),
+		Session: consoleSession(ws, deps),
 	}), nil
 }
 
@@ -67,7 +68,11 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 		if !errors.Is(err, db.ErrLocked) {
 			return nil, nil, err
 		}
-		watcher = watch.New(ws, watch.Deps{Runtime: deps.Runtime, Handle: consoleCrewHandle(ws, deps)})
+		watcher = watch.New(ws, watch.Deps{
+			Runtime: deps.Runtime,
+			Handle:  consoleCrewHandle(ws, deps),
+			Session: consoleSession(ws, deps),
+		})
 		return watcher, nil, nil
 	}
 	ingest := timeline.New(ws, handle, timeline.Deps{
@@ -85,6 +90,7 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 	watcher = watch.New(ws, watch.Deps{
 		Runtime:  deps.Runtime,
 		Handle:   consoleCrewHandle(ws, deps),
+		Session:  consoleSession(ws, deps),
 		Timeline: ingest,
 		// The same *timeline.Ingester also implements watch.BudgetChecker
 		// (mvp.md M5 task 27): it already holds the writable db.DB and the
@@ -121,6 +127,15 @@ func consoleSessionRef(ws *store.Workspace, deps spawn.Deps) timeline.SessionRef
 func consoleCrewHandle(ws *store.Workspace, deps spawn.Deps) watch.HandleFunc {
 	return func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error) {
 		return spawn.CrewHandle(ctx, ws, deps, project, crew)
+	}
+}
+
+// consoleSession is watch.SessionFunc over the same session check the stage
+// preflight uses: the observer hears that Herdr is gone whether or not any
+// crew is open to resolve a handle for.
+func consoleSession(ws *store.Workspace, deps spawn.Deps) watch.SessionFunc {
+	return func(ctx context.Context) error {
+		return herdrSession(ctx, ws, deps)
 	}
 }
 

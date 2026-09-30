@@ -56,6 +56,28 @@ func TestIsAgentNotFoundDoesNotTreatAMissingPaneAsGone(t *testing.T) {
 	}
 }
 
+// IsServerNotRunning separates positive proof the session is down from the
+// other runtime-unavailable failures - the executable refusing to run, a
+// transport fault - which say nothing about the session. The stage refusal
+// and the observer's notice word the first as a stopped session and must
+// leave the rest as their own sentence.
+func TestIsServerNotRunningNamesOnlyTheDownServer(t *testing.T) {
+	t.Parallel()
+	if !IsServerNotRunning(NewHerdrError(HerdrServerNotRunning, "no herdr server is running")) {
+		t.Fatal("server_not_running is the proof the session is down")
+	}
+	// An executable that would not run is runtime-unavailable too, but the
+	// session may well be fine; it must not read as "the session is down".
+	execFailed := observability.WrapError(observability.CodeRuntimeUnavailable,
+		"herdr executable failed to run", fmt.Errorf("exec: herdr: executable file not found"))
+	if IsServerNotRunning(execFailed) {
+		t.Fatal("a herdr that would not run is not proof the session is down")
+	}
+	if IsServerNotRunning(nil) || IsServerNotRunning(fmt.Errorf("nope")) {
+		t.Fatal("unrelated errors are not a stopped server")
+	}
+}
+
 func TestNewHerdrErrorPreservesOriginalCode(t *testing.T) {
 	t.Parallel()
 	err := NewHerdrError(HerdrAgentPaneNotFound, "pane missing")

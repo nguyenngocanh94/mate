@@ -68,6 +68,14 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
 	deps := spawn.LiveDeps()
+	// Point the runtime at the `herdr` findTool resolves - the one the stage
+	// column runs by absolute path, which can be in ~/.local/bin when the
+	// Console's PATH cannot reach it. Without this, a session check would
+	// consult a different executable than the attach and could refuse an
+	// attach that would have worked (measured 2026-09-30).
+	if rt, ok := deps.Runtime.(*runtime.Herdr); ok {
+		rt.Binary = findTool(os.Getenv, "herdr")
+	}
 
 	// The observer of mvp.md section 4b runs for as long as the workspace is
 	// open, and only then: it lives in this process, so quitting the console

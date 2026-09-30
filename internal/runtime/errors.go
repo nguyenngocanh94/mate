@@ -94,6 +94,24 @@ func IsAgentNotFound(err error) bool {
 	return code == HerdrAgentNotFound
 }
 
+// IsServerNotRunning reports whether err is Herdr saying the named session's
+// server is down (server_not_running). It is positive proof the session is
+// not up - unlike an executable that would not run or a transport fault,
+// which are also runtime-unavailable but say nothing about the session - so
+// a caller that words "the session is down" differently from "Herdr could
+// not be reached" can tell them apart.
+func IsServerNotRunning(err error) bool {
+	if err == nil {
+		return false
+	}
+	var coded *observability.Error
+	if !errors.As(err, &coded) {
+		return false
+	}
+	code, _ := coded.Details["herdr_code"].(string)
+	return code == HerdrServerNotRunning
+}
+
 // IsTabGone reports whether err is Herdr saying the tab a caller asked to
 // close no longer exists (tab_not_found, or pane_not_found for its pane). For
 // a removal that is the end state the caller wanted, so compensation treats

@@ -96,11 +96,27 @@ type BudgetChecker interface {
 	CheckBudgets(ctx context.Context) error
 }
 
+// SessionFunc asks whether the workspace's terminal runtime is up, without
+// starting one. It is a seam for the same reason HandleFunc is: the
+// observer imports nothing that can start an agent. nil means the runtime
+// answered; an error describes why it could not be reached, and is what the
+// runtime notice carries.
+//
+// It is called once per poll, independent of whether any crew exists: a
+// workspace with a Mate and no open crews must still hear that Herdr is
+// gone. Asking per crew cannot, because without a crew there is no handle
+// to resolve and so no question to ask.
+type SessionFunc func(ctx context.Context) error
+
 // Deps are the observer's collaborators. Runtime and Handle are required;
 // everything else has a default.
 type Deps struct {
 	Runtime Runtime
 	Handle  HandleFunc
+	// Session checks the workspace session itself, once per poll. Nil means
+	// the observer stands no runtime notice (a build or test that predates
+	// it).
+	Session SessionFunc
 	Clock   Clock
 	Sleeper Sleeper
 	// Timeline records what the files say into `.mate/mate.db`. Nil
@@ -295,7 +311,7 @@ func (w *Watcher) Poll(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
-	w.noteRuntime(errs, now)
+	w.noteRuntime(ctx, now)
 	w.commit(results, seen, listed)
 	// The timeline is recorded last, after the health snapshot has been
 	// swapped in: the ingest reads this round's readings (Watcher.Readings),
@@ -374,13 +390,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	handle, kind, err := w.deps.Handle(ctx, ref.Project, ref.Crew)
 	if err != nil {
 		// No handle to look at: the crew records no agent yet, or the Herdr
-		// session is not running. Neither says the crew is in trouble, so
-		// neither opens an incident - but the second is the whole runtime
-		// being gone, which the Console has to be told (Poll's runtime
-		// notice), so that one propagates and the rest are swallowed.
-		if runtimeUnavailable(err) {
-			return err
-		}
+		// session is not running. Neither says the crew is in trouble.
 		return nil
 	}
 
@@ -467,42 +477,32 @@ func (w *Watcher) RuntimeNotice() (string, time.Time) {
 	return w.runtimeNotice, w.runtimeNoticeAt
 }
 
-// noteRuntime records the round's runtime-unavailable failure, or clears the
-// notice when the round reached Herdr. A round with no runtime-unavailable
-// error clears it: the server answered at least once, so the standing word
-// would be stale. "Herdr could not answer" is never an incident
+// noteRuntime asks the workspace session once per poll and records the
+// answer, or clears the notice when the runtime answered. The check is the
+// workspace's own rather than a crew's: with no open crew there is no handle
+// to resolve, and without one the notice would clear while Herdr is gone
+// (the bug this replaces), never appear at all, or depend on which crews
+// happen to be open. "Herdr could not answer" is never an incident
 // (TestWatchConcludesNothingWhenHerdrCannotAnswer); this is the separate
 // signal a reader needs, because while it stands every file-read row on
 // screen is as fresh as its last read and no row can be re-read.
-func (w *Watcher) noteRuntime(errs []error, now time.Time) {
-	var failure error
-	for _, err := range errs {
-		if runtimeUnavailable(err) {
-			failure = err
-			break
-		}
+func (w *Watcher) noteRuntime(ctx context.Context, now time.Time) {
+	if w.deps.Session == nil || ctx.Err() != nil {
+		return
 	}
+	err := w.deps.Session(ctx)
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if failure == nil {
+	if err == nil {
 		w.runtimeNotice, w.runtimeNoticeAt = "", time.Time{}
 		return
 	}
-	notice := "herdr is not running; start or resume the Mate with s to bring it back"
+	notice := noticeLine(err.Error())
 	var coded *observability.Error
-	if errors.As(failure, &coded) && strings.TrimSpace(coded.Message) != "" {
-		notice += " · " + noticeLine(coded.Message)
+	if errors.As(err, &coded) && strings.TrimSpace(coded.Message) != "" {
+		notice = noticeLine(coded.Message)
 	}
 	w.runtimeNotice, w.runtimeNoticeAt = notice, now
-}
-
-// runtimeUnavailable reports whether err is the runtime being unreachable
-// (CodeRuntimeUnavailable), as opposed to a target that is missing or a
-// screen that could not be read. It traverses errors.Join, which is how a
-// round's per-crew failures arrive.
-func runtimeUnavailable(err error) bool {
-	var coded *observability.Error
-	return errors.As(err, &coded) && coded.Code == observability.CodeRuntimeUnavailable
 }
 
 // noticeLine collapses whitespace so a multi-line error reads as one notice.
