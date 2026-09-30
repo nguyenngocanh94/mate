@@ -1,7 +1,7 @@
 # Phương án dùng Mate qua SSH
 
 - Ngày: 2026-09-30.
-- Trạng thái: đề xuất; chưa sửa production code.
+- Trạng thái: đã chốt hướng ngày 2026-09-30 (mục 5); chưa sửa production code.
 - Baseline: `5d93926` cộng phần tmux/SSH chưa commit (`internal/host/tmux.go`, `sshTmuxCommand` trong `cmd/mate/console.go`), binary `bin/mate` build 2026-09-29 10:25.
 - Máy: Mac mini chạy Mate, Herdr 0.8.2, tmux 3.6a với oh-my-tmux; laptop macOS chạy Ghostty; hai máy nối qua Tailscale.
 - Spec liên quan: [MVP](../mvp.md) mục cột host (M13), dòng về phiên SSH.
@@ -62,6 +62,23 @@ Khả năng nào của terminal ngoài mà tầng giữa không hiểu hoặc kh
 | Cấu hình SSH | không compression, không ControlMaster, không ProxyCommand; laptop không có mosh |
 | `TERM` laptop gửi sang | `xterm-ghostty`; Mac mini không tìm thấy terminfo cho tên này khi đăng nhập qua SSH |
 
+Chuột với Herdr, không có tmux.
+Trên Mac mini đo bằng PTY giả phiên SSH (`TERM=xterm-ghostty` không có terminfo, có `SSH_TTY`) và chuỗi chuột SGR như Ghostty gửi.
+Trên laptop đo qua `ssh -tt macmini` thật, cả tự động lẫn captain thử tay trong Ghostty, laptop ở nhà:
+
+| Phép đo | Mac mini | Laptop |
+| --- | --- | --- |
+| Client `herdr --session` bật chế độ chuột | 1000/1002/1003/1006; mở được dù thiếu terminfo `xterm-ghostty` | như Mac mini |
+| Click chuyển focus giữa hai pane cạnh nhau | được | được; click tới lúc focus đổi p50 khoảng 27 ms, p90 khoảng 36 ms |
+| Click và lăn chuột tới chương trình trong pane có xin nhận chuột | tới đủ, tọa độ đổi sang tọa độ pane | như Mac mini |
+| Lăn chuột ở pane shell (`seq 1 500`) | chưa đo | cuộn về dòng cũ, không có chữ rác |
+| Kéo chọn chữ rồi copy sang laptop | chưa đo | được, mượt như tại chỗ |
+| Claude trong pane: lăn chuột, click, Shift+Enter | chưa đo | lăn chuột và click được; Shift+Enter xuống dòng |
+| `herdr terminal attach --takeover`, chạy thẳng hoặc lồng trong pane Herdr | lăn chuột qua được, click bị nuốt | như Mac mini |
+| Lăn chuột qua attach vào shell không xin nhận chuột | không cuộn; chuỗi chuột thô rơi vào prompt | không cuộn; chữ rác chỉ hiện khi chuỗi bị cắt làm hai lần ghi |
+| Lăn chuột và click qua `agent attach` vào Claude | composer không bị gõ rác | chưa đo riêng |
+| `herdr --remote macmini` | chưa đo | chưa đo, laptop chưa có Herdr |
+
 Chưa đo khi laptop ở ngoài nhà.
 Khi đó Tailscale có thể không nối thẳng được (NAT của laptop là loại khó), và độ trễ mỗi phím sẽ cao hơn.
 
@@ -80,72 +97,41 @@ Khác biệt nằm ở tầng tmux thêm vào giữa:
 3. **Chuột và phím.**
    `~/.tmux.conf` tắt `mouse`, nên không cuộn được.
    oh-my-tmux chỉ bật `extended-keys` với iTerm và mintty, nên Shift+Enter và các tổ hợp Ctrl+Shift không tới Claude.
-   `Ctrl-b` bị tmux giữ, và driver tmux bắt captain chuyển window bằng `Ctrl-b p`/`Ctrl-b w`.
+   `Ctrl-b` bị tmux giữ, và driver tmux bắt captain chuyển window bằng prefix.
+   Enter trên agent chạy `select-window` sang window full-width của agent, console biến khỏi màn hình; Esc rơi vào Claude.
+   Với oh-my-tmux, `Ctrl-b p` là `paste-buffer`, nên đường về thật là `Ctrl-b Tab` hoặc `Ctrl-b 1`, và captain không tìm ra khi dùng thử.
    Captain đã bỏ tổ hợp có prefix khỏi console từ 2026-09-17, vì một prefix gõ lạc rơi vào composer của Mate có thể chọn nhầm lựa chọn phá hỏng; console dùng vùng focus và chuột.
 4. **Không có cột bên cạnh.**
    Driver Ghostty mở cột bằng AppleScript, chỉ làm được với Ghostty chạy trên cùng máy với `mate`.
    Qua SSH, Ghostty nằm trên laptop, nên driver tmux phải dùng window full-width và chuyển bằng `Ctrl-b`.
 
-## 5. Hướng giải quyết
+## 5. Quyết định
 
-### Bước 1: sửa đường tmux
+Chốt 2026-09-30:
 
-Đường tmux vẫn là fallback lâu dài cho terminal không có driver (iPad, Linux) và cho khi cần giữ console qua lần rớt mạng.
+- Bỏ đường tmux.
+  Driver `tmux` và `sshTmuxCommand` trong phần chưa commit không vào `main`; Mate không cần tmux.
+- Chưa làm `mate remote`.
+- Qua SSH, Herdr dàn cột: console Mate là một pane trong Herdr session của workspace, agent nằm ở pane bên cạnh.
+  Captain chỉ cần `ssh macmini` rồi mở console; Ghostty trên laptop vẽ client Herdr.
 
-- Trước khi mở tmux, `sshTmuxCommand` kiểm tra `TERM` có terminfo trên máy không.
-  Nếu không có và `TERM` là `xterm-ghostty`/`ghostty`, trỏ `TERMINFO` sang terminfo trong Ghostty.app khi nó có sẵn.
-  Nếu vẫn không có, dùng `xterm-256color` và khai báo `terminal-features` `RGB` và `sync` cho client đó.
-- Session tmux do Mate mở bật `mouse` và `extended-keys` ở mức session, không đụng cấu hình tmux chung của captain.
-- Phía laptop, captain có thể thêm `shell-integration-features = ssh-terminfo` vào cấu hình Ghostty để Ghostty tự cài terminfo sang máy đích.
-  Mate không dựa vào việc này.
+Lý do:
 
-Bước này sửa lỗi 1 và 3.
-Nó không sửa được lỗi 2: dù tmux nhận đúng `xterm-ghostty`, chỉ 4 trên khoảng 50 frame của Herdr còn được đánh dấu.
-Nó cũng không sửa lỗi 4.
+- Herdr vốn bắt buộc.
+  Client `herdr --session` qua SSH lo chuột, cuộn, chọn chữ và phím mở rộng, đo ở mục 3.
+- Không còn tầng tmux, nên hết lỗi terminfo, `mouse off` của oh-my-tmux và việc bắt dùng `Ctrl-b`.
+- Session Herdr sống trên server.
+  Rớt SSH thì mở lại client là thấy lại console và agent, như `tmux new-session -A` trước đây.
 
-Xong khi: `mate console` qua SSH với `TERM=xterm-ghostty` mở được console; cuộn chuột và Shift+Enter tới Claude trong window agent; unit cho việc chọn `TERM`/`TERMINFO`; `make check` xanh.
+Ràng buộc:
 
-### Bước 2: `mate remote`
+- Cột agent phải là pane thật của agent trong session, không phải `herdr terminal attach` hay `agent attach`.
+  Client attach nuốt click và không cuộn được shell (mục 3).
+- Chuyển giữa console và agent bằng click.
+  Console không thêm tổ hợp prefix (quyết định 2026-09-17); prefix `ctrl+b` mặc định của Herdr vẫn có nhưng console không dựa vào nó.
+- Enter trên agent để focus ở lại console, giống driver WezTerm và Ghostty.
 
-Cột agent và cột review nằm thẳng trong Ghostty trên laptop, còn console, pane runner, Herdr và agent vẫn ở Mac mini.
-
-```
-Laptop (Ghostty)                         Mac mini
-┌──────────────┬───────────┬────────┐
-│ ssh → mate   │ ssh → mate│ssh →   │    console, pane runners,
-│ console      │ pane serve│pane    │ ←→ Herdr, Claude/Codex, file state
-│              │ (agent)   │(review)│    (như hiện tại)
-└──────────────┴───────────┴────────┘
-      ▲ mate host serve (laptop)  ◄── ssh -R unix socket ── host driver "remote"
-```
-
-Kiến trúc hiện tại đã tách phần dàn cột khỏi phần chạy thật.
-Mỗi cột chỉ chạy `mate pane serve --role … --socket … --owner …`, và console điều khiển cột qua unix socket (`cmd/mate/console_stage.go`).
-Chỉ bước dàn cột phải chạy trên laptop.
-
-1. Trên laptop, `mate remote <host> <workspace-dir>` mở socket `mate host serve`, forward nó sang Mac mini bằng `ssh -R`, rồi chạy `mate console <workspace-dir>` bên kia trong pane hiện tại.
-2. Console trên Mac mini thấy socket forward về thì chọn host driver `remote`.
-   Driver này implement `host.Host` (`Layout`, `Close`) bằng cách gửi lệnh ngược về laptop.
-3. Laptop nhận `Layout` và dùng driver Ghostty/WezTerm hiện có, với argv mỗi cột bọc thành `ssh -t <host> mate pane serve …`.
-   Socket và pid owner đều nằm trên Mac mini nên giữ nguyên cách hoạt động.
-4. `mate remote` bật `ControlMaster` cho mọi kết nối của nó, nên các cột đi chung một kết nối TCP và chỉ xác thực một lần.
-
-Được:
-
-- Cột nằm cạnh nhau trong Ghostty như tại chỗ.
-- Chuỗi hiển thị agent là Ghostty ← ssh ← Herdr attach, không có tmux, nên giữ được vẽ trọn frame, không cần xử lý terminfo, chuột, màu và phím như tại chỗ.
-- Độ trễ chỉ còn vòng đi–về của mạng.
-
-Giá:
-
-- Laptop cần binary `mate` và Ghostty hoặc WezTerm; không cần Herdr hay agent.
-- Rớt kết nối thì mất các pane trên laptop và console thoát.
-  Agent không chết: Herdr server, process harness, chữ gõ dở trong composer và state `.mate/` đều ở Mac mini.
-  Pane runner thấy pid owner mất thì chỉ dừng client `herdr agent attach`.
-  Nối lại bằng cách chạy lại `mate remote`; có thể cho `mate remote` tự nối lại, đóng pane chết và dàn lại cột.
-- Khác với tmux, console không sống qua lần rớt mạng.
-
-Xong khi: live test qua `ssh localhost` dựng đủ cột, Enter attach đúng agent, ctrl+c đóng hết cột trên laptop và runner trên máy chủ; rớt kết nối giữa chừng không làm agent nào dừng.
+Xong khi: `ssh macmini` rồi `mate console` mở console trong Herdr; Enter trên agent hiện pane thật của agent bên phải, focus ở lại console; click chuyển qua lại; lăn chuột cuộn Claude; Shift+Enter xuống dòng trong Claude; live test qua PTY giả SSH; `make check` xanh.
 
 ## 6. Hướng đã cân nhắc và không chọn
 
@@ -159,12 +145,21 @@ Xong khi: live test qua `ssh localhost` dựng đủ cột, Enter attach đúng 
 - **Harness headless** (`claude -p --resume`, `codex exec resume`).
   Bỏ được Herdr, lớp vỏ, việc đọc màn hình và cả vấn đề SSH, nhưng mất TUI gốc của harness và đảo ngược quyết định 2026-09-17 ("Mate là harness interactive trong pane Herdr, không headless").
   Đây là quyết định sản phẩm riêng; nếu cân nhắc thì làm spike với một crew thật trước.
+- **Sửa đường tmux** (đề xuất ban đầu của bản này).
+  Kiểm `TERM`/`TERMINFO`, bật `mouse` và `extended-keys` cho session do Mate mở.
+  Sửa được terminfo, chuột và phím, nhưng vẫn là một tầng terminal ảo làm mất đánh dấu frame `?2026`, và driver dùng window full-width nên vẫn phải chuyển window.
+  Herdr làm được cùng việc mà không thêm phụ thuộc.
+- **`mate remote`**: laptop chạy `mate host serve`, forward socket bằng `ssh -R`, và dàn cột Ghostty trên laptop với mỗi cột là `ssh -t macmini mate pane serve …`.
+  Bỏ được mọi tầng giữa, nhưng cần binary `mate` trên laptop, một giao thức có phiên bản, và console chết khi rớt mạng.
+  Để sau, nếu dùng Herdr qua SSH vẫn thấy giật.
 
 ## 7. Câu hỏi mở
 
-- Lệch phiên bản giữa `mate` trên laptop và trên Mac mini: giao thức `host serve` cần số phiên bản và lời từ chối rõ ràng.
-- Forward unix socket bằng `ssh -R` gặp file socket cũ thì bind thất bại nếu `sshd` không có `StreamLocalBindUnlink yes`; dùng đường dẫn socket riêng cho mỗi lần chạy để không phụ thuộc cấu hình server.
-- Ghostty trên laptop cần quyền Automation cho AppleScript lần đầu.
-- Ở ngoài nhà, độ trễ mỗi phím phụ thuộc Tailscale có nối thẳng được không.
-  Cả hai bước đều không giảm được vòng đi–về; mosh giảm được nhưng không dùng chung được với nhiều kết nối SSH theo cột.
-  Cần đo lại khi laptop thật sự ở ngoài.
+- Cách đưa pane agent ra cạnh console.
+  `herdr pane move` có giữ pane id, terminal id và tên agent không; runtime Mate theo dõi agent theo pane id nên phải biết trước khi dùng.
+  Cách khác là đặt console ngay trong tab của agent.
+- Console nằm trong session Herdr nào: session của workspace (`mate-<hash>`), cùng chỗ với agent, hay một session riêng.
+- Cột agent tại chỗ trong WezTerm/Ghostty cũng đi qua `agent attach`, nên cũng mất click và cuộn như mục 3; sửa cùng lúc hay tách việc.
+- Chưa có cảm nhận giật khi Claude stream qua client Herdr, và chưa đo client Herdr có giữ `?2026` không.
+- `herdr --remote` chưa đo vì laptop chưa có Herdr.
+- Chưa đo khi laptop ở ngoài nhà; độ trễ mỗi phím phụ thuộc Tailscale có nối thẳng được không.
