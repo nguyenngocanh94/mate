@@ -34,6 +34,25 @@ type Snapshot struct {
 	// means every field either read successfully or is legitimately absent -
 	// it does not mean the snapshot is fresh.
 	Warnings []FieldWarning
+	// Runtime is the observer's standing word about the terminal runtime
+	// the files on screen were read from. cmd/mate merges it after Load, the
+	// way it merges crew health and the auto daemon's state: internal/query
+	// reads files only, so it cannot ask whether Herdr is up. An empty
+	// Notice is the ordinary state - the last poll that asked got an answer.
+	Runtime RuntimeStatus
+}
+
+// RuntimeStatus is what the observer last knew about the terminal runtime.
+// It is a DTO like the rest of Snapshot: nothing here is a live probe.
+type RuntimeStatus struct {
+	// Notice is a one-line description of why the runtime could not be
+	// reached, empty when it could. It is the observer's own sentence
+	// (internal/watch writes it from the failure it saw), not one invented
+	// by a UI.
+	Notice string
+	// At is when the observer last failed to reach the runtime. Zero when
+	// Notice is empty.
+	At time.Time
 }
 
 // WorkspaceValue is where the open workspace lives. Name is the root

@@ -287,7 +287,7 @@ func TestConsoleStageResolvesMateMeta(t *testing.T) {
 		t.Fatalf("start: %v", err)
 	}
 	rec := newRecordingColumns(t)
-	fn := consoleStage(w, rec.consoleColumns)
+	fn := consoleStage(w, deps, rec.consoleColumns)
 	if fn == nil {
 		t.Fatal("consoleStage on columns is nil")
 	}
@@ -307,9 +307,32 @@ func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	}
 }
 
+// TestConsoleStageRefusesAnAgentWhoseHerdrIsGone: a Mate recorded in
+// `mate.meta` whose Herdr session is no longer running has nothing to
+// attach to. `herdr agent attach` against a dead server prints its own
+// error and exits, which the stage column would leave on screen while the
+// Console believed the pane was fine; the refusal is the status line's
+// instead, and no column is touched (measured 2026-09-30, after a Herdr
+// server was lost to a machine restart).
+func TestConsoleStageRefusesAnAgentWhoseHerdrIsGone(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	if _, err := consoleAction(w, deps)(context.Background(), console.ActionRequest{Action: console.ActionStart, Target: "shop", TargetKind: "mate"}); err != nil {
+		t.Fatal(err)
+	}
+	deps.Runtime.(*runtime.Fake).SessionNotRunning = true
+	rec := newRecordingColumns(t)
+	err := consoleStage(w, deps, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "herdr is not running") {
+		t.Fatalf("error = %v, want the herdr-not-running refusal", err)
+	}
+	if len(rec.of(roleStage))+len(rec.of(roleReview)) != 0 {
+		t.Fatal("a dead Herdr still reached a column")
+	}
+}
+
 func TestConsoleStageNilHostIsNil(t *testing.T) {
-	w, _ := consoleFixture(t, "shop")
-	if consoleStage(w, nil) != nil {
+	w, deps := consoleFixture(t, "shop")
+	if consoleStage(w, deps, nil) != nil {
 		t.Fatal("consoleStage(nil) must be nil")
 	}
 }
@@ -318,9 +341,9 @@ func TestConsoleStageNilHostIsNil(t *testing.T) {
 // `mate.meta` names no agent has nothing to show. The refusal names the
 // stopped state and the key that starts it, and the host is never asked.
 func TestConsoleStageRefusesAStoppedMateWithTheStoppedState(t *testing.T) {
-	w, _ := consoleFixture(t, "shop")
+	w, deps := consoleFixture(t, "shop")
 	rec := newRecordingColumns(t)
-	fn := consoleStage(w, rec.consoleColumns)
+	fn := consoleStage(w, deps, rec.consoleColumns)
 	target := console.StageTarget{Kind: console.StageMate, ID: "mate:shop", ProjectID: "shop"}
 
 	// No meta at all.
@@ -354,7 +377,7 @@ func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	res := spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
-	fn := consoleStage(w, rec.consoleColumns)
+	fn := consoleStage(w, deps, rec.consoleColumns)
 	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
 
 	if err := fn(context.Background(), target); err != nil {
@@ -400,7 +423,7 @@ func TestConsoleStageRemakesAClosedColumn(t *testing.T) {
 	rec.stage = gone
 	// The layout "makes" the column again: its socket is the live one.
 	rec.h = layoutFunc(func() { rec.layouts++; _ = os.Symlink(live, gone) })
-	fn := consoleStage(w, rec.consoleColumns)
+	fn := consoleStage(w, deps, rec.consoleColumns)
 	if err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"}); err != nil {
 		t.Fatalf("stage: %v", err)
 	}
@@ -430,7 +453,7 @@ func TestConsoleStageRemakesAColumnWhoseRunnerDied(t *testing.T) {
 	columnStartWait = 100 * time.Millisecond
 	t.Cleanup(func() { columnStartWait = prev })
 	rec.h = closeAware{layout: func() { rec.layouts++ }, close: func() { closed++; _ = os.Symlink(live, dead) }}
-	fn := consoleStage(w, rec.consoleColumns)
+	fn := consoleStage(w, deps, rec.consoleColumns)
 	if err := fn(context.Background(), console.StageTarget{Kind: console.StageMate, ProjectID: "shop"}); err != nil {
 		t.Fatalf("stage: %v", err)
 	}
@@ -461,7 +484,7 @@ func TestConsoleStageMakesTheReviewForACrew(t *testing.T) {
 	rec.withReview = []host.Column{{Role: roleStage}, {Role: roleReview}}
 	var laid [][]host.Column
 	rec.h = colsHost{func(cols []host.Column) { laid = append(laid, cols); _ = os.Symlink(live, absent) }}
-	if err := consoleStage(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
+	if err := consoleStage(w, deps, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(laid) != 1 || len(laid[0]) != 2 || laid[0][1].Role != roleReview {
@@ -487,7 +510,7 @@ func TestConsoleStageOpensDotMateForAScout(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := newRecordingColumns(t)
-	if err := consoleStage(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "sc", ProjectID: "shop"}); err != nil {
+	if err := consoleStage(w, deps, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "sc", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
 	review := rec.of(roleReview)

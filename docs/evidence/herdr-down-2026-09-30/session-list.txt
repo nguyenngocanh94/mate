@@ -1,0 +1,45 @@
+$ herdr session list --json   # herdr 0.8.2, 2026-09-30
+
+{
+    "sessions": [
+        {
+            "default": true,
+            "name": "default",
+            "running": false,
+            "session_dir": "/Users/erics/.config/herdr",
+            "socket_path": "/Users/erics/.config/herdr/herdr.sock"
+        },
+        {
+            "default": false,
+            "name": "fm-lab-herdr-e2e-49476",
+            "running": false,
+            "session_dir": "/Users/erics/.config/herdr/sessions/fm-lab-herdr-e2e-49476",
+            "socket_path": "/Users/erics/.config/herdr/sessions/fm-lab-herdr-e2e-49476/herdr.sock"
+        },
+        {
+            "default": false,
+            "name": "mate-095cb4d9c3266ebf7f5856009876f711",
+            "running": false,
+            "session_dir": "/Users/erics/.config/herdr/sessions/mate-095cb4d9c3266ebf7f5856009876f711",
+            "socket_path": "/Users/erics/.config/herdr/sessions/mate-095cb4d9c3266ebf7f5856009876f711/herdr.sock"
+        },
+        {
+            "default": false,
+            "name": "mate-7984ac9f",
+            "running": false,
+            "session_dir": "/Users/erics/.config/herdr/sessions/mate-7984ac9f",
+            "socket_path": "/Users/erics/.config/herdr/sessions/mate-7984ac9f/herdr.sock"
+        },
+        {
+            "default": false,
+            "name": "matev2-5a2d7d22",
+            "running": false,
+            "session_dir": "/Users/erics/.config/herdr/sessions/matev2-5a2d7d22",
+            "socket_path": "/Users/erics/.config/herdr/sessions/matev2-5a2d7d22/herdr.sock"
+        }
+    ]
+}
+
+# Every session on this machine reports running: false - no herdr server is up.
+# runtime.Herdr.LookupSession reads the named one as (handle, false, nil): a
+# not-running session is a successful answer, not an error.

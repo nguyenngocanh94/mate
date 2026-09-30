@@ -168,13 +168,16 @@ func (c *consoleColumns) close() {
 // row it closes, so the Console is two columns unless a crew is shown. A
 // nil columns yields a nil StageFunc, which the Console reads as "no next
 // pane".
-func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
+func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) console.StageFunc {
 	if c == nil {
 		return nil
 	}
 	return func(ctx context.Context, target console.StageTarget) error {
 		ref, meta, err := stageRef(ws, target)
 		if err != nil {
+			return err
+		}
+		if err := herdrSession(ctx, ws, deps); err != nil {
 			return err
 		}
 		if err := c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env}); err != nil {
@@ -185,6 +188,49 @@ func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
 		}
 		return c.showReview(ctx, ws, target, meta)
 	}
+}
+
+// herdrSession refuses to attach to an agent whose Herdr session is not up.
+// `herdr agent attach` against a dead server prints its own error and exits
+// nonzero: the stage column would keep that text on screen as a stray
+// terminal, and nothing on the Console would explain it (measured
+// 2026-09-30, after a Herdr server was lost to a machine restart). The
+// session is asked first - LookupSession never starts a server - so the
+// refusal lands on the Console's status line and no column is touched.
+//
+// It asks through the runtime adapter the Console already pointed at the
+// `herdr` binary the stage column runs (findTool's, which can reach
+// ~/.local/bin when the Console's PATH cannot). Asking by the bare name
+// instead made the check and the attach disagree about whether Herdr exists
+// at all, and refused an attach that would have worked.
+//
+// Only a session that is positively down is reworded to a stopped session.
+// A different runtime failure - the executable would not run, a transport
+// fault - is its own sentence: the attach is a separate subprocess and may
+// still be the path that works.
+func herdrSession(ctx context.Context, ws *store.Workspace, deps spawn.Deps) error {
+	spec, err := spawn.SessionSpec(deps, ws)
+	if err != nil {
+		return err
+	}
+	_, running, err := deps.Runtime.LookupSession(ctx, spec)
+	if err != nil {
+		if runtime.IsServerNotRunning(err) {
+			return herdrDown(spec.Name)
+		}
+		return err
+	}
+	if !running {
+		return herdrDown(spec.Name)
+	}
+	return nil
+}
+
+// herdrDown is the one sentence both the stage refusal and the observer's
+// runtime notice use for a session that is positively not up.
+func herdrDown(session string) error {
+	return observability.NewError(observability.CodeRuntimeUnavailable,
+		fmt.Sprintf("herdr is not running; start or resume the Mate with s to bring it back (session %s)", session))
 }
 
 // showReview opens a crew's worktree in the review column, making the

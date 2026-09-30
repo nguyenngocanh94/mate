@@ -44,6 +44,7 @@ func consoleWatcher(dir string, deps spawn.Deps) (*watch.Watcher, error) {
 	return watch.New(ws, watch.Deps{
 		Runtime: deps.Runtime,
 		Handle:  consoleCrewHandle(ws, deps),
+		Session: consoleSession(ws, deps),
 	}), nil
 }
 
@@ -67,7 +68,11 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 		if !errors.Is(err, db.ErrLocked) {
 			return nil, nil, err
 		}
-		watcher = watch.New(ws, watch.Deps{Runtime: deps.Runtime, Handle: consoleCrewHandle(ws, deps)})
+		watcher = watch.New(ws, watch.Deps{
+			Runtime: deps.Runtime,
+			Handle:  consoleCrewHandle(ws, deps),
+			Session: consoleSession(ws, deps),
+		})
 		return watcher, nil, nil
 	}
 	ingest := timeline.New(ws, handle, timeline.Deps{
@@ -85,6 +90,7 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 	watcher = watch.New(ws, watch.Deps{
 		Runtime:  deps.Runtime,
 		Handle:   consoleCrewHandle(ws, deps),
+		Session:  consoleSession(ws, deps),
 		Timeline: ingest,
 		// The same *timeline.Ingester also implements watch.BudgetChecker
 		// (mvp.md M5 task 27): it already holds the writable db.DB and the
@@ -124,6 +130,15 @@ func consoleCrewHandle(ws *store.Workspace, deps spawn.Deps) watch.HandleFunc {
 	}
 }
 
+// consoleSession is watch.SessionFunc over the same session check the stage
+// preflight uses: the observer hears that Herdr is gone whether or not any
+// crew is open to resolve a handle for.
+func consoleSession(ws *store.Workspace, deps spawn.Deps) watch.SessionFunc {
+	return func(ctx context.Context) error {
+		return herdrSession(ctx, ws, deps)
+	}
+}
+
 // withCrewHealth puts the observer's latest readings into a snapshot
 // query.Load built out of files alone.
 //
@@ -146,6 +161,24 @@ func withCrewHealth(snap query.Snapshot, health map[watch.CrewRef]watch.Health) 
 			crew.Health = query.KnownField(crewHealth(h))
 		}
 	}
+	return snap
+}
+
+// withRuntimeNotice puts the observer's standing word about the terminal
+// runtime into a snapshot query.Load built out of files alone. The Console
+// cannot ask Herdr itself (its boundary test), so an empty notice is the
+// only way it can tell "nothing was observed" apart from "nothing could be
+// observed"; without it every file-read row keeps looking fresh while Herdr
+// is down.
+func withRuntimeNotice(snap query.Snapshot, watcher *watch.Watcher) query.Snapshot {
+	if watcher == nil {
+		return snap
+	}
+	notice, at := watcher.RuntimeNotice()
+	if notice == "" {
+		return snap
+	}
+	snap.Runtime = query.RuntimeStatus{Notice: notice, At: at}
 	return snap
 }
 

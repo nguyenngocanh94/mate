@@ -176,6 +176,12 @@ func (m Model) footerMessage() footerMsg {
 	if m.notice != "" {
 		return warnMsg(m.notice)
 	}
+	// The runtime being down outranks the daemon's and the loader's own
+	// notices: while Herdr cannot be reached, both are describing a picture
+	// nobody can refresh, and the reader's first need is to know that.
+	if m.tree.Runtime.Notice != "" {
+		return warnMsg(m.tree.Runtime.Notice)
+	}
 	if d := daemonFooterMsg(m.tree.Projects); d.text != "" {
 		return d
 	}

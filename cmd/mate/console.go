@@ -68,6 +68,14 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
 	deps := spawn.LiveDeps()
+	// Point the runtime at the `herdr` findTool resolves - the one the stage
+	// column runs by absolute path, which can be in ~/.local/bin when the
+	// Console's PATH cannot reach it. Without this, a session check would
+	// consult a different executable than the attach and could refuse an
+	// attach that would have worked (measured 2026-09-30).
+	if rt, ok := deps.Runtime.(*runtime.Herdr); ok {
+		rt.Binary = findTool(os.Getenv, "herdr")
+	}
 
 	// The observer of mvp.md section 4b runs for as long as the workspace is
 	// open, and only then: it lives in this process, so quitting the console
@@ -108,8 +116,12 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		// snapshot picks up whatever the observer has seen by now, and the
 		// crews it has not seen keep their Absent health. The daemon's own
 		// state - when it last sent, why it last could not - rides along the
-		// same way.
-		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
+		// same way, and so does the observer's standing word about the
+		// terminal runtime it could not reach.
+		snap = withCrewHealth(snap, watcher.Snapshot())
+		snap = withRuntimeNotice(snap, watcher)
+		snap = withAutoStatus(snap, pilot.Snapshot())
+		return withTokens(snap, ws), nil
 	}
 	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv, SelfCols: func() int {
 		cols, _, err := term.GetSize(stdoutFile.Fd())
@@ -155,7 +167,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	model := console.New(load, action).
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
-		WithStage(consoleStage(ws, columns)).
+		WithStage(consoleStage(ws, deps, columns)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
 		WithNotice(notice).

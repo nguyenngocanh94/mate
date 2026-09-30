@@ -15,6 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/box"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -95,11 +96,27 @@ type BudgetChecker interface {
 	CheckBudgets(ctx context.Context) error
 }
 
+// SessionFunc asks whether the workspace's terminal runtime is up, without
+// starting one. It is a seam for the same reason HandleFunc is: the
+// observer imports nothing that can start an agent. nil means the runtime
+// answered; an error describes why it could not be reached, and is what the
+// runtime notice carries.
+//
+// It is called once per poll, independent of whether any crew exists: a
+// workspace with a Mate and no open crews must still hear that Herdr is
+// gone. Asking per crew cannot, because without a crew there is no handle
+// to resolve and so no question to ask.
+type SessionFunc func(ctx context.Context) error
+
 // Deps are the observer's collaborators. Runtime and Handle are required;
 // everything else has a default.
 type Deps struct {
 	Runtime Runtime
 	Handle  HandleFunc
+	// Session checks the workspace session itself, once per poll. Nil means
+	// the observer stands no runtime notice (a build or test that predates
+	// it).
+	Session SessionFunc
 	Clock   Clock
 	Sleeper Sleeper
 	// Timeline records what the files say into `.mate/mate.db`. Nil
@@ -174,8 +191,14 @@ type Watcher struct {
 
 	mu     sync.Mutex
 	health map[CrewRef]Health
-	cancel context.CancelFunc
-	done   chan struct{}
+	// runtimeNotice is the standing word about a Herdr the observer could
+	// not reach, and runtimeNoticeAt when it was recorded. Empty means the
+	// last round that asked got an answer. It is a copy of the round's own
+	// read failure, not a conclusion about any crew (mvp.md decision 8).
+	runtimeNotice   string
+	runtimeNoticeAt time.Time
+	cancel          context.CancelFunc
+	done            chan struct{}
 }
 
 // observation is what the previous polls established about one crew.
@@ -288,6 +311,7 @@ func (w *Watcher) Poll(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
+	w.noteRuntime(ctx, now)
 	w.commit(results, seen, listed)
 	// The timeline is recorded last, after the health snapshot has been
 	// swapped in: the ingest reads this round's readings (Watcher.Readings),
@@ -442,6 +466,48 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		ObservedAt:   now,
 	}
 	return nil
+}
+
+// RuntimeNotice is the observer's standing word about a Herdr it could not
+// reach, and when it last failed to. Empty means the last round that asked
+// got an answer. It is safe to call from any goroutine.
+func (w *Watcher) RuntimeNotice() (string, time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.runtimeNotice, w.runtimeNoticeAt
+}
+
+// noteRuntime asks the workspace session once per poll and records the
+// answer, or clears the notice when the runtime answered. The check is the
+// workspace's own rather than a crew's: with no open crew there is no handle
+// to resolve, and without one the notice would clear while Herdr is gone
+// (the bug this replaces), never appear at all, or depend on which crews
+// happen to be open. "Herdr could not answer" is never an incident
+// (TestWatchConcludesNothingWhenHerdrCannotAnswer); this is the separate
+// signal a reader needs, because while it stands every file-read row on
+// screen is as fresh as its last read and no row can be re-read.
+func (w *Watcher) noteRuntime(ctx context.Context, now time.Time) {
+	if w.deps.Session == nil || ctx.Err() != nil {
+		return
+	}
+	err := w.deps.Session(ctx)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err == nil {
+		w.runtimeNotice, w.runtimeNoticeAt = "", time.Time{}
+		return
+	}
+	notice := noticeLine(err.Error())
+	var coded *observability.Error
+	if errors.As(err, &coded) && strings.TrimSpace(coded.Message) != "" {
+		notice = noticeLine(coded.Message)
+	}
+	w.runtimeNotice, w.runtimeNoticeAt = notice, now
+}
+
+// noticeLine collapses whitespace so a multi-line error reads as one notice.
+func noticeLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // staleCleared is the resolve side of the stale rule: the pane moved, the

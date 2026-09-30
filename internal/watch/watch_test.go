@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -246,6 +248,68 @@ func TestWatchConcludesNothingWhenHerdrCannotAnswer(t *testing.T) {
 	f.clock.advance(4 * time.Minute)
 	f.pollIgnoringErrors()
 	f.assertIncidents()
+}
+
+// TestWatchStandsARuntimeNoticeWhileHerdrCannotAnswer: "Herdr could not
+// answer" opens no incident, but it is not nothing either - every row on
+// the Console is a file read that cannot be refreshed while it stands. The
+// notice is the observer's own word, carries the failure it read, and
+// clears on the round Herdr answers again.
+func TestWatchStandsARuntimeNoticeWhileHerdrCannotAnswer(t *testing.T) {
+	f := newFixture(t)
+	var sessionErr error
+	deps := f.deps()
+	deps.Session = func(context.Context) error { return sessionErr }
+	f.w = watch.New(f.ws, deps)
+
+	f.poll()
+	if notice, at := f.w.RuntimeNotice(); notice != "" || !at.IsZero() {
+		t.Fatalf("RuntimeNotice before any failure = %q at %s, want none", notice, at)
+	}
+
+	sessionErr = observability.NewError(observability.CodeRuntimeUnavailable,
+		"herdr is not running; start or resume the Mate with s to bring it back (session mate-lab)")
+	f.poll()
+	notice, at := f.w.RuntimeNotice()
+	if !strings.Contains(notice, "herdr is not running") || !strings.Contains(notice, "mate-lab") {
+		t.Fatalf("RuntimeNotice = %q, want the runtime failure and the session it names", notice)
+	}
+	if at.IsZero() {
+		t.Fatal("RuntimeNotice recorded no time")
+	}
+
+	// A round the session answers clears it: the line is about the runtime
+	// now, not about a failure that has passed.
+	sessionErr = nil
+	f.poll()
+	if notice, at := f.w.RuntimeNotice(); notice != "" || !at.IsZero() {
+		t.Fatalf("RuntimeNotice after recovery = %q at %s, want none", notice, at)
+	}
+}
+
+// TestWatchChecksTheSessionWithNoCrews: the session is asked on its own,
+// not through a crew handle. A workspace whose Mate is running with every
+// crew closed must still stand the notice - asking per crew would have
+// nothing to ask, and the notice would never appear (or would clear while
+// Herdr is gone).
+func TestWatchChecksTheSessionWithNoCrews(t *testing.T) {
+	ws := newWorkspace(t)
+	w := watch.New(ws, watch.Deps{
+		Runtime: runtime.NewFake(),
+		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.Kind, error) {
+			t.Fatal("a workspace with no open crews asked for a crew handle")
+			return runtime.AgentHandle{}, "", nil
+		},
+		Session: func(context.Context) error {
+			return observability.NewError(observability.CodeRuntimeUnavailable, "no herdr server is running")
+		},
+	})
+	if err := w.Poll(context.Background()); err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+	if notice, _ := w.RuntimeNotice(); notice == "" {
+		t.Fatal("no runtime notice in a workspace with no open crews")
+	}
 }
 
 func TestWatchConcludesNothingWhenThePaneCannotBeRead(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -111,6 +112,40 @@ func TestConsoleWatcherOpensRuntimeLostForAKilledAgent(t *testing.T) {
 	}
 	if !strings.Contains(box.Value.Inbox[0].Resolve, "runtime_lost") {
 		t.Fatalf("resolve line = %q, want it to name the incident kind", box.Value.Inbox[0].Resolve)
+	}
+}
+
+// TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot: while Herdr cannot
+// be reached the observer stands a notice the Console can draw. A snapshot
+// straight out of query.Load cannot have one - query reads files only - so
+// without this merge the tree on screen keeps looking fresh while nothing
+// behind it can be re-read.
+func TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	down := observability.NewError(observability.CodeRuntimeUnavailable,
+		"herdr is not running; start or resume the Mate with s to bring it back (session mate-shop)")
+	watcher := watch.New(w, watch.Deps{
+		Runtime: deps.Runtime,
+		Handle:  consoleCrewHandle(w, deps),
+		Session: func(context.Context) error { return down },
+	})
+	if err := watcher.Poll(context.Background()); err != nil {
+		t.Fatalf("Poll: %v", err)
+	}
+
+	snap, err := query.Load(context.Background(), w)
+	if err != nil {
+		t.Fatalf("query.Load: %v", err)
+	}
+	if snap.Runtime.Notice != "" {
+		t.Fatalf("Runtime straight out of query.Load = %+v, want empty: query reads files only", snap.Runtime)
+	}
+	snap = withRuntimeNotice(snap, watcher)
+	if snap.Runtime.Notice == "" || snap.Runtime.At.IsZero() {
+		t.Fatalf("Runtime = %+v, want the observer's notice", snap.Runtime)
+	}
+	if !strings.Contains(snap.Runtime.Notice, "herdr is not running") || !strings.Contains(snap.Runtime.Notice, "mate-shop") {
+		t.Fatalf("Runtime notice = %q, want the failure and the session it names", snap.Runtime.Notice)
 	}
 }
 
