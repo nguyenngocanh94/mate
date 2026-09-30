@@ -122,15 +122,16 @@ An effort the harness does not take is not a failure: the spawn prints a note th
 
 ## 7. The profile of a replacement Crew
 
-`stuck-crew-recovery` step 3 replaces a Crew that looped or stopped responding.
+`stuck-crew-recovery` step 4 replaces a Crew that looped or stopped responding.
+A pane that simply died is step 3's relaunch, which keeps the same profile and the same id.
 Choose the replacement's profile by why the first one failed:
 
 - **It misjudged the work** - misread the brief, looped on a design choice, or kept asking what the brief answers: one step heavier, the heavier rule's profile or the heavier alternative within the same rule.
-- **Its harness failed it** - the agent died, froze or hit a limit while the work itself was on track: the same weight on the other harness.
+- **Its harness failed it** - the harness could not start at all, or hit a limit, while the work itself was on track: the same weight on the other harness.
 - **Neither is clear**: the same profile, with the `- Already tried` lines doing the work.
 
 Climb one step, once.
-If the replacement fails too, the task is failed (`stuck-crew-recovery` step 4); a third Crew on a still heavier profile is not a recovery plan.
+If the replacement fails too, the task is failed (`stuck-crew-recovery` step 5); a third Crew on a still heavier profile is not a recovery plan.
 
 ## 8. Say what you chose
 

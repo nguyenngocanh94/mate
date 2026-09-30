@@ -409,6 +409,10 @@ func (m Model) actionObjectDescription(c actionChoice) (string, string, string) 
 	case ActionRepair:
 		scope = "The recorded binding only; no live agent is assumed."
 		effect = "A stale binding is cleared. Unknown state is never treated as safe to clean."
+	case ActionRestartCrew:
+		object = c.req.Target + "/" + c.req.Crew
+		scope = "This Crew's agent and pane only. Its worktree, branch and status file stay."
+		effect = "A live agent is stopped first; then the harness starts again in the same worktree and the brief is pointed at once more."
 	case ActionMerge:
 		object = c.req.Target + "/" + c.req.Crew
 		scope = "The Project's default branch, and this crew's branch, worktree and pane."

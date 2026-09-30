@@ -13,10 +13,10 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// cmdCrew dispatches `mate crew <spawn|list|stop>`.
+// cmdCrew dispatches `mate crew <spawn|list|stop|relaunch|dispatch>`.
 func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate crew <spawn|list|stop|dispatch> ...")
+		return newUsageError("usage: mate crew <spawn|list|stop|relaunch|dispatch> ...")
 	}
 	switch args[0] {
 	case "spawn":
@@ -27,6 +27,8 @@ func cmdCrew(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return cmdCrewList(args[1:], stdout, stderr)
 	case "stop":
 		return cmdCrewStop(args[1:], stdout, stderr)
+	case "relaunch", "restart":
+		return cmdCrewRelaunch(args[1:], stdout, stderr)
 	default:
 		return newUsageErrorf("unknown crew subcommand %q", args[0])
 	}
@@ -244,6 +246,71 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 	}
 	writeCrewStopReport(stdout, project, crew, res, spawn.CallerFromEnv())
 	return nil
+}
+
+// cmdCrewRelaunch implements `mate crew relaunch <project> <id> [--note <text>]`.
+// `restart` is accepted as the same verb. It is the recovery path for a
+// crew whose Herdr pane or agent is gone: the branch and worktree are kept,
+// the recorded harness is started again in a fresh session, and the brief is
+// pointed at once more (mvp.md M13, "Herdr chết").
+func cmdCrewRelaunch(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("crew relaunch", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: mate crew relaunch <project> <id> [--note \"<one line>\"] [--workspace <dir>]")
+	}
+	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	noteFlag := fs.String("note", "", "one line of progress to carry into the new agent's first prompt")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return &usageError{err}
+	}
+	if fs.NArg() != 2 {
+		fs.Usage()
+		return newUsageError("mate crew relaunch: want exactly 2 arguments: <project> <id>")
+	}
+	w, err := resolveWorkspace(*workspaceFlag)
+	if err != nil {
+		return err
+	}
+	project, crew := fs.Arg(0), fs.Arg(1)
+	res, err := spawn.RelaunchCrew(context.Background(), w, spawn.LiveDeps(), project, crew, *noteFlag)
+	if err != nil {
+		return err
+	}
+	writeCrewRelaunchReport(stdout, res)
+	return nil
+}
+
+// writeCrewRelaunchReport prints what a relaunch established: the facts a
+// reader needs to attach to the new pane, and the turn-end reminder a Mate
+// in auto mode needs (auto_turn.go). A delivery that could not be confirmed
+// is a warning, never a failure - the agent is real and the line can be
+// re-sent.
+func writeCrewRelaunchReport(stdout io.Writer, res spawn.RelaunchResult) {
+	old := "no live agent was recorded"
+	if res.Stopped {
+		old = "the previous agent was stopped"
+	}
+	fmt.Fprintf(stdout, "relaunched %s/%s: agent %s in pane %s (harness %s%s, repo %s, branch %s, worktree %s; %s)\n",
+		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, relaunchProfileNote(res), res.Repo, res.Branch, res.Worktree, old)
+	if res.DeliveryWarning != "" {
+		fmt.Fprintf(stdout, "warning: %s\nlast pane lines:\n%s\n", res.DeliveryWarning, res.PaneTail)
+	}
+	fmt.Fprintf(stdout, "brief %s\n", res.BriefPath)
+	printTurnEnd(stdout, turnRelaunchLine(res.Crew))
+}
+
+// relaunchProfileNote is profileNote's small sibling: the model and effort
+// the relaunch launched with, read back from the crew's own meta.
+func relaunchProfileNote(res spawn.RelaunchResult) string {
+	out := ""
+	if res.Model != "" {
+		out += ", model " + res.Model
+	}
+	if res.Effort != "" {
+		out += ", effort " + string(res.Effort)
+	}
+	return out
 }
 
 // crewStopReport is the one line `mate crew stop` prints describing

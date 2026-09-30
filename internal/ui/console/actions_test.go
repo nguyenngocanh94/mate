@@ -309,14 +309,55 @@ func TestTheMateRowSheetCarriesTheRecoveryActions(t *testing.T) {
 }
 
 // Those two entries are the Mate's; on a crew they would offer to restart
-// something the row does not name.
+// something the row does not name. The crew row's own `R` is
+// ActionRestartCrew, a different action on a different object.
 func TestACrewRowSheetHasNoMateRecoveryActions(t *testing.T) {
 	m := toRunningAttempt(t, loaded(t, sampleTree(), nil))
 	m, _ = send(t, m, key("a"))
+	sawCrewRestart := false
 	for _, e := range m.menu {
-		if e.choice.action == ActionRestartMate || e.choice.action == ActionClearComposer || e.key == "R" || e.key == "C" {
+		if e.choice.action == ActionRestartMate || e.choice.action == ActionClearComposer {
 			t.Fatalf("a crew row's sheet offers %+v", e)
 		}
+		if e.key == "R" {
+			if e.choice.action != ActionRestartCrew {
+				t.Fatalf("a crew row's R entry = %+v, want ActionRestartCrew", e)
+			}
+			sawCrewRestart = true
+		}
+	}
+	if !sawCrewRestart {
+		t.Fatal("a crew row's sheet does not offer Restart crew…")
+	}
+}
+
+// The crew row's Restart crew… entry is dangerous and runs
+// ActionRestartCrew against the Project and the Crew the row names.
+func TestTheCrewRowSheetRestartsTheCrew(t *testing.T) {
+	m, got := actRunner(t, sampleTree(), "crew is running again", nil)
+	m = toRunningAttempt(t, m)
+	crewID := sampleTree().Projects[0].Crews[1].CrewID
+	projectID := sampleTree().Projects[0].ProjectID
+	m, _ = send(t, m, key("a"))
+	e := actEntry(t, m, "R")
+	if !e.enabled || !e.confirms() {
+		t.Fatalf("restart crew entry = %+v, want enabled and confirming", e)
+	}
+	m, cmd := send(t, m, key("R"))
+	if cmd != nil || m.confirm == nil {
+		t.Fatalf("restart crew ran without its confirmation (cmd=%v confirm=%v)", cmd != nil, m.confirm != nil)
+	}
+	m, cmd = send(t, m, key("R"))
+	if cmd == nil {
+		t.Fatal("the answered confirmation ran nothing")
+	}
+	m, _ = send(t, m, cmd())
+	if len(*got) != 1 {
+		t.Fatalf("requests = %+v, want exactly one", *got)
+	}
+	req := (*got)[0]
+	if req.Action != ActionRestartCrew || req.Target != projectID || req.Crew != crewID {
+		t.Fatalf("request = %+v, want restart_crew of %s/%s", req, projectID, crewID)
 	}
 }
 
@@ -343,7 +384,7 @@ func TestTheSheetOrderIsFixedPerKind(t *testing.T) {
 	m, _ = send(t, m, key("esc"))
 	m, _ = send(t, m, key("down"))
 	m, _ = send(t, m, key("a"))
-	if got := keys(m); got != "enter x p M d y" {
+	if got := keys(m); got != "enter x p R M d y" {
 		t.Fatalf("crew row sheet = %q", got)
 	}
 }

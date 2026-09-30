@@ -68,6 +68,7 @@ func (m Model) menuFor(r row, ok bool) []menuEntry {
 			m.showEntry(r),
 			m.choiceEntry("x", "Stop crew…", m.stopChoice(r)),
 			m.choiceEntry("p", "Repair binding…", m.repairChoice(r)),
+			m.choiceEntry("R", "Restart crew…", m.restartCrewChoice(r)),
 			m.mergeEntry(r),
 			m.choiceEntry("d", "Diff", m.diffChoice(r)),
 			m.copyEntry(r),

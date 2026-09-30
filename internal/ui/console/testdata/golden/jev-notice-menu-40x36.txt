@@ -19,11 +19,11 @@
                                         
                                         
                                         
-                                        
 ─ actions · 🤖 crew_01J9P6…B8DT ── esc ─
 ▌ enter  Show in next pane              
   x      Stop crew…             confirm 
   ·      Repair binding…  no recorded … 
+  R      Restart crew…          confirm 
   ·      Merge…    not waiting on merge 
   d      Diff                           
   ·      Copy agent id     no clipboard 
