@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -246,6 +247,38 @@ func TestWatchConcludesNothingWhenHerdrCannotAnswer(t *testing.T) {
 	f.clock.advance(4 * time.Minute)
 	f.pollIgnoringErrors()
 	f.assertIncidents()
+}
+
+// TestWatchStandsARuntimeNoticeWhileHerdrCannotAnswer: "Herdr could not
+// answer" opens no incident, but it is not nothing either - every row on
+// the Console is a file read that cannot be refreshed while it stands. The
+// notice is the observer's own word, carries the failure it read, and
+// clears on the round Herdr answers again.
+func TestWatchStandsARuntimeNoticeWhileHerdrCannotAnswer(t *testing.T) {
+	f := newFixture(t)
+	f.poll()
+	if notice, at := f.w.RuntimeNotice(); notice != "" || !at.IsZero() {
+		t.Fatalf("RuntimeNotice before any failure = %q at %s, want none", notice, at)
+	}
+
+	f.rt.InspectErr = observability.NewError(observability.CodeRuntimeUnavailable,
+		"the Herdr session mate-lab is not running; nothing can be typed into crew-k3")
+	f.pollIgnoringErrors()
+	notice, at := f.w.RuntimeNotice()
+	if !strings.Contains(notice, "herdr is not running") || !strings.Contains(notice, "mate-lab") {
+		t.Fatalf("RuntimeNotice = %q, want the runtime failure and the session it names", notice)
+	}
+	if at.IsZero() {
+		t.Fatal("RuntimeNotice recorded no time")
+	}
+
+	// A round that reaches Herdr clears it: the line is about the runtime
+	// now, not about a failure that has passed.
+	f.rt.InspectErr = nil
+	f.poll()
+	if notice, at := f.w.RuntimeNotice(); notice != "" || !at.IsZero() {
+		t.Fatalf("RuntimeNotice after recovery = %q at %s, want none", notice, at)
+	}
 }
 
 func TestWatchConcludesNothingWhenThePaneCannotBeRead(t *testing.T) {

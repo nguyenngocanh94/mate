@@ -168,13 +168,16 @@ func (c *consoleColumns) close() {
 // row it closes, so the Console is two columns unless a crew is shown. A
 // nil columns yields a nil StageFunc, which the Console reads as "no next
 // pane".
-func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
+func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) console.StageFunc {
 	if c == nil {
 		return nil
 	}
 	return func(ctx context.Context, target console.StageTarget) error {
 		ref, meta, err := stageRef(ws, target)
 		if err != nil {
+			return err
+		}
+		if err := herdrRunning(ctx, ws, deps, target); err != nil {
 			return err
 		}
 		if err := c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env}); err != nil {
@@ -185,6 +188,38 @@ func consoleStage(ws *store.Workspace, c *consoleColumns) console.StageFunc {
 		}
 		return c.showReview(ctx, ws, target, meta)
 	}
+}
+
+// herdrRunning refuses to attach to an agent whose Herdr session is not
+// running. `herdr agent attach` against a dead server prints its own error
+// and exits nonzero: the stage column would keep that text on screen as a
+// stray terminal, and nothing on the Console would explain it (measured
+// 2026-09-30, after a Herdr server was lost to a machine restart). The
+// session is asked first - LookupSession never starts a server - so the
+// refusal lands on the Console's status line and no column is touched.
+//
+// Only the runtime-unavailable failure is reworded; every other error the
+// handle resolution can raise (an unreadable meta, a wrong-session refusal)
+// travels as its own sentence.
+func herdrRunning(ctx context.Context, ws *store.Workspace, deps spawn.Deps, target console.StageTarget) error {
+	var err error
+	switch target.Kind {
+	case console.StageMate:
+		_, _, err = spawn.MateHandle(ctx, ws, deps, target.ProjectID)
+	case console.StageCrew:
+		_, _, err = spawn.CrewHandle(ctx, ws, deps, target.ProjectID, target.ID)
+	default:
+		return nil
+	}
+	if err == nil {
+		return nil
+	}
+	var coded *observability.Error
+	if !errors.As(err, &coded) || coded.Code != observability.CodeRuntimeUnavailable {
+		return err
+	}
+	return observability.WrapError(observability.CodeRuntimeUnavailable,
+		"herdr is not running; start or resume the Mate to bring it back", err)
 }
 
 // showReview opens a crew's worktree in the review column, making the

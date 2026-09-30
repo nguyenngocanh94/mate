@@ -108,8 +108,12 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		// snapshot picks up whatever the observer has seen by now, and the
 		// crews it has not seen keep their Absent health. The daemon's own
 		// state - when it last sent, why it last could not - rides along the
-		// same way.
-		return withTokens(withAutoStatus(withCrewHealth(snap, watcher.Snapshot()), pilot.Snapshot()), ws), nil
+		// same way, and so does the observer's standing word about the
+		// terminal runtime it could not reach.
+		snap = withCrewHealth(snap, watcher.Snapshot())
+		snap = withRuntimeNotice(snap, watcher)
+		snap = withAutoStatus(snap, pilot.Snapshot())
+		return withTokens(snap, ws), nil
 	}
 	h := host.Open(host.Detect(os.Getenv), host.Options{Env: os.Getenv, SelfCols: func() int {
 		cols, _, err := term.GetSize(stdoutFile.Fd())
@@ -155,7 +159,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	model := console.New(load, action).
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
-		WithStage(consoleStage(ws, columns)).
+		WithStage(consoleStage(ws, deps, columns)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
 		WithNotice(notice).

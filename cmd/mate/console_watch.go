@@ -149,6 +149,24 @@ func withCrewHealth(snap query.Snapshot, health map[watch.CrewRef]watch.Health) 
 	return snap
 }
 
+// withRuntimeNotice puts the observer's standing word about the terminal
+// runtime into a snapshot query.Load built out of files alone. The Console
+// cannot ask Herdr itself (its boundary test), so an empty notice is the
+// only way it can tell "nothing was observed" apart from "nothing could be
+// observed"; without it every file-read row keeps looking fresh while Herdr
+// is down.
+func withRuntimeNotice(snap query.Snapshot, watcher *watch.Watcher) query.Snapshot {
+	if watcher == nil {
+		return snap
+	}
+	notice, at := watcher.RuntimeNotice()
+	if notice == "" {
+		return snap
+	}
+	snap.Runtime = query.RuntimeStatus{Notice: notice, At: at}
+	return snap
+}
+
 // crewHealth converts one observation into the Console's DTO. The composer
 // word travels as itself: internal/ui/console may not import internal/send,
 // and an unmeasured harness's state must render as whatever it was called

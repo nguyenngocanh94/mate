@@ -70,6 +70,34 @@ func TestFooterMessageExplicitMessageWinsOverWarnings(t *testing.T) {
 	}
 }
 
+// The observer's standing runtime notice is a warn line and outranks the
+// loader's own unknown-field line: while Herdr cannot be reached, the field
+// warnings are describing a picture nobody can refresh, and the reader's
+// first need is to know that. It is absent from the ordinary snapshot, and
+// the field warning comes back the moment it is cleared.
+func TestFooterMessageShowsTheRuntimeNotice(t *testing.T) {
+	tree := sampleTree()
+	tree.Warnings = []query.FieldWarning{warning("worktree", "attempt 2", "lookup timed out (2s)")}
+	tree.Runtime = query.RuntimeStatus{Notice: "herdr is not running; start or resume the Mate to bring it back"}
+	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
+
+	got := m.footerMessage()
+	if got.tone != toneWarn || !strings.Contains(got.text, "herdr is not running") {
+		t.Fatalf("footerMessage = %+v, want the runtime notice as a warning", got)
+	}
+	if !strings.Contains(renderFrame(t, m), "! herdr is not running") {
+		t.Fatalf("the runtime notice is not on the status line with its ! mark:\n%s", renderFrame(t, m))
+	}
+
+	// Clearing it in the snapshot brings the field warning back, rather
+	// than leaving the line blank.
+	tree.Runtime = query.RuntimeStatus{}
+	cleared := newFixture(t, tree, 120, 36, unicodeGlyphs)
+	if clearedNotice := cleared.footerMessage(); clearedNotice.tone != toneUnknown || !strings.Contains(clearedNotice.text, "1 field unknown") {
+		t.Fatalf("footerMessage after recovery = %+v, want the field warning back", clearedNotice)
+	}
+}
+
 // With nothing to say, the status line says what the next pane shows.
 func TestStatusLineSaysNothingIsShownBeforeTheFirstStage(t *testing.T) {
 	m := newFixture(t, sampleTree(), 40, 36, unicodeGlyphs).WithStage(func(_ context.Context, _ StageTarget) error { return nil })

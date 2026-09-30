@@ -15,6 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/box"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -174,8 +175,14 @@ type Watcher struct {
 
 	mu     sync.Mutex
 	health map[CrewRef]Health
-	cancel context.CancelFunc
-	done   chan struct{}
+	// runtimeNotice is the standing word about a Herdr the observer could
+	// not reach, and runtimeNoticeAt when it was recorded. Empty means the
+	// last round that asked got an answer. It is a copy of the round's own
+	// read failure, not a conclusion about any crew (mvp.md decision 8).
+	runtimeNotice   string
+	runtimeNoticeAt time.Time
+	cancel          context.CancelFunc
+	done            chan struct{}
 }
 
 // observation is what the previous polls established about one crew.
@@ -288,6 +295,7 @@ func (w *Watcher) Poll(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
+	w.noteRuntime(errs, now)
 	w.commit(results, seen, listed)
 	// The timeline is recorded last, after the health snapshot has been
 	// swapped in: the ingest reads this round's readings (Watcher.Readings),
@@ -366,7 +374,13 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	handle, kind, err := w.deps.Handle(ctx, ref.Project, ref.Crew)
 	if err != nil {
 		// No handle to look at: the crew records no agent yet, or the Herdr
-		// session is not running. Neither says the crew is in trouble.
+		// session is not running. Neither says the crew is in trouble, so
+		// neither opens an incident - but the second is the whole runtime
+		// being gone, which the Console has to be told (Poll's runtime
+		// notice), so that one propagates and the rest are swallowed.
+		if runtimeUnavailable(err) {
+			return err
+		}
 		return nil
 	}
 
@@ -442,6 +456,58 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		ObservedAt:   now,
 	}
 	return nil
+}
+
+// RuntimeNotice is the observer's standing word about a Herdr it could not
+// reach, and when it last failed to. Empty means the last round that asked
+// got an answer. It is safe to call from any goroutine.
+func (w *Watcher) RuntimeNotice() (string, time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.runtimeNotice, w.runtimeNoticeAt
+}
+
+// noteRuntime records the round's runtime-unavailable failure, or clears the
+// notice when the round reached Herdr. A round with no runtime-unavailable
+// error clears it: the server answered at least once, so the standing word
+// would be stale. "Herdr could not answer" is never an incident
+// (TestWatchConcludesNothingWhenHerdrCannotAnswer); this is the separate
+// signal a reader needs, because while it stands every file-read row on
+// screen is as fresh as its last read and no row can be re-read.
+func (w *Watcher) noteRuntime(errs []error, now time.Time) {
+	var failure error
+	for _, err := range errs {
+		if runtimeUnavailable(err) {
+			failure = err
+			break
+		}
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if failure == nil {
+		w.runtimeNotice, w.runtimeNoticeAt = "", time.Time{}
+		return
+	}
+	notice := "herdr is not running; start or resume the Mate with s to bring it back"
+	var coded *observability.Error
+	if errors.As(failure, &coded) && strings.TrimSpace(coded.Message) != "" {
+		notice += " · " + noticeLine(coded.Message)
+	}
+	w.runtimeNotice, w.runtimeNoticeAt = notice, now
+}
+
+// runtimeUnavailable reports whether err is the runtime being unreachable
+// (CodeRuntimeUnavailable), as opposed to a target that is missing or a
+// screen that could not be read. It traverses errors.Join, which is how a
+// round's per-crew failures arrive.
+func runtimeUnavailable(err error) bool {
+	var coded *observability.Error
+	return errors.As(err, &coded) && coded.Code == observability.CodeRuntimeUnavailable
+}
+
+// noticeLine collapses whitespace so a multi-line error reads as one notice.
+func noticeLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // staleCleared is the resolve side of the stale rule: the pane moved, the

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -111,6 +113,40 @@ func TestConsoleWatcherOpensRuntimeLostForAKilledAgent(t *testing.T) {
 	}
 	if !strings.Contains(box.Value.Inbox[0].Resolve, "runtime_lost") {
 		t.Fatalf("resolve line = %q, want it to name the incident kind", box.Value.Inbox[0].Resolve)
+	}
+}
+
+// TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot: while Herdr cannot
+// be reached the observer stands a notice the Console can draw. A snapshot
+// straight out of query.Load cannot have one - query reads files only - so
+// without this merge the tree on screen keeps looking fresh while nothing
+// behind it can be re-read.
+func TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	spawnFakeCrew(t, w, deps, "shop", "k3")
+	down := observability.NewError(observability.CodeRuntimeUnavailable,
+		"the Herdr session mate-shop is not running; nothing can be typed into crew-k3")
+	watcher := watch.New(w, watch.Deps{
+		Runtime: deps.Runtime,
+		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.Kind, error) {
+			return runtime.AgentHandle{}, "", down
+		},
+	})
+	_ = watcher.Poll(context.Background())
+
+	snap, err := query.Load(context.Background(), w)
+	if err != nil {
+		t.Fatalf("query.Load: %v", err)
+	}
+	if snap.Runtime.Notice != "" {
+		t.Fatalf("Runtime straight out of query.Load = %+v, want empty: query reads files only", snap.Runtime)
+	}
+	snap = withRuntimeNotice(snap, watcher)
+	if snap.Runtime.Notice == "" || snap.Runtime.At.IsZero() {
+		t.Fatalf("Runtime = %+v, want the observer's notice", snap.Runtime)
+	}
+	if !strings.Contains(snap.Runtime.Notice, "herdr is not running") || !strings.Contains(snap.Runtime.Notice, "mate-shop") {
+		t.Fatalf("Runtime notice = %q, want the failure and the session it names", snap.Runtime.Notice)
 	}
 }
 

@@ -864,6 +864,7 @@ Quyết định:
 - Giữa hai chương trình runner khôi phục termios, rời alt screen, tắt mouse/paste, xoá ảnh kitty và RIS. Chương trình tự thoát thì giữ chữ nó in (lý do herdr từ chối) và chỉ tắt mode.
 - Console gửi PATH của nó cho chương trình trong cột (pane Ghostty bắt đầu từ env của login) và tìm `herdr`/`fresh` thêm ở `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`.
 - Console thoát: gửi exit cho hai runner rồi `Close` (Ghostty giữ pane đã hết tiến trình, kể cả với `wait after command` false; đo 2026-09-26). Console chết đột ngột: runner tự thoát trong 1s khi pid console mất.
+- Herdr chết (mất điện, restart máy) thì console vẫn chạy trên state file, nhưng không còn re-read được gì. Observer đọc không được nên không kết luận gì về crew (mục 4b); nó giữ thêm một dòng `herdr is not running` trên status line, tự mất ở vòng poll đầu tiên Herdr trả lời lại. Enter trong lúc đó bị từ chối trước khi chạy `herdr agent attach`, thay vì để cột agent giữ lỗi của Herdr rồi treo ở đó (đo 2026-09-30, sau khi server Herdr mất vì restart máy).
 - Không có Fresh: chỉ có cột agent, status line chỉ lệnh cài.
 - `mate console` dựng cột agent lúc mở; `mate <dir>` dựng ở Enter đầu tiên.
 
