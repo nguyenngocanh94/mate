@@ -1,0 +1,5 @@
+$ herdr agent get --session mate-7984ac9f probe
+
+{"id":"cli:agent:get","error":{"code":"server_not_running","message":"no herdr server is running at /Users/erics/.config/herdr/sessions/mate-7984ac9f/herdr.sock; run `herdr session attach mate-7984ac9f` to start or attach it"}}
+
+(exit 1)
