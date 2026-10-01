@@ -56,8 +56,15 @@ type StopResult struct {
 	Ahead int
 	// DirtyFiles is the `git status --porcelain` line count of the
 	// worktree. Only meaningful when Unlanded is true because of the
-	// worktree.
+	// worktree. For an OrphanedWorktree it is the number of paths that
+	// differ from the branch, and 0 when the files are exactly a commit
+	// git already holds.
 	DirtyFiles int
+	// OrphanedWorktree is true when the worktree directory was there but
+	// git no longer treated it as one (its `.git` named a gitdir that is
+	// gone, as after the workspace moved machines). It is then judged by
+	// its files and removed as a plain directory.
+	OrphanedWorktree bool
 	// Teardown is TeardownClean or TeardownDiscarded once StopCrew has torn
 	// the crew down. It is empty on a refusal, which changes nothing.
 	Teardown string

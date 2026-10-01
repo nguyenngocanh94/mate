@@ -178,6 +178,14 @@ func TestCrewStopReportLineDescribesEachOutcome(t *testing.T) {
 			want: []string{"removed", "--discard", "3 commit(s)", "2 dirty file(s)", "state failed"},
 		},
 		{
+			name: "orphaned worktree",
+			res: spawn.StopResult{
+				Agent: "crew-k3", TabClosed: true, OrphanedWorktree: true, WorktreeRemoved: true,
+				Teardown: spawn.TeardownClean, State: spawn.CrewStateFinished, Branch: "mate/k3",
+			},
+			want: []string{"git no longer knew the worktree", "already landed", "state finished"},
+		},
+		{
 			name: "already gone",
 			res: spawn.StopResult{
 				Agent: "crew-k3", AlreadyGone: true, TabClosed: true,
