@@ -1,6 +1,6 @@
 ---
 name: harness-adapters
-description: Per-harness facts the Mate needs to read and steer a Crew pane. Use before interrupting or exiting a Crew, when `mate state` says unknown, when `mate peek` shows a dialog or a screen you cannot name, or when a send is refused with "showing a screen mate cannot name". Covers Codex and Claude Code, the two harnesses a mate Crew runs on.
+description: Per-harness facts the Mate needs to read and steer a Crew pane. Use before interrupting or exiting a Crew, when `mate state` says unknown, when `mate peek` shows a dialog or a screen you cannot name, or when a send is refused with "showing a screen mate cannot name". Covers Codex and Claude Code, the harnesses a mate Crew runs on.
 ---
 
 # harness-adapters
@@ -9,7 +9,7 @@ Load this before any harness-specific judgement about a Crew's pane.
 It is a reference, not a procedure: read the rows for the harness the Crew actually runs on and go back to what you were doing.
 
 Which harness a Crew runs on is printed by `/usr/local/bin/mate crew list shop` in the HARNESS column, and by `mate crew spawn` in its first line.
-Never guess it from what you yourself run on; you run on `claude-code` and a Crew defaults to Codex.
+Never guess it from what you yourself run on; you run on `claude` and a Crew defaults to Codex.
 
 ## What you can and cannot do to a pane
 
@@ -79,5 +79,5 @@ It is not typed text and the classifier ignores it, but it is why a peek of an i
 
 ## Adding a harness
 
-Only Codex and Claude Code are verified for a mate Crew.
-If the captain asks for another, say that it is not verified and that a Crew on it would be unsupervisable, because every row above - the busy signature especially - has to be measured before `mate state` can tell working from wedged.
+The harnesses above are the ones this mate binary was built with, and each passed the harness contract suite (`internal/harness/catalog`): its capabilities carry evidence, its launches build, and its measured screens classify.
+If the captain asks for another, say that it is not registered and that a Crew on it would be unsupervisable, because every row above - the busy signature especially - has to be measured and pass that suite before `mate state` can tell working from wedged.

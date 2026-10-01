@@ -457,6 +457,10 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 	if err != nil {
 		return err
 	}
+	harnesses, err := mateassets.HarnessesFrom(deps.Harnesses, profile.Kind())
+	if err != nil {
+		return err
+	}
 	repos := make([]mateassets.RepoParams, 0, len(cfg.Repos))
 	for _, r := range cfg.Repos {
 		repos = append(repos, mateassets.RepoParams{Name: r.Name, Path: w.RepoDir(r.Path), DefaultBranch: r.DefaultBranch})
@@ -468,6 +472,7 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		Mode:             cfg.Mode,
 		Yolo:             cfg.Yolo,
 		Harness:          string(profile.Kind()),
+		Harnesses:        harnesses,
 		SkillsDir:        profile.Info().SkillsDir,
 		WorkspaceDoc:     w.WorkspaceDoc(),
 		ProjectDoc:       w.ProjectDoc(project),

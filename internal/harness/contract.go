@@ -26,6 +26,9 @@ type Profile interface {
 
 // Info is what a harness is called, to Herdr and on disk.
 type Info struct {
+	// Name is the harness as people call it ("Claude Code"), for text a
+	// Mate or the captain reads.
+	Name string
 	// RuntimeKind is what Herdr is told at `agent start --kind`.
 	RuntimeKind string
 	// ConfigDir, InstructionFile and EnvKeys are the names the harness reads
@@ -51,6 +54,10 @@ type Info struct {
 	// Efforts are the reasoning-effort levels the launch passes as a flag.
 	// A requested effort outside them is recorded and left out of the argv.
 	Efforts []Effort
+	// AdapterNotes is the harness's section of the Mate's harness-adapters
+	// skill: what its pane shows and how a Crew on it is steered, as
+	// measured. Markdown with no heading of its own; the skill adds one.
+	AdapterNotes string
 }
 
 // Icon is a harness's mark: a Nerd Font brand glyph, the Unicode stand-in a

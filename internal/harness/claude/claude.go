@@ -5,6 +5,7 @@ package claude
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,6 +43,7 @@ func (Claude) Kind() harness.Kind { return KindClaude }
 // Info implements Profile.
 func (Claude) Info() harness.Info {
 	return harness.Info{
+		Name:            "Claude Code",
 		RuntimeKind:     string(KindClaude),
 		ConfigDir:       ".claude",
 		InstructionFile: "CLAUDE.md",
@@ -56,9 +58,15 @@ func (Claude) Info() harness.Info {
 			{Path: ".claude/settings.json", Role: "repo_claude_settings"},
 		},
 		// claude 2.1.282 --help takes all five.
-		Efforts: harness.Efforts,
+		Efforts:      harness.Efforts,
+		AdapterNotes: adapterNotes,
 	}
 }
+
+// adapterNotes is Claude Code's section of the harness-adapters skill.
+//
+//go:embed adapter.md
+var adapterNotes string
 
 // Launcher implements Profile.
 func (c Claude) Launcher() harness.Launcher { return c }

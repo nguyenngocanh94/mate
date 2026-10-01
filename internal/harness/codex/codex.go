@@ -7,6 +7,7 @@ package codex
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -55,6 +56,7 @@ func (Codex) Kind() harness.Kind { return KindCodex }
 // Info implements Profile.
 func (Codex) Info() harness.Info {
 	return harness.Info{
+		Name:            "Codex",
 		RuntimeKind:     string(KindCodex),
 		ConfigDir:       ".codex",
 		InstructionFile: CodexOverrideName,
@@ -74,9 +76,15 @@ func (Codex) Info() harness.Info {
 		// model_reasoning_effort advertises low through xhigh for the
 		// catalogue models and max for some only (firstmate's codex record,
 		// codex-cli 0.142.1 and 0.153.4), so max is not passed.
-		Efforts: []harness.Effort{harness.EffortLow, harness.EffortMedium, harness.EffortHigh, harness.EffortXHigh},
+		Efforts:      []harness.Effort{harness.EffortLow, harness.EffortMedium, harness.EffortHigh, harness.EffortXHigh},
+		AdapterNotes: adapterNotes,
 	}
 }
+
+// adapterNotes is Codex's section of the harness-adapters skill.
+//
+//go:embed adapter.md
+var adapterNotes string
 
 // Launcher implements Profile.
 func (c Codex) Launcher() harness.Launcher { return c }
