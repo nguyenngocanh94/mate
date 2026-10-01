@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -237,11 +239,22 @@ func TestBuildRefusesAnotherHarnessesLaunchData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Codex{}).Build(context.Background(), AgentSpec{Cwd: req.Cwd, Launch: claude.Launch}); err == nil {
-		t.Fatal("Codex built a launch from Claude's launch data")
+	codex, err := Codex{}.Prepare(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := (Claude{}).Build(context.Background(), AgentSpec{Cwd: req.Cwd, ContextPath: req.ContextPath, Launch: "x"}); err == nil {
-		t.Fatal("Claude built a launch from launch data its Prepare did not make")
+	writePrepared(t, codex)
+	// The cwd Codex is given would launch, so only the launch-data guard
+	// can refuse it.
+	if _, err := (Codex{}).Build(context.Background(), AgentSpec{Cwd: req.Cwd}); err != nil {
+		t.Fatalf("Codex refused its own prepared cwd: %v", err)
+	}
+	foreign := fmt.Sprintf("launch data %T", claude.Launch)
+	if _, err := (Codex{}).Build(context.Background(), AgentSpec{Cwd: req.Cwd, Launch: claude.Launch}); err == nil || !strings.Contains(err.Error(), foreign) {
+		t.Fatalf("Codex given Claude's launch data: err = %v, want a refusal naming %s", err, foreign)
+	}
+	if _, err := (Claude{}).Build(context.Background(), AgentSpec{Cwd: req.Cwd, ContextPath: req.ContextPath, Launch: "x"}); err == nil || !strings.Contains(err.Error(), "launch data string") {
+		t.Fatalf("Claude given foreign launch data: err = %v, want a refusal naming string", err)
 	}
 }
 
@@ -277,6 +290,19 @@ func TestNewLaunchSpecRunsTheHarnessCheckEachTime(t *testing.T) {
 	plan.Env = []EnvVar{{Key: "SECRET", Value: "x"}}
 	if _, err := NewLaunchSpec(plan); err == nil {
 		t.Fatal("NewLaunchSpec accepted an env key off the allowlist")
+	}
+}
+
+// The cwd is absolute on every launch, not only one whose context is
+// required: a relative one would resolve against the Mate process cwd.
+func TestNewLaunchSpecRefusesARelativeCwdWithoutRequiredContext(t *testing.T) {
+	plan := LaunchPlan{RuntimeKind: "claude", Cwd: "rel/dir", Delivery: DeliveryCwdManual, Args: []string{"--x"}}
+	if spec, err := NewLaunchSpec(plan); err == nil {
+		t.Fatalf("NewLaunchSpec accepted cwd %q: %+v", plan.Cwd, spec)
+	}
+	plan.Cwd = t.TempDir()
+	if _, err := NewLaunchSpec(plan); err != nil {
+		t.Fatalf("NewLaunchSpec refused an absolute cwd: %v", err)
 	}
 }
 

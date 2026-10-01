@@ -278,6 +278,9 @@ func (s LaunchSpec) ValidateRequiredContext() error {
 	if !s.Startable() {
 		return s.codedRequired("launch spec is not startable; only a constructor-produced spec carries a validated delivery")
 	}
+	if !filepath.IsAbs(s.cwd) {
+		return s.codedRequired(fmt.Sprintf("cwd %s is relative; the agent's cwd must be absolute, not resolved against the Mate process cwd", s.cwd))
+	}
 	if !s.contextRequired {
 		return nil
 	}
@@ -290,12 +293,6 @@ func (s LaunchSpec) ValidateRequiredContext() error {
 	}
 	if !filepath.IsAbs(s.contextPath) {
 		return s.codedRequired(fmt.Sprintf("context path %s is relative and would resolve against the Mate process cwd, not the cwd the agent runs in", s.contextPath))
-	}
-	if strings.TrimSpace(s.cwd) == "" {
-		return s.codedRequired("launch spec requires the absolute cwd the agent will run in")
-	}
-	if !filepath.IsAbs(s.cwd) {
-		return s.codedRequired(fmt.Sprintf("cwd %s is relative; required context is resolved from the agent's cwd", s.cwd))
 	}
 	info, err := os.Stat(s.contextPath)
 	if err != nil {
