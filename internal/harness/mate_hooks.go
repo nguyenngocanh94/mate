@@ -9,9 +9,10 @@ import (
 
 // The settings and hook files a launch writes, which Prepare names. They came
 // here from internal/spawn with plan PR 2 (docs/plans/harness-registry-
-// 2026-09-30.md, section 6), because Prepare computes their bytes; which of
-// a Mate's hooks the startup settle may trust is still spawn's question
-// until the hook capability exists (plan PR 4).
+// 2026-09-30.md, section 6), because Prepare computes their bytes. Which of
+// a Mate's hooks the startup settle may trust, and how long a digest the
+// hook may print, each profile answers through its Hooks capability (plan
+// PR 4).
 
 const (
 	// ClaudeSettingsFile is the name of the settings file a Claude launch
@@ -94,6 +95,25 @@ const (
 	// CodexHookTimeoutSeconds bounds the hook, which reads files and git
 	// metadata only.
 	CodexHookTimeoutSeconds = 30
+)
+
+// The SessionStart digest's size, per harness (HookInstaller.DigestMaxBytes).
+// Both are measured limits on what a hook's output puts in context
+// (docs/mvp.md section 7, task 37).
+const (
+	// ClaudeSessionHookMaxBytes: Claude Code 2.1.281 replaces any hook
+	// output over 10,000 characters, plain stdout and JSON
+	// additionalContext alike, with a file path and a 2 KB preview, so the
+	// model never reads the rest. A byte bound is a character bound from
+	// above (UTF-8 never spends fewer bytes than UTF-16 code units), and
+	// the margin keeps the cut notice inside it.
+	ClaudeSessionHookMaxBytes = 9500
+	// CodexSessionHookMaxBytes: codex-cli 0.156.1 keeps the head and the
+	// tail of a SessionStart hook's output and drops the middle past about
+	// 2.5K tokens unless the hook raises additionalContextLimit; with the
+	// limit at 20000, 28K characters arrived whole. The digest is bounded
+	// well inside CodexHookContextLimit.
+	CodexSessionHookMaxBytes = 48000
 )
 
 // SessionHookCommand is the exact command a Mate's SessionStart hook runs.

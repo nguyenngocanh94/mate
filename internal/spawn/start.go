@@ -120,6 +120,13 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	if err != nil {
 		return StartResult{}, err
 	}
+	// A Mate's memory and inbox rest on its hooks; a harness without them
+	// can run a Crew, never a Mate (plan section 3.7).
+	if hooks := profile.Capabilities().Hooks; !hooks.Verified() {
+		return StartResult{}, observability.NewError(observability.CodeUsage, fmt.Sprintf(
+			"the %s harness cannot run a Mate: it declares no verified Hooks capability (%s); it can still run a Crew",
+			kind, capReason(hooks.Status, hooks.Reason)))
+	}
 
 	// 1. The recorded Mate, re-checked against Herdr. The meta alone is
 	// never trusted: a stale one is reported and overwritten.
@@ -135,16 +142,17 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	if err != nil {
 		return StartResult{}, err
 	}
-	if staleMeta && priorMeta[MetaHarness] == string(harness.KindCodex) && strings.TrimSpace(priorMeta[MetaSessionID]) == "" {
-		// A Codex Mate that died without `mate stop` never had its session
-		// recorded (StopMate is where Herdr is asked); its rollout can
-		// still say which one it was.
-		if id := codexSessionAtStop(deps, w.MateDir(project), priorMeta, ""); id != "" {
+	if staleMeta && strings.TrimSpace(priorMeta[MetaSessionID]) == "" {
+		// A Mate that died without `mate stop` never had a session named
+		// after launch recorded (StopMate is where Herdr is asked); what the
+		// harness wrote on disk can still say which one it was.
+		prior, _ := deps.Harnesses.Parse(priorMeta[MetaHarness])
+		if id := sessionAtStop(deps, prior, w.MateDir(project), priorMeta, ""); id != "" {
 			priorMeta[MetaSessionID] = id
 		}
 	}
 	decision := decideResume(priorMeta, kind, req)
-	decision = checkCodexResume(deps, kind, decision)
+	decision = checkResume(profile, decision)
 
 	// 2. The Mate's directory: the manual, rendered again on every start,
 	// and the files the harness launches with.
@@ -238,21 +246,21 @@ func oneLineErr(err error) string {
 	return strings.TrimSpace(msg)
 }
 
-// checkCodexResume refuses, before anything is launched, to resume a Codex
-// session whose rollout is not on disk. codex-cli 0.154.0 answers `codex
-// resume <unknown id>` with "No saved session found with ID ..." and drops to
-// the shell, which Herdr reports only as an agent-start timeout a minute
-// later (measured 2026-09-24, task 35); the file name says it at once.
-func checkCodexResume(deps Deps, kind harness.Kind, decision resumeDecision) resumeDecision {
-	if kind != harness.KindCodex || !decision.Resume {
+// checkResume asks the harness, before anything is launched, whether the
+// recorded session can be resumed (harness.SessionIdentity.Resumable). A
+// harness with no verified session identity, or a session it says is gone,
+// starts fresh with a note saying why (plan section 3.7).
+func checkResume(profile harness.Profile, decision resumeDecision) resumeDecision {
+	if !decision.Resume {
 		return decision
 	}
-	dir, err := deps.codexSessionsDir()
-	if err != nil {
-		return resumeDecision{Note: fmt.Sprintf("cannot look for the Codex session %s to resume (%v); starting a fresh session instead", decision.SessionID, err)}
+	session := profile.Capabilities().Session
+	if !session.Verified() {
+		return resumeDecision{Note: fmt.Sprintf("the %s harness declares no verified session identity (%s), so mate.meta's session %s cannot be resumed; starting a fresh session instead",
+			profile.Kind(), capReason(session.Status, session.Reason), decision.SessionID)}
 	}
-	if _, ok := harness.CodexRolloutPath(dir, decision.SessionID); !ok {
-		return resumeDecision{Note: fmt.Sprintf("mate.meta recorded the Codex session %s but %s has no rollout for it; starting a fresh session instead", decision.SessionID, dir)}
+	if err := session.Impl.Resumable(decision.SessionID); err != nil {
+		return resumeDecision{Note: fmt.Sprintf("%v; starting a fresh session instead", err)}
 	}
 	return decision
 }
@@ -329,11 +337,11 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 // project's Mate. A fresh launch and an adopted interrupted one share it.
 func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle, handle runtime.AgentHandle, sessionID string, launchedAt time.Time, launches ...harness.LaunchSpec) (StartResult, error) {
 	resume, resumeNote := decision.Resume, decision.Note
-	trusted, err := ownHooks(deps, kind, mateDir)
+	profile, err := deps.Harnesses.Lookup(kind)
 	if err != nil {
 		return StartResult{}, err
 	}
-	profile, err := deps.Harnesses.Lookup(kind)
+	trusted, err := ownHooks(deps, profile, mateDir)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -500,22 +508,21 @@ func prepareMateLaunch(ctx context.Context, w *store.Workspace, deps Deps, profi
 	return prep, nil
 }
 
-// ownHooks is what the startup settle may trust in Codex's hook review for
-// this launch: the Codex Mate's own SessionStart hook, from its own file,
-// and nothing else. A Claude Mate and every Crew get none.
-func ownHooks(deps Deps, kind harness.Kind, mateDir string) ([]harness.OwnHook, error) {
-	if kind != harness.KindCodex {
+// ownHooks is what the startup settle may trust in the harness's hook
+// review for this Mate launch: the hooks the harness says its own launch
+// wrote (harness.HookInstaller.Own), and nothing else. A harness without
+// verified hooks never gets this far as a Mate (StartMate), and a Crew
+// gets none.
+func ownHooks(deps Deps, profile harness.Profile, mateDir string) ([]harness.OwnHook, error) {
+	hooks := profile.Capabilities().Hooks
+	if !hooks.Verified() {
 		return nil, nil
 	}
 	binary, err := deps.binary()
 	if err != nil {
 		return nil, err
 	}
-	return []harness.OwnHook{{
-		Event:   "SessionStart",
-		Source:  harness.CodexHooksPath(mateDir),
-		Command: harness.SessionHookCommand(binary, harness.KindCodex),
-	}}, nil
+	return hooks.Impl.Own(binary, mateDir), nil
 }
 
 // buildLaunchSpec asks the harness's launcher for the argv of the launch it

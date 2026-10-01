@@ -90,6 +90,37 @@ func assertReadVisible(t *testing.T, rt *runtime.Fake) {
 	}
 }
 
+// codexSessionsIn is catalog.Default() with Codex reading its rollouts from
+// sessions, so a test that resumes or stops a Codex Mate never reads the
+// operator's ~/.codex.
+func codexSessionsIn(t *testing.T, sessions string) harness.Registry {
+	t.Helper()
+	cat := catalog.Default()
+	defaults := map[harness.AgentRole]harness.Kind{}
+	for _, role := range []harness.AgentRole{harness.RoleMate, harness.RoleCrew} {
+		if k, err := cat.Default(role); err == nil {
+			defaults[role] = k
+		}
+	}
+	var profiles []harness.Profile
+	for _, k := range cat.Kinds() {
+		p, err := cat.Lookup(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if codex, ok := p.(harness.Codex); ok {
+			codex.SessionsDir = sessions
+			p = codex
+		}
+		profiles = append(profiles, p)
+	}
+	reg, err := harness.NewRegistry(defaults, profiles...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reg
+}
+
 // screen loads one captured startup screen from the harness testdata.
 func screen(t *testing.T, name string) string {
 	t.Helper()

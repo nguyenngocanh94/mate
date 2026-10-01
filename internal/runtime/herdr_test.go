@@ -1517,6 +1517,59 @@ func TestHerdrStopDoesNotCallAgentStop(t *testing.T) {
 	}
 }
 
+// exitLine is a GracefulStopper of a test's own.
+type exitLine string
+
+func (e exitLine) ExitPrompt() string { return string(e) }
+
+// A graceful stop types the exit prompt the stop carries, whatever the
+// agent's kind: the runtime knows no harness's exit of its own.
+func TestHerdrGracefulStopTypesTheDeclaredExit(t *testing.T) {
+	t.Parallel()
+	var prompted []string
+	rt, _, session, tab := bootHerdr(t, func(_ context.Context, spec process.Spec) (process.Result, error) {
+		if argvHas(spec.Args, "agent", "prompt", "crew-g4-01", "/quit") {
+			prompted = append(prompted, "/quit")
+			return process.Result{Stdout: []byte(`{"id":"cli:agent:prompt","result":{"type":"agent_prompted"}}`)}, nil
+		}
+		if argvHas(spec.Args, "agent", "prompt") {
+			prompted = append(prompted, strings.Join(spec.Args, " "))
+			return process.Result{Stdout: []byte(`{"id":"cli:agent:prompt","result":{"type":"agent_prompted"}}`)}, nil
+		}
+		if argvHas(spec.Args, "agent", "get") {
+			return process.Result{ExitCode: 1, Stderr: readRuntimeTestdata(t, "error-agent-not-found-get.json")}, nil
+		}
+		t.Fatalf("unexpected argv %#v", spec.Args)
+		return process.Result{}, nil
+	})
+	h := runtime.AgentHandle{Session: session, Name: "crew-g4-01", Kind: harness.KindCodex, Tab: tab}
+	if err := rt.StopAgent(context.Background(), h, runtime.StopGraceful(exitLine("/quit"))); err != nil {
+		t.Fatal(err)
+	}
+	if len(prompted) != 1 || prompted[0] != "/quit" {
+		t.Fatalf("prompted %q, want exactly the declared exit /quit", prompted)
+	}
+}
+
+// A stop that names no way to end the agent reaches Herdr not at all.
+func TestHerdrStopRefusesAStopWithoutAMode(t *testing.T) {
+	t.Parallel()
+	rt, _, session, tab := bootHerdr(t, func(_ context.Context, spec process.Spec) (process.Result, error) {
+		t.Fatalf("a refused stop ran %#v", spec.Args)
+		return process.Result{}, nil
+	})
+	h := runtime.AgentHandle{Session: session, Name: "mate-g4-01", Kind: harness.KindClaude, Tab: tab}
+	for name, stop := range map[string]runtime.Stop{
+		"zero Stop":                  {},
+		"graceful without exit":      runtime.StopGraceful(nil),
+		"graceful with an empty one": runtime.StopGraceful(exitLine(" ")),
+	} {
+		if err := rt.StopAgent(context.Background(), h, stop); err == nil {
+			t.Errorf("%s: StopAgent succeeded", name)
+		}
+	}
+}
+
 func reserveOn(t *testing.T, names runtime.LiveNameRegistry, session runtime.SessionHandle, raw string) runtime.NameReservation {
 	t.Helper()
 	res, err := runtime.AllocateAgentName(names, session.Name, "m", raw, runtime.FailOnCollision)

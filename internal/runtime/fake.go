@@ -47,9 +47,11 @@ type Fake struct {
 	// agent. That is the unconfirmed-stop case: the call looked fine, the
 	// inventory still has the name.
 	StopLeavesAgent bool
-	Now             time.Time
-	Calls           []string
-	ReadOutputs     map[string]string
+	// ExitPrompts are, in order, the exit prompts graceful stops typed.
+	ExitPrompts []string
+	Now         time.Time
+	Calls       []string
+	ReadOutputs map[string]string
 	// StyledOutputs are the screens ReadAgentStyled returns, for the tests
 	// that need SGR attributes. An agent with no entry here falls back to
 	// its plain ReadOutputs screen.
@@ -713,7 +715,7 @@ func (f *Fake) terminalForPane(pane string, handle AgentHandle) string {
 }
 
 // StopAgent implements Adapter.
-func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, mode StopMode) error {
+func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, stop Stop) error {
 	// A cancelled context fails the call before it reaches Herdr, as the
 	// real adapter's exec does.
 	if err := ctx.Err(); err != nil {
@@ -721,24 +723,31 @@ func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, mode StopMode)
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.record("StopAgent:" + string(mode))
+	f.record("StopAgent:" + string(stop.Mode()))
 	if f.StopErr != nil {
 		return f.StopErr
 	}
-	key := handle.Session.Name + "/" + handle.Name
-	ag, ok := f.Agents[key]
-	if !ok {
-		return NewHerdrError(HerdrAgentNotFound, "agent target not found")
+	switch stop.Mode() {
+	case StopModeGraceful:
+		exit, err := stop.exitPrompt()
+		if err != nil {
+			return err
+		}
+		f.ExitPrompts = append(f.ExitPrompts, exit)
+	case StopModeForce:
+	default:
+		return observability.NewError(observability.CodeUsage, "stop is neither graceful nor force")
 	}
-	if mode == StopGraceful && ag.Handle.Kind != harness.KindClaude {
-		return observability.NewError(observability.CodeUnknown, "graceful stop is harness-specific and unproven for this kind")
+	key := handle.Session.Name + "/" + handle.Name
+	if _, ok := f.Agents[key]; !ok {
+		return NewHerdrError(HerdrAgentNotFound, "agent target not found")
 	}
 	if f.StopLeavesAgent {
 		return nil
 	}
 	delete(f.Agents, key)
 	f.Names.Release(handle.Session.Name, handle.Name)
-	if mode == StopForce {
+	if stop.Mode() == StopModeForce {
 		f.closePaneLocked(handle.Tab.PaneID)
 	}
 	return nil

@@ -1573,18 +1573,21 @@ func (h *Herdr) agentNameInPane(ctx context.Context, session, pane string) strin
 	return ""
 }
 
-// StopAgent implements Adapter. There is no `herdr agent stop`. Graceful
-// Claude stop is `agent prompt /exit` (G1). Force is pane close. When to
-// stop (stop-before-switch) is G4-06. Codex graceful stop is unproven.
-func (h *Herdr) StopAgent(ctx context.Context, handle AgentHandle, mode StopMode) error {
-	if mode == StopGraceful {
-		if handle.Kind != harness.KindClaude {
-			return observability.NewError(observability.CodeUnknown, "graceful stop is harness-specific and unproven for this kind")
-		}
-		if err := h.PromptAgent(ctx, handle, "/exit"); err != nil && herdrCodeOf(err) != HerdrAgentNotFound {
+// StopAgent implements Adapter. There is no `herdr agent stop`. A graceful
+// stop is `agent prompt <exit>` with the exit prompt the harness declared
+// (Claude's `/exit`, G1). Force is pane close. When to stop
+// (stop-before-switch) is G4-06.
+func (h *Herdr) StopAgent(ctx context.Context, handle AgentHandle, stop Stop) error {
+	switch stop.Mode() {
+	case StopModeGraceful:
+		exit, err := stop.exitPrompt()
+		if err != nil {
 			return err
 		}
-		_, err := h.InspectAgent(ctx, handle)
+		if err := h.PromptAgent(ctx, handle, exit); err != nil && herdrCodeOf(err) != HerdrAgentNotFound {
+			return err
+		}
+		_, err = h.InspectAgent(ctx, handle)
 		if err != nil && herdrCodeOf(err) == HerdrAgentNotFound {
 			if h.Names != nil {
 				h.Names.Release(handle.Session.Name, handle.Name)
@@ -1594,18 +1597,21 @@ func (h *Herdr) StopAgent(ctx context.Context, handle AgentHandle, mode StopMode
 		if err != nil {
 			return err
 		}
-		return observability.NewError(observability.CodeUnknown, "graceful /exit did not end the agent")
+		return observability.NewError(observability.CodeUnknown, fmt.Sprintf("graceful %s did not end the agent", exit))
+	case StopModeForce:
+		if strings.TrimSpace(handle.Tab.PaneID) == "" {
+			return observability.NewError(observability.CodeUsage, "force stop requires a pane id")
+		}
+		if _, err := h.run(ctx, handle.Session.Name, []string{"pane", "close", handle.Tab.PaneID}); err != nil {
+			return err
+		}
+		if h.Names != nil {
+			h.Names.Release(handle.Session.Name, handle.Name)
+		}
+		return nil
+	default:
+		return observability.NewError(observability.CodeUsage, "stop is neither graceful nor force")
 	}
-	if strings.TrimSpace(handle.Tab.PaneID) == "" {
-		return observability.NewError(observability.CodeUsage, "force stop requires a pane id")
-	}
-	if _, err := h.run(ctx, handle.Session.Name, []string{"pane", "close", handle.Tab.PaneID}); err != nil {
-		return err
-	}
-	if h.Names != nil {
-		h.Names.Release(handle.Session.Name, handle.Name)
-	}
-	return nil
 }
 
 // RemoveTab implements Adapter.

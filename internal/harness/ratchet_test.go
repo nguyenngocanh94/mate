@@ -39,7 +39,7 @@ import (
 // The test fails if the count rises above it. When the count falls, lower
 // this constant to the new count in the same change, so the ground gained is
 // kept.
-const harnessRatchetCeiling = 96
+const harnessRatchetCeiling = 86
 
 // ratchetHarnessNames is every spelling of a harness name a literal can
 // carry: the kinds of catalog.Default(), and the names each profile

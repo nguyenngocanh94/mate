@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -118,8 +119,17 @@ func TestRefreshQuietRequiresAnAnsweredCaptainAndFiveMinutes(t *testing.T) {
 	}
 }
 
+// claudeWithoutTurnEnd is Claude declaring no turn-end evidence.
+type claudeWithoutTurnEnd struct{ harness.Claude }
+
+func (c claudeWithoutTurnEnd) Capabilities() harness.Capabilities {
+	caps := c.Claude.Capabilities()
+	caps.TurnEnd = harness.Cap[harness.TurnEndEvidence]{Status: harness.CapUnknown, Reason: "a test harness that never measured it"}
+	return caps
+}
+
 func TestAutomaticRefreshUsesOnlyCurrentSessionAndHonorsThreshold(t *testing.T) {
-	for _, scenario := range []string{"old-session", "below-limit", "disabled", "held", "queued", "busy", "eligible"} {
+	for _, scenario := range []string{"old-session", "below-limit", "disabled", "held", "queued", "busy", "codex-meta", "no-turn-end", "eligible"} {
 		t.Run(scenario, func(t *testing.T) {
 			w, deps := consoleFixture(t, "shop")
 			ctx := context.Background()
@@ -168,6 +178,23 @@ func TestAutomaticRefreshUsesOnlyCurrentSessionAndHonorsThreshold(t *testing.T) 
 			}
 			if scenario == "busy" {
 				rt.SetReadOutput(h, claudeBusyBoxScreen)
+			}
+			// Quietness is judged by answers the Stop hook logs; a harness
+			// whose turn-end evidence is not that log is never refreshed
+			// automatically, whether it is Codex or a Claude declaring none.
+			if scenario == "codex-meta" {
+				meta, _ := w.ReadMateMeta("shop")
+				meta[spawn.MetaHarness] = string(harness.KindCodex)
+				if err := w.WriteMateMeta("shop", meta); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario == "no-turn-end" {
+				reg, err := harness.NewRegistry(nil, claudeWithoutTurnEnd{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				deps.Harnesses = reg
 			}
 			if scenario == "queued" {
 				_, err := consoleOutbox(w, deps).Enqueue("shop", outbox.Request{Source: store.OutboxSourceAssign, Key: "new-work", Text: "resolve: new work"})

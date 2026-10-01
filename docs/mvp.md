@@ -20,7 +20,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 ## 2. Quyết định đã chốt
 
 1. Mate chỉ điều phối và ra quyết định. Không sửa code, không tự khảo sát repo. Ràng buộc bằng cấu trúc (cwd không chứa code), không bằng lời dặn.
-2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi. Mặc định Mate là Claude Code, Crew là Codex.
+2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi. Mặc định Mate là Claude Code, Crew là Codex. Một harness chỉ làm Mate được khi capability `Hooks` của nó là `verified`, vì trí nhớ và inbox của Mate dựa vào hook; thiếu thì `mate mate start` từ chối và nêu tên capability, còn vai Crew không bị ảnh hưởng ([phương án registry harness](plans/harness-registry-2026-09-30.md) mục 3.7 và 9.3).
 3. Runtime terminal là Herdr 0.8.2. Mapping: một Herdr session cho workspace, một Herdr workspace cho project, một tab cho Mate và một tab cho mỗi Crew.
 4. Giao tiếp học triệt để từ firstmate (`/Volumes/Work/Workspace/firstmate`), xem mục 4.
 5. Hai chế độ giao tiếp: giám sát (mặc định) và tự động, xem mục 5.
