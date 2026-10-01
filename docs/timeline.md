@@ -98,7 +98,9 @@ An agent's transcript is found by the first rule that answers, and the rule that
    It is not `started_at=`: that is written once the agent is ready and has its first prompt, and Codex has opened its rollout by then (measured 2026-09-24, task 34: a rollout's first record 0.2s before `started_at`, so every rebuild after the crew was gone lost its transcript, and whether a crew was affected was a sub-second race).
    A record written before `launched_at` existed uses `started_at` less five minutes, which spawn's own timeouts bound; the exact cwd still has to match, and a crew's worktree path is its own.
 
-A crew's binding never moves - a crew is spawned once and is never resumed (docs/mvp.md section 4b) - so once one of those rules has answered, a later pass reuses the path the `session` row already carries (`session.recorded`) instead of asking the runtime again.
+A crew's binding does not move while one agent runs - a crew is never resumed (docs/mvp.md section 4b) - so once one of those rules has answered, a later pass reuses the path the `session` row already carries (`session.recorded`) instead of asking the runtime again.
+`mate crew relaunch` starts a fresh session under the same actor, so a recorded path is reused only when it belongs to the current launch: its session id matches the meta's `session_id=` when both are known, and the file was written at or after `launched_at`.
+A dead agent's transcript fails one of the two and the rules are tried again from the top.
 Without that, every Codex crew would cost two more `herdr` calls every five seconds on top of the observer's three.
 A rebuild starts without the cache and runs the rules again.
 
