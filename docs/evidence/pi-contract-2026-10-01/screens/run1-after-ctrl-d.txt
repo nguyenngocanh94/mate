@@ -1,0 +1,8 @@
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+/Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/tmp/lab/w1 (docs...
+↑5.9k ↓68 R5.6k CH97.3% $0.002 0.6%/1.0M (auto)               (deepseek) deepseek-flash • low
+To resume this session: pi --session-dir /Volumes/Work/Workspace/mate/.claude/worktrees/wf_81
+f3a9a6-12a-5/.scratch/tmp/sessions --session 01a0f591-ad7d-7715-990b-981c079ed79a
+erics@Ericss-Mac-mini w1 %
