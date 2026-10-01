@@ -419,7 +419,8 @@ type Stop struct {
 // StopForce closes the agent's pane.
 var StopForce = Stop{mode: StopModeForce}
 
-// StopGraceful types the harness's exit prompt and proves the agent gone.
+// StopGraceful presses the harness's clear keys, types its exit prompt and
+// proves the agent gone.
 func StopGraceful(exit harness.GracefulStopper) Stop {
 	return Stop{mode: StopModeGraceful, exit: exit}
 }
@@ -427,13 +428,13 @@ func StopGraceful(exit harness.GracefulStopper) Stop {
 // Mode is graceful or force; empty for the zero Stop.
 func (s Stop) Mode() StopMode { return s.mode }
 
-// exitPrompt is the graceful stop's line, or an error when the Stop does
-// not carry one.
-func (s Stop) exitPrompt() (string, error) {
+// exitPrompt is the graceful stop's line and the keys pressed before it, or
+// an error when the Stop does not carry a line.
+func (s Stop) exitPrompt() (clear []string, line string, err error) {
 	if s.exit == nil || strings.TrimSpace(s.exit.ExitPrompt()) == "" {
-		return "", observability.NewError(observability.CodeUsage, "a graceful stop needs the harness's exit prompt")
+		return nil, "", observability.NewError(observability.CodeUsage, "a graceful stop needs the harness's exit prompt")
 	}
-	return s.exit.ExitPrompt(), nil
+	return s.exit.ClearKeys(), s.exit.ExitPrompt(), nil
 }
 
 // AssumptionStatus records G1 evidence honesty for contracts that would

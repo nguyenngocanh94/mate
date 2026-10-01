@@ -182,6 +182,10 @@ type Capabilities struct {
 
 // GracefulStopper is a harness's own way to exit.
 type GracefulStopper interface {
+	// ClearKeys are pressed, one call, before the line is typed: what
+	// empties a composer that may hold a draft, for a harness whose exit
+	// line is taken only on an empty one. Nil presses nothing.
+	ClearKeys() []string
 	// ExitPrompt is the line that, typed into the composer, ends the agent.
 	ExitPrompt() string
 }
@@ -334,6 +338,10 @@ type Evidence struct {
 
 // ExitCommand is a GracefulStopper that types one line.
 type ExitCommand string
+
+// ClearKeys implements GracefulStopper: the line is typed as the composer
+// stands.
+func (ExitCommand) ClearKeys() []string { return nil }
 
 // ExitPrompt implements GracefulStopper.
 func (p ExitCommand) ExitPrompt() string { return string(p) }
