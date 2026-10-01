@@ -26,6 +26,14 @@ type StopResult struct {
 	// AlreadyGone is true when Herdr had no such agent before the stop: the
 	// meta was stale and nothing had to be killed.
 	AlreadyGone bool
+	// Confirmed is true when the stop proved the agent absent through
+	// confirmGone: `agent get` reported it not found and the session
+	// inventory did not list it. It is false when the absence was only
+	// inferred - Herdr's session list did not report the session running,
+	// so no agent could be asked about - and false on a stop that changed
+	// nothing because the record was already closed. Only a confirmed stop
+	// may be taken to mean the harness has stopped writing its transcript.
+	Confirmed bool
 	// TabClosed is true when the tab was removed (or was already).
 	TabClosed bool
 
@@ -69,7 +77,10 @@ type StopResult struct {
 //
 // `herdr agent stop` reporting success is not the proof: the agent must be
 // absent from the session inventory *and* unknown to `agent get`, which is
-// the pair v1 required after observing the two disagree for a window. The
+// the pair v1 required after observing the two disagree for a window. When
+// Herdr's session list does not report the session running there is nothing
+// to ask; the stale record is cleared and the result says AlreadyGone with
+// Confirmed false. The
 // tab is then closed, and `mate.meta` keeps `session_id=` - task 10 resumes
 // the conversation from it - while `agent=` and `pane=` are dropped, because
 // nothing owns them any more.
@@ -118,8 +129,11 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 		Label:       MateTabLabel,
 	}
 	if !running {
-		// No server, no agent, no tab. The record is stale; clear it,
-		// keeping a Codex session the rollouts can still name.
+		// Herdr does not report the session running, so there is no server
+		// to ask about the agent or the tab. The record is treated as stale
+		// and cleared, keeping a Codex session the rollouts can still name,
+		// but the absence is inferred, not confirmed: Confirmed stays false
+		// and nothing may treat the transcript as at rest.
 		out.AlreadyGone, out.TabClosed = true, true
 		if meta[MetaHarness] == string(harness.KindCodex) {
 			if id := codexSessionAtStop(deps, w.MateDir(project), meta, ""); id != "" {
@@ -153,6 +167,7 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 	if err := confirmGone(ctx, deps, handle); err != nil {
 		return StopResult{}, err
 	}
+	out.Confirmed = true
 	deps.Names.Release(session.Name, handle.Name)
 
 	if tab.PaneID != "" || tab.TabID != "" {
@@ -183,7 +198,7 @@ func stopLiveAgent(ctx context.Context, deps Deps, handle runtime.AgentHandle) e
 	return confirmGone(ctx, deps, handle)
 }
 
-// confirmGone is the only success path for a stop: `agent get` must not find
+// confirmGone is the only way a stop is confirmed: `agent get` must not find
 // the name and the session inventory must not list it. Either one alone has
 // been observed lagging the other.
 func confirmGone(ctx context.Context, deps Deps, handle runtime.AgentHandle) error {

@@ -927,8 +927,11 @@ Captain chốt implement 2026-09-27; triển khai 2026-09-28, từ hai research 
   trách nhiệm, không có bộ kiểm tự động chứng minh mọi suy nghĩ đã được ghi.
 - Trước thay mate.meta, giữ provenance session trong `mate/sessions/*.meta`.
   Sau Stop được xác nhận, copy transcript vào snapshot bất biến rồi mới đánh dấu
-  finalized. Reindex tính đủ cả call cuối của phiên đã đóng, không làm token biến
-  mất sau refresh. Transcript đang chạy vẫn chờ message id kế tiếp để chốt nhóm
+  finalized. Xác nhận nghĩa là `agent get` báo không thấy và `agent list` không
+  còn tên; Herdr không báo session đang chạy (mất khỏi list hoặc running=false)
+  chỉ là suy ra, nên archive giữ transcript sống, không finalized, và nhóm
+  message cuối vẫn treo. Reindex tính đủ cả call cuối của phiên đóng có xác
+  nhận, không làm token biến mất sau refresh. Transcript đang chạy vẫn chờ message id kế tiếp để chốt nhóm
   cuối; context có thể trễ một call hoặc chưa có ở call đầu, không giả thành 0.
 - Scout report có Summary ≤6000 ký tự, gồm giới hạn và evidence. `mate report
   <project> <crew> --summary` không fallback sang toàn bộ report nếu thiếu mục.

@@ -64,8 +64,10 @@ import (
 //
 // A caller whose range is at rest - a session's final sync, after the agent has
 // been observed stopped - would use ParseTranscriptFinal instead, which flushes
-// that group. The timeline uses this only for immutable snapshots created after context
-// refresh confirmed a runtime stop. Live transcripts still use the deferral.
+// that group. The timeline uses this only for immutable snapshots that context
+// refresh takes after StopMate confirmed the agent gone (StopResult.Confirmed);
+// a Mate whose Herdr session was merely not running is not frozen. Live
+// transcripts still use the deferral.
 //
 // A trailing fragment with no newline is an active-file boundary: it is not
 // consumed and does not fail. The first complete line that cannot be classified
@@ -98,8 +100,9 @@ func (Claude) ParseTranscript(state TranscriptParseState, data []byte) Transcrip
 //
 // Use it only after the harness runtime has been positively stopped and
 // the bytes copied to an immutable snapshot. Context refresh supplies this
-// precondition through StopMate, FreezeMateSession and Located.Finalized;
-// a live transcript, even one whose composer looks idle, does not.
+// precondition through a Confirmed StopMate, FreezeMateSession and
+// Located.Finalized; a live transcript, even one whose composer looks idle,
+// does not.
 //
 // TestClaudeParseTranscriptFinalCannotProveAtRestFromBytes is the executable
 // statement of this precondition.
