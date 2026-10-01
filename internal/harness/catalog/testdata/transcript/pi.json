@@ -1,0 +1,6 @@
+{
+  "fixture": "../../../pi/testdata/session/2026-10-01T03-54-06-652Z_3f0c5a8e-6b1d-4c2e-9a7f-2d4b8e1c0a11.jsonl",
+  "version": "pi 0.99.1",
+  "turns": 3,
+  "usage": {"input": 2146, "cache_read": 4352, "cache_write": 0, "output": 288, "reasoning": 195}
+}

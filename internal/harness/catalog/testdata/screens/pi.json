@@ -1,0 +1,19 @@
+{
+  "captures": [
+    {"file": "../../../pi/testdata/screens/run1-empty-composer.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "empty"},
+    {"file": "../../../pi/testdata/screens/run6-idle-after-turn.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "empty"},
+    {"file": "../../../pi/testdata/screens/run1-after-ctrl-u.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../pi/testdata/screens/run1-busy-10.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../pi/testdata/screens/run8-busy-reads.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "busy"},
+    {"file": "../../../pi/testdata/screens/run1-busy-1.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "busy"},
+    {"file": "../../../pi/testdata/screens/run1-busy-3.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "busy"},
+    {"file": "../../../pi/testdata/screens/run6-draft.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "draft"},
+    {"file": "../../../pi/testdata/screens/trust-c5-startup.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "trust_dialog"},
+    {"file": "../../../pi/testdata/screens/trust-c5-dialog-third-option.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "trust_dialog"},
+    {"file": "../../../pi/testdata/screens/trust-c5-after-session-trust.visible.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "visible", "want": "ready"},
+    {"file": "../../../pi/testdata/screens/run8-offline-startup.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "ready"},
+    {"file": "../../../pi/testdata/screens/run2-resume-startup.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "ready"},
+    {"file": "../../../pi/testdata/screens/run3-sessid-startup.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "ready"},
+    {"file": "../../../pi/testdata/screens/trust-c5-no-approve-startup.txt", "version": "pi 0.99.1", "pane": "93x39", "source": "recent-unwrapped", "want": "ready"}
+  ]
+}
