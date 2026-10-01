@@ -36,9 +36,12 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			}
 			return startMateAction(ctx, ws, deps, req)
 		case console.ActionStop:
+			if req.TargetKind == "crew" {
+				return stopCrewAction(ctx, ws, deps, req)
+			}
 			if req.TargetKind != "mate" && req.TargetKind != "project-mate" {
 				return "", observability.NewError(observability.CodeUsage,
-					"stopping a Crew is not wired until mvp.md task 16")
+					fmt.Sprintf("stop applies to a Mate or a Crew, not a %s", req.TargetKind))
 			}
 			res, err := spawn.StopMate(ctx, ws, deps, req.Target)
 			if err != nil {
@@ -85,6 +88,23 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 				fmt.Sprintf("%s is not wired in this build", req.Action))
 		}
 	}
+}
+
+// stopCrewAction is the Crew row's `Stop crew…` entry (mvp.md task 16). It
+// calls the same function `mate crew stop` calls and reports in the same
+// words. It never discards: unlanded work is refused before anything
+// changes, and throwing work away stays a deliberate `--discard` on the
+// command line.
+func stopCrewAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" || req.Crew == "" {
+		return "", observability.NewError(observability.CodeUsage,
+			"stop crew needs both a Project and one of its Crews; the request named "+req.Target+"/"+req.Crew)
+	}
+	res, err := spawn.StopCrew(ctx, ws, deps, req.Target, req.Crew, false)
+	if err != nil {
+		return "", err
+	}
+	return crewStopReport(req.Target, req.Crew, res), nil
 }
 
 // relaunchCrewAction is the Console's `Restart crew…` entry (mvp.md M13).
