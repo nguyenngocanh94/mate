@@ -220,6 +220,54 @@ func (s *scriptedPane) screensPressedOn() []string {
 	return append([]string(nil), s.pressedOn...)
 }
 
+// TestStartMateSettlesThroughTheProfilesReadSource: every pane read of the
+// settle (the poll, the dialog answer, the hook review) goes through the
+// source the harness's ScreenProfile names, not one spelled by spawn.
+func TestStartMateSettlesThroughTheProfilesReadSource(t *testing.T) {
+	t.Run("claude trust dialog", func(t *testing.T) {
+		w := newWorkspace(t, "shop")
+		rt := runtime.NewFake()
+		deps := readingVisible(t, rt)
+		pane := newScriptedPane(t, rt,
+			scriptStep{screen: screen(t, "claude-2.1.270-trust-dialog.txt"), key: "down"},
+			scriptStep{screen: screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt"), key: "enter"},
+			scriptStep{screen: screen(t, "claude-2.1.270-ready.txt")},
+		)
+		res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+		if err != nil {
+			t.Fatalf("StartMate: %v", err)
+		}
+		if !res.TrustDialog || strings.Join(pane.sent(), ",") != "down,enter" {
+			t.Fatalf("trust dialog = %v, presses = %v; want it answered with down, enter", res.TrustDialog, pane.sent())
+		}
+		assertReadVisible(t, rt)
+	})
+	t.Run("codex hook review", func(t *testing.T) {
+		w := newWorkspace(t, "shop")
+		rt := runtime.NewFake()
+		deps := readingVisible(t, rt)
+		source := harness.CodexHooksPath(w.MateDir("shop"))
+		command := harness.SessionHookCommand(deps.Binary, harness.KindCodex)
+		own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
+		newScriptedPane(t, rt,
+			scriptStep{screen: screen(t, "codex-0.156.1-hooks-review.txt"), key: "enter"},
+			scriptStep{screen: screen(t, "codex-0.156.1-hooks-table-review.txt"), key: "enter"},
+			scriptStep{screen: own, key: "t"},
+			scriptStep{screen: trustedScreen(own), key: "esc"},
+			scriptStep{screen: screen(t, "codex-0.156.1-hooks-table-trusted.txt"), key: "esc"},
+			scriptStep{screen: screen(t, "codex-0.156.1-ready.txt")},
+		)
+		res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+		if err != nil {
+			t.Fatalf("StartMate: %v", err)
+		}
+		if !res.HooksTrusted {
+			t.Fatal("the start must report that it trusted the Mate's own hook")
+		}
+		assertReadVisible(t, rt)
+	})
+}
+
 func TestStartMateSkipsTheCodexUpdateDialogThenReachesTheComposer(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()

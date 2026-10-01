@@ -9,6 +9,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -122,6 +123,10 @@ func TestSendTypesOnceAndConfirmsTheComposerCleared(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
 	deps, slept := testDeps(rt)
+	// Claude's own screens, read through the source Claude does not use, so
+	// a read that spells recent-unwrapped instead of asking the profile
+	// fails below.
+	deps.Harnesses = harnesstest.ReadingVisible(deps.Harnesses)
 
 	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
 	if err != nil {
@@ -152,9 +157,12 @@ func TestSendTypesOnceAndConfirmsTheComposerCleared(t *testing.T) {
 	}
 	// Every read goes through the source the harness's screens were measured
 	// through.
+	if len(rt.sources) == 0 {
+		t.Fatal("the send never read the pane")
+	}
 	for _, src := range rt.sources {
-		if want := (harness.Claude{}).Screen().ReadSource(); src != want {
-			t.Fatalf("pane read through %q, want the profile's %q", src, want)
+		if src != harness.ReadVisible {
+			t.Fatalf("pane read through %q, want the profile's %q", src, harness.ReadVisible)
 		}
 	}
 	want := []string{"classify", "type", "settle", "enter"}

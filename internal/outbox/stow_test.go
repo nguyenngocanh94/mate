@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -97,8 +98,13 @@ func TestStowEndsOnTheStopHookAnswer(t *testing.T) {
 
 // TestStowEndsOnACodexComposerBackToEmpty: Codex has no Stop hook; busy
 // after the line, then empty twice, is the end of its turn.
+//
+// Codex's screens are read through ReadVisible here, the source Codex does
+// not use, so a read that spells recent-unwrapped instead of asking the
+// profile fails the check at the end.
 func TestStowEndsOnACodexComposerBackToEmpty(t *testing.T) {
 	f := newFixture(t)
+	f.harnesses = harnesstest.ReadingVisible(f.harnesses)
 	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
 	const codexBusy = "• Working (3s • esc to interrupt)\n\n› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
 	f.rt.SetReadOutput(f.handle, codexEmpty)
@@ -117,6 +123,14 @@ func TestStowEndsOnACodexComposerBackToEmpty(t *testing.T) {
 	}
 	if sleeper.n < 5 {
 		t.Fatalf("the stow ended after %d sleeps, before the composer had been empty twice", sleeper.n)
+	}
+	if len(f.rt.ReadSources) == 0 {
+		t.Fatal("the stow never read the pane")
+	}
+	for i, src := range f.rt.ReadSources {
+		if src != harness.ReadVisible {
+			t.Fatalf("read %d went through %q, want the profile's %q", i, src, harness.ReadVisible)
+		}
 	}
 }
 

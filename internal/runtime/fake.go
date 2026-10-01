@@ -55,7 +55,10 @@ type Fake struct {
 	// its plain ReadOutputs screen.
 	StyledOutputs map[string]string
 	ReadCalls     []string
-	StartArgv     [][]string
+	// ReadSources is, in read order, the source each ReadAgent and
+	// ReadAgentStyled was asked to read through.
+	ReadSources []harness.ReadSource
+	StartArgv   [][]string
 	// StartLaunches is, in start order, the validated harness launch each
 	// recorded StartArgv entry was built from, so a test can pin what the
 	// argv alone does not show: env assignments, unsets and delivery.
@@ -482,6 +485,7 @@ func (f *Fake) ReadAgent(_ context.Context, handle AgentHandle, source harness.R
 	}
 	key := handle.Session.Name + "/" + handle.Name
 	f.ReadCalls = append(f.ReadCalls, key+":"+fmt.Sprint(lines))
+	f.ReadSources = append(f.ReadSources, source)
 	if f.ReadErr != nil {
 		return "", f.ReadErr
 	}

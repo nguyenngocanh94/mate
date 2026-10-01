@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -60,6 +62,31 @@ func fakeDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 		Sleep:                func(context.Context, time.Duration) error { return nil },
 		Now:                  func() time.Time { return time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC) },
 		NewSessionID:         func() string { return "11111111-2222-3333-4444-555555555555" },
+	}
+}
+
+// readingVisible is fakeDeps with every harness's screens read through
+// harness.ReadVisible, the source neither Claude nor Codex uses, so a read
+// that spells recent-unwrapped instead of asking the profile shows up in
+// assertReadVisible.
+func readingVisible(t *testing.T, rt *runtime.Fake) spawn.Deps {
+	t.Helper()
+	deps := fakeDeps(t, rt)
+	deps.Harnesses = harnesstest.ReadingVisible(deps.Harnesses)
+	return deps
+}
+
+// assertReadVisible fails unless the pane was read, and every read went
+// through harness.ReadVisible.
+func assertReadVisible(t *testing.T, rt *runtime.Fake) {
+	t.Helper()
+	if len(rt.ReadSources) == 0 {
+		t.Fatal("the pane was never read")
+	}
+	for i, src := range rt.ReadSources {
+		if src != harness.ReadVisible {
+			t.Fatalf("read %d went through %q, want the profile's %q", i, src, harness.ReadVisible)
+		}
 	}
 }
 

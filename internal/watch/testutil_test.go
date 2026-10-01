@@ -60,11 +60,14 @@ type fixture struct {
 	clock  *fakeClock
 	w      *watch.Watcher
 	handle runtime.AgentHandle
+	// screens is the ScreenProfile handleFunc answers with: Codex's, unless
+	// a test swaps it.
+	screens harness.ScreenProfile
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock()}
+	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: harness.Codex{}.Screen()}
 	f.ws = newWorkspace(t)
 	f.handle = runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "mate-lab"},
@@ -104,7 +107,7 @@ func (f *fixture) handleFunc() watch.HandleFunc {
 		handle := f.handle
 		handle.Name = meta["agent"]
 		handle.RawID = crew
-		return handle, harness.Codex{}.Screen(), nil
+		return handle, f.screens, nil
 	}
 }
 
