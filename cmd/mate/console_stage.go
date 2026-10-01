@@ -49,7 +49,7 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 		return nil, fmt.Errorf("find the mate binary: %w", err)
 	}
 	// A short directory: a unix socket path is limited to about 100 bytes.
-	dir, err := os.MkdirTemp("", "mate-cols-")
+	dir, err := panerun.SocketDir("mate-cols-", roleStage+".sock", roleReview+".sock")
 	if err != nil {
 		return nil, err
 	}
