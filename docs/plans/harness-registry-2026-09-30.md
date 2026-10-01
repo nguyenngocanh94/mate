@@ -169,6 +169,8 @@ Builder chạy các kiểm tra chung (cwd tuyệt đối, context tồn tại, e
   `runtime` không còn so sánh kind; nó vẫn import `harness` để nhận `LaunchSpec`.
 - `query` bỏ enum `HarnessKind`; kind là chuỗi mờ ở phía đọc.
   Snapshot mang danh mục harness (tên, icon, thứ tự) lấy từ registry, thay cho `harnessOrder` và `harnessIcon`.
+  Snapshot mang luôn harness mặc định đã giải quyết cho vai Mate: `Defaults().MateHarness` của workspace, rồi mới tới `Registry.Default(role)`; picker của Console xếp giá trị đó lên đầu.
+  Hôm nay `console/actions.go:603-605` cố định thứ tự `{claude, codex}` và bỏ qua `mate_harness` trong `workspace.yaml`, với một comment trỏ tới hằng `config.DefaultMateHarness` không tồn tại.
   Console vẫn không import package nào nói chuyện với process.
 - Biến môi trường: mỗi profile khai báo khoá cần allowlist và khoá phải unset.
   `NestedSessionEnv` là hợp của mọi profile, vì biến của harness này làm nhiễm pane của harness khác.
@@ -211,6 +213,7 @@ Một allowlist có lý do cho từng mục giữ những chỗ được phép n
 | --- | --- |
 | `CLAUDE.md` trong `facts.docNames` | Tên tài liệu chung của repo, không phải hiểu biết về harness |
 | `dispatch/builtin.go` | Chính sách của captain về model và effort; mỗi hàng được registry kiểm lúc đọc |
+
 Con số bắt đầu ở mức hiện tại, fail nếu tăng, và phải về 0 ngoài allowlist ở PR 6.
 
 ## 5. Quan hệ với hai phương án đang có
@@ -238,7 +241,7 @@ Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
 | 3 | Màn hình: chuyển `startupProfileFor`, `composerProfileFor`, `pendingMatches` và `startupReadyScreen` vào `ScreenProfile`, giữ nguyên verdict như hôm nay; `send`, `watch`, `mate state` và fake nhận profile. Chỉ chuyển chỗ; việc tách quan sát khỏi policy (hình dạng đích ở mục 3.2) là probe-TUI PR 1, đi sau | Toàn bộ capture hiện có phân loại như cũ; không còn nhánh bỏ qua settle |
 | 4 | Stop, session, hook, turn-end thành capability; `runtime` bỏ so sánh kind; `outbox`, `context_refresh` và `mate hook` hỏi capability | Live hiện có về resume, stow và recall hook pass trên cả hai harness |
 | 5 | Transcript, usage và quota thành capability, gồm đọc tăng dần và snapshot đã đóng băng; `timeline` còn một đường chuẩn hoá turn | `mate usage` và dashboard cho cùng số trên corpus fixture trước và sau; `telemetry.go` không còn nhánh kind |
-| 6 | Chuyển file vào `harness/claude` và `harness/codex`; harness mặc định và danh mục harness cho `store`, `query` và Console lấy từ `catalog`; skill `harness-adapters` sinh từ registry; ratchet về 0; suite hợp đồng đầy đủ | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai; diff của PR này chỉ là di chuyển và nối dây |
+| 6 | Chuyển file vào `harness/claude` và `harness/codex`; harness mặc định và danh mục harness cho `store`, `query` và Console lấy từ `catalog`, picker Console xếp mặc định đã giải quyết của workspace lên đầu; skill `harness-adapters` sinh từ registry; ratchet về 0; suite hợp đồng đầy đủ | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai; diff của PR này chỉ là di chuyển và nối dây |
 | 7 | Onboard harness thứ ba, vai Crew trước | Diff chỉ gồm package mới, một dòng trong `catalog`, một hàng trong bảng dispatch mặc định, fixture và tài liệu; suite hợp đồng và live conformance pass |
 
 Đồ thị phụ thuộc, gồm cả phương án probe TUI:
