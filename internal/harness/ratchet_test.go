@@ -29,14 +29,15 @@ import (
 //     derived from package harness's source, not listed by hand.
 //   - literal: a string literal equal to a harness name, or carrying one as a
 //     whole token: a path segment (".claude/settings.json"), a word
-//     ("--harness codex"), or an env key ("CODEX_HOME="). Never a substring:
+//     ("--harness codex"), an env key ("CODEX_HOME="), or the namespace of a
+//     dotted name ("claude.projects", "codex.compacted"). Never a substring:
 //     a short name like "pi" must not hit "api", "pipe" or "spin".
 
 // harnessRatchetCeiling is the count recorded when the ratchet was added.
 // The test fails if the count rises above it. When the count falls, lower
 // this constant to the new count in the same change, so the ground gained is
 // kept.
-const harnessRatchetCeiling = 131
+const harnessRatchetCeiling = 136
 
 // ratchetHarnessNames is every spelling of a harness name a literal can
 // carry. Plan PR 1 and PR 6 replace this declared list with
@@ -424,7 +425,10 @@ func recvTypeName(e ast.Expr) string {
 // whole tokens. A token is what lies between separators - whitespace, path
 // separators, and the punctuation that frames a word, a flag value or an
 // env key in a command line ("=", "$", quotes, brackets) - with trailing
-// sentence punctuation removed. A token must equal a name exactly.
+// sentence punctuation removed. A token must equal a name exactly, or use
+// a name as a dotted namespace: its first "."-separated segment equals the
+// name ("claude.projects", "codex.compacted"). A token that starts with a
+// dot (".claude") or names a file ("CLAUDE.md") is matched whole only.
 func literalHarnessNames(s string, names []string) []string {
 	var out []string
 	tokens := strings.FieldsFunc(s, func(r rune) bool {
@@ -432,8 +436,9 @@ func literalHarnessNames(s string, names []string) []string {
 	})
 	for _, tok := range tokens {
 		tok = strings.TrimRight(tok, ".!?")
+		namespace, _, dotted := strings.Cut(tok, ".")
 		for _, name := range names {
-			if tok == name {
+			if tok == name || (dotted && namespace == name) {
 				out = append(out, name)
 			}
 		}
@@ -472,6 +477,11 @@ func TestRatchetLiteralMatchingIsWholeToken(t *testing.T) {
 		{"export $CLAUDE_CONFIG_DIR", []string{"CLAUDE_CONFIG_DIR"}},
 		{"hook mate-session --harness codex", []string{"codex"}},
 		{"the codex.", []string{"codex"}},
+		{"claude.projects", []string{"claude"}},
+		{"codex.adopt", []string{"codex"}},
+		{"claude.compact_boundary", []string{"claude"}},
+		{"source codex.compacted", []string{"codex"}},
+		{"herdr:codex", []string{"codex"}},
 		{"Claude Code", nil},
 		{"claudecode", nil},
 		{"codexlab", nil},
@@ -495,6 +505,9 @@ func TestRatchetLiteralMatchingIsWholeToken(t *testing.T) {
 		{"pi", []string{"pi"}},
 		{"pi --approve", []string{"pi"}},
 		{"/home/x/.pi/agent", []string{".pi"}},
+		{"pi.data", []string{"pi"}},
+		{"api.pi", nil},
+		{"spin.data", nil},
 		{"api", nil},
 		{"pipe", nil},
 		{"spin", nil},
