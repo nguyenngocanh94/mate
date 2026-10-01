@@ -171,11 +171,21 @@ func TestCmdProjectAddRejectsNonGitDir(t *testing.T) {
 	if err := os.MkdirAll(plain, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	outsideAnyCheckout(t, ws)
 
 	err := cmdProjectAdd([]string{"--workspace", ws, "plain", plain}, &out, &errw)
-	if err == nil {
-		t.Fatal("want error for a directory that is not a git repository")
+	if err == nil || !strings.Contains(err.Error(), "not a git repository") {
+		t.Fatalf("err = %v, want the directory refused as not a git repository", err)
 	}
+}
+
+// outsideAnyCheckout stops git's repository discovery at dir, so a test that
+// means "no repository here" gets that whatever TMPDIR the suite runs under:
+// a TMPDIR inside a checkout would otherwise make every temp directory part
+// of that checkout's work tree.
+func outsideAnyCheckout(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
 }
 
 func TestCmdProjectAddRejectsPathOutsideWorkspace(t *testing.T) {
