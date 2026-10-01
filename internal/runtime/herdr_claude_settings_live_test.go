@@ -128,15 +128,24 @@ func TestLiveHerdrClaudeStopHookFiresWithRealPayload(t *testing.T) {
 	}
 
 	sessionID := uuid.NewString()
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{
-		Kind:               harness.KindClaude,
-		Cwd:                cwd,
-		ContextPath:        ctxPath,
-		ClaudeSessionID:    sessionID,
-		ClaudeSettingsPath: settingsPath,
+	// A Crew-shaped launch takes its --settings from <state>/settings.json,
+	// which is settingsPath; the file written above stands in for the one
+	// Prepare names, so prep.Files is not written.
+	prep, err := harness.Claude{}.Prepare(ctx, harness.PrepareRequest{
+		Role: harness.RoleCrew, Cwd: cwd, StateDir: filepath.Dir(settingsPath), ContextPath: ctxPath,
+		NewSessionID: func() string { return sessionID },
 	})
 	if err != nil {
-		t.Fatalf("BuildLaunchSpec: %v", err)
+		t.Fatalf("Prepare: %v", err)
+	}
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind:        harness.KindClaude,
+		Cwd:         cwd,
+		ContextPath: prep.ContextPath,
+		Launch:      prep.Launch,
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
 	}
 	res, err := runtime.AllocateAgentName(rt.Names, handle.Name, "g512", "hook01", runtime.FailOnCollision)
 	if err != nil {

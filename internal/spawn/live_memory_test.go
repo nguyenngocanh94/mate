@@ -271,7 +271,7 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 
 	// The Mate's own settings plus a lab SessionStart hook. StartMate keeps
 	// an existing settings file, so this is what the Mate launches with.
-	base, err := spawn.ClaudeSettings(lab.deps.Binary)
+	base, err := harness.ClaudeSettings(lab.deps.Binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,10 +286,10 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(mateDir, spawn.ClaudeSettingsDir), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(harness.ClaudeSettingsPath(mateDir)), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(mateDir, spawn.ClaudeSettingsDir, spawn.ClaudeSettingsFile), data, 0o644); err != nil {
+	if err := os.WriteFile(harness.ClaudeSettingsPath(mateDir), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 

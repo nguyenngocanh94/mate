@@ -32,12 +32,22 @@ type Info struct {
 	ConfigDir       string
 	InstructionFile string
 	EnvKeys         []string
+	// SkillsDir is where, relative to a Mate's cwd, its skills are written.
+	// The manual names it for a harness that does not discover skills on
+	// its own, so it is fixed before the manual is rendered.
+	SkillsDir string
 }
 
-// Launcher builds a harness's LaunchSpec. It never forks the harness; the
-// runtime hands the spec to Herdr.
+// Launcher lays out and builds a harness's launch (launch.go). It never
+// forks the harness; spawn writes the files Prepare names and the runtime
+// hands Build's spec to Herdr.
 type Launcher interface {
-	BuildLaunchSpec(ctx context.Context, spec AgentSpec) (LaunchSpec, error)
+	// Prepare names the files the launch needs and the data Build reads
+	// back. It reads the filesystem and writes nothing.
+	Prepare(ctx context.Context, req PrepareRequest) (Prepared, error)
+	// Build turns the role-generic request into a startable LaunchSpec, or
+	// refuses it.
+	Build(ctx context.Context, spec AgentSpec) (LaunchSpec, error)
 }
 
 // ScreenProfile recognises a harness's pane. It names what the screen shows

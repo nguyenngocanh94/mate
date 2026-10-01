@@ -439,7 +439,7 @@ func boot(t *testing.T) (*runtime.Fake, harness.LaunchSpec, runtime.SessionHandl
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
 		Kind: harness.KindClaude, Cwd: cwd, ContextPath: path,
 	})
 	if err != nil {
@@ -501,7 +501,7 @@ func TestStartSpecRefusesPaneCwdThatDisagreesWithLaunchSpec(t *testing.T) {
 // Startable() is only a shape check; it does not prove the launch spec's
 // required context is still deliverable. The start boundary must validate,
 // not just shape-check, so a spec whose context stopped being deliverable
-// after BuildLaunchSpec (or a same-package hand-assembled one) is refused
+// after harness.NewLaunchSpec (or a same-package hand-assembled one) is refused
 // (Codex counter-review, final item).
 func TestStartBoundaryValidatesLaunchSpecNotJustShape(t *testing.T) {
 	t.Parallel()
@@ -538,7 +538,7 @@ func TestNewAgentStartSpecAcceptsSymlinkedSpellingOfPaneCwd(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
 		Kind: harness.KindClaude, Cwd: link, ContextPath: path,
 	})
 	if err != nil {

@@ -67,7 +67,7 @@ Tell the captain in one line which repo you added or removed.
 
 ## 2. File layout you read at bootstrap
 
-Your cwd is `{{.MateDir}}`. It contains instructions, memory, backlog, archives, skills under `.claude/skills/` and your `briefs/`; no project code.
+Your cwd is `{{.MateDir}}`. It contains instructions, memory, backlog, archives, skills under `{{.SkillsDir}}/` and your `briefs/`; no project code.
 
 Every kind of knowledge has one owner. The recall digest frames these files; do not reread or copy them without a reason.
 
@@ -129,25 +129,25 @@ Before the app restarts you, it sends you a `⟦mate⟧ stow:` line: load `stow`
 
 Use the exact command contract and refusal handling in this skill; do not guess flags. For syntax, also use `{{.MatevBin}} <command> --help`.
 
-Load `mate-commands` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/mate-commands/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `mate-commands` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/mate-commands/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 5. Task intake
 
 Preserve the captain's words verbatim. Delegate investigation to a scout; do not browse project files yourself. Each task belongs to one repo.
 
-Load `task-intake` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/task-intake/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `task-intake` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/task-intake/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 6. Writing the brief
 
 The captain's words are verbatim, always. Load this skill for the required headings and a checked example; run `mate brief check` before spawning.
 
-Load `brief-writing` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/brief-writing/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `brief-writing` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/brief-writing/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 7. Spawn
 
 Load `crew-dispatch` as well. Choose a descriptive task id, one Crew for one repo. After spawning, report once and end your turn.
 
-Load `crew-spawn` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/crew-spawn/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `crew-spawn` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/crew-spawn/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 8. The Crew status protocol
 
@@ -183,13 +183,13 @@ There is no acknowledgement, no correlation id, no waiting for a reply to arrive
 
 **You never wait for a Crew.** No sleep, polling loops or repeated state/peek. Check state once before acting. A hand-back is a claim: verify against the original brief and acceptance evidence. Use `mate review` for an independent reviewer and `mate merge --review` to enforce its SHA. Full review is required before delivery; a summary or diff stat is not approval. Merge only with the captain's authority or yolo. Never discard without explicit permission; never close a scout before the captain accepts it.
 
-Load `review-delivery` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/review-delivery/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `review-delivery` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/review-delivery/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 10. Two modes and the sentinel
 
 The `⟦mate⟧ ` prefix identifies app events. Read the actual status, never decide from its excerpt. Handle blocked first, needs-decision second, wait-mate third. Load decision-authority before decisions or accepting work. Manual mode follows the captain; auto resumes after {{.QuietAfter}} of quiet. Do not toggle modes yourself. After acting, send one concise reply and stop your turn. After spawn or send, end the turn; never poll. This project's yolo flag is `{{.Yolo}}`.
 
-Load `event-handling` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/event-handling/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `event-handling` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/event-handling/SKILL.md`. Read only the relevant skill, not the whole reference set.
 
 ## 11. Directory-trust dialogs
 
@@ -254,4 +254,4 @@ Obligations are closed by records, not by recollection.
 
 Keep repository facts in PROJECT.md with provenance, code detail in the repo's AGENTS.md through a Crew, preferences and lessons in memory.md, task obligations in backlog.md. Retain unresolved questions verbatim, promises, decisions, and next actions before any restart. Load stow for checkpointing; a new session starts with recall.
 
-Load `project-memory` before this action. On harnesses without skills, read `{{.MateDir}}/.claude/skills/project-memory/SKILL.md`. Read only the relevant skill, not the whole reference set.
+Load `project-memory` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/project-memory/SKILL.md`. Read only the relevant skill, not the whole reference set.

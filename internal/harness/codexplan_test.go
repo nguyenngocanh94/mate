@@ -157,7 +157,7 @@ func TestPlanCodexOverrideRefusesWhenAncestorsAlreadyOverflow(t *testing.T) {
 
 // The planner's arithmetic must agree with the refusal the constructor runs
 // against the bytes actually on disk. Anything else is a plan that blesses a
-// launch BuildLaunchSpec then rejects, or worse the other way round.
+// launch Build then rejects, or worse the other way round.
 func TestPlanCodexOverrideAgreesWithBuildLaunchSpecAtEveryBoundary(t *testing.T) {
 	t.Parallel()
 	for _, size := range []int{498, 499, 500, 501} {
@@ -177,9 +177,9 @@ func TestPlanCodexOverrideAgreesWithBuildLaunchSpecAtEveryBoundary(t *testing.T)
 			content := []byte(strings.Repeat("O", size))
 			planErr := plan.Fits(content)
 			writeFile(t, CodexInstructionPath(cwd), string(content))
-			_, buildErr := Codex{MaxChainBytes: 1000}.BuildLaunchSpec(t.Context(), AgentSpec{Cwd: cwd})
+			_, buildErr := Codex{MaxChainBytes: 1000}.Build(t.Context(), AgentSpec{Cwd: cwd})
 			if (planErr == nil) != (buildErr == nil) {
-				t.Fatalf("plan.Fits = %v but BuildLaunchSpec = %v", planErr, buildErr)
+				t.Fatalf("plan.Fits = %v but Build = %v", planErr, buildErr)
 			}
 		})
 	}

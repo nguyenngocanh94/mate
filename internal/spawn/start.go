@@ -6,27 +6,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/mateassets"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
-)
-
-// ClaudeSettingsDir and ClaudeSettingsFile are the Claude settings the Mate
-// launches with: ClaudeSettings wires its three hooks to the mate binary and
-// turns Claude Code's auto-memory off. Start creates the file, and on one
-// that already exists - the user's own, or one a previous start wrote - it
-// only ever adds a missing autoMemoryEnabled key and a missing SessionStart
-// hook.
-const (
-	ClaudeSettingsDir  = ".claude"
-	ClaudeSettingsFile = "settings.json"
 )
 
 // ErrMateRunning is returned by StartMate when the recorded Mate is still
@@ -127,7 +116,8 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 			return StartResult{}, err
 		}
 	}
-	if _, err := deps.Harnesses.Lookup(kind); err != nil {
+	profile, err := deps.Harnesses.Lookup(kind)
+	if err != nil {
 		return StartResult{}, err
 	}
 
@@ -157,9 +147,13 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	decision = checkCodexResume(deps, kind, decision)
 
 	// 2. The Mate's directory: the manual, rendered again on every start,
-	// and the settings file Claude launches with.
+	// and the files the harness launches with.
 	mateDir := w.MateDir(project)
-	if err := prepareMateDir(w, deps, project, cfg, kind, mateDir); err != nil {
+	if err := prepareMateDir(w, deps, project, cfg, profile, mateDir); err != nil {
+		return StartResult{}, err
+	}
+	prep, err := prepareMateLaunch(ctx, w, deps, profile, mateDir, decision)
+	if err != nil {
 		return StartResult{}, err
 	}
 
@@ -193,7 +187,7 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	}
 
 	// From here on every failure must undo the tab and leave no meta.
-	result, err := startInTab(ctx, w, deps, project, kind, mateDir, decision, session, tab)
+	result, err := startInTab(ctx, w, deps, project, profile, mateDir, decision, prep, session, tab)
 	if err != nil {
 		compensate(ctx, deps, w, project, session, tab)
 		if !decision.Resume || ctx.Err() != nil {
@@ -206,11 +200,14 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 		fresh := resumeDecision{Note: fmt.Sprintf(
 			"resuming the %s session %s failed (%v); started a fresh session instead",
 			kind, decision.SessionID, oneLineErr(err))}
+		if prep, err = prepareMateLaunch(ctx, w, deps, profile, mateDir, fresh); err != nil {
+			return StartResult{}, err
+		}
 		tab, err = openMateTab(ctx, deps, session, project, mateDir)
 		if err != nil {
 			return StartResult{}, err
 		}
-		result, err = startInTab(ctx, w, deps, project, kind, mateDir, fresh, session, tab)
+		result, err = startInTab(ctx, w, deps, project, profile, mateDir, fresh, prep, session, tab)
 		if err != nil {
 			compensate(ctx, deps, w, project, session, tab)
 			return StartResult{}, err
@@ -292,28 +289,13 @@ func decideResume(meta map[string]string, kind harness.Kind, req StartRequest) r
 	return resumeDecision{Resume: true, SessionID: priorID}
 }
 
-// freshSessionID mints the Claude session uuid a non-resuming start needs.
-// Codex has no launch-time session identity: its id exists only once the
-// first prompt opens the rollout, so StopMate records it (task 35) and a
-// fresh Codex start writes session_id= empty (start_test.go's
-// TestStartMateCodexWritesTheDiscoveryFile).
-func freshSessionID(deps Deps, kind harness.Kind) string {
-	if kind != harness.KindClaude {
-		return ""
-	}
-	if deps.NewSessionID != nil {
-		return deps.NewSessionID()
-	}
-	return uuid.NewString()
-}
-
 // startInTab is everything a failure has to compensate for: the launch spec,
-// the agent, its startup screen, the readiness wait and the meta.
-func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project string, kind harness.Kind, mateDir string, decision resumeDecision, session runtime.SessionHandle, tab runtime.TabHandle) (StartResult, error) {
-	sessionID, resume := decision.SessionID, decision.Resume
-	if !resume {
-		sessionID = freshSessionID(deps, kind)
-	}
+// the agent, its startup screen, the readiness wait and the meta. The
+// session id is the one the launch was prepared with: the resumed one, a
+// fresh one for a harness that names its session at launch, or none for a
+// harness whose id exists only once the first prompt opens its session,
+// which StopMate records (task 35).
+func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project string, profile harness.Profile, mateDir string, decision resumeDecision, prep harness.Prepared, session runtime.SessionHandle, tab runtime.TabHandle) (StartResult, error) {
 	env, err := mateEnv(project, session)
 	if err != nil {
 		return StartResult{}, err
@@ -322,7 +304,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	launch, err := buildLaunchSpec(ctx, deps.Harnesses, project, kind, mateDir, sessionID, resume, env, cfg.Mate)
+	launch, err := buildLaunchSpec(ctx, profile, project, mateDir, decision, prep, env, cfg.Mate)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -339,7 +321,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	return settleAndRecord(ctx, w, deps, project, kind, mateDir, decision, session, tab, handle, sessionID, launchedAt, launch)
+	return settleAndRecord(ctx, w, deps, project, profile.Kind(), mateDir, decision, session, tab, handle, prep.SessionID, launchedAt, launch)
 }
 
 // settleAndRecord takes a launched Mate agent the rest of the way: the
@@ -452,11 +434,10 @@ func refuseIfLive(ctx context.Context, w *store.Workspace, deps Deps, project st
 		WithDetails(map[string]any{"agent_name": name, "herdr_session": session.Name})
 }
 
-// prepareMateDir renders the Mate's cwd: the operating manual, the memory
-// and backlog files mateassets creates only when missing, and the Claude
-// settings file. It returns the Claude session uuid for this launch (empty
-// for a harness that has none).
-func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.ProjectConfig, kind harness.Kind, mateDir string) error {
+// prepareMateDir renders the Mate's cwd: the operating manual, the skills
+// where the harness finds them, and the memory and backlog files mateassets
+// creates only when missing.
+func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.ProjectConfig, profile harness.Profile, mateDir string) error {
 	if err := os.MkdirAll(mateDir, 0o755); err != nil {
 		return err
 	}
@@ -468,13 +449,14 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 	for _, r := range cfg.Repos {
 		repos = append(repos, mateassets.RepoParams{Name: r.Name, Path: w.RepoDir(r.Path), DefaultBranch: r.DefaultBranch})
 	}
-	if err := mateassets.Write(mateDir, mateassets.Params{
+	return mateassets.Write(mateDir, mateassets.Params{
 		ProjectName:      project,
 		WorkspaceRoot:    w.Root(),
 		Repos:            repos,
 		Mode:             cfg.Mode,
 		Yolo:             cfg.Yolo,
-		Harness:          string(kind),
+		Harness:          string(profile.Kind()),
+		SkillsDir:        profile.Info().SkillsDir,
 		WorkspaceDoc:     w.WorkspaceDoc(),
 		ProjectDoc:       w.ProjectDoc(project),
 		WorkspaceCrewDoc: w.WorkspaceCrewDoc(),
@@ -484,52 +466,38 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		MatevBin:         binary,
 		MateDir:          mateDir,
 		CrewsDir:         w.CrewsDir(project),
-	}); err != nil {
-		return err
-	}
-	if err := ensureClaudeSettings(mateDir, binary); err != nil {
-		return err
-	}
-	if kind == harness.KindCodex {
-		// Codex discovers AGENTS.override.md, in preference to a tracked
-		// AGENTS.md, at the directory it runs in. The manual is the same
-		// text either way; this is the name Codex reads it under.
-		if err := writeCodexOverride(mateDir); err != nil {
-			return err
-		}
-		if err := writeCodexHooks(mateDir, binary); err != nil {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
-// CodexHooksDir and CodexHooksFile are where a Codex Mate's SessionStart
-// hook lives: `.codex/hooks.json` of its cwd, which Codex loads once the
-// directory is trusted (task 35, A3). The operator's own
-// `$CODEX_HOME/hooks.json` is never read or written.
-const (
-	CodexHooksDir  = ".codex"
-	CodexHooksFile = "hooks.json"
-)
-
-// CodexHooksPath is the Codex Mate's hooks file.
-func CodexHooksPath(mateDir string) string {
-	return filepath.Join(mateDir, CodexHooksDir, CodexHooksFile)
-}
-
-// writeCodexHooks writes CodexHooks for binary, only when it differs, so an
-// unchanged file keeps its mtime as well as the trust Codex recorded for it.
-func writeCodexHooks(mateDir, binary string) error {
-	path := CodexHooksPath(mateDir)
-	want := CodexHooks(binary)
-	if have, err := os.ReadFile(path); err == nil && string(have) == string(want) {
-		return nil
+// prepareMateLaunch asks the harness to lay out this start and writes what
+// it names: the name it reads the manual under, its settings and hooks. A
+// fresh start's session id is minted here, for a harness that names its
+// session at launch.
+func prepareMateLaunch(ctx context.Context, w *store.Workspace, deps Deps, profile harness.Profile, mateDir string, decision resumeDecision) (harness.Prepared, error) {
+	binary, err := deps.binary()
+	if err != nil {
+		return harness.Prepared{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	req := harness.PrepareRequest{
+		Role:         harness.RoleMate,
+		Cwd:          mateDir,
+		StateDir:     mateDir,
+		ContextPath:  filepath.Join(mateDir, mateassets.ManualName),
+		Binary:       binary,
+		NewSessionID: deps.NewSessionID,
 	}
-	return os.WriteFile(path, want, 0o644)
+	if decision.Resume {
+		req.ResumeSessionID = decision.SessionID
+	}
+	prep, err := profile.Launcher().Prepare(ctx, req)
+	if err != nil {
+		return harness.Prepared{}, err
+	}
+	// A Mate's directory is not a git working tree: nothing to exclude.
+	if err := writeLaunchFiles(ctx, w, nil, mateDir, prep.Files); err != nil {
+		return harness.Prepared{}, err
+	}
+	return prep, nil
 }
 
 // ownHooks is what the startup settle may trust in Codex's hook review for
@@ -545,80 +513,33 @@ func ownHooks(deps Deps, kind harness.Kind, mateDir string) ([]harness.OwnHook, 
 	}
 	return []harness.OwnHook{{
 		Event:   "SessionStart",
-		Source:  CodexHooksPath(mateDir),
-		Command: SessionHookCommand(binary, harness.KindCodex),
+		Source:  harness.CodexHooksPath(mateDir),
+		Command: harness.SessionHookCommand(binary, harness.KindCodex),
 	}}, nil
 }
 
-// ensureClaudeSettings creates `<mate>/.claude/settings.json` if it is not
-// there, wired to binary's `hook mate-prompt`/`hook mate-stop`/`hook
-// mate-session` (ClaudeSettings). An existing file - the user's own, or one a
-// previous start already wrote - keeps every key it has; the two things a
-// start adds to it are `autoMemoryEnabled: false` when the file does not say
-// (EnsureAutoMemoryOff), and the SessionStart hook when no SessionStart entry
-// runs it (EnsureSessionHook), so a Mate directory made before task 35 or 37
-// starts with auto-memory off and its digest wired too.
-func ensureClaudeSettings(mateDir, binary string) error {
-	dir := filepath.Join(mateDir, ClaudeSettingsDir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	path := filepath.Join(dir, ClaudeSettingsFile)
-	existing, err := os.ReadFile(path)
-	if err == nil {
-		updated, memoryChanged, err := EnsureAutoMemoryOff(existing)
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		updated, hookChanged, err := EnsureSessionHook(updated, binary)
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		if !memoryChanged && !hookChanged {
-			return nil
-		}
-		return os.WriteFile(path, updated, 0o644)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	data, err := ClaudeSettings(binary)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
-}
-
-// writeCodexOverride copies the rendered manual to the name Codex reads.
-func writeCodexOverride(mateDir string) error {
-	manual, err := os.ReadFile(filepath.Join(mateDir, "AGENTS.md"))
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(harness.CodexInstructionPath(mateDir), manual, 0o644)
-}
-
-// buildLaunchSpec asks the harness's launcher for the argv. The cwd is the
-// Mate directory, which is also where the manual is: the launchers require
-// a context path, so the path they are given is that same manual, never a
-// separate generated file.
-func buildLaunchSpec(ctx context.Context, harnesses harness.Registry, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
-	profile, err := harnesses.Lookup(kind)
-	if err != nil {
-		return harness.LaunchSpec{}, err
-	}
+// buildLaunchSpec asks the harness's launcher for the argv of the launch it
+// prepared. The cwd is the Mate directory, which is also where the manual
+// is.
+func buildLaunchSpec(ctx context.Context, profile harness.Profile, project, mateDir string, decision resumeDecision, prep harness.Prepared, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
 	spec := harness.AgentSpec{
-		ID:   AgentNamePrefix + "-" + project,
-		Role: harness.RoleMate,
-		Kind: kind,
-		Cwd:  mateDir,
+		ID:          AgentNamePrefix + "-" + project,
+		Role:        harness.RoleMate,
+		Kind:        profile.Kind(),
+		Cwd:         mateDir,
+		ContextPath: prep.ContextPath,
+		Launch:      prep.Launch,
 		// The Mate's environment rides on the launch as well as on the
 		// workspace create: the runtime exports it into the pane before
 		// every start, which is the only way a Mate restarted into a fresh
 		// `tab create` (a Crew still holds the workspace) keeps its
-		// identity. The Codex adapter pins CODEX_HOME itself.
-		Env:    launchEnv(env, kind),
-		Config: harness.Config{Kind: kind},
+		// identity.
+		Env: launchEnv(env, profile),
 	}
+	if decision.Resume {
+		spec.ResumeSessionID = decision.SessionID
+	}
+	var err error
 	if len(profiles) > 0 {
 		spec.Model, err = harness.ParseModel(profiles[0].Model)
 		if err != nil {
@@ -629,29 +550,7 @@ func buildLaunchSpec(ctx context.Context, harnesses harness.Registry, project st
 			return harness.LaunchSpec{}, err
 		}
 	}
-	switch kind {
-	case harness.KindClaude:
-		// No context path: `<mate>/CLAUDE.md` is `@AGENTS.md` and Claude
-		// loads it from the cwd on its own, so passing the same manual as
-		// --append-system-prompt-file put it in context twice (docs/mvp.md,
-		// task 17).
-		spec.ManualInCwd = true
-		// A fresh session id is what a first start names for a later
-		// `--resume` (task 10); the settings file is where task 08's hooks
-		// go. Claude refuses either without the other, fresh or resumed.
-		if resume {
-			spec.ResumeSessionID = sessionID
-		} else {
-			spec.ClaudeSessionID = sessionID
-		}
-		spec.ClaudeSettingsPath = filepath.Join(mateDir, ClaudeSettingsDir, ClaudeSettingsFile)
-	case harness.KindCodex:
-		spec.ContextPath = harness.CodexInstructionPath(mateDir)
-		if resume {
-			spec.ResumeSessionID = sessionID
-		}
-	}
-	return profile.Launcher().BuildLaunchSpec(ctx, spec)
+	return profile.Launcher().Build(ctx, spec)
 }
 
 // ensureProjectWorkspace creates the Herdr workspace for a project, injecting
@@ -699,12 +598,15 @@ func mateEnv(project string, session runtime.SessionHandle) ([]runtime.EnvVar, e
 	}, nil
 }
 
-// launchEnv is env as a launch carries it. A Codex launch pins CODEX_HOME
-// itself (harness.Codex.BuildLaunchSpec) and refuses a second assignment.
-func launchEnv(env []runtime.EnvVar, kind harness.Kind) []harness.EnvVar {
+// launchEnv is env as a launch carries it. The variables the harness
+// declares (harness.Info.EnvKeys) are its own to set, and a launch refuses a
+// second assignment, so they are left to it; another harness's variables
+// ride along, because the agent may launch that harness.
+func launchEnv(env []runtime.EnvVar, profile harness.Profile) []harness.EnvVar {
+	own := profile.Info().EnvKeys
 	out := make([]harness.EnvVar, 0, len(env))
 	for _, v := range env {
-		if kind == harness.KindCodex && v.Key == config.EnvCodexHome {
+		if slices.Contains(own, v.Key) {
 			continue
 		}
 		out = append(out, harness.EnvVar{Key: v.Key, Value: v.Value})

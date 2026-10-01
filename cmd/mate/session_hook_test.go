@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -17,8 +18,8 @@ func runMateSession(t *testing.T, w *store.Workspace, payload string, args ...st
 	t.Setenv("MATE_PROJECT", "shop")
 	chdir(t, w.MateDir("shop"))
 	var stdout, stderr bytes.Buffer
-	if err := cmdHook(append([]string{spawn.SessionHookName}, args...), strings.NewReader(payload), &stdout, &stderr); err != nil {
-		t.Fatalf("cmdHook %s: %v", spawn.SessionHookName, err)
+	if err := cmdHook(append([]string{harness.SessionHookName}, args...), strings.NewReader(payload), &stdout, &stderr); err != nil {
+		t.Fatalf("cmdHook %s: %v", harness.SessionHookName, err)
 	}
 	return stdout.String(), stderr.String()
 }
@@ -105,7 +106,7 @@ func TestSessionHookFitsWhatEachHarnessReads(t *testing.T) {
 
 func TestSessionHookRefusesAnUnknownHarness(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := cmdHook([]string{spawn.SessionHookName, "--harness", "pi-ish"}, strings.NewReader(""), &stdout, &stderr)
+	err := cmdHook([]string{harness.SessionHookName, "--harness", "pi-ish"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil || stdout.Len() != 0 {
 		t.Fatalf("an unknown --harness = %v, stdout %q", err, stdout.String())
 	}

@@ -36,10 +36,22 @@ const (
 	// `CLAUDE.md` that is exactly `@AGENTS.md` (docs/mvp.md section 3), so
 	// also passing that same manual as --append-system-prompt-file put it in
 	// the model's context twice. A spec with this delivery carries no
-	// context path and no context flag: the caller asserts, with
-	// AgentSpec.ManualInCwd, that the cwd is doing the work.
+	// context path and no context flag: the harness's Prepare wrote the
+	// file the cwd loads, and its Build says so.
 	DeliveryCwdManual Delivery = "cwd_manual"
 )
+
+// ParseDelivery rejects unknown strategies.
+func ParseDelivery(s string) (Delivery, error) {
+	switch Delivery(strings.TrimSpace(s)) {
+	case DeliveryAppendSystemPromptFile, DeliveryAppendSystemPrompt, DeliveryInstructionFile:
+		return Delivery(strings.TrimSpace(s)), nil
+	case "":
+		return "", fmt.Errorf("delivery: empty")
+	default:
+		return "", observability.NewError(observability.CodeUsage, fmt.Sprintf("unknown delivery %q", s))
+	}
+}
 
 const (
 	// DefaultMaxInlineBytes stays well under the Darwin ARG_MAX observed in
@@ -87,9 +99,9 @@ type GeneratedFile struct {
 }
 
 // LaunchSpec is a validated harness launch plan. Fields are unexported, so
-// outside this package the constructors are the only source of a startable
-// spec, and they refuse an undeliverable required context. The zero value Go
-// still allows is not startable, and ValidateRequiredContext refuses it.
+// outside this package NewLaunchSpec is the only source of a startable spec,
+// and it refuses an undeliverable required context. The zero value Go still
+// allows is not startable, and ValidateRequiredContext refuses it.
 type LaunchSpec struct {
 	kind            string
 	args            []string
@@ -109,7 +121,7 @@ type LaunchSpec struct {
 	codexHome       string
 	claudeConfigDir string
 	unsetEnv        []string
-	codexFallback   []string
+	checkContext    func(LaunchSpec) error
 }
 
 // Kind is the harness kind string (claude, codex).
@@ -256,7 +268,7 @@ func (s LaunchSpec) deliveryLimit() (deliveryLimit, error) {
 	}
 }
 
-// ValidateRequiredContext is defence in depth. Constructors already run it;
+// ValidateRequiredContext is defence in depth. NewLaunchSpec already runs it;
 // an undeliverable spec is not returned. Same-package tests may assemble a
 // struct literal to prove the rule still holds if a spec is mutated by hand.
 // A spec that is not startable (the zero value, or a hand-assembled one) is
@@ -305,17 +317,8 @@ func (s LaunchSpec) ValidateRequiredContext() error {
 	if size > limit.max {
 		return s.codedTooLarge(fmt.Sprintf("%s is %d bytes, %s limit %d%s", s.contextPath, size, s.delivery, limit.max, limit.note))
 	}
-	if s.delivery == DeliveryInstructionFile {
-		wantPath := CodexInstructionPath(s.cwd)
-		if filepath.Clean(s.contextPath) != filepath.Clean(wantPath) {
-			return s.codedRequired(fmt.Sprintf("context path %s is not the Codex discovery file for cwd %s (%s)", s.contextPath, s.cwd, wantPath))
-		}
-		chain, err := DiscoverCodexChain(DiscoverRequest{Cwd: s.cwd, CodexHome: s.codexHome, FallbackFilenames: s.codexFallback})
-		if err != nil {
-			return err
-		}
-		max := int(limit.max)
-		if err := chain.RefuseIfRequiredMissingOrTruncated(wantPath, max); err != nil {
+	if s.checkContext != nil {
+		if err := s.checkContext(s); err != nil {
 			return err
 		}
 	}
@@ -380,13 +383,6 @@ func (s LaunchSpec) argvValue(flag string) (string, error) {
 		return "", s.codedRequired(fmt.Sprintf("duplicate %s (target CLI last-wins; mate rejects rather than guessing)", flag))
 	}
 	return found[0], nil
-}
-
-func finalize(s LaunchSpec) (LaunchSpec, error) {
-	if err := s.ValidateRequiredContext(); err != nil {
-		return LaunchSpec{}, err
-	}
-	return s, nil
 }
 
 // CodexInstructionPath is the Mate-written discovery file at cwd.

@@ -14,7 +14,7 @@ import (
 func TestCodexRefusesMissingOverride(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Codex{}.Build(context.Background(), AgentSpec{
 		Kind: KindCodex,
 		Cwd:  cwd,
 	})
@@ -34,13 +34,13 @@ func TestCodexResumeLaunchesTheSubcommandWithTheID(t *testing.T) {
 		t.Fatal(err)
 	}
 	const id = "01a0d260-cd47-77d2-bee7-46d98aa0461a"
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{
 		Kind:            KindCodex,
 		Cwd:             cwd,
 		ResumeSessionID: id,
 	})
 	if err != nil {
-		t.Fatalf("BuildLaunchSpec resume: %v", err)
+		t.Fatalf("Build resume: %v", err)
 	}
 	want := []string{"resume", "--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride, id}
 	if !slices.Equal(spec.Args(), want) {
@@ -58,7 +58,7 @@ func TestCodexRefusesAResumeIDThatIsNotAUUID(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"--last", "some-thread-id", "01a0d260-cd47"} {
-		_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+		_, err := Codex{}.Build(context.Background(), AgentSpec{
 			Kind:            KindCodex,
 			Cwd:             cwd,
 			ResumeSessionID: id,
@@ -75,7 +75,7 @@ func TestCodexRefusesEmptyOverride(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte{}, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: cwd})
+	_, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: cwd})
 	if !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("empty override: err = %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCodexRefusesTrackedAgentsMDAsDiscoveryFile(t *testing.T) {
 	if err := os.WriteFile(tracked, []byte("tracked project instructions"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Codex{}.Build(context.Background(), AgentSpec{
 		Cwd:         cwd,
 		ContextPath: tracked,
 	})
@@ -103,7 +103,7 @@ func TestCodexBindsCwdAndOverride(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: cwd, TaskPrompt: "FIRST-CREW-TASK"})
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: cwd, TaskPrompt: "FIRST-CREW-TASK"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,8 +172,8 @@ func TestCodexPinsEffectiveHomeIntoLaunchEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "client-home"))
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind: KindCodex, Cwd: cwd, Config: Config{CodexHome: home},
+	spec, err := Codex{Home: home}.Build(context.Background(), AgentSpec{
+		Kind: KindCodex, Cwd: cwd,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -205,9 +205,8 @@ func TestCodexRefusesSilentChainTruncation(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(sub), []byte(required), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Cwd:    sub,
-		Config: Config{ProjectDocMaxBytes: CodexDefaultMaxBytes},
+	_, err := Codex{MaxChainBytes: CodexDefaultMaxBytes}.Build(context.Background(), AgentSpec{
+		Cwd: sub,
 	})
 	if !errors.Is(err, ErrContextTooLarge) {
 		t.Fatalf("parent+cwd chain exceeds the cap: err = %v, want ErrContextTooLarge (Codex would truncate silently)", err)
@@ -220,7 +219,7 @@ func TestCodexRefusesWhenRequiredFileItselfExceedsCap(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte(strings.Repeat("x", CodexDefaultMaxBytes+1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: cwd})
+	_, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: cwd})
 	if !errors.Is(err, ErrContextTooLarge) {
 		t.Fatalf("err = %v", err)
 	}
@@ -240,7 +239,7 @@ func TestCodexAcceptsChainUnderBudget(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(sub), []byte("you are crew\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: sub})
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: sub})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +261,7 @@ func TestCodexWithoutGitDoesNotWalkParents(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: cwd})
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: cwd})
 	if err != nil {
 		t.Fatalf("parent AGENTS.md must not be in the chain without git: %v", err)
 	}
@@ -291,7 +290,7 @@ func TestCodexOverrideTakesPrecedenceOverBaseAtSameDir(t *testing.T) {
 
 func TestCodexRelativeCwdRejected(t *testing.T) {
 	t.Parallel()
-	_, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: "."})
+	_, err := Codex{}.Build(context.Background(), AgentSpec{Cwd: "."})
 	if !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("err = %v", err)
 	}
@@ -466,9 +465,8 @@ func TestCodexBuildLaunchSpecRefusesOneMeteredByteOverCap(t *testing.T) {
 	if err := os.WriteFile(required, bytes.Repeat([]byte("c"), max-200), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Cwd:    deep,
-		Config: Config{ProjectDocMaxBytes: max},
+	spec, err := Codex{MaxChainBytes: max}.Build(context.Background(), AgentSpec{
+		Cwd: deep,
 	})
 	if err != nil {
 		t.Fatalf("chain metering exactly at the cap must start: %v", err)
@@ -479,9 +477,8 @@ func TestCodexBuildLaunchSpecRefusesOneMeteredByteOverCap(t *testing.T) {
 	if err := os.WriteFile(required, bytes.Repeat([]byte("c"), max-200+1), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err = Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Cwd:    deep,
-		Config: Config{ProjectDocMaxBytes: max},
+	_, err = Codex{MaxChainBytes: max}.Build(context.Background(), AgentSpec{
+		Cwd: deep,
 	})
 	if !errors.Is(err, ErrContextTooLarge) {
 		t.Fatalf("one metered byte over project_doc_max_bytes must refuse: err = %v", err)

@@ -88,7 +88,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 	// wired to the same mate binary the Mate's manual names - otherwise a
 	// silent fallback to an empty {} would make the rest of this test prove
 	// nothing about the real hooks.
-	settingsPath := filepath.Join(started.MateDir, spawn.ClaudeSettingsDir, spawn.ClaudeSettingsFile)
+	settingsPath := harness.ClaudeSettingsPath(started.MateDir)
 	settings, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", settingsPath, err)

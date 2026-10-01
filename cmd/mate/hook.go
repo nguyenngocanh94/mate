@@ -30,8 +30,8 @@ func cmdHook(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		runHook(stdin, stderr, "mate-prompt", hook.HandlePrompt)
 	case "mate-stop":
 		runHook(stdin, stderr, "mate-stop", hook.HandleStop)
-	case spawn.SessionHookName:
-		fs := flag.NewFlagSet("hook "+spawn.SessionHookName, flag.ContinueOnError)
+	case harness.SessionHookName:
+		fs := flag.NewFlagSet("hook "+harness.SessionHookName, flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		harnessFlag := fs.String("harness", string(harness.KindClaude), "the harness running the hook: claude or codex")
 		if err := fs.Parse(args[1:]); err != nil {
@@ -84,7 +84,7 @@ func runHook(stdin io.Reader, stderr io.Writer, name string, handle func(*store.
 // failure after the workspace is found still prints one line telling the
 // Mate to run recall itself; like the other hooks it always exits 0.
 func runSessionHook(stdin io.Reader, stdout, stderr io.Writer, kind harness.Kind, now time.Time) {
-	const name = spawn.SessionHookName
+	const name = harness.SessionHookName
 	root, project, err := resolveHookTarget()
 	if err != nil {
 		fmt.Fprintf(stderr, "mate hook %s: %v\n", name, err)

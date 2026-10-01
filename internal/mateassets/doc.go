@@ -3,7 +3,7 @@
 //
 // Render and RenderBrief are pure: they take a Params/BriefParams value and
 // return bytes, with no filesystem access. Write is the one function that
-// touches disk: it writes `AGENTS.md` and `CLAUDE.md` atomically (temp file
+// touches disk: it writes `AGENTS.md` and the skills atomically (temp file
 // plus rename) and creates `memory.md`/`backlog.md` with their headers
 // only if they do not already exist - it never overwrites either, because
 // they are the Mate's own memory, not generated content.

@@ -71,7 +71,7 @@ func TestPaneEnvCopiesLaunchSpecEnv(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(context.Background(), harness.AgentSpec{
+	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
 		Kind:        harness.KindClaude,
 		Cwd:         cwd,
 		ContextPath: path,
@@ -105,13 +105,13 @@ func TestPaneEnvRefusesUnknownLaunchEnv(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := harness.Claude{}.BuildLaunchSpec(context.Background(), harness.AgentSpec{
+	_, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
 		Kind:        harness.KindClaude,
 		Cwd:         cwd,
 		ContextPath: path,
 		Env:         []harness.EnvVar{{Key: "SECRET", Value: "nope"}},
 	})
 	if err == nil {
-		t.Fatal("BuildLaunchSpec must refuse unknown env rather than drop it onto LaunchSpec.Env")
+		t.Fatal("Build must refuse unknown env rather than drop it onto LaunchSpec.Env")
 	}
 }

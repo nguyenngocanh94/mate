@@ -5,27 +5,28 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nguyenngocanh94/mate/assets"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 )
 
-// Write renders AGENTS.md and CLAUDE.md into dir, replacing whatever is
+// ManualName is the operating manual's file name in a Mate's directory. A
+// harness that reads its instructions under another name is pointed at this
+// file by its own launch (harness.Launcher.Prepare).
+const ManualName = "AGENTS.md"
+
+// Write renders the manual and the skills into dir, replacing whatever is
 // there, and creates memory.md and backlog.md with their headers and empty
-// sections (internal/memory) only if they do not already exist. dir must already exist; Write does not create
-// it. It never touches an existing memory.md or backlog.md.
+// sections (internal/memory) only if they do not already exist. dir must
+// already exist; Write does not create it. It never touches an existing
+// memory.md or backlog.md.
 func Write(dir string, p Params) error {
+	if !filepath.IsLocal(filepath.FromSlash(p.SkillsDir)) {
+		return fmt.Errorf("mateassets: skills directory %q is not a relative path inside the Mate's directory", p.SkillsDir)
+	}
 	agentsMD, err := Render(p)
 	if err != nil {
 		return err
 	}
-	claudeMD, err := assets.FS.ReadFile("mate/CLAUDE.md")
-	if err != nil {
-		return fmt.Errorf("mateassets: read CLAUDE.md template: %w", err)
-	}
-	if err := writeAtomic(filepath.Join(dir, "AGENTS.md"), agentsMD); err != nil {
-		return err
-	}
-	if err := writeAtomic(filepath.Join(dir, "CLAUDE.md"), claudeMD); err != nil {
+	if err := writeAtomic(filepath.Join(dir, ManualName), agentsMD); err != nil {
 		return err
 	}
 	if err := ensureFile(filepath.Join(dir, "memory.md"), memory.Header); err != nil {
@@ -37,10 +38,6 @@ func Write(dir string, p Params) error {
 	return writeSkills(dir, p)
 }
 
-// ClaudeSkillsDir is where Claude Code discovers skills relative to its own
-// working directory: `<cwd>/.claude/skills/<name>/SKILL.md`.
-const ClaudeSkillsDir = ".claude/skills"
-
 // writeSkills installs every SkillNames entry under dir, replacing whatever
 // is there. Skills are generated content like the manual, not the Mate's own
 // memory, so they are rewritten on every start rather than preserved.
@@ -50,7 +47,7 @@ func writeSkills(dir string, p Params) error {
 		if err != nil {
 			return err
 		}
-		skillDir := filepath.Join(dir, filepath.FromSlash(ClaudeSkillsDir), name)
+		skillDir := filepath.Join(dir, filepath.FromSlash(p.SkillsDir), name)
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return err
 		}

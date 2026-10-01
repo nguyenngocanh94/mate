@@ -1004,10 +1004,9 @@ func TestHerdrStartExportsTheLaunchEnvIntoThePane(t *testing.T) {
 		t.Fatal(err)
 	}
 	home := filepath.Join(t.TempDir(), "it's a home")
-	launch, err := harness.Codex{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+	launch, err := harness.Codex{Home: home}.Build(ctx, harness.AgentSpec{
 		Kind: harness.KindCodex, Cwd: cwd,
-		Env:    []harness.EnvVar{{Key: "MATE_AGENT_ROLE", Value: "mate"}},
-		Config: harness.Config{CodexHome: home},
+		Env: []harness.EnvVar{{Key: "MATE_AGENT_ROLE", Value: "mate"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1538,7 +1537,7 @@ func bootHerdrWithOptions(t *testing.T, observePaneEnvClear bool, handler func(c
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(context.Background(), harness.AgentSpec{
+	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
 		Kind: harness.KindClaude, Cwd: cwd, ContextPath: path,
 	})
 	if err != nil {
@@ -1817,7 +1816,7 @@ func TestHerdrCreateAgentTabRefusesMismatchedCwdFromCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1866,7 +1865,7 @@ func TestHerdrCreateAgentTabRefusesEmptyCwdFromCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1921,7 +1920,7 @@ func TestHerdrCreateAgentTabRefusesMismatchedCwdOnLabelReuse(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -62,10 +62,10 @@ func TestClaudeLaunchCarriesModelAndEffort(t *testing.T) {
 	cwd := t.TempDir()
 	contextPath := writeAbs(t, cwd, "context.md", "you are a crew")
 	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	spec, err := Claude{}.Build(context.Background(), AgentSpec{
 		Kind: KindClaude, Cwd: cwd, ContextPath: contextPath,
-		ClaudeSessionID: "11111111-1111-4111-8111-111111111111", ClaudeSettingsPath: settingsPath,
-		Model: "haiku", Effort: EffortLow,
+		Launch: claudeLaunch{sessionID: "11111111-1111-4111-8111-111111111111", settingsPath: settingsPath},
+		Model:  "haiku", Effort: EffortLow,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestCodexLaunchCarriesModelAndEffortBeforeTheResumeID(t *testing.T) {
 		t.Fatal(err)
 	}
 	const id = "01a0d260-cd47-77d2-bee7-46d98aa0461a"
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{
 		Kind: KindCodex, Cwd: cwd, ResumeSessionID: id, Model: "gpt-5.5", Effort: EffortHigh,
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestAnUnsupportedEffortIsRecordedNotPassed(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are a crew"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Kind: KindCodex, Cwd: cwd, Effort: EffortMax})
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{Kind: KindCodex, Cwd: cwd, Effort: EffortMax})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestNoProfileMeansNoFlags(t *testing.T) {
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("you are a crew"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := Codex{}.BuildLaunchSpec(context.Background(), AgentSpec{Kind: KindCodex, Cwd: cwd})
+	spec, err := Codex{}.Build(context.Background(), AgentSpec{Kind: KindCodex, Cwd: cwd})
 	if err != nil {
 		t.Fatal(err)
 	}

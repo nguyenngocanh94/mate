@@ -15,11 +15,9 @@ var (
 	briefTemplate  = template.Must(template.ParseFS(assets.FS, "crew/brief.md.tmpl"))
 )
 
-// SkillNames are the Claude Code skills installed beside the manual, in the
-// order Write lays them down. Each one is
-// `assets/mate/skills/<name>/SKILL.md.tmpl` in the embedded FS and
-// `<mate>/.claude/skills/<name>/SKILL.md` on disk, which is where Claude
-// Code discovers a skill relative to its own working directory.
+// SkillNames are the skills installed beside the manual, in the order Write
+// lays them down. Each one is `assets/mate/skills/<name>/SKILL.md.tmpl` in
+// the embedded FS and `<mate>/<SkillsDir>/<name>/SKILL.md` on disk.
 var SkillNames = []string{"harness-adapters", "crew-dispatch", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow", "mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
@@ -50,6 +48,10 @@ type Params struct {
 	Yolo bool
 	// Harness names the harness the Mate itself runs on (e.g. "claude-code").
 	Harness string
+	// SkillsDir is where the skills are written, relative to MateDir: the
+	// directory the Mate's harness discovers them in (harness.Info). The
+	// manual names it for a harness that does not.
+	SkillsDir string
 	// WorkspaceDoc is the absolute path of the workspace-wide WORKSPACE.md.
 	WorkspaceDoc string
 	// ProjectDoc is the absolute path of the project's PROJECT.md.

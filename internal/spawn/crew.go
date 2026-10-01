@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/brief"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
@@ -375,11 +374,12 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	if err := createStatusFile(w, statusPath); err != nil {
 		return CrewResult{}, err
 	}
-	sessionID, settingsPath, err := prepareCrewHarnessFiles(ctx, w, deps, saga.git, plan, brief)
+	prep, err := prepareCrewLaunch(ctx, w, deps, saga.git, plan)
 	if err != nil {
 		return CrewResult{}, err
 	}
-	launch, err := buildCrewLaunchSpec(ctx, plan, briefPath, sessionID, settingsPath)
+	sessionID := prep.SessionID
+	launch, err := buildCrewLaunchSpec(ctx, plan, prep)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -742,42 +742,31 @@ func renderCrewBrief(w *store.Workspace, plan crewPlan) ([]byte, error) {
 	})
 }
 
-// prepareCrewHarnessFiles writes whatever the chosen harness needs beside
-// the brief and returns the harness session id and settings path for the
-// launch spec.
-//
-// Codex reads AGENTS.override.md at its cwd and nothing else, so the brief
-// is copied into the worktree under that name and excluded locally, which is
-// why the crew is told to read the brief by absolute path rather than to
-// trust whatever it found in its cwd. Claude takes the brief itself as
-// --append-system-prompt-file, so nothing lands in the worktree.
-func prepareCrewHarnessFiles(ctx context.Context, w *store.Workspace, deps Deps, git gitx.Git, plan crewPlan, brief []byte) (sessionID, settingsPath string, err error) {
-	switch plan.kind {
-	case harness.KindCodex:
-		override := harness.CodexInstructionPath(plan.worktree)
-		if err := os.WriteFile(override, brief, 0o644); err != nil {
-			return "", "", err
-		}
-		// The discovery file is mate's, not the crew's work: excluding it
-		// locally keeps a `git add -A` from committing it onto the branch the
-		// Mate will review and fast-forward.
-		if err := excludeGeneratedFile(ctx, git, plan.worktree, filepath.Base(override)); err != nil {
-			return "", "", err
-		}
-		return "", "", nil
-	case harness.KindClaude:
-		// A Claude launch can only carry a session id together with a
-		// settings file, and decision 9 wants session_id= recorded from the
-		// first day, so the crew gets a settings file of its own. It wires
-		// no hooks (the Mate's hooks are the Mate's) and turns auto-memory
-		// off (CrewClaudeSettings).
-		settingsPath = filepath.Join(w.CrewDir(plan.project, plan.crew), ClaudeSettingsFile)
-		if err := writeInside(w, settingsPath, CrewClaudeSettings(), 0o644); err != nil {
-			return "", "", err
-		}
-		return newSessionID(deps.NewSessionID), settingsPath, nil
+// prepareCrewLaunch asks the harness to lay out a crew's launch from the
+// brief on disk, and writes what it names beside the brief: in the crew's
+// own directory, or in the worktree and excluded there, since such a file is
+// mate's and not the crew's work. The session id is minted here, for a
+// harness that names its session at launch.
+func prepareCrewLaunch(ctx context.Context, w *store.Workspace, deps Deps, git gitx.Git, plan crewPlan) (harness.Prepared, error) {
+	binary, err := deps.binary()
+	if err != nil {
+		return harness.Prepared{}, err
 	}
-	return "", "", nil
+	prep, err := plan.profile.Launcher().Prepare(ctx, harness.PrepareRequest{
+		Role:         harness.RoleCrew,
+		Cwd:          plan.worktree,
+		StateDir:     w.CrewDir(plan.project, plan.crew),
+		ContextPath:  w.CrewBrief(plan.project, plan.crew),
+		Binary:       binary,
+		NewSessionID: deps.NewSessionID,
+	})
+	if err != nil {
+		return harness.Prepared{}, err
+	}
+	if err := writeLaunchFiles(ctx, w, &git, plan.worktree, prep.Files); err != nil {
+		return harness.Prepared{}, err
+	}
+	return prep, nil
 }
 
 // excludeGeneratedFile appends an anchored literal name to the working
@@ -820,31 +809,22 @@ func excludeGeneratedFile(ctx context.Context, git gitx.Git, worktree, name stri
 	return closeErr
 }
 
-// buildCrewLaunchSpec asks the harness's launcher for the argv. The cwd is
-// the worktree; the context file is the brief (Claude) or the copy of it
-// Codex discovers in that cwd.
-func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionID, settingsPath string) (harness.LaunchSpec, error) {
-	spec := harness.AgentSpec{
-		ID:   CrewAgentNamePrefix + "-" + plan.crew,
-		Role: harness.RoleCrew,
-		Kind: plan.kind,
-		Cwd:  plan.worktree,
+// buildCrewLaunchSpec asks the harness's launcher for the argv of the launch
+// it prepared. The cwd is the worktree.
+func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, prep harness.Prepared) (harness.LaunchSpec, error) {
+	return plan.profile.Launcher().Build(ctx, harness.AgentSpec{
+		ID:          CrewAgentNamePrefix + "-" + plan.crew,
+		Role:        harness.RoleCrew,
+		Kind:        plan.kind,
+		Cwd:         plan.worktree,
+		ContextPath: prep.ContextPath,
+		Launch:      prep.Launch,
 		// No launch env: Herdr 0.8.2 applies `--env` when a pane is created,
 		// so the crew's identity (and MATE_STATUS) is injected by the tab
 		// create above.
-		Config: harness.Config{Kind: plan.kind},
 		Model:  plan.model,
 		Effort: plan.effort,
-	}
-	switch plan.kind {
-	case harness.KindClaude:
-		spec.ContextPath = briefPath
-		spec.ClaudeSessionID = sessionID
-		spec.ClaudeSettingsPath = settingsPath
-	case harness.KindCodex:
-		spec.ContextPath = harness.CodexInstructionPath(plan.worktree)
-	}
-	return plan.profile.Launcher().BuildLaunchSpec(ctx, spec)
+	})
 }
 
 // crewPaneEnv is the crew's identity, injected when its pane is created.
@@ -931,15 +911,6 @@ func writeInside(w *store.Workspace, path string, data []byte, perm os.FileMode)
 		return err
 	}
 	return os.WriteFile(path, data, perm)
-}
-
-// newSessionID mints a Claude session uuid. The Deps hook keeps unit tests
-// deterministic.
-func newSessionID(fn func() string) string {
-	if fn != nil {
-		return fn()
-	}
-	return uuid.NewString()
 }
 
 func planKind(plan crewPlan) brief.Kind {
