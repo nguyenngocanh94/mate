@@ -216,7 +216,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 			}
 			out.AlreadyGone = !live
 			if live {
-				if err := stopLiveAgent(ctx, deps, handle); err != nil {
+				if out.Forced, err = stopLiveAgent(ctx, deps, handle); err != nil {
 					return StopResult{}, err
 				}
 			}

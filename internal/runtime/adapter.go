@@ -65,7 +65,7 @@ type Adapter interface {
 	// separately.
 	SendText(ctx context.Context, handle AgentHandle, text string) error
 	AttachAgent(ctx context.Context, handle AgentHandle, target AttachTarget) (AttachedTo, error)
-	StopAgent(ctx context.Context, handle AgentHandle, mode StopMode) error
+	StopAgent(ctx context.Context, handle AgentHandle, stop Stop) error
 	RemoveTab(ctx context.Context, handle TabHandle) error
 }
 
@@ -395,16 +395,42 @@ const (
 	AttachTerminal AttachMode = "terminal"
 )
 
-// StopMode is graceful (harness-specific capability) vs force (pane/tab close).
-// RuntimeAdapter must not hardcode send-keys for every harness. Claude
-// graceful stop is `agent prompt /exit`; that is a capability of the first
-// harness, not a generic Herdr API (there is no `herdr agent stop`).
+// StopMode is graceful (the harness's own exit) vs force (pane close).
 type StopMode string
 
 const (
-	StopGraceful StopMode = "graceful"
-	StopForce    StopMode = "force"
+	StopModeGraceful StopMode = "graceful"
+	StopModeForce    StopMode = "force"
 )
+
+// Stop is how StopAgent ends an agent. There is no `herdr agent stop`, and
+// the runtime does not know any harness's exit: a graceful stop carries the
+// line the harness declared (harness.Capabilities.GracefulStop). The zero
+// Stop is neither and is refused.
+type Stop struct {
+	mode StopMode
+	exit harness.GracefulStopper
+}
+
+// StopForce closes the agent's pane.
+var StopForce = Stop{mode: StopModeForce}
+
+// StopGraceful types the harness's exit prompt and proves the agent gone.
+func StopGraceful(exit harness.GracefulStopper) Stop {
+	return Stop{mode: StopModeGraceful, exit: exit}
+}
+
+// Mode is graceful or force; empty for the zero Stop.
+func (s Stop) Mode() StopMode { return s.mode }
+
+// exitPrompt is the graceful stop's line, or an error when the Stop does
+// not carry one.
+func (s Stop) exitPrompt() (string, error) {
+	if s.exit == nil || strings.TrimSpace(s.exit.ExitPrompt()) == "" {
+		return "", observability.NewError(observability.CodeUsage, "a graceful stop needs the harness's exit prompt")
+	}
+	return s.exit.ExitPrompt(), nil
+}
 
 // AssumptionStatus records G1 evidence honesty for contracts that would
 // otherwise silently assume the convenient case.

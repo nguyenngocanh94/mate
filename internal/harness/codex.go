@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/config"
@@ -32,6 +33,11 @@ type Codex struct {
 	// means only AGENTS.override.md / AGENTS.md, never an assumed
 	// TEAM_GUIDE.md.
 	FallbackFilenames []string
+	// SessionsDir is where Codex writes its rollouts, which a Mate's resume
+	// is checked against and its session id recovered from at stop (task
+	// 35). Empty means CodexSessionsDir(Home); tests point it at a
+	// directory of their own so none reads the operator's ~/.codex.
+	SessionsDir string
 }
 
 // Kind implements Profile.
@@ -59,13 +65,137 @@ func (c Codex) Launcher() Launcher { return c }
 func (Codex) Screen() ScreenProfile { return codexScreen{} }
 
 // Capabilities implements Profile.
-func (Codex) Capabilities() Capabilities {
+func (c Codex) Capabilities() Capabilities {
 	return Capabilities{
 		GracefulStop: Cap[GracefulStopper]{
 			Status: CapUnknown,
 			Reason: "never measured: v1 G1 proved only Claude's /exit, so a Codex stop closes the pane",
 		},
+		Session: Cap[SessionIdentity]{
+			Status: CapVerified,
+			Impl:   codexSessions{c},
+			Evidence: Evidence{
+				Version:  "codex-cli 0.156.1",
+				Measured: "2026-09-24 (docs/mvp.md section 7, task 35 A4 and B11)",
+				Proof:    "live TestLiveSpawnMateResumeRemembersCodex: the id read at stop resumed with `codex resume <flags> <id>` and the Mate remembered",
+			},
+		},
+		Hooks: Cap[HookInstaller]{
+			Status: CapVerified,
+			Impl:   codexHooks{},
+			Evidence: Evidence{
+				Version:  "codex-cli 0.156.1",
+				Measured: "2026-09-24 (docs/mvp.md section 7, tasks 35 A3 and 37)",
+				Proof:    "live TestLiveCodexSessionStartHook and TestLiveCodexMateRecallHook: the cwd's .codex/hooks.json SessionStart hook, trusted in the hook review, puts its stdout in context",
+			},
+		},
+		TurnEnd: Cap[TurnEndEvidence]{
+			Status: CapVerified,
+			Impl:   codexTurnEnd{},
+			Evidence: Evidence{
+				Version:  "codex-cli 0.156.1",
+				Measured: "2026-09-24 (docs/mvp.md task 38)",
+				Proof:    "live TestLiveMemorySurvivesRestart codex: the stow ended on the rollout's task_complete, where the composer had read empty mid-turn",
+			},
+		},
 	}
+}
+
+// codexSessions is Codex's SessionIdentity. Codex has no launch-time
+// session id: it exists once the first prompt opens the rollout, and after
+// a /clear it is a new one, so it is read at the one moment that knows it.
+type codexSessions struct{ c Codex }
+
+func (s codexSessions) dir() (string, error) {
+	if s.c.SessionsDir != "" {
+		return s.c.SessionsDir, nil
+	}
+	return CodexSessionsDir(s.c.Home)
+}
+
+// AtStop implements SessionIdentity (task 35, B11).
+//
+// The runtime's ref (Herdr's agent_session.value) is the first rule. It is
+// exact, and on Herdr 0.8.2 it is filled by the Herdr integration's
+// SessionStart hook in the operator's ~/.codex/hooks.json, which codex-cli
+// 0.154.0 runs at the first prompt of a session, not at launch (measured
+// 2026-09-24). When Herdr has none - the agent already gone, or no
+// integration - the rollout is adopted by the timeline's own rule
+// (AdoptCodexRollout: this cwd, a session_meta at or after launched, and
+// exactly one of them). Empty means neither answered: a resumed session's
+// rollout is older than its launch, so the adoption rule rightly finds
+// nothing new for it.
+func (s codexSessions) AtStop(cwd string, launched time.Time, runtimeRef string) string {
+	if ref := strings.TrimSpace(runtimeRef); ref != "" {
+		return ref
+	}
+	if launched.IsZero() {
+		return ""
+	}
+	dir, err := s.dir()
+	if err != nil {
+		return ""
+	}
+	candidates, err := CodexRolloutCandidatesSince(dir, launched)
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
+	}
+	adopted := AdoptCodexRollout(candidates, cwd, launched, "")
+	if adopted.Status != CodexAdoptionKnown {
+		return ""
+	}
+	return adopted.Candidate.Meta.SessionID
+}
+
+// Resumable implements SessionIdentity. codex-cli 0.154.0 answers `codex
+// resume <unknown id>` with "No saved session found with ID ..." and drops
+// to the shell, which Herdr reports only as an agent-start timeout a minute
+// later (measured 2026-09-24, task 35); the rollout's file name says it at
+// once.
+func (s codexSessions) Resumable(id string) error {
+	dir, err := s.dir()
+	if err != nil {
+		return fmt.Errorf("cannot look for the Codex session %s to resume (%v)", id, err)
+	}
+	if _, ok := CodexRolloutPath(dir, id); !ok {
+		return &NoSessionError{Session: "the Codex session " + id, Missing: dir + " has no rollout for it"}
+	}
+	return nil
+}
+
+// codexHooks is Codex's HookInstaller: the SessionStart hook of the Mate's
+// `.codex/hooks.json` (CodexHooks), which Codex asks the operator to trust
+// in its hook review.
+type codexHooks struct{}
+
+// Own implements HookInstaller.
+func (codexHooks) Own(binary, cwd string) []OwnHook {
+	return []OwnHook{{
+		Event:   "SessionStart",
+		Source:  CodexHooksPath(cwd),
+		Command: SessionHookCommand(binary, KindCodex),
+	}}
+}
+
+// DigestMaxBytes implements HookInstaller.
+func (codexHooks) DigestMaxBytes() int { return CodexSessionHookMaxBytes }
+
+// codexTurnEnd is Codex's TurnEndEvidence: no Stop hook, but the rollout
+// records `task_complete` when a turn ends (CodexTurnCompletedAfter).
+type codexTurnEnd struct{}
+
+// LogsAnswers implements TurnEndEvidence.
+func (codexTurnEnd) LogsAnswers() bool { return false }
+
+// EndsInTranscript implements TurnEndEvidence.
+func (codexTurnEnd) EndsInTranscript() bool { return true }
+
+// TranscriptTurnEnded implements TurnEndEvidence.
+func (codexTurnEnd) TranscriptTurnEnded(rollout []byte, after time.Time) bool {
+	return CodexTurnCompletedAfter(rollout, after)
 }
 
 func (c Codex) maxBytes() int {

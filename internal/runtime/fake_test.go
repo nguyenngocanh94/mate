@@ -388,6 +388,28 @@ func TestFakeStopLeavesAgentIsNotAConfirmedStop(t *testing.T) {
 	}
 }
 
+// The fake, like Herdr, ends an agent gracefully with the exit the stop
+// carries and refuses a graceful stop that carries none.
+func TestFakeGracefulStopNeedsTheHarnessExit(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	rt, launch, session, tab := boot(t)
+	res := mustReserve(t, rt, session, "mate_001")
+	h, err := rt.StartAgent(ctx, mustStartSpec(t, tab, res, launch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.StopAgent(ctx, h, runtime.StopGraceful(nil)); err == nil {
+		t.Fatal("a graceful stop without the harness's exit succeeded")
+	}
+	if err := rt.StopAgent(ctx, h, runtime.StopGraceful(exitLine("/quit"))); err != nil {
+		t.Fatal(err)
+	}
+	if len(rt.ExitPrompts) != 1 || rt.ExitPrompts[0] != "/quit" || rt.LiveAgentCount() != 0 {
+		t.Fatalf("exit prompts %q, live agents %d; want /quit typed and the agent gone", rt.ExitPrompts, rt.LiveAgentCount())
+	}
+}
+
 func mustReserve(t *testing.T, rt *runtime.Fake, session runtime.SessionHandle, raw string) runtime.NameReservation {
 	t.Helper()
 	res, err := runtime.AllocateAgentName(rt.Names, session.Name, "m", raw, runtime.FailOnCollision)

@@ -119,7 +119,8 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no lab CODEX_HOME: %v", err)
 	}
-	lab.deps.CodexSessionsDir = filepath.Join(home, "sessions")
+	sessions := filepath.Join(home, "sessions")
+	lab.deps.Harnesses = codexSessionsIn(t, sessions)
 	mateDir := lab.w.MateDir("shop")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
@@ -148,7 +149,7 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 		}
 	}
 	rollout := readMeta(t, lab.w, "shop")[spawn.MetaTranscript]
-	if p, ok := harness.CodexRolloutPath(lab.deps.CodexSessionsDir, id); !ok || p != rollout {
+	if p, ok := harness.CodexRolloutPath(sessions, id); !ok || p != rollout {
 		t.Fatalf("mate.meta transcript %q, rollout for %s %q (found %v)", rollout, id, p, ok)
 	}
 	answer := waitCodexAnswer(t, rollout, 0, 3*time.Minute)

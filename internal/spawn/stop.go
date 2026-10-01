@@ -3,7 +3,6 @@ package spawn
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,6 +35,11 @@ type StopResult struct {
 	Confirmed bool
 	// TabClosed is true when the tab was removed (or was already).
 	TabClosed bool
+	// Forced says why the stop closed the agent's pane instead of letting
+	// the harness exit on its own: no verified graceful stop, or one that
+	// did not end the agent (plan section 3.7). Empty when the harness
+	// exited, or when there was no live agent to stop.
+	Forced string
 
 	// The fields below are set only by StopCrew; a Mate has no worktree or
 	// branch of its own.
@@ -128,39 +132,36 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 		Cwd:         w.MateDir(project),
 		Label:       MateTabLabel,
 	}
+	kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 	if !running {
 		// Herdr does not report the session running, so there is no server
 		// to ask about the agent or the tab. The record is treated as stale
-		// and cleared, keeping a Codex session the rollouts can still name,
-		// but the absence is inferred, not confirmed: Confirmed stays false
-		// and nothing may treat the transcript as at rest.
+		// and cleared, keeping a session the harness can still name from
+		// disk, but the absence is inferred, not confirmed: Confirmed stays
+		// false and nothing may treat the transcript as at rest.
 		out.AlreadyGone, out.TabClosed = true, true
-		if meta[MetaHarness] == string(harness.KindCodex) {
-			if id := codexSessionAtStop(deps, w.MateDir(project), meta, ""); id != "" {
-				meta[MetaSessionID] = id
-				out.SessionID = id
-			}
+		if id := sessionAtStop(deps, kind, w.MateDir(project), meta, ""); id != "" {
+			meta[MetaSessionID] = id
+			out.SessionID = id
 		}
 		return out, clearRunMeta(w, project, meta, deps.now())
 	}
 
-	kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 	handle := runtime.AgentHandle{Session: session, Name: out.Agent, RawID: project, Kind: kind, Tab: tab}
 	observed, live, err := inspectLive(ctx, deps, handle)
 	if err != nil {
 		return StopResult{}, err
 	}
 	out.AlreadyGone = !live
-	if kind == harness.KindCodex {
-		// Read before the agent is gone: Herdr forgets agent_session with
-		// the agent, and a Codex session id exists nowhere mate writes.
-		if id := codexSessionAtStop(deps, w.MateDir(project), meta, observed.SessionRef); id != "" {
-			meta[MetaSessionID] = id
-			out.SessionID = id
-		}
+	// Read before the agent is gone: Herdr forgets agent_session with the
+	// agent, and a harness that names its session only after the first
+	// prompt (Codex) has it nowhere mate writes.
+	if id := sessionAtStop(deps, kind, w.MateDir(project), meta, observed.SessionRef); id != "" {
+		meta[MetaSessionID] = id
+		out.SessionID = id
 	}
 	if live {
-		if err := stopLiveAgent(ctx, deps, handle); err != nil {
+		if out.Forced, err = stopLiveAgent(ctx, deps, handle); err != nil {
 			return StopResult{}, err
 		}
 	}
@@ -181,29 +182,53 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 
 // stopLiveAgent asks for a graceful stop where the harness has one, then
 // forces. A name Herdr already does not know is success, not a failure.
-func stopLiveAgent(ctx context.Context, deps Deps, handle runtime.AgentHandle) error {
-	if gracefulStop(deps, handle.Kind) {
-		if err := deps.Runtime.StopAgent(ctx, handle, runtime.StopGraceful); err == nil || runtime.IsAgentNotFound(err) {
-			if confirmGone(ctx, deps, handle) == nil {
-				return nil
+// forced says why the pane was closed instead, empty when the harness
+// exited on its own.
+func stopLiveAgent(ctx context.Context, deps Deps, handle runtime.AgentHandle) (string, error) {
+	exit, forced := gracefulStop(deps, handle.Kind)
+	if exit != nil {
+		failed := deps.Runtime.StopAgent(ctx, handle, runtime.StopGraceful(exit))
+		if failed == nil || runtime.IsAgentNotFound(failed) {
+			if failed = confirmGone(ctx, deps, handle); failed == nil {
+				return "", nil
 			}
 		}
+		forced = fmt.Sprintf("the %s exit prompt %q did not end the agent (%s)", handle.Kind, exit.ExitPrompt(), oneLineErr(failed))
 	}
 	if err := deps.Runtime.StopAgent(ctx, handle, runtime.StopForce); err != nil && !runtime.IsAgentNotFound(err) {
 		if confirmGone(ctx, deps, handle) == nil {
-			return nil
+			return forced, nil
 		}
-		return err
+		return forced, err
 	}
-	return confirmGone(ctx, deps, handle)
+	return forced, confirmGone(ctx, deps, handle)
 }
 
-// gracefulStop reports whether the harness declares a verified graceful
-// stop. Anything else - unsupported, unknown, or a kind no profile is
-// registered for - goes straight to the force stop (plan section 3.7).
-func gracefulStop(deps Deps, kind harness.Kind) bool {
+// gracefulStop is the harness's verified graceful stop, or nil and why
+// there is none: unsupported, unknown, or a kind no profile is registered
+// for all go straight to the force stop (plan section 3.7).
+func gracefulStop(deps Deps, kind harness.Kind) (harness.GracefulStopper, string) {
 	profile, err := deps.Harnesses.Lookup(kind)
-	return err == nil && profile.Capabilities().GracefulStop.Verified()
+	if err != nil {
+		return nil, oneLineErr(err)
+	}
+	c := profile.Capabilities().GracefulStop
+	if !c.Verified() {
+		return nil, fmt.Sprintf("the %s harness declares no verified graceful stop (%s)", kind, capReason(c.Status, c.Reason))
+	}
+	return c.Impl, ""
+}
+
+// capReason is why a capability is not verified, for a note: its declared
+// reason, or its status when it gave none.
+func capReason(status harness.CapStatus, reason string) string {
+	if strings.TrimSpace(reason) != "" {
+		return reason
+	}
+	if status == harness.CapUndeclared {
+		return "undeclared"
+	}
+	return string(status)
 }
 
 // confirmGone is the only way a stop is confirmed: `agent get` must not find
@@ -251,46 +276,25 @@ func inspectLive(ctx context.Context, deps Deps, handle runtime.AgentHandle) (ru
 	return observed, true, nil
 }
 
-// codexSessionAtStop is the Codex session a stopping Mate was in, for the
-// next start to resume (task 35, B11). Codex has no launch-time session id:
-// it exists once the first prompt opens the rollout, and after a `/clear` it
-// is a new one, so it is read at the one moment that knows the answer.
-//
-// Herdr's agent_session.value is the first rule. It is exact, and on Herdr
-// 0.8.2 it is filled by the Herdr integration's SessionStart hook in the
-// operator's ~/.codex/hooks.json, which codex-cli 0.154.0 runs at the first
-// prompt of a session, not at launch (measured 2026-09-24). When Herdr has
-// none - the agent already gone, or no integration - the rollout is adopted
-// by the timeline's own rule (harness.AdoptCodexRollout: this cwd, a
-// session_meta at or after launched_at, and exactly one of them). Empty
-// means neither answered, and the caller keeps whatever session_id the meta
-// already had: a resumed session's rollout is older than its launch, so the
-// adoption rule rightly finds nothing new for it.
-func codexSessionAtStop(deps Deps, mateDir string, meta map[string]string, herdrRef string) string {
-	if ref := strings.TrimSpace(herdrRef); ref != "" {
-		return ref
-	}
-	launched, err := time.Parse(time.RFC3339, strings.TrimSpace(meta[MetaLaunchedAt]))
+// sessionAtStop is the session a stopping Mate was in, for the next start to
+// resume (task 35, B11), as its harness names it
+// (harness.SessionIdentity.AtStop) from Herdr's agent_session.value
+// (herdrRef) or from disk. Empty means the harness could not say - or has
+// no verified session identity, so there is nothing to resume anyway - and
+// the caller keeps whatever session_id the meta already had.
+func sessionAtStop(deps Deps, kind harness.Kind, mateDir string, meta map[string]string, herdrRef string) string {
+	profile, err := deps.Harnesses.Lookup(kind)
 	if err != nil {
 		return ""
 	}
-	dir, err := deps.codexSessionsDir()
-	if err != nil {
+	session := profile.Capabilities().Session
+	if !session.Verified() {
 		return ""
 	}
-	candidates, err := harness.CodexRolloutCandidatesSince(dir, launched)
-	if err != nil {
-		return ""
-	}
-	cwd := mateDir
-	if resolved, err := filepath.EvalSymlinks(mateDir); err == nil {
-		cwd = resolved
-	}
-	adopted := harness.AdoptCodexRollout(candidates, cwd, launched, "")
-	if adopted.Status != harness.CodexAdoptionKnown {
-		return ""
-	}
-	return adopted.Candidate.Meta.SessionID
+	// An unreadable launched_at is the zero time: the harness then has only
+	// herdrRef to go on.
+	launched, _ := time.Parse(time.RFC3339, strings.TrimSpace(meta[MetaLaunchedAt]))
+	return session.Impl.AtStop(mateDir, launched, herdrRef)
 }
 
 // clearRunMeta drops everything that named a live pane and keeps what a

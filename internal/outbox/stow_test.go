@@ -182,6 +182,58 @@ func TestStowWaitsForTheCodexRolloutToFinishTheTurn(t *testing.T) {
 	}
 }
 
+// codexWithoutTurnEnd is Codex declaring no turn-end evidence.
+type codexWithoutTurnEnd struct{ harness.Codex }
+
+func (c codexWithoutTurnEnd) Capabilities() harness.Capabilities {
+	caps := c.Codex.Capabilities()
+	caps.TurnEnd = harness.Cap[harness.TurnEndEvidence]{Status: harness.CapUnknown, Reason: "a test harness that never measured it"}
+	return caps
+}
+
+// TestStowFallsBackToTheComposerWithoutTurnEndEvidence: the stow asks the
+// harness for its evidence, not the kind. The same Codex Mate with its
+// rollout named, registered without turn-end evidence, is judged by the
+// composer alone (plan section 3.7): busy, then empty twice.
+func TestStowFallsBackToTheComposerWithoutTurnEndEvidence(t *testing.T) {
+	f := newFixture(t)
+	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	const codexBusy = "• Working (3s • esc to interrupt)\n\n› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	rollout := filepath.Join(t.TempDir(), "rollout.jsonl")
+	if err := os.WriteFile(rollout, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ws.WriteMateMeta(project, map[string]string{"harness": "codex", "transcript": rollout}); err != nil {
+		t.Fatal(err)
+	}
+	f.rt.SetReadOutput(f.handle, codexEmpty)
+	f.rt.OnSendText = func(h runtime.AgentHandle, _ string) { f.rt.SetReadOutput(h, codexBusy) }
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(n int) {
+		if n == 4 {
+			f.rt.SetReadOutput(f.handle, codexEmpty)
+		}
+	}}
+	reg, err := harness.NewRegistry(nil, codexWithoutTurnEnd{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := f.deps()
+	d.Harnesses, d.Sleeper, d.Handle = reg, sleeper, func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
+		return f.handle, harness.KindCodex, nil
+	}
+	ws, err := store.Open(f.ws.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := outbox.New(ws, d).Stow(context.Background(), project, outbox.StowOptions{Ceiling: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Stowed {
+		t.Fatalf("result = %+v: with no turn-end evidence the composer decides", res)
+	}
+}
+
 func TestCodexTurnCompletedAfter(t *testing.T) {
 	at := time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC)
 	rec := func(kind string, ts time.Time) string {

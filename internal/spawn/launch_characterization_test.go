@@ -40,6 +40,8 @@ type launchFixture struct {
 	rt   *runtime.Fake
 	rec  *promptRecorder
 	deps spawn.Deps
+	// codexSessions is where the registered Codex reads its rollouts.
+	codexSessions string
 	// roots are the directories a launch could write to.
 	roots []string
 	// places are replaced by their names wherever they appear; sizes are
@@ -74,15 +76,16 @@ func newLaunchFixture(t *testing.T, crew bool, env map[string]string) *launchFix
 	rec := &promptRecorder{Fake: rt}
 	deps := fakeDeps(t, rt)
 	deps.Runtime = rec
-	deps.CodexSessionsDir = t.TempDir()
-	f := &launchFixture{w: w, rt: rt, rec: rec, deps: deps}
+	codexSessions := t.TempDir()
+	deps.Harnesses = codexSessionsIn(t, codexSessions)
+	f := &launchFixture{w: w, rt: rt, rec: rec, deps: deps, codexSessions: codexSessions}
 	f.places = []placeholder{
 		{w.Root(), "{{WORKSPACE}}"},
 		{home, "{{HOME}}"},
 		{codexHome, "{{CODEX_HOME}}"},
 		{deps.ConfigHome, "{{CONFIG_HOME}}"},
 		{filepath.Dir(deps.Binary), "{{BIN_DIR}}"},
-		{deps.CodexSessionsDir, "{{CODEX_SESSIONS}}"},
+		{codexSessions, "{{CODEX_SESSIONS}}"},
 		// The Herdr session name is a hash of the workspace root.
 		{w.Session(), "{{HERDR_SESSION}}"},
 	}
@@ -450,7 +453,7 @@ func TestLaunchCharacterizationMate(t *testing.T) {
 			if tc.resume {
 				if tc.kind == harness.KindCodex {
 					setSessionRef(t, f.rt, f.w, res.Agent, codexSessionA)
-					writeCodexRollout(t, f.deps.CodexSessionsDir, codexSessionA, f.w.MateDir("shop"), f.deps.Now())
+					writeCodexRollout(t, f.codexSessions, codexSessionA, f.w.MateDir("shop"), f.deps.Now())
 				}
 				if _, err := spawn.StopMate(ctx, f.w, f.deps, "shop"); err != nil {
 					t.Fatalf("StopMate: %v", err)

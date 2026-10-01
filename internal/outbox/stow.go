@@ -179,21 +179,24 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		polls++
 	}
 
-	// 2. The turn on it. Claude's Stop hook writes the Mate's answer to
-	// sent.log (docs/mvp.md task 08), which says the turn ended; Codex has
-	// no such hook, but its rollout records `task_complete` when a turn
+	// 2. The turn on it, by the evidence the harness declares
+	// (harness.TurnEndEvidence). Claude's Stop hook writes the Mate's answer
+	// to sent.log (docs/mvp.md task 08), which says the turn ended; Codex
+	// has no such hook, but its rollout records `task_complete` when a turn
 	// ends, and mate.meta names the rollout once the Mate's SessionStart
 	// hook has run. A Codex composer reads empty between tool calls
 	// (task 38: a stow judged over by the composer was cut off mid-turn),
-	// so while the rollout is known it is the only rule. Claude's hook does
-	// not fire every turn (section 7), and a Codex rollout can be unknown,
-	// so the composer remains the fallback: busy after the line, then empty
-	// on two looks in a row.
+	// so while the transcript is known it is the only rule. Claude's hook
+	// does not fire every turn (section 7), a transcript can be unknown,
+	// and a harness can declare no evidence at all (plan section 3.7), so
+	// the composer remains the fallback: busy after the line, then empty on
+	// two looks in a row.
+	evidence := s.turnEnd(kind)
 	sawBusy, empties, since := false, 0, 0
 	for ; ; since++ {
-		if kind == harness.KindCodex {
-			if rollout := s.codexRollout(project); rollout != "" {
-				if data, err := os.ReadFile(rollout); err == nil && harness.CodexTurnCompletedAfter(data, item.SentAt) {
+		if evidence != nil && evidence.EndsInTranscript() {
+			if transcript := s.mateTranscript(project); transcript != "" {
+				if data, err := os.ReadFile(transcript); err == nil && evidence.TranscriptTurnEnded(data, item.SentAt) {
 					if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
 						return done(StowResult{Stowed: true})
 					}
@@ -208,7 +211,7 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 				continue
 			}
 		}
-		if kind == harness.KindClaude {
+		if evidence != nil && evidence.LogsAnswers() {
 			ended, err := s.answeredAfter(project, item)
 			if err != nil {
 				return out, err
@@ -296,8 +299,21 @@ func (s *Sender) answeredAfter(project string, item store.OutboxItem) (bool, err
 // internal/spawn's tests hold the two equal.
 const MateMetaTranscript = "transcript"
 
-// codexRollout is the rollout mate.meta records for a Codex Mate, or "".
-func (s *Sender) codexRollout(project string) string {
+// turnEnd is the turn-end evidence the Mate's harness declares, or nil when
+// it declares none verified and the composer is all there is.
+func (s *Sender) turnEnd(kind harness.Kind) harness.TurnEndEvidence {
+	profile, err := s.deps.Harnesses.Lookup(kind)
+	if err != nil {
+		return nil
+	}
+	if c := profile.Capabilities().TurnEnd; c.Verified() {
+		return c.Impl
+	}
+	return nil
+}
+
+// mateTranscript is the transcript mate.meta records for the Mate, or "".
+func (s *Sender) mateTranscript(project string) string {
 	meta, err := s.ws.ReadMateMeta(project)
 	if err != nil {
 		return ""

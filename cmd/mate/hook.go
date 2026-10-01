@@ -13,7 +13,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/hook"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -33,7 +32,10 @@ func cmdHook(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case harness.SessionHookName:
 		fs := flag.NewFlagSet("hook "+harness.SessionHookName, flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		harnessFlag := fs.String("harness", string(harness.KindClaude), "the harness running the hook: claude or codex")
+		// The default is the one harness whose hook runs without the flag:
+		// every Claude Mate's settings file, its users' own included, says
+		// `hook mate-session` and nothing more (harness.SessionHookCommand).
+		harnessFlag := fs.String("harness", string(harness.KindClaude), "the registered harness running the hook")
 		if err := fs.Parse(args[1:]); err != nil {
 			return &usageError{err}
 		}
@@ -114,14 +116,25 @@ func runSessionHook(stdin io.Reader, stdout, stderr io.Writer, kind harness.Kind
 	if source == "" {
 		source = "unknown source"
 	}
+	// The digest is sized to what the harness puts in context whole. A
+	// harness without verified hooks never runs a Mate (spawn.StartMate),
+	// so a hook that names one is told to recall by hand rather than given
+	// a digest of a guessed size.
+	profile, err := harnesses.Lookup(kind)
+	if err != nil {
+		fallback(err)
+		return
+	}
+	hooks := profile.Capabilities().Hooks
+	if !hooks.Verified() {
+		fallback(fmt.Errorf("the %s harness declares no verified Hooks capability", kind))
+		return
+	}
 	opts := recallOptions{
 		LiveOnly: start.LiveOnly(),
-		MaxBytes: spawn.ClaudeSessionHookMaxBytes,
+		MaxBytes: hooks.Impl.DigestMaxBytes(),
 		Occasion: "session start: " + source,
 		Binary:   bin,
-	}
-	if kind == harness.KindCodex {
-		opts.MaxBytes = spawn.CodexSessionHookMaxBytes
 	}
 	text, err := recall(context.Background(), w, gitx.New(), project, now, opts)
 	if err != nil {

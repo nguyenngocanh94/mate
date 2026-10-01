@@ -125,18 +125,6 @@ type Deps struct {
 	// NewSessionID mints the Claude session uuid; tests make it
 	// deterministic. Nil means uuid.NewString.
 	NewSessionID func() string
-	// CodexSessionsDir is where Codex writes its rollouts, which a Codex
-	// Mate's resume is checked against and its session id is recovered
-	// from when Herdr has none (task 35). Empty means
-	// harness.CodexSessionsDir("") - CODEX_HOME, then ~/.codex.
-	CodexSessionsDir string
-}
-
-func (d Deps) codexSessionsDir() (string, error) {
-	if d.CodexSessionsDir != "" {
-		return d.CodexSessionsDir, nil
-	}
-	return harness.CodexSessionsDir("")
 }
 
 // LiveDeps is what the CLI uses: the real Herdr adapter over os/exec, and

@@ -18,13 +18,14 @@ import (
 
 const codexSessionA = "01a0d260-cd47-77d2-bee7-46d98aa0461a"
 
-// codexDeps is fakeDeps with a sessions directory of the test's own, so no
-// test reads the operator's ~/.codex.
-func codexDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
+// codexDeps is fakeDeps with Codex's rollouts in a directory of the test's
+// own, which it returns, so no test reads the operator's ~/.codex.
+func codexDeps(t *testing.T, rt *runtime.Fake) (spawn.Deps, string) {
 	t.Helper()
 	deps := fakeDeps(t, rt)
-	deps.CodexSessionsDir = t.TempDir()
-	return deps
+	sessions := t.TempDir()
+	deps.Harnesses = codexSessionsIn(t, sessions)
+	return deps, sessions
 }
 
 // writeCodexRollout writes a rollout file of codex-cli 0.154.0's naming and
@@ -67,7 +68,7 @@ func lastArgv(t *testing.T, rt *runtime.Fake) []string {
 func TestStopMateRecordsTheCodexSessionAndStartResumesIt(t *testing.T) {
 	w := newWorkspace(t, "blog")
 	rt := runtime.NewFake()
-	deps := codexDeps(t, rt)
+	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
 	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
@@ -75,7 +76,7 @@ func TestStopMateRecordsTheCodexSessionAndStartResumesIt(t *testing.T) {
 		t.Fatalf("first StartMate: %v", err)
 	}
 	setSessionRef(t, rt, w, first.Agent, codexSessionA)
-	writeCodexRollout(t, deps.CodexSessionsDir, codexSessionA, w.MateDir("blog"), deps.Now())
+	writeCodexRollout(t, sessions, codexSessionA, w.MateDir("blog"), deps.Now())
 
 	stopped, err := spawn.StopMate(ctx, w, deps, "blog")
 	if err != nil {
@@ -125,7 +126,7 @@ func TestStopMateRecordsTheCodexSessionAndStartResumesIt(t *testing.T) {
 func TestStopMateAdoptsTheCodexRolloutWhenHerdrHasNoSession(t *testing.T) {
 	w := newWorkspace(t, "blog")
 	rt := runtime.NewFake()
-	deps := codexDeps(t, rt)
+	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
 	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex}); err != nil {
@@ -135,11 +136,11 @@ func TestStopMateAdoptsTheCodexRolloutWhenHerdrHasNoSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeCodexRollout(t, deps.CodexSessionsDir, codexSessionA, cwd, deps.Now().Add(2*time.Second))
+	writeCodexRollout(t, sessions, codexSessionA, cwd, deps.Now().Add(2*time.Second))
 	// Another directory's session, and one of this directory's from before
 	// the launch: neither is this Mate's.
-	writeCodexRollout(t, deps.CodexSessionsDir, "01a0d260-0000-7000-8000-000000000001", "/elsewhere", deps.Now().Add(time.Second))
-	writeCodexRollout(t, deps.CodexSessionsDir, "01a0d260-0000-7000-8000-000000000002", cwd, deps.Now().Add(-time.Hour))
+	writeCodexRollout(t, sessions, "01a0d260-0000-7000-8000-000000000001", "/elsewhere", deps.Now().Add(time.Second))
+	writeCodexRollout(t, sessions, "01a0d260-0000-7000-8000-000000000002", cwd, deps.Now().Add(-time.Hour))
 
 	stopped, err := spawn.StopMate(ctx, w, deps, "blog")
 	if err != nil {
@@ -155,7 +156,7 @@ func TestStopMateAdoptsTheCodexRolloutWhenHerdrHasNoSession(t *testing.T) {
 func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 	w := newWorkspace(t, "blog")
 	rt := runtime.NewFake()
-	deps := codexDeps(t, rt)
+	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
 	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
@@ -174,8 +175,10 @@ func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 	if second.Resumed {
 		t.Fatal("a session with no rollout must not be resumed")
 	}
-	if !strings.Contains(second.ResumeNote, codexSessionA) || !strings.Contains(second.ResumeNote, "no rollout") {
-		t.Fatalf("ResumeNote = %q, want it to name the session and the missing rollout", second.ResumeNote)
+	// The note is the one mate has always printed for a Codex Mate.
+	want := "mate.meta recorded the Codex session " + codexSessionA + " but " + sessions + " has no rollout for it; starting a fresh session instead"
+	if second.ResumeNote != want {
+		t.Fatalf("ResumeNote = %q, want %q", second.ResumeNote, want)
 	}
 	if slices.Contains(lastArgv(t, rt), "resume") {
 		t.Fatalf("fresh argv %v must not carry resume", lastArgv(t, rt))
@@ -188,7 +191,7 @@ func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 func TestStartMateFallsBackToFreshWhenTheResumedLaunchFails(t *testing.T) {
 	w := newWorkspace(t, "blog")
 	rt := runtime.NewFake()
-	deps := codexDeps(t, rt)
+	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
 	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
@@ -196,7 +199,7 @@ func TestStartMateFallsBackToFreshWhenTheResumedLaunchFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	setSessionRef(t, rt, w, first.Agent, codexSessionA)
-	writeCodexRollout(t, deps.CodexSessionsDir, codexSessionA, w.MateDir("blog"), deps.Now())
+	writeCodexRollout(t, sessions, codexSessionA, w.MateDir("blog"), deps.Now())
 	if _, err := spawn.StopMate(ctx, w, deps, "blog"); err != nil {
 		t.Fatal(err)
 	}

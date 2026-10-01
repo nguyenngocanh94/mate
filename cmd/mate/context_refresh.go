@@ -38,9 +38,12 @@ func contextRefresh(ctx context.Context, w *store.Workspace, deps spawn.Deps, pr
 		return false, err
 	}
 	session := meta[spawn.MetaSessionID]
-	// Claude records both prompt and Stop hooks. Until equivalent activity
-	// evidence exists for Codex, automatic refresh must not infer its quietness.
-	if automatic && (cfg.Mate.RefreshContext < 0 || meta[spawn.MetaHarness] != string(harness.KindClaude) || !w.Auto(project) || w.Held(project)) {
+	// Automatic refresh judges the Mate quiet by the answers its Stop hook
+	// logs to sent.log (refreshQuiet). A harness whose turn-end evidence is
+	// not that log - Codex's is its rollout - or that declares none gives
+	// it nothing to judge by, so it is never refreshed automatically; the
+	// captain's `mate mate refresh` still can.
+	if automatic && (cfg.Mate.RefreshContext < 0 || !logsAnswers(deps.Harnesses, meta[spawn.MetaHarness]) || !w.Auto(project) || w.Held(project)) {
 		return false, nil
 	}
 	if session == "" {
@@ -193,6 +196,21 @@ func contextRefresh(ctx context.Context, w *store.Workspace, deps spawn.Deps, pr
 	}
 	err = w.AppendSent(project, store.SentEntry{Source: store.SourceApp, Target: store.TargetMate, Text: "context refreshed from checkpoint; previous session " + session})
 	return true, err
+}
+
+// logsAnswers reports whether the recorded harness declares verified
+// turn-end evidence that mate's Stop hook logs each answer to sent.log.
+func logsAnswers(reg harness.Registry, recorded string) bool {
+	kind, err := reg.Parse(recorded)
+	if err != nil {
+		return false
+	}
+	profile, err := reg.Lookup(kind)
+	if err != nil {
+		return false
+	}
+	c := profile.Capabilities().TurnEnd
+	return c.Verified() && c.Impl.LogsAnswers()
 }
 
 func shellWord(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }

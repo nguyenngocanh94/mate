@@ -92,8 +92,8 @@ func TestSessionHookFitsWhatEachHarnessReads(t *testing.T) {
 	writeFixture(t, w.MemoryFile("shop"), big.String())
 
 	claude, _ := runMateSession(t, w, `{"source":"startup"}`)
-	if len(claude) > spawn.ClaudeSessionHookMaxBytes {
-		t.Fatalf("the Claude digest is %d bytes, over %d", len(claude), spawn.ClaudeSessionHookMaxBytes)
+	if len(claude) > harness.ClaudeSessionHookMaxBytes {
+		t.Fatalf("the Claude digest is %d bytes, over %d", len(claude), harness.ClaudeSessionHookMaxBytes)
 	}
 	if !strings.Contains(claude, "== 1. Live state ==") || !strings.Contains(claude, "recall cut to fit 9500 bytes; not shown: ") {
 		t.Fatalf("the cut Claude digest lost part 1 or its notice:\n%s", claude)
@@ -109,5 +109,35 @@ func TestSessionHookRefusesAnUnknownHarness(t *testing.T) {
 	err := cmdHook([]string{harness.SessionHookName, "--harness", "pi-ish"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil || stdout.Len() != 0 {
 		t.Fatalf("an unknown --harness = %v, stdout %q", err, stdout.String())
+	}
+}
+
+// codexWithoutHooks is Codex declaring no hooks.
+type codexWithoutHooks struct{ harness.Codex }
+
+func (c codexWithoutHooks) Capabilities() harness.Capabilities {
+	caps := c.Codex.Capabilities()
+	caps.Hooks = harness.Cap[harness.HookInstaller]{Status: harness.CapUnsupported, Reason: "a test harness without hooks"}
+	return caps
+}
+
+// The digest's size is the harness's to say. A hook run for a harness that
+// declares no verified hooks prints no digest of a guessed size: it tells
+// the Mate to recall by hand and says why on stderr.
+func TestSessionHookAsksTheHarnessForItsDigestSize(t *testing.T) {
+	w, _, _ := recallFixture(t)
+	reg, err := harness.NewRegistry(nil, codexWithoutHooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := harnesses
+	harnesses = reg
+	t.Cleanup(func() { harnesses = saved })
+	stdout, stderr := runMateSession(t, w, `{"source":"startup"}`, "--harness", "codex")
+	if strings.Contains(stdout, "== 1. Live state ==") || !strings.Contains(stdout, "recall shop") {
+		t.Fatalf("stdout = %q, want only the line telling the Mate to run recall", stdout)
+	}
+	if !strings.Contains(stderr, "no verified Hooks") {
+		t.Fatalf("stderr = %q, want the missing capability named", stderr)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/config"
@@ -62,8 +63,71 @@ func (Claude) Capabilities() Capabilities {
 				Proof:    "`herdr agent prompt <name> \"/exit\"` ended the agent; runtime.Herdr.StopAgent sends it",
 			},
 		},
+		Session: Cap[SessionIdentity]{
+			Status: CapVerified,
+			Impl:   claudeSessions{},
+			Evidence: Evidence{
+				Version:  "claude-code 2.1.281",
+				Measured: "2026-09-24 (docs/mvp.md section 7, task 35 A2 and A5)",
+				Proof:    "live TestLiveMateResumeReloadsManual: `--resume <id>` of the launch's --session-id restores the conversation; the SessionStart hook records the id a /clear mints",
+			},
+		},
+		Hooks: Cap[HookInstaller]{
+			Status: CapVerified,
+			Impl:   claudeHooks{},
+			Evidence: Evidence{
+				Version:  "claude-code 2.1.281",
+				Measured: "2026-09-24 (docs/mvp.md section 7, tasks 35 A2 and 37)",
+				Proof:    "live TestLiveMateSessionStartHookSources and TestLiveMateRecallOnCompact: the settings' SessionStart hook fires on startup, clear, compact and resume and its stdout reaches the model",
+			},
+		},
+		TurnEnd: Cap[TurnEndEvidence]{
+			Status: CapVerified,
+			Impl:   claudeTurnEnd{},
+			Evidence: Evidence{
+				Version:  "claude-code 2.1.281",
+				Measured: "2026-09-24 (docs/mvp.md task 37)",
+				Proof:    "live TestLiveRestartMateStowsFirst: the Stop hook's answer in sent.log ended the stow turn",
+			},
+		},
 	}
 }
+
+// claudeSessions is Claude's SessionIdentity. Prepare names the session at
+// launch (--session-id), and the Mate's SessionStart hook records the new
+// id a /clear mints, so nothing is left to read at stop.
+type claudeSessions struct{}
+
+// AtStop implements SessionIdentity.
+func (claudeSessions) AtStop(string, time.Time, string) string { return "" }
+
+// Resumable implements SessionIdentity. Claude keeps every session it
+// named; nothing is checked before --resume.
+func (claudeSessions) Resumable(string) error { return nil }
+
+// claudeHooks is Claude's HookInstaller: the hooks of the Mate's settings
+// file (ClaudeSettings), which Claude never asks the operator to trust.
+type claudeHooks struct{}
+
+// Own implements HookInstaller.
+func (claudeHooks) Own(string, string) []OwnHook { return nil }
+
+// DigestMaxBytes implements HookInstaller.
+func (claudeHooks) DigestMaxBytes() int { return ClaudeSessionHookMaxBytes }
+
+// claudeTurnEnd is Claude's TurnEndEvidence: the Mate's Stop hook (`mate
+// hook mate-stop`) logs each answer it sees to sent.log. Claude's transcript
+// is not read for it.
+type claudeTurnEnd struct{}
+
+// LogsAnswers implements TurnEndEvidence.
+func (claudeTurnEnd) LogsAnswers() bool { return true }
+
+// EndsInTranscript implements TurnEndEvidence.
+func (claudeTurnEnd) EndsInTranscript() bool { return false }
+
+// TranscriptTurnEnded implements TurnEndEvidence.
+func (claudeTurnEnd) TranscriptTurnEnded([]byte, time.Time) bool { return false }
 
 // claudeLaunch is what Claude's Prepare hands its Build.
 type claudeLaunch struct {
