@@ -40,6 +40,9 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 	}
 
 	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws) }
+	// New picks the glyph set from the locale, and the assertions spell the
+	// Unicode arrow; force that set so a shell without UTF-8 draws the same.
+	t.Setenv("MATE_ASCII", "0")
 	m := console.New(load, nil)
 	// The Console is the left ~20% of the captain's terminal: 40 columns.
 	model, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 36})
