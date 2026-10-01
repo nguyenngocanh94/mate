@@ -452,7 +452,8 @@ func (c Claude) Build(_ context.Context, spec harness.AgentSpec) (harness.Launch
 		)
 	} else {
 		out.Delivery = harness.DeliveryAppendSystemPromptFile
-		out.Args = append(extra, "--append-system-prompt-file", path)
+		out.ContextFlag = "--append-system-prompt-file"
+		out.Args = append(extra, out.ContextFlag, path)
 		out.Notes = append(append([]string(nil), dangerousPermissionNotes...),
 			"default Claude delivery is --append-system-prompt-file; Claude exits 1 on a missing file, and mate still fails in BuildLaunchSpec first",
 			"G5-12 live evidence proves Claude receives the locator flags through Herdr and fires the configured Stop hook",
