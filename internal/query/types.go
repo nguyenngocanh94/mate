@@ -62,6 +62,12 @@ type RuntimeStatus struct {
 type WorkspaceValue struct {
 	Name string
 	Root string
+	// MateHarness is the harness a new Mate gets when nobody picks one:
+	// workspace.yaml's `mate_harness`, resolved by the store (which fills
+	// in its own default when the key is missing). It is "" when the value
+	// names no harness kind this package knows, so a UI falls back to its
+	// own order rather than offering a kind nothing can start.
+	MateHarness HarnessKind
 }
 
 // ProjectNode is one registered Project plus its designated Mate, its

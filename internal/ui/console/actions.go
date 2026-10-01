@@ -641,9 +641,32 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 // lists everything; these are shortcuts into the same choices, so both
 // surfaces read availability from the store-backed loader and cannot disagree.
 
-// harnessOrder is the picker's order, and claude is first because it is the
-// configured default for a new Mate (config.DefaultMateHarness).
-var harnessOrder = []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}
+// harnessKinds is every harness a Mate can be created on, in the picker's
+// order when the workspace names no default of its own.
+var harnessKinds = []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}
+
+// harnessOrder is the picker's order: the workspace's default Mate harness
+// (workspace.yaml's `mate_harness`, which query.Load resolves into the
+// snapshot) first, so the cursor starts on it and Enter alone creates the
+// Mate the workspace is configured for, then the rest in harnessKinds order.
+func (m Model) harnessOrder() []query.HarnessKind {
+	def := query.HarnessKind("")
+	if m.tree.Workspace.IsKnown() {
+		def = m.tree.Workspace.Value.MateHarness
+	}
+	order := make([]query.HarnessKind, 0, len(harnessKinds))
+	for _, kind := range harnessKinds {
+		if kind == def {
+			order = append(order, kind)
+		}
+	}
+	for _, kind := range harnessKinds {
+		if kind != def {
+			order = append(order, kind)
+		}
+	}
+	return order
+}
 
 // beginMateStart is the 's' key. One key covers create, start and resume
 // because they are one thing to the reader - "get this Project's Mate
@@ -757,7 +780,7 @@ func (m Model) recordedHarnessIndex() int {
 	if !mate.Designated.IsKnown() {
 		return 0
 	}
-	for i, kind := range harnessOrder {
+	for i, kind := range m.harnessOrder() {
 		if kind == mate.Designated.Value.HarnessKind {
 			return i
 		}
@@ -785,13 +808,13 @@ func (m Model) onHarnessKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "down", "j":
-		if m.harnessIndex+1 < len(harnessOrder) {
+		if m.harnessIndex+1 < len(m.harnessOrder()) {
 			m.harnessIndex++
 		}
 		return m, nil
 	case "enter":
 		choice := m.pendingChoice
-		choice.req.Harness = harnessOrder[m.harnessIndex]
+		choice.req.Harness = m.harnessOrder()[m.harnessIndex]
 		m = m.closeHarnessPick()
 		return m.runPending(choice)
 	default:
