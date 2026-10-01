@@ -136,7 +136,11 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		return RelaunchResult{}, observability.NewError(observability.CodeNeedsRepair,
 			fmt.Sprintf("crew %s has no readable brief at %s; a relaunch would start an agent with nothing to do", crew, briefPath))
 	}
-	kind, err := relaunchHarness(w, meta)
+	kind, err := relaunchHarness(w, deps, meta)
+	if err != nil {
+		return RelaunchResult{}, err
+	}
+	profile, err := deps.Harnesses.Lookup(kind)
 	if err != nil {
 		return RelaunchResult{}, err
 	}
@@ -144,6 +148,7 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		project:  project,
 		crew:     crew,
 		kind:     kind,
+		profile:  profile,
 		model:    meta[MetaModel],
 		effort:   harness.Effort(strings.TrimSpace(meta[MetaEffort])),
 		branch:   meta[MetaBranch],
@@ -247,11 +252,11 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 // relaunchHarness is the harness a relaunch launches: the one the crew was
 // spawned with, or the workspace's crew default for a record old enough to
 // have no harness= key.
-func relaunchHarness(w *store.Workspace, meta map[string]string) (harness.Kind, error) {
+func relaunchHarness(w *store.Workspace, deps Deps, meta map[string]string) (harness.Kind, error) {
 	if raw := strings.TrimSpace(meta[MetaHarness]); raw != "" {
-		return harness.ParseKind(raw)
+		return deps.Harnesses.Parse(raw)
 	}
-	return harness.ParseKind(w.Defaults().CrewHarness)
+	return deps.defaultHarness(w.Defaults().CrewHarness, harness.RoleCrew)
 }
 
 // stopCrewAgentForRelaunch stops whatever Herdr still has for the crew and
@@ -287,7 +292,7 @@ func stopCrewAgentForRelaunch(ctx context.Context, w *store.Workspace, deps Deps
 		}
 		return false, nil
 	}
-	kind, _ := harness.ParseKind(meta[MetaHarness])
+	kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 	handle := runtime.AgentHandle{Session: session, Name: name, RawID: crew, Kind: kind, Tab: tab}
 	live, err := agentLive(ctx, deps, handle)
 	if err != nil {
@@ -366,7 +371,7 @@ func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *cre
 		return RelaunchResult{}, err
 	}
 	saga.startedAgent = true
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.kind, deps.startupPromptTimeout(), deps.sleep())
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.startupPromptTimeout(), deps.sleep())
 	if err != nil {
 		return RelaunchResult{}, err
 	}

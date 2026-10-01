@@ -49,7 +49,7 @@ func cmdMerge(args []string, stdout, stderr io.Writer) error {
 		}
 		reviewed = append(reviewed, spawn.ReviewedCommit{Head: fp["head"], Base: fp["base"]})
 	}
-	res, err := spawn.MergeCrew(context.Background(), w, spawn.LiveDeps(), project, crew, spawn.CallerFromEnv(), reviewed...)
+	res, err := spawn.MergeCrew(context.Background(), w, spawn.LiveDeps(harnesses), project, crew, spawn.CallerFromEnv(), reviewed...)
 	if err != nil {
 		// Including the one failure that is not a refusal: a teardown that
 		// failed after the fast-forward landed. MergeCrew's error already

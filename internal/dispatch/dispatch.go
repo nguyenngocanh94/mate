@@ -77,9 +77,10 @@ type Table struct {
 // Path is the table's path in a workspace whose `.mate/` directory is dir.
 func Path(mateDir string) string { return filepath.Join(mateDir, FileName) }
 
-// Load reads and checks the table at path. ok is false, with no error,
-// when there is no file: Resolve then falls back to the built-in table.
-func Load(path string) (Table, bool, error) {
+// Load reads and checks the table at path; a profile's harness must be one
+// of harnesses. ok is false, with no error, when there is no file: Resolve
+// then falls back to the built-in table.
+func Load(path string, harnesses harness.Registry) (Table, bool, error) {
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return Table{}, false, nil
@@ -87,7 +88,7 @@ func Load(path string) (Table, bool, error) {
 	if err != nil {
 		return Table{}, false, fmt.Errorf("read %s: %w", path, err)
 	}
-	t, err := parse(raw)
+	t, err := parse(raw, harnesses)
 	if err != nil {
 		return Table{}, false, fmt.Errorf("%w %s: %v", ErrInvalid, path, err)
 	}
@@ -112,7 +113,7 @@ type rawTable struct {
 	Default json.RawMessage `json:"default"`
 }
 
-func parse(raw []byte) (Table, error) {
+func parse(raw []byte, harnesses harness.Registry) (Table, error) {
 	var rt rawTable
 	if err := strictUnmarshal(raw, &rt); err != nil {
 		return Table{}, err
@@ -126,14 +127,14 @@ func parse(raw []byte) (Table, error) {
 		if len(r.Use) == 0 {
 			return Table{}, fmt.Errorf("%s: `use` is required", where)
 		}
-		use, err := profiles(r.Use, where)
+		use, err := profiles(r.Use, where, harnesses)
 		if err != nil {
 			return Table{}, err
 		}
 		t.Rules = append(t.Rules, Rule{When: strings.TrimSpace(r.When), Use: use, Why: strings.TrimSpace(r.Why)})
 	}
 	if len(rt.Default) > 0 && string(rt.Default) != "null" {
-		def, err := profiles(rt.Default, "default")
+		def, err := profiles(rt.Default, "default", harnesses)
 		if err != nil {
 			return Table{}, err
 		}
@@ -146,7 +147,7 @@ func parse(raw []byte) (Table, error) {
 }
 
 // profiles reads one profile object or a non-empty array of them.
-func profiles(raw json.RawMessage, where string) ([]Profile, error) {
+func profiles(raw json.RawMessage, where string, harnesses harness.Registry) ([]Profile, error) {
 	var list []rawProfile
 	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("[")) {
 		if err := strictUnmarshal(raw, &list); err != nil {
@@ -164,7 +165,7 @@ func profiles(raw json.RawMessage, where string) ([]Profile, error) {
 	}
 	out := make([]Profile, 0, len(list))
 	for j, rp := range list {
-		p, err := checkProfile(rp)
+		p, err := checkProfile(rp, harnesses)
 		if err != nil {
 			if len(list) > 1 {
 				return nil, fmt.Errorf("%s profile %d: %v", where, j+1, err)
@@ -177,12 +178,13 @@ func profiles(raw json.RawMessage, where string) ([]Profile, error) {
 }
 
 // checkProfile is every check a spawn would make, made at load: a known
-// harness, one model name, and an effort that harness takes.
-func checkProfile(rp rawProfile) (Profile, error) {
+// harness, one model name, and an effort that harness takes. A harness is
+// known when it is registered.
+func checkProfile(rp rawProfile, harnesses harness.Registry) (Profile, error) {
 	if strings.TrimSpace(rp.Harness) == "" {
 		return Profile{}, errors.New("`harness` is required")
 	}
-	kind, err := harness.ParseKind(strings.TrimSpace(rp.Harness))
+	kind, err := harnesses.Parse(strings.TrimSpace(rp.Harness))
 	if err != nil {
 		return Profile{}, err
 	}

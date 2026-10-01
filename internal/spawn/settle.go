@@ -137,11 +137,12 @@ var startupDialogs = map[harness.StartupScreen]startupDialog{
 // Mate's SessionStart hook). Codex's hook review is walked, and those hooks
 // trusted, only when every hook the review lists is one of them; with none,
 // the review is refused at once.
-func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
+func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
 	if sleep == nil {
 		sleep = sleepCtx
 	}
-	if _, err := harness.ClassifyStartupScreen(kind, ""); err != nil {
+	kind, screens := profile.Kind(), profile.Screen()
+	if _, err := screens.ClassifyStartup(""); err != nil {
 		// No profile for this harness: nothing can be recognised, so
 		// nothing is pressed and the launch proceeds without this step.
 		return Settlement{}, nil
@@ -154,7 +155,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err != nil {
 			return settled, err
 		}
-		class, err := harness.ClassifyStartupScreen(kind, screen)
+		class, err := screens.ClassifyStartup(screen)
 		if err != nil {
 			return settled, err
 		}

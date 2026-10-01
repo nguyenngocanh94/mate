@@ -73,7 +73,7 @@ func agentHandle(ctx context.Context, w *store.Workspace, deps Deps, meta map[st
 		return runtime.AgentHandle{}, "", observability.NewError(observability.CodeRuntimeUnavailable,
 			fmt.Sprintf("the Herdr session %s is not running; nothing can be typed into %s", spec.Name, meta[MetaAgent]))
 	}
-	kind, _ := harness.ParseKind(meta[MetaHarness])
+	kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 	return runtime.AgentHandle{
 		Session: session,
 		Name:    meta[MetaAgent],

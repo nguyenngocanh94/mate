@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -50,7 +49,7 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	}
 	req := spawn.StartRequest{Project: fs.Arg(0), Resume: true, Fresh: *freshFlag}
 	if *harnessFlag != "" {
-		kind, err := harness.ParseKind(*harnessFlag)
+		kind, err := harnesses.Parse(*harnessFlag)
 		if err != nil {
 			return &usageError{err}
 		}
@@ -60,7 +59,7 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := spawn.StartMate(context.Background(), w, spawn.LiveDeps(), req)
+	res, err := spawn.StartMate(context.Background(), w, spawn.LiveDeps(harnesses), req)
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return mateStop(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
+	return mateStop(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
 }
 
 // mateStop is cmdMateStop's core, over any deps, for tests.
@@ -169,7 +168,7 @@ func cmdMateStatus(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	status, err := spawn.MateStatus(context.Background(), w, spawn.LiveDeps(), fs.Arg(0))
+	status, err := spawn.MateStatus(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0))
 	if err != nil {
 		return err
 	}
@@ -192,7 +191,7 @@ func cmdMateRefresh(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	changed, err := contextRefresh(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), false)
+	changed, err := contextRefresh(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), false)
 	if err != nil {
 		return err
 	}

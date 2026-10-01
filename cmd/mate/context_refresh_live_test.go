@@ -37,7 +37,7 @@ func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 	}
 	rt := runtime.NewHerdr(process.ExecRunner{})
 	rt.Names = runtime.NewMemoryNameRegistry()
-	deps := spawn.Deps{Runtime: rt, Names: rt.Names, ConfigHome: home, Binary: consoleBinaryPath(t)}
+	deps := spawn.Deps{Harnesses: harnesses, Runtime: rt, Names: rt.Names, ConfigHome: home, Binary: consoleBinaryPath(t)}
 	marker := filepath.Join(home, "mate", "session-owners", session)
 	_ = os.Remove(marker)
 	t.Cleanup(func() { _ = os.Remove(marker) })

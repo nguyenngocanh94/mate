@@ -11,7 +11,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
-// Claude is the HarnessAdapter for Claude Code. Default delivery is
+// Claude is the Profile of Claude Code. Default delivery is
 // --append-system-prompt-file. Inline --append-system-prompt is a bounded
 // fallback only: it carries file contents (Claude 2.1.251 does not resolve
 // @path tokens) and exposes the entire context in the process table.
@@ -19,32 +19,38 @@ type Claude struct {
 	MaxInlineBytes int
 }
 
-// Validate reports Claude capabilities. Executable/auth probing is G4; the
-// pinned live lab proves the launch flags reach Claude through Herdr.
-func (c Claude) Validate(_ context.Context, cfg Config) (CapabilitySet, error) {
-	if cfg.Kind != "" && cfg.Kind != KindClaude {
-		return CapabilitySet{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("claude adapter got kind %q", cfg.Kind))
+// Kind implements Profile.
+func (Claude) Kind() Kind { return KindClaude }
+
+// Info implements Profile.
+func (Claude) Info() Info {
+	return Info{
+		RuntimeKind:     string(KindClaude),
+		ConfigDir:       ".claude",
+		InstructionFile: "CLAUDE.md",
+		EnvKeys:         []string{config.EnvClaudeConfigDir},
 	}
-	return CapabilitySet{
-		Kind:                      KindClaude,
-		Deliveries:                []Delivery{DeliveryAppendSystemPromptFile, DeliveryAppendSystemPrompt},
-		DefaultDelivery:           DeliveryAppendSystemPromptFile,
-		SupportsInlineFallback:    true,
-		GracefulStop:              GracefulStop{Available: true, Method: `herdr agent prompt <name> "/exit"`, ProvenOn: "claude-code 2.1.251"},
-		InlineExposesProcessTable: true,
-		Assumptions: []Assumption{
-			{
-				ID:      AssumptionInlineProcessTable,
-				Status:  "proven",
-				Summary: "Inline --append-system-prompt puts the entire canonical context in the process table (ps eww). Default to the file flag.",
-			},
-			{
-				ID:      AssumptionClaudeArgsThroughHerdr,
-				Status:  "proven",
-				Summary: "The pinned live lab proved --session-id, --settings and --append-system-prompt-file reach Claude through Herdr; the configured Stop hook fired with the launched session id.",
+}
+
+// Launcher implements Profile.
+func (c Claude) Launcher() Launcher { return c }
+
+// Screen implements Profile.
+func (Claude) Screen() ScreenProfile { return kindScreen(KindClaude) }
+
+// Capabilities implements Profile.
+func (Claude) Capabilities() Capabilities {
+	return Capabilities{
+		GracefulStop: Cap[GracefulStopper]{
+			Status: CapVerified,
+			Impl:   exitPrompt("/exit"),
+			Evidence: Evidence{
+				Version:  "claude-code 2.1.251",
+				Measured: "mate v1 G1, carried into this repo 2026-09-17",
+				Proof:    "`herdr agent prompt <name> \"/exit\"` ended the agent; runtime.Herdr.StopAgent sends it",
 			},
 		},
-	}, nil
+	}
 }
 
 // BuildLaunchSpec constructs a startable Claude spec or returns an error.
@@ -164,7 +170,7 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 		"the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation",
 	}
 	out := LaunchSpec{
-		kind:            string(KindClaude),
+		kind:            c.Info().RuntimeKind,
 		cwd:             cwd,
 		env:             env,
 		contextFiles:    []GeneratedFile{{Path: path, Role: "canonical_context"}},

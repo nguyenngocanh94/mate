@@ -7,11 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
@@ -235,6 +235,10 @@ func CheckStartTimeout(timeout time.Duration) error {
 	return nil
 }
 
+// herdrKindPattern is the shape of a Herdr agent kind: one lower-case word,
+// never something Herdr could read as a flag.
+var herdrKindPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
 // NewAgentStartCommand fails closed on any missing required value or a
 // --timeout outside Herdr's documented range.
 func NewAgentStartCommand(session, name, kind, pane string, timeout time.Duration, extra []string) (AgentStartCommand, error) {
@@ -258,16 +262,19 @@ func NewAgentStartCommand(session, name, kind, pane string, timeout time.Duratio
 	if err := CheckStartTimeout(timeout); err != nil {
 		return AgentStartCommand{}, err
 	}
-	// Herdr receives kind verbatim as --kind; an unknown kind is an
-	// invocation Herdr rejects, so the constructor refuses it.
-	parsedKind, err := harness.ParseKind(kind)
-	if err != nil {
-		return AgentStartCommand{}, observability.WrapError(observability.CodeUsage, "agent start --kind", err)
+	// Herdr receives kind verbatim as --kind. Which kinds exist is the
+	// harness registry's to say, not this package's: a start takes its kind
+	// from a sealed harness.LaunchSpec, which only a registered profile's
+	// Info().RuntimeKind fills. What is refused here is a kind Herdr could
+	// not read as one: anything but one lower-case word.
+	if !herdrKindPattern.MatchString(kind) {
+		return AgentStartCommand{}, observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("agent start --kind %q is not one lower-case word", kind))
 	}
 	return AgentStartCommand{
 		session: session,
 		name:    name,
-		kind:    parsedKind.String(),
+		kind:    kind,
 		pane:    pane,
 		timeout: timeout,
 		extra:   append([]string(nil), extra...),

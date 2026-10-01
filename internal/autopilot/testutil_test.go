@@ -12,6 +12,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
 	"github.com/nguyenngocanh94/mate/internal/box"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -125,7 +126,8 @@ func (f *fixture) depsOver(ws *store.Workspace, onSleep func()) autopilot.Deps {
 
 func (f *fixture) outboxDeps() outbox.Deps {
 	return outbox.Deps{
-		Runtime: f.rt,
+		Harnesses: catalog.Default(),
+		Runtime:   f.rt,
 		Handle: func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
 			if f.onHandle != nil {
 				f.onHandle()

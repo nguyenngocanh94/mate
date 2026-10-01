@@ -187,7 +187,7 @@ func TestCrewDispatchWithoutATableShowsTheBuiltIn(t *testing.T) {
 	if err := os.WriteFile(p, out.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := dispatch.Load(p); err != nil || !ok {
+	if _, ok, err := dispatch.Load(p, harnesses); err != nil || !ok {
 		t.Fatalf("the example does not load: %v\n%s", err, out.String())
 	}
 }

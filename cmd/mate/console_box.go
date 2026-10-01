@@ -148,7 +148,7 @@ func boxReplyAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, r
 	if err != nil {
 		return "", err
 	}
-	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime}, handle, kind, text, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime, Harnesses: deps.Harnesses}, handle, kind, text, send.Options{})
 	if err != nil {
 		return "", err
 	}
@@ -255,7 +255,7 @@ func restartHarness(ws *store.Workspace, project string) (harness.Kind, error) {
 	if recorded == "" {
 		return "", nil
 	}
-	return harness.ParseKind(recorded)
+	return harnesses.Parse(recorded)
 }
 
 // restartConfirmWindow is how long a held restart waits for the captain's

@@ -479,3 +479,13 @@ func StartupScreenTail(screen string, n int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// kindScreen is the ScreenProfile of a harness whose startup profile is
+// keyed by kind in this file. Plan PR 3 moves the profiles themselves behind
+// ScreenProfile.
+type kindScreen Kind
+
+// ClassifyStartup implements ScreenProfile.
+func (k kindScreen) ClassifyStartup(screen string) (StartupScreen, error) {
+	return ClassifyStartupScreen(Kind(k), screen)
+}

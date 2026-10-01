@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -85,7 +86,8 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) deps() outbox.Deps {
 	return outbox.Deps{
-		Runtime: f.rt,
+		Harnesses: catalog.Default(),
+		Runtime:   f.rt,
 		Handle: func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
 			if f.handleErr != nil {
 				return runtime.AgentHandle{}, "", f.handleErr

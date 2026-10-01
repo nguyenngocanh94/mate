@@ -30,7 +30,7 @@ import (
 // on the workspace's default harness, and note says so; --model or --effort
 // without --harness is refused, since a model name belongs to one harness.
 func applyDispatch(w *store.Workspace, req spawn.SpawnCrewRequest) (spawn.SpawnCrewRequest, string, error) {
-	t, err := dispatch.Resolve(w.StateDir())
+	t, err := dispatch.Resolve(w.StateDir(), harnesses)
 	if errors.Is(err, dispatch.ErrInvalid) {
 		// Exit 2 like the bad flags below: both are "fix the table or the
 		// invocation and run it again", never a crash.
@@ -45,7 +45,15 @@ func applyDispatch(w *store.Workspace, req spawn.SpawnCrewRequest) (spawn.SpawnC
 	if req.Model != "" || req.Effort != "" {
 		return req, "", newUsageError("mate crew spawn: --model and --effort need --harness; pick a whole profile from `mate crew dispatch`")
 	}
-	p, ok := t.DefaultFor(w.Defaults().CrewHarness)
+	def := w.Defaults().CrewHarness
+	if def == "" {
+		k, err := harnesses.Default(harness.RoleCrew)
+		if err != nil {
+			return req, "", err
+		}
+		def = string(k)
+	}
+	p, ok := t.DefaultFor(def)
 	if !ok {
 		return req, "", nil
 	}
@@ -85,7 +93,7 @@ func cmdCrewDispatch(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	t, err := dispatch.Resolve(w.StateDir())
+	t, err := dispatch.Resolve(w.StateDir(), harnesses)
 	if err != nil {
 		return err
 	}

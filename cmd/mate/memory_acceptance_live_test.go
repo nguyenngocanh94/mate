@@ -114,6 +114,7 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,

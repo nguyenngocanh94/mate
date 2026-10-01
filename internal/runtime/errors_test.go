@@ -232,11 +232,13 @@ func TestAgentStartCommandRefusesEmptyRequiredValues(t *testing.T) {
 	}
 }
 
-// Herdr receives kind as --kind; an unknown kind is an invocation Herdr
-// rejects, so it must be unconstructible (counter-review of PR #3).
-func TestNewAgentStartCommandRejectsUnknownKind(t *testing.T) {
+// Herdr receives kind as --kind; a kind it could not read as one word must
+// be unconstructible (counter-review of PR #3). Which words are harnesses is
+// the registry's to say (harness.Registry), and a start's kind comes from a
+// sealed LaunchSpec only a registered profile fills.
+func TestNewAgentStartCommandRejectsMalformedKind(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []string{"bogus", " ", "CLAUDE X"} {
+	for _, kind := range []string{" ", "CLAUDE X", "Claude", "--pane", "claude ", "a/b"} {
 		if _, err := NewAgentStartCommand("s", "n", kind, "p", 0, nil); err == nil {
 			t.Fatalf("kind %q must not construct an agent start command", kind)
 		}

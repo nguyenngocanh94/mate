@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 )
 
 // The harness ratchet counts how much of the code outside internal/harness
@@ -40,20 +42,36 @@ import (
 const harnessRatchetCeiling = 136
 
 // ratchetHarnessNames is every spelling of a harness name a literal can
-// carry. Plan PR 1 and PR 6 replace this declared list with
-// catalog.Default(): its Kinds() plus the names each profile declares in
-// Info() (config directory, instruction file, env keys), so a new harness
-// enters the ratchet by being registered.
-var ratchetHarnessNames = []string{
-	"claude", "codex",
-	".claude", ".codex",
-	"CLAUDE.md",
-	"CODEX_HOME", "CLAUDE_CONFIG_DIR",
-}
+// carry: the kinds of catalog.Default(), and the names each profile
+// declares in Info() (config directory, instruction file, env keys). A new
+// harness enters the ratchet by being registered.
+var ratchetHarnessNames = func() []string {
+	var names []string
+	reg := catalog.Default()
+	for _, k := range reg.Kinds() {
+		names = append(names, string(k))
+	}
+	for _, k := range reg.Kinds() {
+		p, _ := reg.Lookup(k)
+		info := p.Info()
+		for _, n := range append([]string{info.ConfigDir, info.InstructionFile}, info.EnvKeys...) {
+			if n != "" {
+				names = append(names, n)
+			}
+		}
+	}
+	return names
+}()
 
 // ratchetKinds are the harness kinds; an identifier is harness-specific
 // when one of its camel-case words is one of them.
-var ratchetKinds = []string{"claude", "codex"}
+var ratchetKinds = func() []string {
+	var kinds []string
+	for _, k := range catalog.Default().Kinds() {
+		kinds = append(kinds, string(k))
+	}
+	return kinds
+}()
 
 // ratchetAllow are the places allowed to name a harness, each with its
 // reason (plan section 4). An entry names a file, and optionally the
@@ -473,6 +491,8 @@ func TestRatchetLiteralMatchingIsWholeToken(t *testing.T) {
 		{".claude/settings.json", []string{".claude"}},
 		{"/home/x/.codex/hooks.json", []string{".codex"}},
 		{"CLAUDE.md", []string{"CLAUDE.md"}},
+		{"/w/AGENTS.override.md", []string{"AGENTS.override.md"}},
+		{"AGENTS.md", nil},
 		{"CODEX_HOME=/tmp/x", []string{"CODEX_HOME"}},
 		{"export $CLAUDE_CONFIG_DIR", []string{"CLAUDE_CONFIG_DIR"}},
 		{"hook mate-session --harness codex", []string{"codex"}},

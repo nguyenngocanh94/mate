@@ -66,6 +66,7 @@ func mergeLiveDeps(t *testing.T, session, configHome string) (spawn.Deps, *runti
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,

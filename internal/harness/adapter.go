@@ -1,19 +1,11 @@
 package harness
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
-
-// Adapter validates a harness and builds a LaunchSpec. It never forks the
-// harness process; RuntimeAdapter hands the spec to Herdr.
-type Adapter interface {
-	Validate(ctx context.Context, cfg Config) (CapabilitySet, error)
-	BuildLaunchSpec(ctx context.Context, spec AgentSpec) (LaunchSpec, error)
-}
 
 // Config is the user/project harness configuration.
 type Config struct {
@@ -85,38 +77,6 @@ type AgentSpec struct {
 	Effort Effort
 }
 
-// CapabilitySet is what Validate returns. Unproven items stay marked.
-type CapabilitySet struct {
-	Kind                      Kind
-	Deliveries                []Delivery
-	DefaultDelivery           Delivery
-	SupportsInlineFallback    bool
-	GracefulStop              GracefulStop
-	ProjectDocMaxBytes        int
-	InlineExposesProcessTable bool
-	Assumptions               []Assumption
-}
-
-// GracefulStop is harness-specific. Herdr has no `agent stop`.
-type GracefulStop struct {
-	Available bool
-	Method    string // e.g. `herdr agent prompt <name> "/exit"`
-	ProvenOn  string // e.g. "claude-code 2.1.251"
-}
-
-// Assumption mirrors runtime honesty for harness-side leftovers.
-type Assumption struct {
-	ID      string
-	Status  string
-	Summary string
-}
-
-const (
-	AssumptionInlineProcessTable     = "inline_append_system_prompt_exposes_process_table"
-	AssumptionClaudeArgsThroughHerdr = "claude_flags_survive_agent_start_dash_dash"
-	AssumptionCodexConfigFallbacks   = "codex_config_toml_fallback_filenames_not_read_in_g2"
-)
-
 // ParseDelivery rejects unknown strategies.
 func ParseDelivery(s string) (Delivery, error) {
 	switch Delivery(strings.TrimSpace(s)) {
@@ -126,20 +86,5 @@ func ParseDelivery(s string) (Delivery, error) {
 		return "", fmt.Errorf("delivery: empty")
 	default:
 		return "", observability.NewError(observability.CodeUsage, fmt.Sprintf("unknown delivery %q", s))
-	}
-}
-
-// AdapterFor returns this binary's adapter for a harness kind. It is the one
-// place the delivery matrix is resolved from a kind, so a caller cannot
-// silently fall back to a default harness for a kind mate does not support.
-func AdapterFor(kind Kind) (Adapter, error) {
-	switch kind {
-	case KindClaude:
-		return Claude{}, nil
-	case KindCodex:
-		return Codex{}, nil
-	default:
-		return nil, observability.NewError(observability.CodeUsage,
-			fmt.Sprintf("no harness adapter for kind %q", kind))
 	}
 }

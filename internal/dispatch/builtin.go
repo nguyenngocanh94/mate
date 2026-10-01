@@ -1,6 +1,10 @@
 package dispatch
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/nguyenngocanh94/mate/internal/harness"
+)
 
 // BuiltInJSON is the table a workspace uses until the captain writes its
 // own `.mate/crew-dispatch.json`, which then replaces it whole. It is the
@@ -64,28 +68,29 @@ const BuiltInJSON = `{
 }
 `
 
-// builtIn is BuiltInJSON, checked once. A built-in table that does not
-// parse is a bug in this file, caught by its test, never a runtime state.
-var builtIn = func() Table {
-	t, err := parse([]byte(BuiltInJSON))
+// builtIn is BuiltInJSON, checked against harnesses like any table read
+// from a file. It names only harnesses of catalog.Default(), which its test
+// checks; a registry without one of them refuses it.
+func builtIn(harnesses harness.Registry) (Table, error) {
+	t, err := parse([]byte(BuiltInJSON), harnesses)
 	if err != nil {
-		panic(fmt.Sprintf("dispatch: the built-in table is invalid: %v", err))
+		return Table{}, fmt.Errorf("%w (built-in): %v", ErrInvalid, err)
 	}
 	t.BuiltIn = true
-	return t
-}()
+	return t, nil
+}
 
 // Resolve is the table that governs a workspace whose `.mate/` directory
 // is mateDir: its own file when there is one, else the built-in table. A
 // malformed file is an error (ErrInvalid), never a fall back to the
 // built-in: the captain meant their table.
-func Resolve(mateDir string) (Table, error) {
-	t, ok, err := Load(Path(mateDir))
+func Resolve(mateDir string, harnesses harness.Registry) (Table, error) {
+	t, ok, err := Load(Path(mateDir), harnesses)
 	if err != nil {
 		return Table{}, err
 	}
 	if !ok {
-		return builtIn, nil
+		return builtIn(harnesses)
 	}
 	return t, nil
 }

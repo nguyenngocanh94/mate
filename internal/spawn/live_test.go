@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -98,6 +99,7 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            catalog.Default(),
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,

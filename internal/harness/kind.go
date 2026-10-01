@@ -17,28 +17,14 @@ var (
 	ErrInvalidValue = errors.New("invalid value")
 )
 
-// Kind is a supported agent harness. mate launches the two v1 probed:
-// Claude Code and Codex CLI.
+// Kind names an agent harness. A kind is valid when a Registry holds a
+// profile for it (registry.go); Registry.Parse reads one from text.
 type Kind string
 
 const (
 	KindClaude Kind = "claude"
 	KindCodex  Kind = "codex"
 )
-
-// ParseKind rejects empty and unknown kinds.
-func ParseKind(s string) (Kind, error) {
-	switch Kind(strings.ToLower(strings.TrimSpace(s))) {
-	case KindClaude:
-		return KindClaude, nil
-	case KindCodex:
-		return KindCodex, nil
-	case "":
-		return "", fmt.Errorf("harness kind: %w", ErrEmptyValue)
-	default:
-		return "", fmt.Errorf("harness kind %q: %w", s, ErrInvalidValue)
-	}
-}
 
 func (k Kind) String() string { return string(k) }
 

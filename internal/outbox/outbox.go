@@ -95,11 +95,14 @@ type Sleeper interface {
 	Sleep(ctx context.Context, d time.Duration) error
 }
 
-// Deps are the sender's collaborators. Runtime and Handle are needed to
-// deliver; Enqueue and Offer need neither.
+// Deps are the sender's collaborators. Runtime, Handle and Harnesses are
+// needed to deliver; Enqueue and Offer need none of them.
 type Deps struct {
-	Runtime     Runtime
-	Handle      HandleFunc
+	Runtime Runtime
+	Handle  HandleFunc
+	// Harnesses are the harnesses the Mate may run; a delivery to one that
+	// is not registered is refused (send.Deps.Harnesses).
+	Harnesses   harness.Registry
 	Clock       Clock
 	Sleeper     Sleeper
 	Interval    time.Duration
@@ -463,7 +466,7 @@ func (s *Sender) deliver(ctx context.Context, project string, item store.OutboxI
 	if s.withdrawn(project, item) {
 		return send.Report{}, errWithdrawn
 	}
-	deps := send.Deps{Runtime: s.deps.Runtime}
+	deps := send.Deps{Runtime: s.deps.Runtime, Harnesses: s.deps.Harnesses}
 	if s.deps.Sleeper != nil {
 		deps.Sleep = s.deps.sleep
 	}

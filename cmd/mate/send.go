@@ -47,7 +47,7 @@ func cmdSend(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	opts := send.Options{Marker: *markerFlag, QueueWhileBusy: *queueFlag}
-	report, err := sendToCrew(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), fs.Arg(1), fs.Arg(2), source, opts)
+	report, err := sendToCrew(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), fs.Arg(1), fs.Arg(2), source, opts)
 	if err != nil {
 		printSendRefusalDetails(stderr, err)
 		return err
@@ -136,7 +136,7 @@ func sendToCrewLocked(ctx context.Context, w *store.Workspace, deps spawn.Deps, 
 		payload = send.Marker + text
 	}
 	opts.ResumePending = prior != nil && prior.Identity == string(identity) && prior.Text == payload && prior.Source == source
-	sendDeps := send.Deps{Runtime: deps.Runtime, Sleep: deps.Sleep, BeforeType: func() error {
+	sendDeps := send.Deps{Runtime: deps.Runtime, Harnesses: deps.Harnesses, Sleep: deps.Sleep, BeforeType: func() error {
 		return save(&store.CrewSendAttempt{Identity: string(identity), Text: payload, Source: source})
 	}}
 	report, err := send.Send(ctx, sendDeps, resolved.Handle, resolved.Kind, text, opts)
@@ -184,7 +184,7 @@ func resolveCrewHandle(ctx context.Context, w *store.Workspace, deps spawn.Deps,
 	if agent == "" {
 		return resolvedCrew{}, nil
 	}
-	kind, err := harness.ParseKind(meta[spawn.MetaHarness])
+	kind, err := deps.Harnesses.Parse(meta[spawn.MetaHarness])
 	if err != nil {
 		return resolvedCrew{}, err
 	}

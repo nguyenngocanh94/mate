@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -50,6 +51,40 @@ func TestStopMateConfirmsTheAgentIsGone(t *testing.T) {
 	}
 	if meta[spawn.MetaStoppedAt] != "2026-09-17T10:00:00Z" {
 		t.Errorf("meta stopped_at = %q", meta[spawn.MetaStoppedAt])
+	}
+}
+
+// claudeWithoutExit is Claude's profile declaring no graceful stop.
+type claudeWithoutExit struct{ harness.Claude }
+
+func (claudeWithoutExit) Capabilities() harness.Capabilities {
+	return harness.Capabilities{GracefulStop: harness.Cap[harness.GracefulStopper]{
+		Status: harness.CapUnknown, Reason: "a test harness that never measured one",
+	}}
+}
+
+// The stop asks the profile, not the kind: the same Claude Mate is forced
+// when the registered profile declares no verified graceful stop.
+func TestStopMateForcesWhenGracefulStopIsNotVerified(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"}); err != nil {
+		t.Fatalf("StartMate: %v", err)
+	}
+	reg, err := harness.NewRegistry(nil, claudeWithoutExit{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.Harnesses = reg
+	if _, err := spawn.StopMate(context.Background(), w, deps, "shop"); err != nil {
+		t.Fatalf("StopMate: %v", err)
+	}
+	if slices.Contains(rt.Calls, "StopAgent:graceful") || !slices.Contains(rt.Calls, "StopAgent:force") {
+		t.Fatalf("calls %v: a harness without a verified graceful stop is forced, and only forced", rt.Calls)
+	}
+	if len(rt.Agents) != 0 {
+		t.Fatalf("agents left behind: %v", rt.Agents)
 	}
 }
 

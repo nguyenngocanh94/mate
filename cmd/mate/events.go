@@ -278,7 +278,7 @@ func cmdReindex(args []string, stdout, stderr io.Writer) error {
 	// its agent is still listed (measured 2026-09-20 on a real workspace).
 	// A Herdr that is not running just leaves the fallback in charge.
 	if err := timeline.New(w, handle, timeline.Deps{
-		SessionRef: consoleSessionRef(w, spawn.LiveDeps()),
+		SessionRef: consoleSessionRef(w, spawn.LiveDeps(harnesses)),
 	}).Reindex(ctx); err != nil {
 		return err
 	}
