@@ -172,6 +172,9 @@ func (m Model) stopChoice(r row) actionChoice {
 		return c
 	}
 	c.enabled, c.desc = true, "Stop the recorded runtime agent"
+	if r.kind == rowCrew {
+		c.desc = "Close the task: stop the agent, remove worktree and branch"
+	}
 	return c
 }
 
@@ -322,7 +325,8 @@ func (m Model) actionRequest(a Action, r row) ActionRequest {
 	case rowMate:
 		req.Target, req.TargetKind = m.currentProject().ProjectID, "mate"
 	case rowCrew:
-		req.Target, req.TargetKind = r.id, "crew"
+		// A crew is named within its Project, as every crew action names it.
+		req.Target, req.TargetKind, req.Crew = m.currentProject().ProjectID, "crew", r.id
 	default:
 		req.TargetKind = "workspace"
 	}

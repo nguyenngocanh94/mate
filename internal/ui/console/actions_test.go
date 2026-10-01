@@ -57,7 +57,7 @@ func TestDangerousActionAsksBeforeTheRunnerAndEnterCancels(t *testing.T) {
 		t.Fatalf("x must open the confirmation without running: cmd=%v confirm=%v calls=%d", cmd != nil, m.confirm != nil, len(*got))
 	}
 	view := renderFrame(t, m)
-	for _, want := range []string{"stop crew?", "object", "scope", "effect", "cancel", "x      stop crew"} {
+	for _, want := range []string{"stop crew?", "object", "scope", "effect", "cancel", "x      stop crew", "worktree and branch"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("confirmation missing %q:\n%s", want, view)
 		}
@@ -77,6 +77,11 @@ func TestDangerousActionAsksBeforeTheRunnerAndEnterCancels(t *testing.T) {
 	m, _ = send(t, m, cmd())
 	if len(*got) != 1 || (*got)[0].Action != ActionStop || (*got)[0].TargetKind != "crew" {
 		t.Fatalf("runner requests = %+v, want one crew stop", *got)
+	}
+	// The crew is named within its Project, as `mate crew stop <project> <id>` names it.
+	tree := sampleTree()
+	if req := (*got)[0]; req.Target != tree.Projects[0].ProjectID || req.Crew != tree.Projects[0].Crews[1].CrewID {
+		t.Fatalf("crew stop request = %+v, want Target %q and Crew %q", req, tree.Projects[0].ProjectID, tree.Projects[0].Crews[1].CrewID)
 	}
 	if m.msg.tone != toneOK || !strings.Contains(m.msg.text, "stop completed") {
 		t.Fatalf("success message = %+v", m.msg)

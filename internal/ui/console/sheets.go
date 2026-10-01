@@ -393,15 +393,19 @@ func (m Model) actionObjectDescription(c actionChoice) (string, string, string) 
 	if object == "" {
 		object = "workspace"
 	}
+	if c.req.Crew != "" {
+		object += "/" + c.req.Crew
+	}
 	scope := "Recorded state and the runtime resources named by this action."
 	effect := "The snapshot is re-read when the service returns."
 	switch c.req.Action {
 	case ActionStop:
 		if c.req.TargetKind == "crew" {
-			scope = "This crew's agent only. Its worktree and branch stay."
-		} else {
-			scope = "This Mate only. Its crews keep running."
+			scope = "This crew's agent, tab, worktree and branch. Its brief, report and status file stay."
+			effect = "Refused, changing nothing, if the branch is not landed or the worktree is dirty. Otherwise the agent stops, the worktree and branch are removed and the task is finished."
+			break
 		}
+		scope = "This Mate only. Its crews keep running."
 		effect = "The agent stops; the binding is released once the service confirms it."
 	case ActionRestartMate:
 		scope = "This Mate only. Its crews keep running."
