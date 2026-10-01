@@ -1,0 +1,260 @@
+starts: 1
+
+== herdr argv (last start) ==
+"agent"
+"start"
+"mate-shop"
+"--kind"
+"codex"
+"--pane"
+"w1:p1"
+"--session"
+"{{HERDR_SESSION}}"
+"--timeout"
+"10000"
+"--"
+"--dangerously-bypass-approvals-and-sandbox"
+"-c"
+"check_for_update_on_startup=false"
+"-c"
+"project_doc_max_bytes=131072"
+"-m"
+"gpt-5.5"
+"-c"
+"model_reasoning_effort=\"high\""
+
+== launch spec ==
+kind: codex
+cwd: {{WORKSPACE}}/.mate/projects/shop/mate
+delivery: instruction_file
+context_path: {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.override.md
+context_required: true
+context_file: {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.override.md role=codex_override
+max_inline_bytes: 0
+max_file_bytes: 131072
+model: gpt-5.5
+effort: high
+effort_omitted: false
+codex_home: {{CODEX_HOME}}
+claude_config_dir: 
+task_prompt: ""
+
+== launch args ==
+"--dangerously-bypass-approvals-and-sandbox"
+"-c"
+"check_for_update_on_startup=false"
+"-c"
+"project_doc_max_bytes=131072"
+"-m"
+"gpt-5.5"
+"-c"
+"model_reasoning_effort=\"high\""
+
+== launch env (set) ==
+MATE_PROJECT_ID=shop
+MATE_AGENT_ID=mate-shop
+MATE_AGENT_ROLE=mate
+MATE_RUNTIME_SESSION_ID={{HERDR_SESSION}}
+MATE_CALLER=mate
+CODEX_HOME={{CODEX_HOME}}
+
+== launch env (exported into the pane before start) ==
+MATE_PROJECT_ID=shop
+MATE_AGENT_ID=mate-shop
+MATE_AGENT_ROLE=mate
+MATE_RUNTIME_SESSION_ID={{HERDR_SESSION}}
+MATE_CALLER=mate
+CODEX_HOME={{CODEX_HOME}}
+
+== launch env (unset) ==
+CLAUDECODE
+CLAUDE_CODE_SESSION_ID
+CLAUDE_CODE_CHILD_SESSION
+CLAUDE_CODE_SESSION_ATTENDED
+CLAUDE_CODE_ENTRYPOINT
+CLAUDE_CODE_EXECPATH
+CLAUDE_CODE_MESSAGING_SOCKET
+CLAUDE_CODE_MESSAGING_TOKEN
+CLAUDE_PID
+CLAUDE_EFFORT
+
+== pane env (tab create) ==
+label: mate
+cwd: {{WORKSPACE}}/.mate/projects/shop/mate
+MATE_PROJECT_ID=shop
+MATE_AGENT_ID=mate-shop
+MATE_AGENT_ROLE=mate
+MATE_RUNTIME_SESSION_ID={{HERDR_SESSION}}
+MATE_CALLER=mate
+CODEX_HOME={{CODEX_HOME}}
+
+== prompts ==
+
+== notes ==
+- the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code
+- the captain first chose the narrower --ask-for-approval never --sandbox workspace-write pair, then reversed that ruling the same day: a linked Crew worktree's .git is a pointer file into the primary repo's git dir, outside workspace-write's writable root, so a Codex Crew under the narrow pair could do work but could never git commit it (measured both directions) - and mate never commits on a Crew's behalf, it only fast-forwards the Crew branch, so uncommitted work can never be delivered
+- this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.mate/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit
+- this puts gomate in the same posture firstmate's own tooling already runs Codex in
+- this does not clear Codex's per-absolute-path directory-trust confirmation; that dialog is a separate wall no flag removes, measured 2026-09-14
+- the launch also carries -c check_for_update_on_startup=false: codex-cli draws a three-option release-update prompt ahead of everything else while a newer version is published, which blocks the composer (measured 2026-09-18 with 0.154.0 installed and 0.155.0 out); the key is documented and the override is per-launch, so the operator's own config.toml is never written
+- the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation
+- Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered); the launch raises that cap to CodexDefaultMaxBytes with -c project_doc_max_bytes= and mate meters against the same number
+- missing or empty project files do not fail Codex; mate refuses to start instead
+
+== files the launch created or changed ==
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/settings.json mode=-rw-r--r-- bytes=615 ---
+{
+  "autoMemoryEnabled": false,
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "'{{BIN_DIR}}/mate' hook mate-session",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "'{{BIN_DIR}}/mate' hook mate-stop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "'{{BIN_DIR}}/mate' hook mate-prompt",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/settings.json ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/brief-writing/SKILL.md mode=-rw-r--r-- bytes=5736 ---
+(rendered asset) sha256=288e9146796cf9cfe8d05b456340f851f858627e3576337695abb1abb647073e
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/brief-writing/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/crew-dispatch/SKILL.md mode=-rw-r--r-- bytes=11351 ---
+(rendered asset) sha256=b0a4936e0fb35bfdcbe929f06a06242aed4f9c444cff3763e9b1d59c74886abf
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/crew-dispatch/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/crew-spawn/SKILL.md mode=-rw-r--r-- bytes=3154 ---
+(rendered asset) sha256=4a2cf7bdb1f957a435410d63d226e1d60bd16ff6ef3a0e83cf422180641e22a9
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/crew-spawn/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/decision-authority/SKILL.md mode=-rw-r--r-- bytes=4638 ---
+(rendered asset) sha256=892f4bb290be9551a4e87ec7a033b8e6b0d733d907315d66aa36a29986ca3459
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/decision-authority/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/diagnostic-reasoning/SKILL.md mode=-rw-r--r-- bytes=4253 ---
+(rendered asset) sha256=60c75fce53a195d27377d19ec8c85b063244cfaf97ed03da8fa5593996bb74e6
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/diagnostic-reasoning/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/event-handling/SKILL.md mode=-rw-r--r-- bytes=11169 ---
+(rendered asset) sha256=1d4f81b724ba3e2820a0af9c1a1c8003b62f074d432567e9900f6280e676f6cb
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/event-handling/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/harness-adapters/SKILL.md mode=-rw-r--r-- bytes=5939 ---
+(rendered asset) sha256=065f700ee9bf903ad944a17a6eee9d657227ca6ac4534a9edfd64f28c11662cc
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/harness-adapters/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/mate-commands/SKILL.md mode=-rw-r--r-- bytes=25313 ---
+(rendered asset) sha256=f3910d5ac93e8189a8113d17727260f65018d75915d7bf68c4016c85593a6084
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/mate-commands/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/project-memory/SKILL.md mode=-rw-r--r-- bytes=7292 ---
+(rendered asset) sha256=3cea3f39fb1a98d01f24ab2e112f8f71703559d35ddfb0b8c0dfe2346f9903d8
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/project-memory/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/review-delivery/SKILL.md mode=-rw-r--r-- bytes=8006 ---
+(rendered asset) sha256=5e5dbad10cdb05f2a4d6f4fcfa81c221df6b602419be39f94db1263d1b6716cb
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/review-delivery/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/stow/SKILL.md mode=-rw-r--r-- bytes=15580 ---
+(rendered asset) sha256=7986e900f33ba4027b3674f49a81ed4645daf5d4ba9eeefa51e5a82ece49e9a2
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/stow/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/stuck-crew-recovery/SKILL.md mode=-rw-r--r-- bytes=7268 ---
+(rendered asset) sha256=77d5dd4f67ee64fdff5649fc62d8546ef64f40f8d6b207d966d8b1fdcb70c6ff
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/stuck-crew-recovery/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md mode=-rw-r--r-- bytes=5577 ---
+(rendered asset) sha256=a9aa7e40807608f0f0b34659b0afdc856e04998a0eed343edc420d55ba2498fe
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.codex/hooks.json mode=-rw-r--r-- bytes=299 ---
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "additionalContextLimit": 32000,
+            "command": "'{{BIN_DIR}}/mate' hook mate-session --harness codex",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/.codex/hooks.json ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.md mode=-rw-r--r-- bytes=21941 ---
+(rendered asset) sha256=4877e29601e25fec7f88ea6c39cc3142de8e133cc04d698ebf31f30fd757a699
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.override.md mode=-rw-r--r-- bytes=21941 ---
+(rendered asset) sha256=4877e29601e25fec7f88ea6c39cc3142de8e133cc04d698ebf31f30fd757a699
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/AGENTS.override.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/CLAUDE.md mode=-rw-r--r-- bytes=11 ---
+@AGENTS.md
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/CLAUDE.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/backlog.md mode=-rw-r--r-- bytes=69 ---
+# Backlog
+
+## In flight
+
+## Held for the captain
+
+## Queued
+
+## Done
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/backlog.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/mate.meta mode=-rw-r--r-- bytes=193 ---
+agent=mate-shop
+effort=high
+harness=codex
+launched_at=2026-09-17T10:00:00Z
+model=gpt-5.5
+pane=w1:p1
+session={{HERDR_SESSION}}
+session_id=
+started_at=2026-09-17T10:00:00Z
+tab=w1:t1
+workspace=w1
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/mate.meta ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/memory.md mode=-rw-r--r-- bytes=75 ---
+# Memory
+<!-- memory tiers: see the stow skill -->
+
+## Captain
+
+## Lessons
+--- end {{WORKSPACE}}/.mate/projects/shop/mate/memory.md ---

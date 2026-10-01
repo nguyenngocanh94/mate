@@ -1,0 +1,215 @@
+starts: 2
+
+== herdr argv (last start) ==
+"agent"
+"start"
+"crew-k3"
+"--kind"
+"claude"
+"--pane"
+"w1:p3"
+"--session"
+"{{HERDR_SESSION}}"
+"--timeout"
+"10000"
+"--"
+"--dangerously-skip-permissions"
+"--session-id"
+"11111111-2222-3333-4444-555555555555"
+"--settings"
+"{{WORKSPACE}}/.mate/projects/shop/crews/k3/settings.json"
+"--model"
+"sonnet"
+"--effort"
+"high"
+"--append-system-prompt-file"
+"{{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md"
+
+== launch spec ==
+kind: claude
+cwd: {{WORKSPACE}}/.worktrees/shop-k3
+delivery: append_system_prompt_file
+context_path: {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md
+context_required: true
+context_file: {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md role=canonical_context
+max_inline_bytes: 100000
+max_file_bytes: 0
+model: sonnet
+effort: high
+effort_omitted: false
+codex_home: 
+claude_config_dir: {{HOME}}/.claude
+task_prompt: ""
+
+== launch args ==
+"--dangerously-skip-permissions"
+"--session-id"
+"11111111-2222-3333-4444-555555555555"
+"--settings"
+"{{WORKSPACE}}/.mate/projects/shop/crews/k3/settings.json"
+"--model"
+"sonnet"
+"--effort"
+"high"
+"--append-system-prompt-file"
+"{{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md"
+
+== launch env (set) ==
+
+== launch env (exported into the pane before start) ==
+
+== launch env (unset) ==
+CLAUDE_CONFIG_DIR
+CLAUDECODE
+CLAUDE_CODE_SESSION_ID
+CLAUDE_CODE_CHILD_SESSION
+CLAUDE_CODE_SESSION_ATTENDED
+CLAUDE_CODE_ENTRYPOINT
+CLAUDE_CODE_EXECPATH
+CLAUDE_CODE_MESSAGING_SOCKET
+CLAUDE_CODE_MESSAGING_TOKEN
+CLAUDE_PID
+CLAUDE_EFFORT
+
+== pane env (tab create) ==
+label: crew-k3
+cwd: {{WORKSPACE}}/.worktrees/shop-k3
+MATE_PROJECT_ID=shop
+MATE_AGENT_ID=crew-k3
+MATE_AGENT_ROLE=crew
+MATE_CREW_ID=k3
+MATE_RUNTIME_SESSION_ID={{HERDR_SESSION}}
+MATE_STATUS={{WORKSPACE}}/.mate/projects/shop/crews/k3.status
+MATE_CALLER=crew
+
+== prompts ==
+"Read and follow the brief at {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md. Progress so far: pushed two commits. Start now."
+
+== notes ==
+- the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code
+- --dangerously-skip-permissions suppresses per-tool permission prompts; Claude exposes no sandbox option to remove
+- two separate one-time walls remain, neither cleared by this flag - naming only one, as an earlier version of this note did, is the exact understatement this record exists to correct: (1) Claude's per-absolute-path directory-trust confirmation, measured 2026-09-14; (2) --dangerously-skip-permissions itself raises a second, separate blocking 'Bypass Permissions mode' acceptance screen the first time a given CLAUDE_CONFIG_DIR sees it - measured 2026-09-14 on a linked worktree of an already-trusted primary repo with an isolated config dir, then persisted to that config dir's settings.json so it never reappears there (why a machine that accepted it long ago never surfaces it)
+- whether mate should auto-accept that second screen for the operator is a separate open captain call (gomate-claude-bypass-mode-screen), not implemented here
+- the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation
+- default Claude delivery is --append-system-prompt-file; Claude exits 1 on a missing file, and mate still fails in BuildLaunchSpec first
+- G5-12 live evidence proves Claude receives the locator flags through Herdr and fires the configured Stop hook
+
+== files the launch created or changed ==
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta mode=-rw-r--r-- bytes=349 ---
+agent=crew-k3
+branch=mate/k3
+effort=high
+harness=claude
+kind=ship
+launched_at=2026-09-17T10:00:00Z
+model=sonnet
+pane=w1:p3
+repo=shop
+session={{HERDR_SESSION}}
+session_id=11111111-2222-3333-4444-555555555555
+started_at=2026-09-17T10:00:00Z
+state=spawned
+tab=w1:t3
+task=Add a healthcheck endpoint.
+transcript=
+workspace=w1
+worktree=.worktrees/shop-k3
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.status mode=-rw-r--r-- bytes=0 ---
+(empty)
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.status ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7634 ---
+(rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2095 ---
+{
+  "version": 1,
+  "captured_at": "2026-09-17T10:00:00Z",
+  "source": "launch",
+  "project": "shop",
+  "crew": "k3",
+  "repo": "shop",
+  "harness": "claude",
+  "mate_version": "dev",
+  "requested_model": "sonnet",
+  "requested_effort": "high",
+  "effort_omitted": false,
+  "repo_commit": "{{HEAD}}",
+  "repo_dirty": false,
+  "documents": [
+    {
+      "path": ".mate/projects/shop/crews/k3/brief.md",
+      "role": "task_brief",
+      "sha256": "{{sha256 of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}}",
+      "bytes": {{bytes of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}},
+      "state": "configured"
+    },
+    {
+      "path": ".mate/CREW.md",
+      "role": "workspace_crew_rules",
+      "sha256": "a3403b12a400203117618302ad02acfbd23a0a107d9a7d1ea9c5df6a5f0b8894",
+      "bytes": 441,
+      "state": "configured"
+    },
+    {
+      "path": ".mate/projects/shop/CREW.md",
+      "role": "project_crew_rules",
+      "sha256": "9603c2a33aa9ba8608a4f7565ed121371fdc7a3fa3454e9ba530aff31af82d58",
+      "bytes": 370,
+      "state": "configured"
+    },
+    {
+      "path": ".worktrees/shop-k3/AGENTS.md",
+      "role": "repo_agents",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/CLAUDE.md",
+      "role": "repo_claude",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/AGENTS.override.md",
+      "role": "generated_prompt",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/.codex/config.toml",
+      "role": "repo_codex_config",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/.claude/settings.json",
+      "role": "repo_claude_settings",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": "embedded:crew/brief.md.tmpl",
+      "role": "crew_prompt_template",
+      "sha256": "8375b828647af556f67e98066eba1ccb6107cf7aaf6041e730b5f3f174a9b7b5",
+      "bytes": 9578,
+      "state": "configured"
+    }
+  ],
+  "fingerprint": "47a886fdb0e65cc0cc2e3f7a8b7b138098c8fb02d9134cec10012eaa78c71021"
+}
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/settings.json mode=-rw-r--r-- bytes=33 ---
+{
+  "autoMemoryEnabled": false
+}
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/settings.json ---
+
+--- created {{WORKSPACE}}/.worktrees/shop-k3/README.md mode=-rw-r--r-- bytes=5 ---
+shop
+--- end {{WORKSPACE}}/.worktrees/shop-k3/README.md ---
