@@ -308,7 +308,7 @@ func decideResume(meta map[string]string, kind harness.Kind, req StartRequest) r
 // harness whose id exists only once the first prompt opens its session,
 // which StopMate records (task 35).
 func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project string, profile harness.Profile, mateDir string, decision resumeDecision, prep harness.Prepared, session runtime.SessionHandle, tab runtime.TabHandle) (StartResult, error) {
-	env, err := mateEnv(project, session)
+	env, err := mateEnv(deps.Harnesses, project, session)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -316,7 +316,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	launch, err := buildLaunchSpec(ctx, profile, project, mateDir, decision, prep, env, cfg.Mate)
+	launch, err := buildLaunchSpec(ctx, profile, project, mateDir, decision, prep, env, deps.Harnesses.EnvKeys(), cfg.Mate)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -532,7 +532,7 @@ func ownHooks(deps Deps, profile harness.Profile, mateDir string) ([]harness.Own
 // buildLaunchSpec asks the harness's launcher for the argv of the launch it
 // prepared. The cwd is the Mate directory, which is also where the manual
 // is.
-func buildLaunchSpec(ctx context.Context, profile harness.Profile, project, mateDir string, decision resumeDecision, prep harness.Prepared, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
+func buildLaunchSpec(ctx context.Context, profile harness.Profile, project, mateDir string, decision resumeDecision, prep harness.Prepared, env []runtime.EnvVar, envKeys []string, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
 	spec := harness.AgentSpec{
 		ID:          AgentNamePrefix + "-" + project,
 		Role:        harness.RoleMate,
@@ -545,7 +545,8 @@ func buildLaunchSpec(ctx context.Context, profile harness.Profile, project, mate
 		// every start, which is the only way a Mate restarted into a fresh
 		// `tab create` (a Crew still holds the workspace) keeps its
 		// identity.
-		Env: launchEnv(env, profile),
+		Env:     launchEnv(env, profile),
+		EnvKeys: envKeys,
 	}
 	if decision.Resume {
 		spec.ResumeSessionID = decision.SessionID
@@ -569,13 +570,13 @@ func buildLaunchSpec(ctx context.Context, profile harness.Profile, project, mate
 // the pane is made and never afterwards, so an existing workspace is adopted
 // as it is.
 func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.SessionHandle, project, mateDir string) (runtime.WorkspaceHandle, error) {
-	spec := runtime.WorkspaceSpec{Session: session, Label: project, Cwd: mateDir}
+	spec := runtime.WorkspaceSpec{Session: session, Label: project, Cwd: mateDir, EnvKeys: deps.Harnesses.EnvKeys()}
 	if _, found, err := deps.Runtime.LookupProjectWorkspace(ctx, spec); err != nil {
 		return runtime.WorkspaceHandle{}, err
 	} else if found {
 		return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
 	}
-	env, err := mateEnv(project, session)
+	env, err := mateEnv(deps.Harnesses, project, session)
 	if err != nil {
 		return runtime.WorkspaceHandle{}, err
 	}
@@ -583,30 +584,40 @@ func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.Sess
 	return deps.Runtime.EnsureProjectWorkspace(ctx, spec)
 }
 
-// mateEnv is the Mate pane's environment: its identity, and the CODEX_HOME
-// every Codex agent of this project runs in.
+// mateEnv is the Mate pane's environment: its identity, and what each
+// registered harness pins for a launch of it the Mate makes itself
+// (harness.Launcher.PaneEnv).
 //
 // MATE_CALLER is how `mate merge` knows a Mate typed it and applies the
 // project's `yolo` rule (docs/mvp.md M4 decisions), and MATE_AGENT_ROLE is
-// how `mate send` records a line as the Mate's. CODEX_HOME is pinned for
-// either harness because the Mate's own `mate crew spawn` launches Codex
-// Crews and finds their rollouts from it: a Claude Mate that inherited
-// whatever the Herdr server was started with would put its Crews' trust
-// and rollouts somewhere this process never looks. harness.LaunchCodexHome
-// is also what refuses the operator's home during a live test run.
-func mateEnv(project string, session runtime.SessionHandle) ([]runtime.EnvVar, error) {
-	codexHome, err := harness.LaunchCodexHome("")
-	if err != nil {
-		return nil, observability.WrapError(observability.CodeUsage, "codex home", err)
-	}
-	return []runtime.EnvVar{
+// how `mate send` records a line as the Mate's. A harness's pane env is
+// pinned whichever harness the Mate runs on, because the Mate's own `mate
+// crew spawn` launches Crews of any of them and this process finds their
+// records from the same values: a Mate that inherited whatever the Herdr
+// server was started with would put its Crews' state somewhere this
+// process never looks.
+func mateEnv(harnesses harness.Registry, project string, session runtime.SessionHandle) ([]runtime.EnvVar, error) {
+	env := []runtime.EnvVar{
 		{Key: config.EnvProjectID, Value: project},
 		{Key: config.EnvAgentID, Value: AgentNamePrefix + "-" + project},
 		{Key: config.EnvAgentRole, Value: string(harness.RoleMate)},
 		{Key: config.EnvRuntimeSessionID, Value: session.Name},
 		{Key: config.EnvCaller, Value: CallerMate},
-		{Key: config.EnvCodexHome, Value: codexHome},
-	}, nil
+	}
+	for _, k := range harnesses.Kinds() {
+		profile, err := harnesses.Lookup(k)
+		if err != nil {
+			return nil, err
+		}
+		pinned, err := profile.Launcher().PaneEnv()
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range pinned {
+			env = append(env, runtime.EnvVar{Key: v.Key, Value: v.Value})
+		}
+	}
+	return env, nil
 }
 
 // launchEnv is env as a launch carries it. The variables the harness

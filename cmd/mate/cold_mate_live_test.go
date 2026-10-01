@@ -48,7 +48,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 	// 1. The Mate, through the Console's own action seam. Nothing is typed
 	// into it here or anywhere below: that is the whole point.
 	startOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessClaude})
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("console start action: %v", err)
 	}

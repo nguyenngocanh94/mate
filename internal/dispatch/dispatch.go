@@ -196,7 +196,11 @@ func checkProfile(rp rawProfile, harnesses harness.Registry) (Profile, error) {
 	if err != nil {
 		return Profile{}, err
 	}
-	if effort != "" && !kind.SupportsEffort(effort) {
+	profile, err := harnesses.Lookup(kind)
+	if err != nil {
+		return Profile{}, err
+	}
+	if effort != "" && !profile.Info().SupportsEffort(effort) {
 		return Profile{}, fmt.Errorf("%s does not take effort %s", kind, effort)
 	}
 	return Profile{Harness: kind, Model: model, Effort: effort}, nil

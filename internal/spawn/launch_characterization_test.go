@@ -16,6 +16,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -60,8 +61,8 @@ func newLaunchFixture(t *testing.T, crew bool, env map[string]string) *launchFix
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv(config.EnvCodexHome, codexHome)
-	t.Setenv(config.EnvClaudeConfigDir, "")
+	t.Setenv(harness.CodexHomeEnv, codexHome)
+	t.Setenv(harness.ClaudeConfigDirEnv, "")
 	t.Setenv(config.EnvLive, "")
 	for k, v := range env {
 		t.Setenv(k, v)
@@ -415,7 +416,7 @@ func TestLaunchCharacterizationMate(t *testing.T) {
 		{name: "mate-claude-fresh-model-effort", kind: harness.KindClaude, mate: store.MateConfig{Model: "sonnet", Effort: "high"}},
 		{name: "mate-claude-fresh-effort-only", kind: harness.KindClaude, mate: store.MateConfig{Effort: "max"}},
 		// CLAUDE_CONFIG_DIR set: the launch assigns it instead of unsetting it.
-		{name: "mate-claude-fresh-config-dir", kind: harness.KindClaude, env: map[string]string{config.EnvClaudeConfigDir: "dir"}},
+		{name: "mate-claude-fresh-config-dir", kind: harness.KindClaude, env: map[string]string{harness.ClaudeConfigDirEnv: "dir"}},
 		{name: "mate-claude-resume", kind: harness.KindClaude, resume: true},
 		{name: "mate-codex-fresh-default", kind: harness.KindCodex},
 		{name: "mate-codex-fresh-model-effort", kind: harness.KindCodex, mate: store.MateConfig{Model: "gpt-5.5", Effort: "high"}},
@@ -487,7 +488,7 @@ func TestLaunchCharacterizationCrew(t *testing.T) {
 	cases := []crewCase{
 		{name: "crew-claude-default", kind: harness.KindClaude},
 		{name: "crew-claude-model-effort", kind: harness.KindClaude, model: "sonnet", effort: harness.EffortMax},
-		{name: "crew-claude-config-dir", kind: harness.KindClaude, env: map[string]string{config.EnvClaudeConfigDir: "dir"}},
+		{name: "crew-claude-config-dir", kind: harness.KindClaude, env: map[string]string{harness.ClaudeConfigDirEnv: "dir"}},
 		{name: "crew-claude-relaunch", kind: harness.KindClaude, model: "sonnet", effort: harness.EffortHigh, relaunch: true},
 		{name: "crew-codex-default", kind: harness.KindCodex},
 		{name: "crew-codex-model-effort", kind: harness.KindCodex, model: "gpt-5.5", effort: harness.EffortHigh},
@@ -534,8 +535,8 @@ func TestLaunchCharacterizationCrew(t *testing.T) {
 // session variables stripped from every pane before an agent starts.
 func TestLaunchCharacterizationEnvSets(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("== config.LaunchEnvKeys (allowlist) ==\n")
-	for _, k := range config.LaunchEnvKeys() {
+	b.WriteString("== config.IdentityEnvKeys + Registry.EnvKeys (allowlist) ==\n")
+	for _, k := range append(config.IdentityEnvKeys(), catalog.Default().EnvKeys()...) {
 		b.WriteString(k + "\n")
 	}
 	b.WriteString("\n== harness.NestedSessionEnv (always unset) ==\n")

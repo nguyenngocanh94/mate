@@ -24,7 +24,7 @@ import (
 // real git repositories each with one commit on main.
 func twoRepoWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestSpawnCrewRefusesAnUnknownRepo(t *testing.T) {
 }
 
 func TestSpawnCrewRefusesAProjectWithNoRepo(t *testing.T) {
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestLiveConsoleBoxRoundTrip(t *testing.T) {
 
 	// 1. The Mate, through the Console's own action seam.
 	startOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessClaude})
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("console start action: %v", err)
 	}

@@ -2,6 +2,7 @@ package harness
 
 import (
 	"context"
+	"slices"
 	"time"
 )
 
@@ -39,6 +40,39 @@ type Info struct {
 	// The manual names it for a harness that does not discover skills on
 	// its own, so it is fixed before the manual is rendered.
 	SkillsDir string
+	// Icon is the harness's one-cell mark, as the Console draws it in each
+	// glyph alphabet.
+	Icon Icon
+	// Documents are the files of a working tree, relative to its top, that
+	// shape what the harness does there. A Crew's harness profile records
+	// each under its role, for every registered harness: a repo may carry
+	// files for a harness its Crew does not run on.
+	Documents []Document
+	// Efforts are the reasoning-effort levels the launch passes as a flag.
+	// A requested effort outside them is recorded and left out of the argv.
+	Efforts []Effort
+}
+
+// Icon is a harness's mark: a Nerd Font brand glyph, the Unicode stand-in a
+// terminal without that font draws, and the ASCII one for a terminal that
+// draws nothing else. Each is one cell.
+type Icon struct {
+	Nerd    string
+	Unicode string
+	ASCII   string
+}
+
+// Document is a file of a working tree a harness reads, slash-separated
+// and relative to the tree's top, and the role a harness profile records it
+// under.
+type Document struct {
+	Path string
+	Role string
+}
+
+// SupportsEffort reports whether the harness takes e as a launch flag.
+func (i Info) SupportsEffort(e Effort) bool {
+	return e != "" && slices.Contains(i.Efforts, e)
 }
 
 // Launcher lays out and builds a harness's launch (launch.go). It never
@@ -51,6 +85,10 @@ type Launcher interface {
 	// Build turns the role-generic request into a startable LaunchSpec, or
 	// refuses it.
 	Build(ctx context.Context, spec AgentSpec) (LaunchSpec, error)
+	// PaneEnv is what a Mate's pane is given so that a launch of this
+	// harness the Mate makes itself (`mate crew spawn`) runs where mate's
+	// own launches of it do. Each key is one of Info().EnvKeys.
+	PaneEnv() ([]EnvVar, error)
 }
 
 // ScreenProfile recognises a harness's pane: how it is read, its startup
@@ -175,10 +213,49 @@ type HookInstaller interface {
 	// the operator to trust at startup. The startup settle trusts these and
 	// nothing else.
 	Own(binary, cwd string) []OwnHook
+	// ReviewOwn walks the harness's review of untrusted hooks, from the
+	// StartupScreenHooksReview dialog on screen back to the composer,
+	// trusting own and nothing else. A screen the walk does not expect is
+	// a *ScreenRefusal, with nothing further pressed. A harness that never
+	// asks the operator to trust a hook refuses.
+	ReviewOwn(ctx context.Context, pane HookReviewPane, screen string, own []OwnHook) error
 	// DigestMaxBytes bounds the session-start digest the hook prints, to
 	// what the harness puts in context whole.
 	DigestMaxBytes() int
+	// BareSessionHook reports whether the harness's SessionStart hook runs
+	// `mate hook mate-session` without --harness, so a hook that names no
+	// harness is this one's. At most one registered harness says so.
+	BareSessionHook() bool
 }
+
+// OwnHook is one hook the settle may trust: mate wrote it, in this file,
+// with this command, for this event.
+type OwnHook struct {
+	Event   string
+	Source  string // the absolute path of the hooks.json that holds it
+	Command string
+}
+
+// HookReviewPane is the pane a hook review is walked in. Whoever settles the
+// startup owns it: which pane, read through which source, and how long a
+// key press is given to redraw.
+type HookReviewPane interface {
+	// Read re-reads the screen.
+	Read(ctx context.Context) (string, error)
+	// Press sends one key and waits for the harness to redraw.
+	Press(ctx context.Context, key string) error
+	// Wait pauses before a screen still being drawn is read again.
+	Wait(ctx context.Context) error
+}
+
+// ScreenRefusal is a screen walk stopping on a screen it did not expect,
+// before pressing anything into it.
+type ScreenRefusal struct {
+	Screen string
+	Reason string
+}
+
+func (e *ScreenRefusal) Error() string { return e.Reason }
 
 // TurnEndEvidence is what, besides the composer, shows that a turn of the
 // harness ended.
@@ -248,17 +325,17 @@ type Evidence struct {
 	Proof string
 }
 
-// exitPrompt is a GracefulStopper that types one line.
-type exitPrompt string
+// ExitCommand is a GracefulStopper that types one line.
+type ExitCommand string
 
 // ExitPrompt implements GracefulStopper.
-func (p exitPrompt) ExitPrompt() string { return string(p) }
+func (p ExitCommand) ExitPrompt() string { return string(p) }
 
-// quotaRow is a QuotaProvider that names one row.
-type quotaRow struct{ provider, lane string }
+// QuotaRow is a QuotaProvider that names one row.
+type QuotaRow struct{ Provider, Lane string }
 
 // QuotaProvider implements QuotaProvider.
-func (q quotaRow) QuotaProvider() string { return q.provider }
+func (q QuotaRow) QuotaProvider() string { return q.Provider }
 
 // QuotaLane implements QuotaProvider.
-func (q quotaRow) QuotaLane() string { return q.lane }
+func (q QuotaRow) QuotaLane() string { return q.Lane }

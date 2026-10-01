@@ -324,6 +324,7 @@ func unknownMate(reason string) query.MateNode {
 func sampleTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
+		Harnesses:   testHarnesses,
 		Workspace: query.KnownField(query.WorkspaceValue{
 			Name: "acme", Root: "/Users/dev/work/acme",
 		}),
@@ -334,7 +335,7 @@ func sampleTree() query.Snapshot {
 				Name:      "payments-api",
 				Mate: query.MateNode{
 					Designated: query.KnownField(query.MateIdentity{
-						MateID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", HarnessKind: query.HarnessClaude,
+						MateID: "mate_01J9M2G9N3X8D5J0B4H7V2T1WK", HarnessKind: query.HarnessKind("claude"),
 						Status: query.MateRunning, IsDefault: true,
 					}),
 					AgentName: query.KnownField("mate-payments-api"),
@@ -361,7 +362,7 @@ func sampleTree() query.Snapshot {
 						// `failed` is terminal, so this row lives in the
 						// Completed group (mvp.md section 4b).
 						Closed:      true,
-						HarnessKind: query.HarnessCodex,
+						HarnessKind: query.HarnessKind("codex"),
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "payments-api", DisplayName: "payments-api",
 							Path: "repos/payments-api", DefaultBranch: "main",
@@ -392,7 +393,7 @@ func sampleTree() query.Snapshot {
 						RepoID:      "payments-api",
 						Task:        "Add idempotency-key index",
 						Status:      query.CrewWorking,
-						HarnessKind: query.HarnessClaude,
+						HarnessKind: query.HarnessKind("claude"),
 						Repo: query.KnownField(query.RepoValue{
 							RepoID: "payments-api", DisplayName: "payments-api",
 							Path: "repos/payments-api", DefaultBranch: "main",

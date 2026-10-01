@@ -26,8 +26,9 @@ type glyphSet struct {
 
 	// Mate and Crew are the kind marks, two cells each (kinds.go).
 	Mate, Crew string
-	// Claude and Codex are the harness icons, one cell each (icons.go).
-	Claude, Codex string
+	// Icons is which of a harness's marks this alphabet draws (icons.go):
+	// each harness names its own (query.HarnessIcon), one cell each.
+	Icons iconSet
 }
 
 var unicodeGlyphs = glyphSet{
@@ -48,8 +49,7 @@ var unicodeGlyphs = glyphSet{
 	Bang:      "!",
 	Mate:      "👨‍💻",
 	Crew:      "🤖",
-	Claude:    "✻",
-	Codex:     "⌬",
+	Icons:     iconsUnicode,
 }
 
 // asciiGlyphs is design I's fallback table, one cell each ("9 ASCII
@@ -72,8 +72,7 @@ var asciiGlyphs = glyphSet{
 	Bang:      "!",
 	Mate:      "@ ",
 	Crew:      "o ",
-	Claude:    "*",
-	Codex:     "#",
+	Icons:     iconsASCII,
 }
 
 // glyphsFor picks the alphabet from the environment - the only place this

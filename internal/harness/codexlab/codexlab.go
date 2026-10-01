@@ -26,7 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
@@ -88,7 +87,7 @@ func Home(t testing.TB) string {
 	if err := os.WriteFile(filepath.Join(home, Marker), []byte("a mate live test's lab CODEX_HOME\n"), 0o644); err != nil {
 		t.Fatalf("codexlab: %v", err)
 	}
-	t.Setenv(config.EnvCodexHome, home)
+	t.Setenv(harness.CodexHomeEnv, home)
 	if _, err := harness.LaunchCodexHome(""); err != nil {
 		t.Fatalf("codexlab: the lab home would be refused: %v", err)
 	}

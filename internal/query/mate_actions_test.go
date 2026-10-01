@@ -34,21 +34,21 @@ func TestMateActionsAuthorOnboard(t *testing.T) {
 		{
 			name: "created mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateCreated,
+				MateID: "mate_1", HarnessKind: HarnessKind("claude"), Status: MateCreated,
 			})},
 			onboard: false,
 		},
 		{
 			name: "stopped mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateStopped,
+				MateID: "mate_1", HarnessKind: HarnessKind("claude"), Status: MateStopped,
 			})},
 			onboard: false,
 		},
 		{
 			name: "running mate",
 			mate: MateNode{Designated: KnownField(MateIdentity{
-				MateID: "mate_1", HarnessKind: HarnessClaude, Status: MateRunning,
+				MateID: "mate_1", HarnessKind: HarnessKind("claude"), Status: MateRunning,
 			})},
 			onboard: false,
 		},

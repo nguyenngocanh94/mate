@@ -30,15 +30,13 @@ const (
 	// It is injected at pane create beside the identity keys, for the same
 	// reason MATE_STATUS is: a command can only know which of the three
 	// ran it from the environment its pane was given.
-	EnvCaller          = "MATE_CALLER"
-	EnvClaudeConfigDir = "CLAUDE_CONFIG_DIR"
-	EnvCodexHome       = "CODEX_HOME"
+	EnvCaller = "MATE_CALLER"
 	// EnvLive is the single opt-in that lets `TestLive*` proofs claim a real
 	// Herdr lab and real harnesses (AGENTS.md). The product reads it in one
-	// place only: a process that carries it may not launch Codex, or hand a
-	// pane a CODEX_HOME, outside the temp directory (harness.LaunchCodexHome),
-	// so a live run never writes trust or rollouts into the operator's own
-	// ~/.codex.
+	// place only: a process that carries it may not launch a harness, or
+	// hand a pane a harness home, outside the temp directory (each harness's
+	// Launcher refuses it), so a live run never writes trust or rollouts into
+	// the operator's own home.
 	EnvLive = "MATE_LIVE"
 )
 
@@ -59,7 +57,8 @@ func ParseLogLevel(s string) slog.Level {
 
 // IdentityEnvKeys are the MATE_* identity keys Mate injects into an agent
 // pane (workspace/tab create --env, not agent start). Both the runtime
-// allowlist and the harness launch-env filter derive from this one list
+// allowlist and the harness launch-env filter derive from this one list,
+// plus the keys each registered harness declares (harness.Info.EnvKeys),
 // so they cannot drift. Unknown keys are refused (ADR 0009).
 func IdentityEnvKeys() []string {
 	return []string{
@@ -73,13 +72,4 @@ func IdentityEnvKeys() []string {
 		EnvStatusFile,
 		EnvCaller,
 	}
-}
-
-// LaunchEnvKeys are identity keys plus provider roots that Mate may explicitly
-// pass through to the Herdr-owned pane environment. Claude's default root is
-// intentionally not an assignment; its unset operation is carried by the
-// harness LaunchSpec and applied immediately before agent start.
-func LaunchEnvKeys() []string {
-	keys := IdentityEnvKeys()
-	return append(keys, EnvClaudeConfigDir, EnvCodexHome)
 }

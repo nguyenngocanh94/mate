@@ -443,7 +443,7 @@ func (h *Herdr) EnsureProjectWorkspace(ctx context.Context, spec WorkspaceSpec) 
 	if err := CheckWorkspaceSpec(spec); err != nil {
 		return WorkspaceHandle{}, err
 	}
-	env, err := AllowlistedEnv(spec.Env)
+	env, err := AllowlistedEnv(spec.Env, spec.EnvKeys)
 	if err != nil {
 		return WorkspaceHandle{}, err
 	}
@@ -611,7 +611,7 @@ func (h *Herdr) CreateAgentTab(ctx context.Context, spec TabSpec) (TabHandle, er
 	if err := CheckTabSpec(spec); err != nil {
 		return TabHandle{}, err
 	}
-	env, err := AllowlistedEnv(spec.Env)
+	env, err := AllowlistedEnv(spec.Env, spec.EnvKeys)
 	if err != nil {
 		return TabHandle{}, err
 	}
@@ -950,7 +950,7 @@ func (h *Herdr) StartAgent(ctx context.Context, spec AgentStartSpec) (AgentHandl
 	// inherits nothing from the workspace (measured 2026-09-24, Herdr 0.8.2:
 	// a tab created without --env in a workspace made with --env FOO=ws
 	// echoes FOO empty).
-	if env, err := AllowlistedEnv(runtimeEnv(spec.Launch().Env())); err != nil {
+	if env, err := PaneEnv(spec.Launch()); err != nil {
 		return AgentHandle{}, err
 	} else if len(env) > 0 {
 		argv := append([]string{"pane", "run", spec.Tab().PaneID, "export"}, exportAssignments(env)...)

@@ -18,7 +18,7 @@ func newWorkspace(t *testing.T) *store.Workspace {
 	if err := os.MkdirAll(filepath.Join(dir, "shop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	w, err := store.Init(dir)
+	w, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
@@ -28,15 +28,16 @@ func newWorkspace(t *testing.T) *store.Workspace {
 func TestStoreInitThenOpenRoundTrips(t *testing.T) {
 	dir := t.TempDir()
 
-	created, err := store.Init(dir)
+	want := store.Defaults{MateHarness: "harness-a", CrewHarness: "harness-b"}
+	created, err := store.Init(dir, want)
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 	if created.Session() == "" || !strings.HasPrefix(created.Session(), "mate-") {
 		t.Fatalf("session name %q does not look like mate-<id>", created.Session())
 	}
-	if got := created.Defaults(); got.MateHarness != store.DefaultMateHarness || got.CrewHarness != store.DefaultCrewHarness {
-		t.Fatalf("defaults = %+v, want claude/codex", got)
+	if got := created.Defaults(); got != want {
+		t.Fatalf("defaults = %+v, want what Init was given, %+v", got, want)
 	}
 
 	opened, err := store.Open(dir)
@@ -52,9 +53,12 @@ func TestStoreInitThenOpenRoundTrips(t *testing.T) {
 	if opened.Config().Version != created.Config().Version {
 		t.Fatalf("version changed")
 	}
+	if got := opened.Defaults(); got != want {
+		t.Fatalf("defaults read back as %+v, want %+v", got, want)
+	}
 
 	// Init on an existing workspace keeps the stored session name.
-	again, err := store.Init(dir)
+	again, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("second Init: %v", err)
 	}
@@ -156,7 +160,7 @@ func TestStoreLayoutPathsAreInsideWorkspace(t *testing.T) {
 // edits.
 func TestInitSeedsTheWorkspaceDoc(t *testing.T) {
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
@@ -170,7 +174,7 @@ func TestInitSeedsTheWorkspaceDoc(t *testing.T) {
 	if err := os.WriteFile(w.WorkspaceDoc(), []byte("# mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Init(root); err != nil {
+	if _, err := store.Init(root, store.Defaults{}); err != nil {
 		t.Fatalf("second Init: %v", err)
 	}
 	if got, _ := os.ReadFile(w.WorkspaceDoc()); string(got) != "# mine\n" {
@@ -183,11 +187,28 @@ func TestInitSeedsTheWorkspaceDoc(t *testing.T) {
 // with a bare lstat error.
 func TestInitCreatesAMissingDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "new", "ws")
-	w, err := store.Init(dir)
+	w, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("Init(%s): %v", dir, err)
 	}
 	if _, err := os.Stat(w.WorkspaceFile()); err != nil {
 		t.Fatalf("no workspace file after Init: %v", err)
+	}
+}
+
+// The store records the defaults it is given and fills in none of its own:
+// a workspace.yaml without them reads back empty, and the binary's harness
+// registry decides (docs/plans/harness-registry-2026-09-30.md, section 3.4).
+func TestStoreFillsInNoHarnessDefault(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := store.Init(dir, store.Defaults{}); err != nil {
+		t.Fatal(err)
+	}
+	w, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Defaults(); got != (store.Defaults{}) {
+		t.Fatalf("defaults = %+v, want none: the store names no harness", got)
 	}
 }

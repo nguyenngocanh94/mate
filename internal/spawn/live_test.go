@@ -66,7 +66,7 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 	// symlinks resolved, and the launch guard compares the two (docs/mvp.md
 	// section 7). The runner sets TMPDIR; t.TempDir honours it.
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

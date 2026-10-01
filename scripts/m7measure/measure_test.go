@@ -19,7 +19,7 @@ import (
 func fixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}

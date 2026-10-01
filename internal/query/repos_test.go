@@ -27,7 +27,7 @@ func addProjectWithRepos(t *testing.T, ws *store.Workspace, project string, repo
 
 func loadOnly(t *testing.T, ws *store.Workspace) ProjectNode {
 	t.Helper()
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestLoadProjectRepos(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ws, err := store.Init(t.TempDir())
+			ws, err := store.Init(t.TempDir(), store.Defaults{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -116,7 +116,7 @@ func TestLoadResolvesEachCrewsRepo(t *testing.T) {
 		{name: "named repo since removed", repos: []store.RepoConfig{web}, metaRepo: "api", wantID: "api", want: Absent, reason: "api, which is not registered"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ws, err := store.Init(t.TempDir())
+			ws, err := store.Init(t.TempDir(), store.Defaults{})
 			if err != nil {
 				t.Fatal(err)
 			}

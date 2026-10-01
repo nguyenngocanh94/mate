@@ -267,7 +267,7 @@ func liveWorkspace(t *testing.T, session string) *store.Workspace {
 	// symlinks resolved and the launch guard compares the two (mvp.md
 	// section 7).
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

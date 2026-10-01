@@ -45,7 +45,7 @@ func TestMateStartRejectsAnUnknownHarness(t *testing.T) {
 // project whose meta names no agent is stopped, and it says so in one line.
 func TestMateStatusPrintsOneLineForAStoppedProject(t *testing.T) {
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
-// AllowlistedEnv is the live allowlist: identity keys plus explicitly pinned
-// provider roots, no HERDR_* (Herdr injects those), and no secrets. Unknown keys, empty values,
-// duplicates, and KEY=VALUE-breaking characters are refused. Dropping a
-// key the caller intended to inject would start an agent that cannot
-// prove its identity to `mate`.
-func AllowlistedEnv(vars []EnvVar) ([]EnvVar, error) {
+// AllowlistedEnv is the live allowlist: the identity keys
+// (config.IdentityEnvKeys) plus the provider roots a harness declares
+// (providerKeys, from harness.Info.EnvKeys), no HERDR_* (Herdr injects
+// those), and no secrets. Unknown keys, empty values, duplicates, and
+// KEY=VALUE-breaking characters are refused. Dropping a key the caller
+// intended to inject would start an agent that cannot prove its identity to
+// `mate`.
+func AllowlistedEnv(vars []EnvVar, providerKeys []string) ([]EnvVar, error) {
 	allow := make(map[string]struct{}, 8)
-	for _, k := range AllowlistedEnvKeys() {
+	for _, k := range append(config.IdentityEnvKeys(), providerKeys...) {
 		allow[k] = struct{}{}
 	}
 	seen := make(map[string]struct{}, len(vars))
@@ -54,7 +57,7 @@ func AllowlistedEnv(vars []EnvVar) ([]EnvVar, error) {
 // Herdr.StartAgent exports the same allowlisted variables into the pane's
 // shell before every start.
 func PaneEnv(launch harness.LaunchSpec) ([]EnvVar, error) {
-	return AllowlistedEnv(runtimeEnv(launch.Env()))
+	return AllowlistedEnv(runtimeEnv(launch.Env()), launch.EnvKeys())
 }
 
 func runtimeEnv(src []harness.EnvVar) []EnvVar {

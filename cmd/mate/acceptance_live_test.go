@@ -51,7 +51,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 
 	// TMPDIR must not go through a symlink (docs/mvp.md section 7).
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

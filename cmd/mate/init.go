@@ -26,7 +26,7 @@ func cmdInit(args []string, stdout, stderr io.Writer) error {
 	if fs.NArg() == 1 {
 		dir = fs.Arg(0)
 	}
-	w, err := store.Init(dir)
+	w, err := store.Init(dir, workspaceDefaults())
 	if err != nil {
 		return err
 	}

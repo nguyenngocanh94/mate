@@ -21,11 +21,6 @@ var (
 // profile for it (registry.go); Registry.Parse reads one from text.
 type Kind string
 
-const (
-	KindClaude Kind = "claude"
-	KindCodex  Kind = "codex"
-)
-
 func (k Kind) String() string { return string(k) }
 
 // AgentRole is the caller role. Agents never self-declare a different

@@ -81,7 +81,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	// TMPDIR must not go through a symlink (docs/mvp.md section 7).
 	root := liveWorkspaceRoot(t)
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 
 	for _, project := range []string{"shop", "blog"} {
 		out, startErr := action(ctx, console.ActionRequest{
-			Action: console.ActionStart, Target: project, TargetKind: "mate", Harness: query.HarnessClaude})
+			Action: console.ActionStart, Target: project, TargetKind: "mate", Harness: query.HarnessKind("claude")})
 		if startErr != nil {
 			t.Fatalf("start the %s Mate: %v", project, startErr)
 		}

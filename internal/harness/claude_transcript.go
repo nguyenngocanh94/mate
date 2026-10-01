@@ -738,18 +738,6 @@ func joinTranscriptText(existing, add string) string {
 	return existing + "\n" + add
 }
 
-func compactJSON(raw json.RawMessage, fallback string) string {
-	t := bytes.TrimSpace(raw)
-	if len(t) == 0 {
-		return fallback
-	}
-	var buf bytes.Buffer
-	if err := json.Compact(&buf, t); err != nil {
-		return string(t)
-	}
-	return buf.String()
-}
-
 func parseTranscriptTime(value string) (time.Time, error) {
 	if strings.TrimSpace(value) == "" {
 		return time.Time{}, fmt.Errorf("record has no timestamp")
@@ -881,3 +869,7 @@ func ClaudeTranscriptFileName(providerSessionID string) string {
 func ClaudeTranscriptPath(searchRoot, cwd, providerSessionID string) string {
 	return filepath.Join(searchRoot, ClaudeProjectSlug(cwd), ClaudeTranscriptFileName(providerSessionID))
 }
+
+const (
+	TranscriptClaude TranscriptFormat = "claude_transcript"
+)

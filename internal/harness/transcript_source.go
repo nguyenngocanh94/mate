@@ -168,3 +168,15 @@ type TelemetryUpdate struct {
 	// is unobservable rather than absent.
 	Gaps []string
 }
+
+// TelemetryState accompanies the byte cursor in the same database transaction.
+// Only unfinished correlations are carried, so history does not grow this state.
+type TelemetryState struct {
+	HeaderSHA256 string                    `json:"header_sha256,omitempty"`
+	HeaderBytes  int64                     `json:"header_bytes,omitempty"`
+	Turn         string                    `json:"turn,omitempty"`
+	Model        string                    `json:"model,omitempty"`
+	Effort       string                    `json:"effort,omitempty"`
+	Wrappers     map[string]telemetry.Fact `json:"wrappers,omitempty"`
+	Responses    map[string]telemetry.Fact `json:"responses,omitempty"`
+}

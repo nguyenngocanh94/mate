@@ -22,7 +22,7 @@ func mateDirFor(t *testing.T, project string) (root, mateDir string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := store.Init(resolved)
+	w, err := store.Init(resolved, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

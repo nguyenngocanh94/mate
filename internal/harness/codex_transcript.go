@@ -639,32 +639,6 @@ func codexCumulativePublic(c codexCumulative) CodexCumulativeUsage {
 	}
 }
 
-func codexMessageText(raw json.RawMessage) string {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
-		return ""
-	}
-	if trimmed[0] == '"' {
-		var text string
-		if json.Unmarshal(trimmed, &text) == nil {
-			return text
-		}
-	}
-	var blocks []struct {
-		Text string `json:"text"`
-	}
-	if trimmed[0] == '[' && json.Unmarshal(trimmed, &blocks) == nil {
-		parts := make([]string, 0, len(blocks))
-		for _, block := range blocks {
-			if block.Text != "" {
-				parts = append(parts, block.Text)
-			}
-		}
-		return strings.Join(parts, "\n")
-	}
-	return compactJSON(trimmed, string(trimmed))
-}
-
 func codexFunctionArguments(raw json.RawMessage) (string, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) > 0 && trimmed[0] == '"' {
@@ -758,3 +732,7 @@ func firstJSONLine(data []byte) ([]byte, bool) {
 	}
 	return nil, false
 }
+
+const (
+	TranscriptCodex TranscriptFormat = "codex_rollout"
+)

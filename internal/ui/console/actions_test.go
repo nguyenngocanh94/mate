@@ -124,7 +124,7 @@ func TestProjectRowStartDispatchesForEmptyAndPopulatedProjects(t *testing.T) {
 			tree.Projects[0].Repos = tc.repos
 			tree.Projects[0].Crews = tc.crews
 			tree.Projects[0].Mate.Designated = query.KnownField(query.MateIdentity{
-				MateID: "mate_created", HarnessKind: query.HarnessClaude, Status: query.MateCreated, IsDefault: true,
+				MateID: "mate_created", HarnessKind: query.HarnessKind("claude"), Status: query.MateCreated, IsDefault: true,
 			})
 			tree.Projects[0].Actions = []query.ActionAvailability{
 				{Action: "start", Available: true, Reason: "Mate is recorded created"},
@@ -166,6 +166,7 @@ func TestWorkspaceNewProjectAddsAProjectWhenEmptyAndWhenNotEmpty(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := query.Snapshot{
 				WorkspaceID: "ws_acme",
+				Harnesses:   testHarnesses,
 				Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme", Root: "/work/acme"}),
 				Projects:    tc.projects,
 			}

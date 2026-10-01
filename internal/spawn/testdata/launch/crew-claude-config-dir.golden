@@ -164,6 +164,12 @@ worktree=.worktrees/shop-k3
       "state": "missing"
     },
     {
+      "path": ".worktrees/shop-k3/.claude/settings.json",
+      "role": "repo_claude_settings",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
       "path": ".worktrees/shop-k3/AGENTS.override.md",
       "role": "generated_prompt",
       "bytes": 0,
@@ -172,12 +178,6 @@ worktree=.worktrees/shop-k3
     {
       "path": ".worktrees/shop-k3/.codex/config.toml",
       "role": "repo_codex_config",
-      "bytes": 0,
-      "state": "missing"
-    },
-    {
-      "path": ".worktrees/shop-k3/.claude/settings.json",
-      "role": "repo_claude_settings",
       "bytes": 0,
       "state": "missing"
     },

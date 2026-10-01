@@ -23,7 +23,7 @@ import (
 func backlogFixtureWorkspace(t *testing.T) (*store.Workspace, time.Time) {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestBacklogAllIncludesClosedCrews(t *testing.T) {
 
 func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 func TestBacklogStateMatchesQueryLoad(t *testing.T) {
 	w, now := backlogFixtureWorkspace(t)
 
-	snap, err := query.Load(context.Background(), w)
+	snap, err := query.Load(context.Background(), w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

@@ -247,7 +247,7 @@ func TestStartMateSettlesThroughTheProfilesReadSource(t *testing.T) {
 		rt := runtime.NewFake()
 		deps := readingVisible(t, rt)
 		source := harness.CodexHooksPath(w.MateDir("shop"))
-		command := harness.SessionHookCommand(deps.Binary, harness.KindCodex)
+		command := harness.CodexSessionHookCommand(deps.Binary)
 		own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
 		newScriptedPane(t, rt,
 			scriptStep{screen: screen(t, "codex-0.156.1-hooks-review.txt"), key: "enter"},

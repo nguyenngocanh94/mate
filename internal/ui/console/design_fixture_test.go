@@ -18,7 +18,7 @@ func designTree() query.Snapshot {
 	quiet := func(n int) []query.CrewNode {
 		out := make([]query.CrewNode, 0, n)
 		for i := 0; i < n; i++ {
-			out = append(out, designCrew("c"+string(rune('a'+i)), "a crew", query.CrewWorking, query.HarnessClaude, at(13, 30)))
+			out = append(out, designCrew("c"+string(rune('a'+i)), "a crew", query.CrewWorking, query.HarnessKind("claude"), at(13, 30)))
 		}
 		return out
 	}
@@ -38,6 +38,7 @@ func designTree() query.Snapshot {
 
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
+		Harnesses:   testHarnesses,
 		Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme", Root: "/Users/dev/work/acme"}),
 		Projects: []query.ProjectNode{
 			simple("auth-gateway", running("auth-gateway", at(13, 0)), quiet(1)),
@@ -65,13 +66,13 @@ func designPayments() query.ProjectNode {
 	mate.Tokens = query.KnownField(query.TokenValue{Total: 182_000})
 	mate.LastEvent = query.KnownField(query.EventValue{EventType: "status", OccurredAt: at(14, 1)})
 
-	index := designCrew("k7", "Add index to orders.created_at", query.CrewWorking, query.HarnessCodex, at(13, 38))
-	backfill := designCrew("k3", "Backfill ledger v2", query.CrewNeedsDecision, query.HarnessClaude, at(13, 29))
+	index := designCrew("k7", "Add index to orders.created_at", query.CrewWorking, query.HarnessKind("codex"), at(13, 38))
+	backfill := designCrew("k3", "Backfill ledger v2", query.CrewNeedsDecision, query.HarnessKind("claude"), at(13, 29))
 	backfill.Attention = query.KnownField(query.Attention{
 		Kind: query.AttentionDecision,
 		Why:  "crew k3 asked a question and stopped its turn; it waits on an answer",
 	})
-	migrate := designCrew("k1", "Migrate ledger v1", query.CrewFailed, query.HarnessClaude, at(12, 40))
+	migrate := designCrew("k1", "Migrate ledger v1", query.CrewFailed, query.HarnessKind("claude"), at(12, 40))
 	migrate.Closed = true
 	migrate.Error = query.KnownField(query.ErrorReason("exit 1"))
 	migrate.Attention = query.KnownField(query.Attention{Kind: query.AttentionFailed, Why: "crew k1 failed: exit 1"})
@@ -103,7 +104,7 @@ func designMate(project string, status query.MateStatus, since time.Time) query.
 	agent := project + ".mate"
 	mate := query.MateNode{
 		Designated: query.KnownField(query.MateIdentity{
-			MateID: "mate_" + project, HarnessKind: query.HarnessClaude, Status: status, IsDefault: true,
+			MateID: "mate_" + project, HarnessKind: query.HarnessKind("claude"), Status: status, IsDefault: true,
 		}),
 		AgentName: query.KnownField(agent),
 		Error:     query.AbsentField[query.ErrorReason](notErrorState),

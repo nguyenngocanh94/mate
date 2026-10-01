@@ -3,6 +3,8 @@ package console
 import (
 	"strings"
 	"testing"
+
+	"github.com/nguyenngocanh94/mate/internal/query"
 )
 
 func TestGlyphsForPicksTheSetFromMateAsciiAndTheLocale(t *testing.T) {
@@ -45,8 +47,9 @@ func TestHarnessIconsAreTheCallersChoice(t *testing.T) {
 		{"LANG": "en_US.UTF-8", "MATE_ICONS": "nerd"},
 	} {
 		g := glyphsFor(func(k string) string { return env[k] })
-		if g.Claude != "✻" || g.Codex != "⌬" {
-			t.Errorf("glyphsFor(%v) icons = %q %q, want the Unicode stand-ins by default", env, g.Claude, g.Codex)
+		claude, codex := harnessIcon("claude", g, testHarnesses), harnessIcon("codex", g, testHarnesses)
+		if claude != "✻" || codex != "⌬" {
+			t.Errorf("glyphsFor(%v) icons = %q %q, want the Unicode stand-ins by default", env, claude, codex)
 		}
 	}
 	cases := []struct {
@@ -62,27 +65,30 @@ func TestHarnessIconsAreTheCallersChoice(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := Model{g: tc.g}.WithHarnessIcons(tc.nerd)
-			if got := harnessIcon("claude", m.g); got != tc.claude {
+			if got := harnessIcon("claude", m.g, testHarnesses); got != tc.claude {
 				t.Fatalf("claude = %q, want %q", got, tc.claude)
 			}
-			if got := harnessIcon("codex", m.g); got != tc.codex {
+			if got := harnessIcon("codex", m.g, testHarnesses); got != tc.codex {
 				t.Fatalf("codex = %q, want %q", got, tc.codex)
 			}
 		})
 	}
 	// Switching back is honoured too.
 	m := Model{g: unicodeGlyphs}.WithHarnessIcons(true).WithHarnessIcons(false)
-	if m.g.Claude != "✻" {
-		t.Fatalf("WithHarnessIcons(false) after true = %q, want ✻", m.g.Claude)
+	if got := harnessIcon("claude", m.g, testHarnesses); got != "✻" {
+		t.Fatalf("WithHarnessIcons(false) after true = %q, want ✻", got)
 	}
 }
 
 // An unknown harness is never drawn as somebody else's logo.
 func TestAnUnknownHarnessIsItsOwnWord(t *testing.T) {
-	if got := harnessIcon("gemini", unicodeGlyphs); got != "gemini" {
+	if got := harnessIcon("gemini", unicodeGlyphs, testHarnesses); got != "gemini" {
 		t.Fatalf("harnessIcon(gemini) = %q, want the word", got)
 	}
-	if got := harnessIcon("", unicodeGlyphs); got != "?" {
+	if got := harnessIcon("claude", unicodeGlyphs, nil); got != "claude" {
+		t.Fatalf("harnessIcon(claude) with no catalog = %q, want the word", got)
+	}
+	if got := harnessIcon("", unicodeGlyphs, testHarnesses); got != "?" {
 		t.Fatalf("harnessIcon(\"\") = %q, want ?", got)
 	}
 }
@@ -121,8 +127,16 @@ func bxAllGlyphs(g glyphSet) map[string]string {
 		"Collapsed": g.Collapsed, "Expanded": g.Expanded, "Cursor": g.Cursor,
 		"Crumb": g.Crumb, "Ellipsis": g.Ellipsis, "Up": g.Up, "Down": g.Down,
 		"UpDown": g.UpDown, "Dot": g.Dot, "Arrow": g.Arrow, "Bang": g.Bang,
-		"Mate": g.Mate, "Crew": g.Crew, "Claude": g.Claude, "Codex": g.Codex,
+		"Mate": g.Mate, "Crew": g.Crew,
+		"Claude": harnessIcon("claude", g, testHarnesses), "Codex": harnessIcon("codex", g, testHarnesses),
 	}
+}
+
+// testHarnesses is the harness catalog the fixtures' snapshots carry, as
+// cmd/mate builds it from the registry (TestConsoleHarnessesAreTheCatalogs).
+var testHarnesses = []query.Harness{
+	{Kind: "claude", Icon: query.HarnessIcon{Nerd: "\uec82", Unicode: "✻", ASCII: "*"}},
+	{Kind: "codex", Icon: query.HarnessIcon{Nerd: "\uec81", Unicode: "⌬", ASCII: "#"}},
 }
 
 // TestAsciiSetIsActuallyASCII: a stray box-drawing glyph in the fallback

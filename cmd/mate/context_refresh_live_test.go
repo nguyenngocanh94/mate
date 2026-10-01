@@ -20,7 +20,7 @@ import (
 func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 	requireConsoleLive(t)
 	session, home := consoleLiveLab(t)
-	w, err := store.Init(liveWorkspaceRoot(t))
+	w, err := store.Init(liveWorkspaceRoot(t), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}

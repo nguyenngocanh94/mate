@@ -27,11 +27,14 @@ import (
 // snapshot: one unreadable project.yaml must not blank the workspace. Only
 // a failure to list the projects at all is returned as an error, because
 // after that there is no tree to show.
-func Load(ctx context.Context, ws *store.Workspace) (Snapshot, error) {
-	return load(ctx, ws, time.Now)
+//
+// harnesses is the binary's harness catalog: the snapshot carries it, and
+// resolves the workspace's default Mate harness against it.
+func Load(ctx context.Context, ws *store.Workspace, harnesses Harnesses) (Snapshot, error) {
+	return load(ctx, ws, harnesses, time.Now)
 }
 
-func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snapshot, error) {
+func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, now func() time.Time) (Snapshot, error) {
 	if ws == nil {
 		return Snapshot{}, fmt.Errorf("query: no workspace is open")
 	}
@@ -56,8 +59,9 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 		Workspace: KnownField(WorkspaceValue{
 			Name:        filepath.Base(root),
 			Root:        root,
-			MateHarness: defaultMateHarness(ws),
+			MateHarness: defaultMateHarness(ws, harnesses),
 		}),
+		Harnesses: append([]Harness(nil), harnesses.List...),
 	}
 	for _, ref := range ws.Projects() {
 		if err := ctx.Err(); err != nil {
@@ -71,14 +75,19 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 	return snap, nil
 }
 
-// defaultMateHarness is the workspace's resolved default Mate harness, or
-// "" when workspace.yaml names a kind this package does not know.
-func defaultMateHarness(ws *store.Workspace) HarnessKind {
-	kind, err := ParseHarnessKind(ws.Defaults().MateHarness)
-	if err != nil {
-		return ""
+// defaultMateHarness is the harness a new Mate gets: workspace.yaml's
+// `mate_harness`, else the catalog's default for a Mate. It is "" when the
+// workspace names a kind the catalog does not hold, so a UI never offers
+// first a kind nothing can start.
+func defaultMateHarness(ws *store.Workspace, harnesses Harnesses) HarnessKind {
+	recorded := strings.ToLower(strings.TrimSpace(ws.Defaults().MateHarness))
+	if recorded == "" {
+		return harnesses.MateDefault
 	}
-	return kind
+	if kind := HarnessKind(recorded); harnesses.Has(kind) {
+		return kind
+	}
+	return ""
 }
 
 func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) ProjectNode {
@@ -157,10 +166,7 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 		return unknownMate(readFailureReason(err), w, row)
 	}
 
-	kind, kindErr := ParseHarnessKind(meta["harness"])
-	if kindErr != nil {
-		kind = HarnessKind(meta["harness"])
-	}
+	kind := HarnessKind(meta["harness"])
 	pane := meta["pane"]
 	status := MateCreated
 	if pane != "" {
@@ -332,11 +338,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 
 	c.RepoID, c.Repo = crewRepo(repos, meta[store.MetaRepo])
 	c.Task = meta["task"]
-	if kind, err := ParseHarnessKind(meta["harness"]); err == nil {
-		c.HarnessKind = kind
-	} else {
-		c.HarnessKind = HarnessKind(meta["harness"])
-	}
+	c.HarnessKind = HarnessKind(meta["harness"])
 	c.Model, c.Effort = meta["model"], meta["effort"]
 
 	if worktree := meta["worktree"]; worktree != "" {

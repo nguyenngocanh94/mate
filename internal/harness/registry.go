@@ -2,6 +2,7 @@ package harness
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
@@ -70,6 +71,21 @@ func (r Registry) Parse(s string) (Kind, error) {
 
 // Kinds are the registered kinds, in registration order.
 func (r Registry) Kinds() []Kind { return append([]Kind(nil), r.order...) }
+
+// EnvKeys are the variables every registered harness declares
+// (Info().EnvKeys), in registration order: what a pane or a launch may
+// carry besides mate's identity keys.
+func (r Registry) EnvKeys() []string {
+	var keys []string
+	for _, k := range r.order {
+		for _, key := range r.profiles[k].Info().EnvKeys {
+			if !slices.Contains(keys, key) {
+				keys = append(keys, key)
+			}
+		}
+	}
+	return keys
+}
 
 // Default is the harness a role gets when neither the caller nor the
 // workspace picked one.

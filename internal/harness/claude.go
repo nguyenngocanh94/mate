@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
@@ -29,6 +28,10 @@ type Claude struct {
 	ConfigDir string
 }
 
+// ClaudeConfigDirEnv is the variable Claude Code reads its account and
+// transcripts root from.
+const ClaudeConfigDirEnv = "CLAUDE_CONFIG_DIR"
+
 // Kind implements Profile.
 func (Claude) Kind() Kind { return KindClaude }
 
@@ -38,10 +41,18 @@ func (Claude) Info() Info {
 		RuntimeKind:     string(KindClaude),
 		ConfigDir:       ".claude",
 		InstructionFile: "CLAUDE.md",
-		EnvKeys:         []string{config.EnvClaudeConfigDir},
+		EnvKeys:         []string{ClaudeConfigDirEnv},
 		// Claude Code discovers skills under its cwd's
 		// `.claude/skills/<name>/SKILL.md`.
 		SkillsDir: ".claude/skills",
+		// Nerd Fonts 3.5 ships cod-claude at U+EC82 in its Codicons set.
+		Icon: Icon{Nerd: "\uec82", Unicode: "✻", ASCII: "*"},
+		Documents: []Document{
+			{Path: "CLAUDE.md", Role: "repo_claude"},
+			{Path: ".claude/settings.json", Role: "repo_claude_settings"},
+		},
+		// claude 2.1.282 --help takes all five.
+		Efforts: Efforts,
 	}
 }
 
@@ -56,7 +67,7 @@ func (c Claude) Capabilities() Capabilities {
 	return Capabilities{
 		GracefulStop: Cap[GracefulStopper]{
 			Status: CapVerified,
-			Impl:   exitPrompt("/exit"),
+			Impl:   ExitCommand("/exit"),
 			Evidence: Evidence{
 				Version:  "claude-code 2.1.251",
 				Measured: "mate v1 G1, carried into this repo 2026-09-17",
@@ -101,7 +112,7 @@ func (c Claude) Capabilities() Capabilities {
 		},
 		Quota: Cap[QuotaProvider]{
 			Status: CapVerified,
-			Impl:   quotaRow{provider: "claude"},
+			Impl:   QuotaRow{Provider: "claude"},
 			Evidence: Evidence{
 				Version:  "quota-axi 0.1.34",
 				Measured: "2026-09-26",
@@ -130,8 +141,17 @@ type claudeHooks struct{}
 // Own implements HookInstaller.
 func (claudeHooks) Own(string, string) []OwnHook { return nil }
 
+// ReviewOwn implements HookInstaller. Claude has no hook review.
+func (claudeHooks) ReviewOwn(context.Context, HookReviewPane, string, []OwnHook) error {
+	return observability.NewError(observability.CodeUsage, "claude asks no one to review its hooks; there is no review to walk")
+}
+
 // DigestMaxBytes implements HookInstaller.
 func (claudeHooks) DigestMaxBytes() int { return ClaudeSessionHookMaxBytes }
+
+// BareSessionHook implements HookInstaller: every Claude Mate's settings
+// file, its users' own included, runs `hook mate-session` and nothing more.
+func (claudeHooks) BareSessionHook() bool { return true }
 
 // claudeTurnEnd is Claude's TurnEndEvidence: the Mate's Stop hook (`mate
 // hook mate-stop`) logs each answer it sees to sent.log. Claude's transcript
@@ -146,6 +166,10 @@ func (claudeTurnEnd) EndsInTranscript() bool { return false }
 
 // TranscriptTurnEnded implements TurnEndEvidence.
 func (claudeTurnEnd) TranscriptTurnEnded([]byte, time.Time) bool { return false }
+
+// PaneEnv implements Launcher. A Claude launch resolves its config
+// directory itself (ClaudeConfigDirForLaunch), so a pane needs none.
+func (Claude) PaneEnv() ([]EnvVar, error) { return nil, nil }
 
 // claudeLaunch is what Claude's Prepare hands its Build.
 type claudeLaunch struct {
@@ -317,9 +341,9 @@ func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	envInput := append([]EnvVar(nil), spec.Env...)
 	var unsetEnv []string
 	if setConfigDir {
-		envInput = append(envInput, EnvVar{Key: config.EnvClaudeConfigDir, Value: configDir})
+		envInput = append(envInput, EnvVar{Key: ClaudeConfigDirEnv, Value: configDir})
 	} else {
-		unsetEnv = []string{config.EnvClaudeConfigDir}
+		unsetEnv = []string{ClaudeConfigDirEnv}
 	}
 
 	extra := make([]string, 0, 6)
@@ -345,8 +369,13 @@ func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 			spec.Effort = EffortMedium
 		}
 	}
-	profile, effortOmitted := profileArgs(KindClaude, spec.Model, spec.Effort)
-	extra = append(extra, profile...)
+	effortOmitted := spec.Effort != "" && !c.Info().SupportsEffort(spec.Effort)
+	if spec.Model != "" {
+		extra = append(extra, "--model", spec.Model)
+	}
+	if c.Info().SupportsEffort(spec.Effort) {
+		extra = append(extra, "--effort", string(spec.Effort))
+	}
 	// dangerousPermissionNotes records why --dangerously-skip-permissions is
 	// carried and what it does not cover; see the analogous (not identical -
 	// Codex carries its own extra bullets) record on the Codex adapter
@@ -373,6 +402,7 @@ func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 		EffortOmitted:   effortOmitted,
 		ClaudeConfigDir: configDir,
 		UnsetEnv:        unsetEnv,
+		EnvKeys:         append(c.Info().EnvKeys, spec.EnvKeys...),
 	}
 	if launch.manualInCwd {
 		out.ContextFiles = nil
@@ -418,3 +448,7 @@ func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	}
 	return NewLaunchSpec(out)
 }
+
+const (
+	KindClaude Kind = "claude"
+)

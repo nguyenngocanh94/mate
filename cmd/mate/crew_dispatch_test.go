@@ -19,7 +19,7 @@ import (
 
 func dispatchWorkspace(t *testing.T, table string) *store.Workspace {
 	t.Helper()
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}

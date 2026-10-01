@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
@@ -40,6 +39,10 @@ type Codex struct {
 	SessionsDir string
 }
 
+// CodexHomeEnv is the variable codex-cli reads its home from: config,
+// trust, hooks and rollouts.
+const CodexHomeEnv = "CODEX_HOME"
+
 // Kind implements Profile.
 func (Codex) Kind() Kind { return KindCodex }
 
@@ -49,12 +52,23 @@ func (Codex) Info() Info {
 		RuntimeKind:     string(KindCodex),
 		ConfigDir:       ".codex",
 		InstructionFile: CodexOverrideName,
-		EnvKeys:         []string{config.EnvCodexHome},
+		EnvKeys:         []string{CodexHomeEnv},
 		// Codex discovers no skills from a Mate's cwd; its manual sends it
 		// to each skill's file by path, in the directory a Claude Mate's
 		// layout puts them, so a project's skills live in one place
 		// whichever harness its Mate runs on.
 		SkillsDir: ".claude/skills",
+		// Nerd Fonts 3.5 ships cod-openai at U+EC81 in its Codicons set
+		// (Codex is OpenAI's).
+		Icon: Icon{Nerd: "\uec81", Unicode: "⌬", ASCII: "#"},
+		Documents: []Document{
+			{Path: CodexOverrideName, Role: "generated_prompt"},
+			{Path: ".codex/config.toml", Role: "repo_codex_config"},
+		},
+		// model_reasoning_effort advertises low through xhigh for the
+		// catalogue models and max for some only (firstmate's codex record,
+		// codex-cli 0.142.1 and 0.153.4), so max is not passed.
+		Efforts: []Effort{EffortLow, EffortMedium, EffortHigh, EffortXHigh},
 	}
 }
 
@@ -111,7 +125,7 @@ func (c Codex) Capabilities() Capabilities {
 			Status: CapVerified,
 			// Native Codex is filed under the codex-home account (firstmate
 			// bin/fm-quota-axi-lib.sh quota_lane).
-			Impl: quotaRow{provider: "codex", lane: "codex-home"},
+			Impl: QuotaRow{Provider: "codex", Lane: "codex-home"},
 			Evidence: Evidence{
 				Version:  "quota-axi 0.1.34",
 				Measured: "2026-09-26",
@@ -196,12 +210,15 @@ func (codexHooks) Own(binary, cwd string) []OwnHook {
 	return []OwnHook{{
 		Event:   "SessionStart",
 		Source:  CodexHooksPath(cwd),
-		Command: SessionHookCommand(binary, KindCodex),
+		Command: CodexSessionHookCommand(binary),
 	}}
 }
 
 // DigestMaxBytes implements HookInstaller.
 func (codexHooks) DigestMaxBytes() int { return CodexSessionHookMaxBytes }
+
+// BareSessionHook implements HookInstaller: the hook names Codex.
+func (codexHooks) BareSessionHook() bool { return false }
 
 // codexTurnEnd is Codex's TurnEndEvidence: no Stop hook, but the rollout
 // records `task_complete` when a turn ends (CodexTurnCompletedAfter).
@@ -216,6 +233,19 @@ func (codexTurnEnd) EndsInTranscript() bool { return true }
 // TranscriptTurnEnded implements TurnEndEvidence.
 func (codexTurnEnd) TranscriptTurnEnded(rollout []byte, after time.Time) bool {
 	return CodexTurnCompletedAfter(rollout, after)
+}
+
+// PaneEnv implements Launcher: the CODEX_HOME every Codex launch runs in,
+// pinned so a Mate's own `mate crew spawn` puts its Crews' trust and
+// rollouts where this process looks for them, whichever harness the Mate
+// runs on. LaunchCodexHome is also what refuses the operator's home during
+// a live test run.
+func (c Codex) PaneEnv() ([]EnvVar, error) {
+	home, err := LaunchCodexHome(c.Home)
+	if err != nil {
+		return nil, observability.WrapError(observability.CodeUsage, "codex home", err)
+	}
+	return []EnvVar{{Key: CodexHomeEnv, Value: home}}, nil
 }
 
 func (c Codex) maxBytes() int {
@@ -314,10 +344,15 @@ func (c Codex) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 		return LaunchSpec{}, err
 	}
 	envInput := append([]EnvVar(nil), spec.Env...)
-	envInput = append(envInput, EnvVar{Key: config.EnvCodexHome, Value: codexHome})
+	envInput = append(envInput, EnvVar{Key: CodexHomeEnv, Value: codexHome})
 	args := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride}
-	profile, effortOmitted := profileArgs(KindCodex, spec.Model, spec.Effort)
-	args = append(args, profile...)
+	effortOmitted := spec.Effort != "" && !c.Info().SupportsEffort(spec.Effort)
+	if spec.Model != "" {
+		args = append(args, "-m", spec.Model)
+	}
+	if c.Info().SupportsEffort(spec.Effort) {
+		args = append(args, "-c", `model_reasoning_effort="`+string(spec.Effort)+`"`)
+	}
 	if resumeID != "" {
 		// The subcommand takes the same flags as a fresh launch (0.154.0
 		// `codex resume --help`), and the id goes last, after every flag.
@@ -334,6 +369,7 @@ func (c Codex) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 		Args:            args,
 		Cwd:             cwd,
 		Env:             envInput,
+		EnvKeys:         append(c.Info().EnvKeys, spec.EnvKeys...),
 		ContextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
 		Delivery:        DeliveryInstructionFile,
 		ContextPath:     want,
@@ -665,3 +701,7 @@ func dirsFromRootToCwd(root, cwd string) []string {
 	}
 	return out
 }
+
+const (
+	KindCodex Kind = "codex"
+)

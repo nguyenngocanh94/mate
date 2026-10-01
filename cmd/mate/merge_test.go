@@ -23,7 +23,7 @@ import (
 func mergeCLIWorkspace(t *testing.T) (*store.Workspace, string) {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

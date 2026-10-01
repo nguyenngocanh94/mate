@@ -41,7 +41,7 @@ func TestCrewSpawnRequiresProjectIDAndBrief(t *testing.T) {
 
 func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 
 func TestCrewListStateColumnShowsTheDeclaredState(t *testing.T) {
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestCrewStopRequiresProjectAndID(t *testing.T) {
 // with `crew stop` (2026-09-18). So a crew that reported is still listed, a
 // closed one is not, and the footer says how many are hidden.
 func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}

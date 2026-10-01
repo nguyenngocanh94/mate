@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -35,10 +36,10 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mate start", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate mate start <project> [--workspace <dir>] [--harness claude|codex] [--fresh]")
+		fmt.Fprintln(stderr, "usage: mate mate start <project> [--workspace <dir>] [--harness "+harnessChoices(harness.RoleMate, "|")+"] [--fresh]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	harnessFlag := fs.String("harness", "", "harness to launch (claude or codex; default: the workspace default)")
+	harnessFlag := fs.String("harness", "", "harness to launch ("+harnessChoices(harness.RoleMate, " or ")+"; default: the workspace default)")
 	freshFlag := fs.Bool("fresh", false, "start a brand new harness session instead of resuming mate.meta's session_id")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}

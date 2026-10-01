@@ -42,7 +42,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

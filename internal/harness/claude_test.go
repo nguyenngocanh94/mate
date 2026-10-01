@@ -8,8 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/nguyenngocanh94/mate/internal/config"
 )
 
 func TestClaudeDefaultUsesFileFlag(t *testing.T) {
@@ -42,11 +40,11 @@ func TestClaudeDefaultUsesFileFlag(t *testing.T) {
 		t.Fatal("default transcript locator must still retain the effective Claude config directory")
 	}
 	for _, env := range spec.Env() {
-		if env.Key == config.EnvClaudeConfigDir {
-			t.Fatalf("default launch must not set %s: %#v", config.EnvClaudeConfigDir, spec.Env())
+		if env.Key == ClaudeConfigDirEnv {
+			t.Fatalf("default launch must not set %s: %#v", ClaudeConfigDirEnv, spec.Env())
 		}
 	}
-	if got := spec.UnsetEnv(); !slices.Equal(got, append([]string{config.EnvClaudeConfigDir}, NestedSessionEnv...)) {
+	if got := spec.UnsetEnv(); !slices.Equal(got, append([]string{ClaudeConfigDirEnv}, NestedSessionEnv...)) {
 		t.Fatalf("default launch unset env = %#v", got)
 	}
 	notes := strings.Join(spec.Notes(), " ")
@@ -286,7 +284,7 @@ func TestClaudeLaunchEnvIsAllowlisted(t *testing.T) {
 	if len(spec.Env()) != 2 || spec.Env()[0].Key != "MATE_AGENT_ID" || spec.Env()[1].Key != "CLAUDE_CONFIG_DIR" || spec.Env()[1].Value != configDir || spec.ClaudeConfigDir() != configDir {
 		t.Fatalf("env = %#v", spec.Env())
 	}
-	if got := spec.UnsetEnv(); slices.Contains(got, config.EnvClaudeConfigDir) || !slices.Equal(got, NestedSessionEnv) {
+	if got := spec.UnsetEnv(); slices.Contains(got, ClaudeConfigDirEnv) || !slices.Equal(got, NestedSessionEnv) {
 		t.Fatalf("custom config launch must unset only the nested-session variables: %#v", got)
 	}
 }

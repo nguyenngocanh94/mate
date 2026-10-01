@@ -145,7 +145,7 @@ func (m Model) projectPeekFields(proj query.ProjectNode, vw int) []detailField {
 	word := mateWord(mate)
 	mateLine := gl()
 	if h := mateHarness(mate); h != "" {
-		mateLine = mateLine.add(harnessIcon(h, m.g), tFg).pad(1)
+		mateLine = mateLine.add(m.harnessIcon(h), tFg).pad(1)
 	}
 	mateLine = mateLine.add(word, statusTokFg(word))
 	if since := m.since(mate.Binding.Value.BoundSince); since != "" && mate.Binding.IsKnown() && word == string(query.MateRunning) {
@@ -275,7 +275,7 @@ func (m Model) mateDetailFields(vw int) []detailField {
 		out = append(out, detailField{label: "agent", lines: text(agent, tFg), copy: agent})
 	}
 	if h := mateHarness(mate); h != "" {
-		out = append(out, detailField{label: "harness", lines: one(gl().add(harnessIcon(h, m.g), tFg).pad(1).add(h, tFg))})
+		out = append(out, detailField{label: "harness", lines: one(gl().add(m.harnessIcon(h), tFg).pad(1).add(h, tFg))})
 	}
 	word := mateWord(mate)
 	status := gl().add(word, statusTokFg(word))
@@ -350,7 +350,7 @@ func (m Model) crewDetailFields(c query.CrewNode, vw int) []detailField {
 	var out []detailField
 	out = append(out, detailField{label: "agent", lines: text(shortID(c.CrewID, m.g), tFg), copy: c.CrewID})
 	if h := string(c.HarnessKind); h != "" {
-		out = append(out, detailField{label: "harness", lines: one(gl().add(harnessIcon(h, m.g), tFg).pad(1).add(h, tFg))})
+		out = append(out, detailField{label: "harness", lines: one(gl().add(m.harnessIcon(h), tFg).pad(1).add(h, tFg))})
 	}
 	// The launch profile, as spawned; absent means the harness's own.
 	if c.Model != "" {

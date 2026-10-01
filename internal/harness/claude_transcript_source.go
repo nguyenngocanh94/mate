@@ -1,10 +1,13 @@
 package harness
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/nguyenngocanh94/mate/internal/telemetry"
 )
 
 // claudeTranscripts is Claude Code's TranscriptSource: its session JSONL
@@ -149,4 +152,54 @@ func (s claudeTranscripts) Telemetry(req TelemetryRequest) (TelemetryUpdate, err
 		up.Offset = req.Batch.ConsumedBytes
 	}
 	return up, nil
+}
+
+// NormalizedTelemetry supplies Claude and older harnesses with the observations
+// already verified by their transcript adapter. No native process/timing claims
+// are made for this fallback.
+func NormalizedTelemetry(tb TranscriptBatch) []telemetry.Fact {
+	var out []telemetry.Fact
+	for _, t := range tb.Turns {
+		off := t.Offset
+		f := telemetry.Fact{Version: telemetry.Version, ID: t.SourceRef, Kind: "response", SourceRef: t.SourceRef, SourceOffset: off, OccurredAt: t.OccurredAt, MeasurementKind: "normalized", HarnessTurnRef: t.HarnessTurnRef, ResponseID: t.SourceRef, Model: t.Model, Text: t.Text, InputTokens: t.Usage.Input, CacheReadTokens: t.Usage.CacheRead, CacheWriteTokens: t.Usage.CacheWrite, OutputTokens: t.Usage.Output, ReasoningTokens: t.Usage.Reasoning, ContextTokens: t.Usage.ContextTokens(), LedgerRefOffset: &off}
+		out = append(out, f)
+	}
+	calls := map[string]TranscriptToolCall{}
+	for _, c := range tb.ToolCalls {
+		calls[c.SourceRef] = c
+		at := c.StartedAt
+		out = append(out, telemetry.Fact{Version: telemetry.Version, ID: c.SourceRef, Kind: "tool_call", SourceRef: c.SourceRef, SourceOffset: c.Offset, OccurredAt: at, MeasurementKind: "normalized", ResponseID: c.TurnSourceRef, WrapperRef: c.SourceRef, Tool: c.ToolName, Command: c.InputJSON, StartedAt: &at})
+	}
+	for _, r := range tb.ToolResults {
+		at := r.CompletedAt
+		c := calls[r.CallID]
+		f := telemetry.Fact{Version: telemetry.Version, ID: r.CallID, Kind: "tool_result", SourceRef: r.SourceRef, SourceOffset: r.Offset, OccurredAt: at, MeasurementKind: "normalized", ResponseID: c.TurnSourceRef, WrapperRef: r.CallID, Tool: c.ToolName, Command: c.InputJSON, CompletedAt: &at, Output: outputFact(r.OutputText, nil)}
+		if r.IsError {
+			f.Status = "failed"
+		}
+		out = append(out, f)
+	}
+	for _, r := range tb.Records {
+		if r.Kind != TranscriptKindUser {
+			continue
+		}
+		var p struct {
+			Type     string `json:"type"`
+			PromptID string `json:"promptId"`
+			Message  struct {
+				Content json.RawMessage `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal([]byte(r.RawJSON), &p) != nil {
+			continue
+		}
+		if bytes.Contains(p.Message.Content, []byte(`"tool_result"`)) {
+			continue
+		}
+		text := codexMessageText(p.Message.Content)
+		if text != "" {
+			out = append(out, telemetry.Fact{Version: telemetry.Version, ID: r.SourceRef, Kind: "prompt", SourceRef: r.SourceRef, SourceOffset: r.Offset, OccurredAt: r.OccurredAt, MeasurementKind: "normalized", HarnessTurnRef: p.PromptID, Text: text})
+		}
+	}
+	return out
 }

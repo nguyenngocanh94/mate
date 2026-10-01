@@ -11,10 +11,19 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
+// testHarnesses is a harness catalog as cmd/mate hands one to Load.
+var testHarnesses = Harnesses{
+	List: []Harness{
+		{Kind: "claude", Icon: HarnessIcon{Nerd: "\uec82", Unicode: "✻", ASCII: "*"}},
+		{Kind: "codex", Icon: HarnessIcon{Nerd: "\uec81", Unicode: "⌬", ASCII: "#"}},
+	},
+	MateDefault: "claude",
+}
+
 func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	ws, err := store.Init(root)
+	ws, err := store.Init(root, store.Defaults{MateHarness: "claude", CrewHarness: "codex"})
 	if err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
@@ -31,7 +40,7 @@ func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
 
 func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 	ws := newWorkspace(t, "shop", "blog")
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -65,7 +74,7 @@ func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 // would claim the read failed.
 func TestLoadReportsNoMateAsAbsentNotUnknown(t *testing.T) {
 	ws := newWorkspace(t, "shop")
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -107,7 +116,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 		}
 	}
 
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -118,7 +127,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 	if got := p.Mate.Designated.Value.Status; got != MateRunning {
 		t.Fatalf("mate status = %q, want running for a recorded pane", got)
 	}
-	if got := p.Mate.Designated.Value.HarnessKind; got != HarnessClaude {
+	if got := p.Mate.Designated.Value.HarnessKind; got != HarnessKind("claude") {
 		t.Fatalf("mate harness = %q, want claude", got)
 	}
 	if p.Mate.Binding.State != Known || p.Mate.Binding.Reason == "" {
@@ -129,7 +138,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 		t.Fatalf("crews = %+v, want the one crew meta", p.Crews)
 	}
 	c := p.Crews[0]
-	if c.CrewID != "k3" || c.Task != "wire the webhook" || c.HarnessKind != HarnessCodex {
+	if c.CrewID != "k3" || c.Task != "wire the webhook" || c.HarnessKind != HarnessKind("codex") {
 		t.Fatalf("crew = %+v, want k3 from its meta", c)
 	}
 	if c.Model != "gpt-5.5" || c.Effort != "high" {
@@ -151,7 +160,7 @@ func TestLoadGivesACrewThatWroteNothingTheSpawnedState(t *testing.T) {
 	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{"task": "scout", "state": "spawned"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -192,7 +201,7 @@ func TestLoadResolvesEachCrewStateInTheOrderOfSection4b(t *testing.T) {
 	// Backward compatibility: stopped_at with no state= is finished.
 	write("k8", map[string]string{"stopped_at": "2026-09-17T10:00:00Z"})
 
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -252,7 +261,7 @@ func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 		}
 	}
 
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -294,7 +303,7 @@ func TestLoadLeavesTokensAbsent(t *testing.T) {
 		t.Fatalf("write crew meta: %v", err)
 	}
 
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -325,7 +334,7 @@ func TestLoadDoesNotBlockOnABudgetIncident(t *testing.T) {
 		t.Fatalf("AppendIncident: %v", err)
 	}
 
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -372,7 +381,7 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 	if err := other.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
 		t.Fatalf("add project: %v", err)
 	}
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -398,7 +407,7 @@ func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 		"task": "scout", "state": "finished", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -423,7 +432,7 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship", "agent": "crew-k1", "pane": "w1:p2", "state": "spawned"}); err != nil {
 		t.Fatal(err)
 	}
-	snap, err := Load(context.Background(), ws)
+	snap, err := Load(context.Background(), ws, testHarnesses)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -437,7 +446,7 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	if err := ws.AppendSent("shop", store.SentEntry{Time: at, Source: "user", Target: "mate", Text: "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if snap, err = Load(context.Background(), ws); err != nil {
+	if snap, err = Load(context.Background(), ws, testHarnesses); err != nil {
 		t.Fatalf("load: %v", err)
 	}
 	p := snap.Projects[0]
@@ -449,18 +458,18 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	}
 }
 
-// The snapshot carries the workspace's default Mate harness, resolved the
-// way the store resolves it: workspace.yaml's `mate_harness`, the store's
-// own default when the key is missing, and "" for a kind nothing can start.
+// The snapshot carries the workspace's default Mate harness, resolved
+// against the catalog: workspace.yaml's `mate_harness`, the catalog's
+// default when the key is missing, and "" for a kind nothing can start.
 func TestLoadCarriesTheWorkspaceDefaultMateHarness(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		line string // replaces "mate_harness: claude" in workspace.yaml
 		want HarnessKind
 	}{
-		{"store default", "mate_harness: claude", HarnessClaude},
-		{"codex", "mate_harness: codex", HarnessCodex},
-		{"missing key", "", HarnessKind(store.DefaultMateHarness)},
+		{"claude", "mate_harness: claude", HarnessKind("claude")},
+		{"codex", "mate_harness: codex", HarnessKind("codex")},
+		{"missing key", "", testHarnesses.MateDefault},
 		{"unknown kind", "mate_harness: gemini", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -476,7 +485,7 @@ func TestLoadCarriesTheWorkspaceDefaultMateHarness(t *testing.T) {
 			if err := os.WriteFile(ws.WorkspaceFile(), []byte(edited), 0o644); err != nil {
 				t.Fatalf("write workspace.yaml: %v", err)
 			}
-			snap, err := Load(context.Background(), ws)
+			snap, err := Load(context.Background(), ws, testHarnesses)
 			if err != nil {
 				t.Fatalf("load: %v", err)
 			}

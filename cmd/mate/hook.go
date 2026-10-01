@@ -32,14 +32,11 @@ func cmdHook(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case harness.SessionHookName:
 		fs := flag.NewFlagSet("hook "+harness.SessionHookName, flag.ContinueOnError)
 		fs.SetOutput(stderr)
-		// The default is the one harness whose hook runs without the flag:
-		// every Claude Mate's settings file, its users' own included, says
-		// `hook mate-session` and nothing more (harness.SessionHookCommand).
-		harnessFlag := fs.String("harness", string(harness.KindClaude), "the registered harness running the hook")
+		harnessFlag := fs.String("harness", "", "the registered harness running the hook (default: the one whose hook names none)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return &usageError{err}
 		}
-		kind, err := harnesses.Parse(*harnessFlag)
+		kind, err := sessionHookHarness(*harnessFlag)
 		if err != nil {
 			return &usageError{err}
 		}
@@ -75,6 +72,31 @@ func runHook(stdin io.Reader, stderr io.Writer, name string, handle func(*store.
 	if err := handle(w, project, data); err != nil {
 		fmt.Fprintf(stderr, "mate hook %s: %v\n", name, err)
 	}
+}
+
+// sessionHookHarness is the harness a `hook mate-session` runs for: the one
+// --harness names, or without it the one harness whose hook names none
+// (HookInstaller.BareSessionHook) - a hook in a settings file written
+// before its harness learnt to name itself, or by the captain, says `hook
+// mate-session` and nothing more.
+func sessionHookHarness(flag string) (harness.Kind, error) {
+	if flag != "" {
+		return harnesses.Parse(flag)
+	}
+	var bare []harness.Kind
+	for _, k := range harnesses.Kinds() {
+		p, err := harnesses.Lookup(k)
+		if err != nil {
+			return "", err
+		}
+		if hooks := p.Capabilities().Hooks; hooks.Verified() && hooks.Impl.BareSessionHook() {
+			bare = append(bare, k)
+		}
+	}
+	if len(bare) != 1 {
+		return "", fmt.Errorf("hook %s: --harness is required, because %d registered harnesses run this hook without naming themselves", harness.SessionHookName, len(bare))
+	}
+	return bare[0], nil
 }
 
 // runSessionHook is `mate hook mate-session` (docs/mvp.md task 37, B2):

@@ -49,7 +49,7 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 	deps := fakeDeps(t, rt)
 	mateDir := w.MateDir("shop")
 	source := harness.CodexHooksPath(mateDir)
-	command := harness.SessionHookCommand(deps.Binary, harness.KindCodex)
+	command := harness.CodexSessionHookCommand(deps.Binary)
 
 	own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
 	pane := newScriptedPane(t, rt,

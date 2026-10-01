@@ -39,7 +39,7 @@ import (
 // The test fails if the count rises above it. When the count falls, lower
 // this constant to the new count in the same change, so the ground gained is
 // kept.
-const harnessRatchetCeiling = 32
+const harnessRatchetCeiling = 0
 
 // ratchetHarnessNames is every spelling of a harness name a literal can
 // carry: the kinds of catalog.Default(), and the names each profile
@@ -84,6 +84,10 @@ var ratchetAllow = []struct {
 	{
 		file: "internal/facts/facts.go", decl: "docNames", literal: "CLAUDE.md",
 		reason: "a repository's own documentation file name, not knowledge of a harness",
+	},
+	{
+		file: "internal/diagnostics/work.go", decl: "instructionName",
+		reason: "a repository's instruction file names, matched in a command as facts.docNames lists them, not knowledge of a harness",
 	},
 	{
 		file:   "internal/dispatch/builtin.go",

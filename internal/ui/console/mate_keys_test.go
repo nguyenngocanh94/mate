@@ -50,8 +50,8 @@ func TestTheStartEntryFollowsTheRecordedMateStatus(t *testing.T) {
 		want string
 	}{
 		{"no mate", absentMate("this Project has no Mate"), actMateCaps(true, false, false), "Create mate…"},
-		{"created", actKnownMate(query.MateCreated, query.HarnessClaude), actMateCaps(false, true, false), "Start mate"},
-		{"stopped", actKnownMate(query.MateStopped, query.HarnessClaude), actMateCaps(false, false, true), "Resume mate"},
+		{"created", actKnownMate(query.MateCreated, query.HarnessKind("claude")), actMateCaps(false, true, false), "Start mate"},
+		{"stopped", actKnownMate(query.MateStopped, query.HarnessKind("claude")), actMateCaps(false, false, true), "Resume mate"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := projectFrame(t, actMateTree(tc.mate, tc.caps))
@@ -106,7 +106,7 @@ func TestCreatingAMateAsksWhichHarnessToUse(t *testing.T) {
 	if len(*got) != 1 {
 		t.Fatalf("runner calls = %d, want one", len(*got))
 	}
-	if req := (*got)[0]; req.Action != ActionOnboard || req.Harness != query.HarnessCodex || req.TargetKind != "project-mate" {
+	if req := (*got)[0]; req.Action != ActionOnboard || req.Harness != query.HarnessKind("codex") || req.TargetKind != "project-mate" {
 		t.Fatalf("request = %+v, want a project-mate onboard carrying codex", req)
 	}
 }
@@ -119,8 +119,8 @@ func TestStartAndResumeDoNotAskForAHarness(t *testing.T) {
 		caps   []query.ActionAvailability
 		action Action
 	}{
-		{"created", actKnownMate(query.MateCreated, query.HarnessClaude), actMateCaps(false, true, false), ActionStart},
-		{"stopped", actKnownMate(query.MateStopped, query.HarnessClaude), actMateCaps(false, false, true), ActionResume},
+		{"created", actKnownMate(query.MateCreated, query.HarnessKind("claude")), actMateCaps(false, true, false), ActionStart},
+		{"stopped", actKnownMate(query.MateStopped, query.HarnessKind("claude")), actMateCaps(false, false, true), ActionResume},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, got := actRunner(t, actMateTree(tc.mate, tc.caps), "ok", nil)
@@ -196,9 +196,9 @@ func TestTheHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 		golden string
 		want   []query.HarnessKind
 	}{
-		{"claude", query.HarnessClaude, "harness-picker-claude-default-40x36", []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}},
-		{"codex", query.HarnessCodex, "harness-picker-codex-default-40x36", []query.HarnessKind{query.HarnessCodex, query.HarnessClaude}},
-		{"none", "", "", []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}},
+		{"claude", query.HarnessKind("claude"), "harness-picker-claude-default-40x36", []query.HarnessKind{query.HarnessKind("claude"), query.HarnessKind("codex")}},
+		{"codex", query.HarnessKind("codex"), "harness-picker-codex-default-40x36", []query.HarnessKind{query.HarnessKind("codex"), query.HarnessKind("claude")}},
+		{"none", "", "", []query.HarnessKind{query.HarnessKind("claude"), query.HarnessKind("codex")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := actMateTree(absentMate("this Project has no Mate"), actMateCaps(true, false, false))

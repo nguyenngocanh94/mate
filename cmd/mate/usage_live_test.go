@@ -41,7 +41,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	// ledger forever, not because nothing happened but because the ingest
 	// cannot yet prove that group is finished.
 	startOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessClaude})
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("start the Mate: %v", err)
 	}

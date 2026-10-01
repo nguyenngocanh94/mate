@@ -62,7 +62,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	ws, err := store.Init(t.TempDir())
+	ws, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

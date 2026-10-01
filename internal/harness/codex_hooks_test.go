@@ -72,7 +72,7 @@ func TestHookEventReadsTheSelectedHook(t *testing.T) {
 	if e.Detail.Source != "Project config - "+fixtureOneSource {
 		t.Fatalf("source = %q: the wrapped path was not joined", e.Detail.Source)
 	}
-	if !own.Matches(e.Detail) || e.Detail.Trusted() {
+	if !ownHookMatches(own, e.Detail) || e.Detail.Trusted() {
 		t.Fatalf("detail %+v: want mate's own, untrusted", e.Detail)
 	}
 	// A different command, or the same command from another file, is not
@@ -82,7 +82,7 @@ func TestHookEventReadsTheSelectedHook(t *testing.T) {
 		{Event: "SessionStart", Source: "/elsewhere/.codex/hooks.json", Command: fixtureOwnCommand},
 		{Event: "Stop", Source: fixtureOneSource, Command: fixtureOwnCommand},
 	} {
-		if other.Matches(e.Detail) {
+		if ownHookMatches(other, e.Detail) {
 			t.Errorf("%+v matched %+v", other, e.Detail)
 		}
 	}
@@ -106,7 +106,7 @@ func TestHookEventMatchesAcrossAWrapThatDroppedASlash(t *testing.T) {
 		t.Fatalf("detail = %+v, want both values drawn over two lines", e.Detail)
 	}
 	own := OwnHook{Event: "SessionStart", Source: source, Command: command}
-	if !own.Matches(e.Detail) {
+	if !ownHookMatches(own, e.Detail) {
 		t.Fatalf("mate's own hook did not match its wrapped drawing: %+v", e.Detail)
 	}
 	// Forgiving one dropped separator at a break forgives nothing else.
@@ -124,7 +124,7 @@ func TestHookEventMatchesAcrossAWrapThatDroppedASlash(t *testing.T) {
 		{Event: "SessionStart", Source: source, Command: "'" + root + "/002/mate' hook mate-session"},
 		{Event: "Stop", Source: source, Command: command},
 	} {
-		if other.Matches(e.Detail) {
+		if ownHookMatches(other, e.Detail) {
 			t.Errorf("%+v matched the drawing", other)
 		}
 	}
@@ -159,14 +159,14 @@ func TestHookEventTwoHooksOneForeign(t *testing.T) {
 	if !ok || len(first.Hooks) != 2 || first.Selected() != 0 || first.NeedReview != 2 {
 		t.Fatalf("two-hook list = %+v (ok %v)", first, ok)
 	}
-	if own.Matches(first.Detail) {
+	if ownHookMatches(own, first.Detail) {
 		t.Fatalf("the operator's user-config hook matched mate's: %+v", first.Detail)
 	}
 	if first.Detail.Source[:len("User config - ")] != "User config - " {
 		t.Fatalf("source = %q", first.Detail.Source)
 	}
 	second, ok := ParseCodexHookEvent(startupFixture(t, "codex-0.156.1-hooks-sessionstart-two-own-selected.txt"))
-	if !ok || second.Selected() != 1 || !own.Matches(second.Detail) {
+	if !ok || second.Selected() != 1 || !ownHookMatches(own, second.Detail) {
 		t.Fatalf("second hook = %+v (ok %v)", second, ok)
 	}
 	trusted, ok := ParseCodexHookEvent(startupFixture(t, "codex-0.156.1-hooks-sessionstart-two-own-trusted.txt"))
@@ -193,7 +193,7 @@ func TestHookEventMatchesACommandCodexCut(t *testing.T) {
 		t.Fatal("the hook list did not parse")
 	}
 	own := OwnHook{Event: "SessionStart", Source: source, Command: command}
-	if !own.Matches(e.Detail) {
+	if !ownHookMatches(own, e.Detail) {
 		t.Fatalf("mate's own hook did not match its cut drawing: %+v", e.Detail)
 	}
 	// The cut forgives only what is not drawn: the drawn part must be the
@@ -205,7 +205,7 @@ func TestHookEventMatchesACommandCodexCut(t *testing.T) {
 		{Event: "SessionStart", Source: root + "/001/.mate/projects/shop/mate/.codex/hooks.json.bak", Command: command},
 		{Event: "Stop", Source: source, Command: command},
 	} {
-		if other.Matches(e.Detail) {
+		if ownHookMatches(other, e.Detail) {
 			t.Errorf("%+v matched the drawing", other)
 		}
 	}

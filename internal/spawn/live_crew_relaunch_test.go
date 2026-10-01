@@ -28,7 +28,7 @@ func TestLiveCrewRelaunchAfterThePaneDies(t *testing.T) {
 	session, configHome := liveLabSession(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

@@ -295,7 +295,7 @@ func (m Model) harnessSheetLines(p framePlan) []gline {
 		if on {
 			lead = gl().add(m.g.Selected, tAcc)
 		}
-		l := lead.pad(1).add(harnessIcon(string(kind), m.g), tFg).pad(1).add(string(kind), tFg)
+		l := lead.pad(1).add(m.harnessIcon(string(kind)), tFg).pad(1).add(string(kind), tFg)
 		if m.recordedHarness() == kind {
 			l = l.add("  current", tDim)
 		}

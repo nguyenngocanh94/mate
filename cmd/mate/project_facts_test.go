@@ -13,7 +13,7 @@ import (
 // project the console's New project form makes when the Repo field is empty.
 func noRepoWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

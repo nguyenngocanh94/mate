@@ -20,7 +20,7 @@ func newFixtureWorkspace(t *testing.T) *store.Workspace {
 	if err := os.MkdirAll(filepath.Join(dir, "shop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	w, err := store.Init(dir)
+	w, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}

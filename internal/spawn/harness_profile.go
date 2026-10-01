@@ -43,10 +43,15 @@ func captureCrewHarnessProfile(ctx context.Context, w *store.Workspace, deps Dep
 		{w.WorkspaceCrewDoc(), "workspace_crew_rules"},
 		{w.ProjectCrewDoc(plan.project), "project_crew_rules"},
 		{filepath.Join(plan.worktree, "AGENTS.md"), "repo_agents"},
-		{filepath.Join(plan.worktree, "CLAUDE.md"), "repo_claude"},
-		{filepath.Join(plan.worktree, "AGENTS.override.md"), "generated_prompt"},
-		{filepath.Join(plan.worktree, ".codex", "config.toml"), "repo_codex_config"},
-		{filepath.Join(plan.worktree, ".claude", "settings.json"), "repo_claude_settings"},
+	}
+	for _, k := range deps.Harnesses.Kinds() {
+		profile, err := deps.Harnesses.Lookup(k)
+		if err != nil {
+			return err
+		}
+		for _, d := range profile.Info().Documents {
+			inputs = append(inputs, struct{ path, role string }{filepath.Join(plan.worktree, filepath.FromSlash(d.Path)), d.Role})
+		}
 	}
 	for _, input := range inputs {
 		p.Documents = append(p.Documents, profileDocument(w, input.path, input.role))

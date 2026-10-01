@@ -83,7 +83,7 @@ func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
 	for _, kind := range []harness.Kind{harness.KindClaude, harness.KindCodex} {
 		t.Run(string(kind), func(t *testing.T) {
 			home := t.TempDir()
-			t.Setenv(config.EnvCodexHome, home)
+			t.Setenv(harness.CodexHomeEnv, home)
 			w := newWorkspace(t, "shop")
 			rt := runtime.NewFake()
 			deps := fakeDeps(t, rt)
@@ -96,16 +96,16 @@ func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
 				env[v.Key] = v.Value
 			}
 			for key, want := range map[string]string{
-				config.EnvCaller:    spawn.CallerMate,
-				config.EnvAgentRole: string(harness.RoleMate),
-				config.EnvProjectID: "shop",
-				config.EnvCodexHome: home,
+				config.EnvCaller:     spawn.CallerMate,
+				config.EnvAgentRole:  string(harness.RoleMate),
+				config.EnvProjectID:  "shop",
+				harness.CodexHomeEnv: home,
 			} {
 				if env[key] != want {
 					t.Fatalf("the %s Mate's launch exports %s=%q, want %q (all: %v)", kind, key, env[key], want, env)
 				}
 			}
-			if got := paneEnv(t, rt, res.Pane)[config.EnvCodexHome]; got != home {
+			if got := paneEnv(t, rt, res.Pane)[harness.CodexHomeEnv]; got != home {
 				t.Fatalf("the workspace create gave the Mate pane CODEX_HOME=%q, want %q", got, home)
 			}
 		})
@@ -125,7 +125,7 @@ func TestOutboxReadsTheTranscriptKeySpawnWrites(t *testing.T) {
 // Crew the Mate spawns.
 func TestStartMateRefusesTheOperatorsCodexHomeInALiveRun(t *testing.T) {
 	t.Setenv(config.EnvLive, "1")
-	t.Setenv(config.EnvCodexHome, "")
+	t.Setenv(harness.CodexHomeEnv, "")
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)

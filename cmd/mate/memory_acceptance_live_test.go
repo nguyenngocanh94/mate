@@ -88,7 +88,7 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 	codexHome := os.Getenv("CODEX_HOME")
 
 	root := liveWorkspaceRoot(t)
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -157,9 +157,9 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 	pilot.Start(ctx)
 	defer pilot.Stop()
 
-	harnessChoice := query.HarnessClaude
+	harnessChoice := query.HarnessKind("claude")
 	if kind == harness.KindCodex {
-		harnessChoice = query.HarnessCodex
+		harnessChoice = query.HarnessKind("codex")
 	}
 	out, err := action(ctx, console.ActionRequest{Action: console.ActionStart, Target: memoryProject, TargetKind: "mate", Harness: harnessChoice})
 	if err != nil {

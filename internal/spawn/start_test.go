@@ -408,7 +408,7 @@ func startedManual(t *testing.T, w *store.Workspace) string {
 // TestStartMateForAProjectWithNoRepo: a project with no repo still gets a
 // Mate (docs/mvp.md M9); its manual says no Crew can be spawned yet.
 func TestStartMateForAProjectWithNoRepo(t *testing.T) {
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}

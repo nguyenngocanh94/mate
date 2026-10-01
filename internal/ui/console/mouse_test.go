@@ -231,7 +231,7 @@ func TestClickOnAHarnessRowPicksIt(t *testing.T) {
 		t.Fatal("a click on codex ran nothing")
 	}
 	cmd()
-	if len(got) != 1 || got[0].Harness != query.HarnessCodex {
+	if len(got) != 1 || got[0].Harness != query.HarnessKind("codex") {
 		t.Fatalf("requests = %+v, want one create with codex", got)
 	}
 }

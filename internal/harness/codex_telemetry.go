@@ -15,18 +15,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/telemetry"
 )
 
-// TelemetryState accompanies the byte cursor in the same database transaction.
-// Only unfinished correlations are carried, so history does not grow this state.
-type TelemetryState struct {
-	HeaderSHA256 string                    `json:"header_sha256,omitempty"`
-	HeaderBytes  int64                     `json:"header_bytes,omitempty"`
-	Turn         string                    `json:"turn,omitempty"`
-	Model        string                    `json:"model,omitempty"`
-	Effort       string                    `json:"effort,omitempty"`
-	Wrappers     map[string]telemetry.Fact `json:"wrappers,omitempty"`
-	Responses    map[string]telemetry.Fact `json:"responses,omitempty"`
-}
-
 type TelemetryBatch struct {
 	Facts    []telemetry.Fact
 	State    TelemetryState
@@ -384,18 +372,6 @@ type telemetryItem struct {
 }
 
 func hashText(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
-func outputFact(s string, n *int64) *telemetry.Output {
-	preview := s
-	if len(preview) > 1200 {
-		preview = preview[:1200]
-	}
-	o := &telemetry.Output{Bytes: int64(len(s)), SHA256: hashText(s), NewBytes: n, Preview: preview}
-	if strings.Contains(s, "Warning: truncated output") || strings.Contains(s, "tokens truncated") || strings.Contains(s, "Output truncated") {
-		yes := true
-		o.Truncated = &yes
-	}
-	return o
-}
 func telemetryPath(s string) string {
 	if u, err := url.Parse(s); err == nil && u.Scheme == "file" {
 		return u.Path
@@ -461,54 +437,4 @@ func nestedCommandResult(s string) (string, *int, string, bool) {
 	var pid json.Number
 	_ = json.Unmarshal(m["session_id"], &pid)
 	return output, exit, pid.String(), true
-}
-
-// NormalizedTelemetry supplies Claude and older harnesses with the observations
-// already verified by their transcript adapter. No native process/timing claims
-// are made for this fallback.
-func NormalizedTelemetry(tb TranscriptBatch) []telemetry.Fact {
-	var out []telemetry.Fact
-	for _, t := range tb.Turns {
-		off := t.Offset
-		f := telemetry.Fact{Version: telemetry.Version, ID: t.SourceRef, Kind: "response", SourceRef: t.SourceRef, SourceOffset: off, OccurredAt: t.OccurredAt, MeasurementKind: "normalized", HarnessTurnRef: t.HarnessTurnRef, ResponseID: t.SourceRef, Model: t.Model, Text: t.Text, InputTokens: t.Usage.Input, CacheReadTokens: t.Usage.CacheRead, CacheWriteTokens: t.Usage.CacheWrite, OutputTokens: t.Usage.Output, ReasoningTokens: t.Usage.Reasoning, ContextTokens: t.Usage.ContextTokens(), LedgerRefOffset: &off}
-		out = append(out, f)
-	}
-	calls := map[string]TranscriptToolCall{}
-	for _, c := range tb.ToolCalls {
-		calls[c.SourceRef] = c
-		at := c.StartedAt
-		out = append(out, telemetry.Fact{Version: telemetry.Version, ID: c.SourceRef, Kind: "tool_call", SourceRef: c.SourceRef, SourceOffset: c.Offset, OccurredAt: at, MeasurementKind: "normalized", ResponseID: c.TurnSourceRef, WrapperRef: c.SourceRef, Tool: c.ToolName, Command: c.InputJSON, StartedAt: &at})
-	}
-	for _, r := range tb.ToolResults {
-		at := r.CompletedAt
-		c := calls[r.CallID]
-		f := telemetry.Fact{Version: telemetry.Version, ID: r.CallID, Kind: "tool_result", SourceRef: r.SourceRef, SourceOffset: r.Offset, OccurredAt: at, MeasurementKind: "normalized", ResponseID: c.TurnSourceRef, WrapperRef: r.CallID, Tool: c.ToolName, Command: c.InputJSON, CompletedAt: &at, Output: outputFact(r.OutputText, nil)}
-		if r.IsError {
-			f.Status = "failed"
-		}
-		out = append(out, f)
-	}
-	for _, r := range tb.Records {
-		if r.Kind != TranscriptKindUser {
-			continue
-		}
-		var p struct {
-			Type     string `json:"type"`
-			PromptID string `json:"promptId"`
-			Message  struct {
-				Content json.RawMessage `json:"content"`
-			} `json:"message"`
-		}
-		if json.Unmarshal([]byte(r.RawJSON), &p) != nil {
-			continue
-		}
-		if bytes.Contains(p.Message.Content, []byte(`"tool_result"`)) {
-			continue
-		}
-		text := codexMessageText(p.Message.Content)
-		if text != "" {
-			out = append(out, telemetry.Fact{Version: telemetry.Version, ID: r.SourceRef, Kind: "prompt", SourceRef: r.SourceRef, SourceOffset: r.Offset, OccurredAt: r.OccurredAt, MeasurementKind: "normalized", HarnessTurnRef: p.PromptID, Text: text})
-		}
-	}
-	return out
 }

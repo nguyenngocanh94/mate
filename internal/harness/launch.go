@@ -108,6 +108,11 @@ type AgentSpec struct {
 	// a fresh one (docs/mvp.md task 10).
 	ResumeSessionID string
 	Env             []EnvVar
+	// EnvKeys are the variables of every registered harness
+	// (Registry.EnvKeys). Env may carry them besides the identity keys,
+	// because an agent may launch another harness; the harness's own
+	// Info().EnvKeys are allowed without them.
+	EnvKeys []string
 	// TaskPrompt is a Crew's first user message. It is intentionally separate
 	// from ContextPath: every harness instruction delivery is passive.
 	TaskPrompt string
@@ -128,6 +133,9 @@ type LaunchPlan struct {
 	Args        []string
 	Cwd         string
 	Env         []EnvVar
+	// EnvKeys are the variables Env may carry besides the identity keys
+	// (config.IdentityEnvKeys).
+	EnvKeys []string
 	// UnsetEnv are variables removed from the pane before the start, besides
 	// NestedSessionEnv, which every launch removes.
 	UnsetEnv        []string
@@ -165,7 +173,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage,
 			fmt.Sprintf("harness %q launch names no screen profile; mate refuses a pane it cannot read", p.RuntimeKind))
 	}
-	env, err := filterLaunchEnv(p.Env)
+	env, err := filterLaunchEnv(p.Env, p.EnvKeys)
 	if err != nil {
 		return LaunchSpec{}, err
 	}
@@ -188,6 +196,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		codexHome:       p.CodexHome,
 		claudeConfigDir: p.ClaudeConfigDir,
 		unsetEnv:        append([]string(nil), p.UnsetEnv...),
+		envKeys:         append([]string(nil), p.EnvKeys...),
 		checkContext:    p.CheckContext,
 		screen:          p.Screen,
 	}

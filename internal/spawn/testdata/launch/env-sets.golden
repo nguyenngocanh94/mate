@@ -1,4 +1,4 @@
-== config.LaunchEnvKeys (allowlist) ==
+== config.IdentityEnvKeys + Registry.EnvKeys (allowlist) ==
 MATE_WORKSPACE_ID
 MATE_PROJECT_ID
 MATE_AGENT_ID

@@ -15,16 +15,16 @@ import (
 var ErrNotWorkspace = errors.New("store: not a mate workspace")
 
 // Defaults are the harnesses a project uses when it does not say otherwise.
+// They are what workspace.yaml records and nothing more: an empty field
+// means the workspace names none, and the binary's harness registry decides
+// (harness.Registry.Default) where the harness is resolved. The store knows
+// no harness by name.
 type Defaults struct {
 	MateHarness string `yaml:"mate_harness"`
 	CrewHarness string `yaml:"crew_harness"`
 }
 
-// The harnesses of decision 2 in docs/mvp.md: Mate is Claude Code, Crew is Codex.
 const (
-	DefaultMateHarness = "claude"
-	DefaultCrewHarness = "codex"
-
 	// DefaultBranch is what a project falls back to when none is given.
 	DefaultBranch = "main"
 
@@ -61,10 +61,12 @@ type Workspace struct {
 	cfg  WorkspaceConfig
 }
 
-// Init creates `.mate/` under workspaceDir and writes a default
-// workspace.yaml. It is idempotent for a directory that already has one: the
-// existing workspace is opened instead, so the stored session name survives.
-func Init(workspaceDir string) (*Workspace, error) {
+// Init creates `.mate/` under workspaceDir and writes a workspace.yaml
+// recording defaults, which the caller resolves from its harness registry
+// so a new workspace's file says what it runs. It is idempotent for a
+// directory that already has one: the existing workspace is opened instead,
+// so the stored session name and defaults survive.
+func Init(workspaceDir string, defaults Defaults) (*Workspace, error) {
 	// A directory that does not exist yet is made, as `git init <dir>`
 	// does; Open, which only reads, still refuses one.
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
@@ -81,12 +83,9 @@ func Init(workspaceDir string) (*Workspace, error) {
 		return nil, err
 	}
 	w.cfg = WorkspaceConfig{
-		Version: workspaceVersion,
-		Session: SessionName(root),
-		Defaults: Defaults{
-			MateHarness: DefaultMateHarness,
-			CrewHarness: DefaultCrewHarness,
-		},
+		Version:  workspaceVersion,
+		Session:  SessionName(root),
+		Defaults: defaults,
 	}
 	if err := w.mkdirAll(w.ProjectsDir()); err != nil {
 		return nil, err
@@ -220,12 +219,6 @@ func (w *Workspace) LoadConfig() error {
 	}
 	if cfg.Session == "" {
 		cfg.Session = SessionName(w.root)
-	}
-	if cfg.Defaults.MateHarness == "" {
-		cfg.Defaults.MateHarness = DefaultMateHarness
-	}
-	if cfg.Defaults.CrewHarness == "" {
-		cfg.Defaults.CrewHarness = DefaultCrewHarness
 	}
 	w.cfg = cfg
 	return nil

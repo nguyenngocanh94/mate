@@ -22,7 +22,7 @@ import (
 func newWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

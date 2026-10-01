@@ -29,7 +29,7 @@ import (
 func mergeLiveWorkspace(t *testing.T, session string, yolo bool) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -142,7 +142,7 @@ func assertMergedAndFinished(t *testing.T, w *store.Workspace, project, crew, br
 	}
 
 	// The console's own read: a finished crew is not a row any more.
-	snap, err := query.Load(ctx, w)
+	snap, err := query.Load(ctx, w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 
 	// The console only offers merge on a `wait-mate` row, so the snapshot
 	// the menu is built from has to agree before the action is driven.
-	snap, err := query.Load(ctx, w)
+	snap, err := query.Load(ctx, w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

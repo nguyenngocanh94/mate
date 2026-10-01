@@ -36,7 +36,7 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 	// TMPDIR must not go through a symlink: Herdr reports a pane cwd with
 	// symlinks resolved and the launch guard compares the two.
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

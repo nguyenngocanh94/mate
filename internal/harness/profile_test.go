@@ -30,16 +30,16 @@ func TestParseEffortKnowsTheFiveLevels(t *testing.T) {
 // recorded but not passed.
 func TestEffortSupportPerHarness(t *testing.T) {
 	for _, e := range []Effort{EffortLow, EffortMedium, EffortHigh, EffortXHigh, EffortMax} {
-		if !KindClaude.SupportsEffort(e) {
+		if !(Claude{}).Info().SupportsEffort(e) {
 			t.Errorf("claude does not take %s", e)
 		}
 	}
 	for _, e := range []Effort{EffortLow, EffortMedium, EffortHigh, EffortXHigh} {
-		if !KindCodex.SupportsEffort(e) {
+		if !(Codex{}).Info().SupportsEffort(e) {
 			t.Errorf("codex does not take %s", e)
 		}
 	}
-	if KindCodex.SupportsEffort(EffortMax) {
+	if (Codex{}).Info().SupportsEffort(EffortMax) {
 		t.Error("codex takes max; its catalogue does not advertise it for every model")
 	}
 }

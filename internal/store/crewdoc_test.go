@@ -9,7 +9,7 @@ import (
 
 func TestInitAndAddProjectSeedCrewDocs(t *testing.T) {
 	root := t.TempDir()
-	w, err := Init(root)
+	w, err := Init(root, Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestInitAndAddProjectSeedCrewDocs(t *testing.T) {
 	if err := os.WriteFile(w.WorkspaceCrewDoc(), []byte("<!-- mine -->\n\n- Reproduce first.\n\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Init(root); err != nil {
+	if _, err := Init(root, Defaults{}); err != nil {
 		t.Fatal(err)
 	}
 	ws, _, err = w.CrewRules("shop")
@@ -56,7 +56,7 @@ func TestInitAndAddProjectSeedCrewDocs(t *testing.T) {
 }
 
 func TestCrewRulesMissingFilesAreEmpty(t *testing.T) {
-	w, err := Init(t.TempDir())
+	w, err := Init(t.TempDir(), Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}

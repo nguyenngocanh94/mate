@@ -25,33 +25,51 @@ var (
 	ErrInvalidValue = errors.New("invalid value")
 )
 
-// HarnessKind is a supported agent harness. mate launches the two v1
-// probed: Claude Code and Codex CLI. It mirrors harness.Kind's values
-// without this package importing internal/harness, for the same reason
-// WorktreeStatus mirrors the store's own spelling: the Console must stay
-// free of every package that talks to a real process.
+// HarnessKind names a harness as mate's files record it. It is opaque
+// here: which harnesses exist is the binary's registry's to say, and it
+// reaches the read model as data (Harnesses), so this package names none
+// and never imports internal/harness - the Console must stay free of every
+// package that talks to a real process.
 type HarnessKind string
 
-const (
-	HarnessClaude HarnessKind = "claude"
-	HarnessCodex  HarnessKind = "codex"
-)
+func (k HarnessKind) String() string { return string(k) }
 
-// ParseHarnessKind rejects empty and unknown kinds.
-func ParseHarnessKind(s string) (HarnessKind, error) {
-	switch HarnessKind(strings.ToLower(strings.TrimSpace(s))) {
-	case HarnessClaude:
-		return HarnessClaude, nil
-	case HarnessCodex:
-		return HarnessCodex, nil
-	case "":
-		return "", fmt.Errorf("harness kind: %w", ErrEmptyValue)
-	default:
-		return "", fmt.Errorf("harness kind %q: %w", s, ErrInvalidValue)
-	}
+// Harness is one harness the binary launches, as a UI draws it.
+type Harness struct {
+	Kind HarnessKind
+	Icon HarnessIcon
 }
 
-func (k HarnessKind) String() string { return string(k) }
+// HarnessIcon is a harness's one-cell mark in each glyph alphabet a UI may
+// draw with.
+type HarnessIcon struct {
+	// Nerd is the brand mark in a Nerd Font.
+	Nerd string
+	// Unicode is the stand-in any UTF-8 terminal draws.
+	Unicode string
+	// ASCII is the stand-in for a terminal that draws nothing else.
+	ASCII string
+}
+
+// Harnesses is the binary's harness catalog, which cmd/mate builds from its
+// registry and Load copies into every Snapshot.
+type Harnesses struct {
+	// List is every harness, in registration order.
+	List []Harness
+	// MateDefault is the harness a Mate gets when neither the request nor
+	// the workspace picks one.
+	MateDefault HarnessKind
+}
+
+// Has reports whether kind is one of List.
+func (h Harnesses) Has(kind HarnessKind) bool {
+	for _, x := range h.List {
+		if x.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
 
 // Mode is a Project's communication mode (mvp.md section 5). Manual is
 // the default and means no byte is ever sent to the Mate's pane without the

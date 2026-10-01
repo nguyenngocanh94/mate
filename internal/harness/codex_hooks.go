@@ -1,6 +1,8 @@
 package harness
 
 import (
+	"encoding/json"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,8 +33,9 @@ import (
 //  5. esc back to the table (now without a Review column, footer "enter
 //     details · esc close"), esc again to the composer.
 //
-// The settle walks exactly that, and trusts a hook only when every hook the
-// review lists is one it was told is mate's own (OwnHook). It never
+// ReviewOwn (codex_review.go) walks exactly that, and trusts a hook only
+// when every hook the review lists is one it was told is mate's own
+// (OwnHook). It never
 // presses "Trust all", and it never trusts anything it did not read.
 
 // StartupScreenHooksReview is codex-cli's "Hooks need review" dialog.
@@ -78,15 +81,7 @@ func hooksReviewDialogs() []dialogProfile {
 	return []dialogProfile{v156, v154}
 }
 
-// OwnHook is one hook the settle may trust: mate wrote it, in this file,
-// with this command, for this event.
-type OwnHook struct {
-	Event   string
-	Source  string // the absolute path of the hooks.json that holds it
-	Command string
-}
-
-// Matches reports whether a reviewed hook is exactly this one: the same
+// ownHookMatches reports whether a reviewed hook is exactly own: the same
 // event, a project config at this path, this command. The source must be a
 // project config: mate never writes the operator's user config.
 //
@@ -104,7 +99,7 @@ type OwnHook struct {
 // drawing ends in `…` matches when what is drawn is the command up to a
 // space; the Source, which says which file holds the hook, is never cut and
 // must match whole.
-func (o OwnHook) Matches(h CodexReviewHook) bool {
+func ownHookMatches(o OwnHook, h CodexReviewHook) bool {
 	return h.Event == o.Event &&
 		wrapMatch(h.SourceLines, codexHookProjectSource+o.Source) &&
 		commandMatch(h.CommandLines, o.Command)
@@ -468,4 +463,69 @@ func nonEmptyTrimmed(screen string) []string {
 		}
 	}
 	return out
+}
+
+const (
+	// CodexHooksFile is the Codex Mate's hook file, in the `.codex/` of its
+	// cwd, which Codex loads once the directory is trusted (task 35, A3).
+	// The operator's own `$CODEX_HOME/hooks.json` is never read or written.
+	CodexHooksFile = "hooks.json"
+)
+
+// CodexHooksPath is the hook file of a Codex Mate in mateDir.
+func CodexHooksPath(mateDir string) string {
+	return filepath.Join(mateDir, Codex{}.Info().ConfigDir, CodexHooksFile)
+}
+
+const (
+	// CodexHookContextLimit is the additionalContextLimit, in tokens, the
+	// Codex Mate's hook is installed with: codex-cli 0.156.1 keeps the head
+	// and the tail of a SessionStart hook's output and drops the middle past
+	// about 2.5K tokens unless the hook raises it (docs/mvp.md section 7,
+	// task 37).
+	CodexHookContextLimit = 32000
+	// CodexHookTimeoutSeconds bounds the hook, which reads files and git
+	// metadata only.
+	CodexHookTimeoutSeconds = 30
+)
+
+// The SessionStart digest's size, per harness (HookInstaller.DigestMaxBytes).
+// Both are measured limits on what a hook's output puts in context
+// (docs/mvp.md section 7, task 37).
+const (
+	// CodexSessionHookMaxBytes: codex-cli 0.156.1 keeps the head and the
+	// tail of a SessionStart hook's output and drops the middle past about
+	// 2.5K tokens unless the hook raises additionalContextLimit; with the
+	// limit at 20000, 28K characters arrived whole. The digest is bounded
+	// well inside CodexHookContextLimit.
+	CodexSessionHookMaxBytes = 48000
+)
+
+// CodexSessionHookCommand is the exact command a Codex Mate's SessionStart
+// hook runs. It names its harness so the digest is sized for it, and the
+// hook review compares a hook Codex asks to trust against this string, so it
+// is the one place it is spelled.
+func CodexSessionHookCommand(binary string) string {
+	return SessionHookCommand(binary) + " --harness " + string(KindCodex)
+}
+
+// CodexHooks is `mate/.codex/hooks.json` for a Codex Mate: the same
+// SessionStart hook, with its output limit raised so the digest arrives
+// whole (see CodexHookContextLimit). Codex runs it at the first prompt
+// after a launch, resume, /compact or /clear (task 35, A3). It is the app's
+// file, rewritten on every start; the same bytes keep the same trust.
+func CodexHooks(binary string) []byte {
+	data, _ := json.MarshalIndent(map[string]any{
+		"hooks": map[string]any{
+			"SessionStart": []any{map[string]any{
+				"hooks": []any{map[string]any{
+					"type":                   "command",
+					"command":                CodexSessionHookCommand(binary),
+					"timeout":                CodexHookTimeoutSeconds,
+					"additionalContextLimit": CodexHookContextLimit,
+				}},
+			}},
+		},
+	}, "", "  ")
+	return append(data, '\n')
 }

@@ -32,7 +32,7 @@ import (
 func consoleFixture(t *testing.T, project string) (*store.Workspace, spawn.Deps) {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 
 	// And the snapshot the Console renders follows the flag.
-	snap, err := query.Load(ctx, w)
+	snap, err := query.Load(ctx, w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	if err := w.SetAuto("shop", true); err != nil {
 		t.Fatal(err)
 	}
-	if snap, err = query.Load(ctx, w); err != nil {
+	if snap, err = query.Load(ctx, w, consoleHarnesses()); err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
 	if snap.Projects[0].Mode != query.ModeAuto {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // recorder runs Home's cleanups on demand and keeps what they report, so the
@@ -42,7 +42,7 @@ func operatorHome(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv(config.EnvCodexHome, dir)
+	t.Setenv(harness.CodexHomeEnv, dir)
 	return dir
 }
 
@@ -52,8 +52,8 @@ func TestHomeCopiesOnlyTheLoginAndPointsCodexAtIt(t *testing.T) {
 	home := Home(r)
 	defer r.runCleanups()
 
-	if home == operator || os.Getenv(config.EnvCodexHome) != home {
-		t.Fatalf("CODEX_HOME = %q after Home, want the new lab home %q (operator %q)", os.Getenv(config.EnvCodexHome), home, operator)
+	if home == operator || os.Getenv(harness.CodexHomeEnv) != home {
+		t.Fatalf("CODEX_HOME = %q after Home, want the new lab home %q (operator %q)", os.Getenv(harness.CodexHomeEnv), home, operator)
 	}
 	info, err := os.Lstat(filepath.Join(home, AuthFile))
 	if err != nil || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o600 {
