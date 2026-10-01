@@ -824,7 +824,7 @@ func ClassifyClaudeTool(name string) CommandClass {
 // A slug longer than claudeSlugMax is cut to that length and suffixed with
 // '-' and a hash of the whole cwd, so a deep path still fits in one directory
 // name (read from claude-code 2.1.286's bundle, where the same rule names its
-// cache directories; TestLiveClaudeProjectSlugResolution measures it on a
+// cache directories; TestLiveClaudeProjectSlugOfALongCwd measures it on a
 // real CLI). Without the cut a long cwd names a directory no filesystem can
 // hold.
 func ClaudeProjectSlug(cwd string) string {
