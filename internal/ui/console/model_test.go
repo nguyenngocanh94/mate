@@ -163,7 +163,9 @@ func TestRefreshUpdatesAsOfAndTheAgesMeasuredFromIt(t *testing.T) {
 		}
 		return tree, nil
 	})
-	m.p = plainPalette()
+	// The assertions spell the Unicode dot; pin the set so the test does
+	// not depend on the locale it runs under.
+	m.g, m.p = unicodeGlyphs, plainPalette()
 	m, _ = send(t, m, tea.WindowSizeMsg{Width: 40, Height: 36})
 	m, _ = send(t, m, m.Init()())
 	m, _ = send(t, m, key("enter")) // the Mate row: bound since 09:14:02
