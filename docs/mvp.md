@@ -522,6 +522,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   `--thinking` nhận cả năm mức `Effort`, nhưng pi kẹp theo model mà không báo (`deepseek-flash`: medium thành high, xhigh thành max); mức thật đọc lại từ bản ghi `thinking_level_change` của session và đi vào telemetry như effort của runtime.
   `/quit` gõ vào composer đang có draft sẽ nối vào draft, và `ctrl+d` chỉ thoát khi composer trống, nên stop êm bấm `ctrl+u` trước rồi mới gõ `/quit`.
   Session đặt tên lúc launch (`--session-dir`, `--session-id`); file chỉ xuất hiện ở prompt đầu tiên, và `--session-id` với id chưa có file thì tạo session mới chứ không báo lỗi.
+  Chưa đo: pi nạp `AGENTS.md` (không có thì `CLAUDE.md`) của mọi thư mục cha, đo được tới git root và theo mã nguồn thì tới `/`, nên Crew ở `<workspace>/.worktrees/<project>-<crew>/` có thể nạp cả file context ở `<workspace>/` và phía trên; cần một phép đo ngoài git repo, và mate hiện không chặn cũng không ghi lại các file đó.
 
 ## 8. Tái sử dụng từ v1
 
