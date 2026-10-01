@@ -50,12 +50,60 @@ type Launcher interface {
 	Build(ctx context.Context, spec AgentSpec) (LaunchSpec, error)
 }
 
-// ScreenProfile recognises a harness's pane. It names what the screen shows
-// and leaves what to do about it to the caller.
+// ScreenProfile recognises a harness's pane: how it is read, its startup
+// dialogs, and its composer. It names what the screen shows and leaves what
+// to do about it to the caller (startup_prompt.go, composer.go).
+//
+// Plan PR 3 moved the per-kind tables here unchanged; the TUI probe plan's
+// PR 1 reshapes the composer half into an observation the core's policy
+// decides from.
 type ScreenProfile interface {
+	// ReadSource is the pane read this harness's screens were measured
+	// through. Every read of its pane uses it, so what is classified is
+	// what was measured.
+	ReadSource() ReadSource
+
 	// ClassifyStartup names what the pane shows right after launch.
-	ClassifyStartup(screen string) (StartupScreen, error)
+	ClassifyStartup(screen string) StartupScreen
+	// StartupAnswer is the measured key sequence that answers one startup
+	// dialog, or a refusal when this harness draws no such dialog.
+	StartupAnswer(dialog StartupScreen) (StartupDialogAnswer, error)
+	// StartupTargetSelected reports whether that dialog is on screen,
+	// structurally confirmed, with its highlight on the option
+	// StartupAnswer confirms. It is false on any other screen.
+	StartupTargetSelected(dialog StartupScreen, screen string) bool
+	// ReadyScreen is the smallest screen ClassifyStartup calls ready: what
+	// a fake runtime shows for an agent that started cleanly.
+	ReadyScreen() string
+
+	// ComposerGlyph is the glyph the harness draws at its composer.
+	ComposerGlyph() string
+	// Composer returns the composer line's content after the glyph, and
+	// whether a composer was found at all.
+	Composer(lines []string) (content string, ok bool)
+	// ComposerPlaceholders are the measured texts an empty composer holds.
+	ComposerPlaceholders() []string
+	// ComposerRows returns every row of a composer holding text, the first
+	// without its glyph, or false when the composer's extent cannot be
+	// read off the screen.
+	ComposerRows(lines []string) (rows []string, ok bool)
+	// Busy returns the line proving the harness is mid-turn.
+	Busy(lines []string) (evidence string, ok bool)
 }
+
+// ReadSource is a `herdr agent read --source`.
+type ReadSource string
+
+const (
+	// ReadRecentUnwrapped is the agent's recent output with wrapped rows
+	// joined. While Herdr refuses it for a working agent drawn on the
+	// alternate screen, the runtime reads ReadVisible instead
+	// (runtime.Herdr.readAgent).
+	ReadRecentUnwrapped ReadSource = "recent-unwrapped"
+	// ReadVisible is the screen as it is drawn, rows wrapped at the pane
+	// width.
+	ReadVisible ReadSource = "visible"
+)
 
 // Capabilities are the optional parts of the contract. Every field must be
 // declared by every harness: the zero Cap is "undeclared", which the

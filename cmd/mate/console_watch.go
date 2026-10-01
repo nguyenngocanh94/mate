@@ -122,11 +122,19 @@ func consoleSessionRef(ws *store.Workspace, deps spawn.Deps) timeline.SessionRef
 
 // consoleCrewHandle is watch.HandleFunc over spawn.CrewHandle: the recorded
 // `crews/<id>.meta` resolved against the session Herdr currently answers
-// for. The observer takes it as a function so it imports nothing that could
-// start or stop an agent.
+// for, with the screen profile of the harness it records. The observer takes
+// it as a function so it imports nothing that could start or stop an agent.
 func consoleCrewHandle(ws *store.Workspace, deps spawn.Deps) watch.HandleFunc {
-	return func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error) {
-		return spawn.CrewHandle(ctx, ws, deps, project, crew)
+	return func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.ScreenProfile, error) {
+		handle, kind, err := spawn.CrewHandle(ctx, ws, deps, project, crew)
+		if err != nil {
+			return runtime.AgentHandle{}, nil, err
+		}
+		screens, err := screenOf(deps, kind)
+		if err != nil {
+			return runtime.AgentHandle{}, nil, err
+		}
+		return handle, screens, nil
 	}
 }
 

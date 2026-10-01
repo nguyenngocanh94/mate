@@ -94,7 +94,7 @@ func crewPaneTail(ctx context.Context, rt *runtime.Herdr, session, configHome, a
 		Name:    agent, RawID: crew, Kind: harness.KindCodex,
 	}
 	return func() string {
-		screen, err := rt.ReadAgent(ctx, handle, 40)
+		screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if err != nil {
 			return "(pane not readable: " + err.Error() + ")"
 		}
@@ -315,7 +315,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 		Name:    mateRes.Agent, RawID: "shop", Kind: harness.KindClaude,
 	}
 	mateTail := func() string {
-		screen, readErr := rt.ReadAgent(ctx, mateHandle, 60)
+		screen, readErr := rt.ReadAgent(ctx, mateHandle, harness.ReadRecentUnwrapped, 60)
 		if readErr != nil {
 			return "(mate pane not readable: " + readErr.Error() + ")"
 		}

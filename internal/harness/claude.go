@@ -48,7 +48,7 @@ func (Claude) Info() Info {
 func (c Claude) Launcher() Launcher { return c }
 
 // Screen implements Profile.
-func (Claude) Screen() ScreenProfile { return kindScreen(KindClaude) }
+func (Claude) Screen() ScreenProfile { return claudeScreen{} }
 
 // Capabilities implements Profile.
 func (Claude) Capabilities() Capabilities {
@@ -278,6 +278,7 @@ func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	}
 	out := LaunchPlan{
 		RuntimeKind:     c.Info().RuntimeKind,
+		Screen:          c.Screen(),
 		Cwd:             cwd,
 		Env:             envInput,
 		ContextFiles:    []GeneratedFile{{Path: path, Role: "canonical_context"}},

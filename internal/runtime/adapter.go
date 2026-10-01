@@ -32,7 +32,9 @@ type Adapter interface {
 	InspectAgent(ctx context.Context, handle AgentHandle) (ObservedAgent, error)
 	// ReadAgent returns a bounded recent terminal snapshot. It is deliberately
 	// separate from InspectAgent: pane output is live runtime data, not state.
-	ReadAgent(ctx context.Context, handle AgentHandle, lines int) (string, error)
+	// source is the harness's own (harness.ScreenProfile.ReadSource): the
+	// read its screens were measured through.
+	ReadAgent(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error)
 	// ReadAgentStyled is the same snapshot with the harness's own SGR
 	// attributes still in it. It exists because one question cannot be
 	// answered without them: whether the text in a composer is a person's
@@ -40,7 +42,7 @@ type Adapter interface {
 	// same characters and differ only by being drawn dim (docs/mvp.md
 	// section 7, measured 2026-09-19). Everything a human reads uses
 	// ReadAgent; only the composer classifier needs this.
-	ReadAgentStyled(ctx context.Context, handle AgentHandle, lines int) (string, error)
+	ReadAgentStyled(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error)
 	// ListAgents is the live inventory of one named session. Identity and
 	// occupancy questions must be answered from this list (and Inspect of a
 	// recorded name), never from focus, most-recent, or whoever currently

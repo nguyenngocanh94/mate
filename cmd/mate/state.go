@@ -136,13 +136,10 @@ func stateOfCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, proje
 	if resolved.AgentRecorded && resolved.SessionRunning {
 		// Styled, so a faint suggestion in the composer reads as the idle
 		// pane it is rather than as somebody's half-typed line.
-		screen, err := deps.Runtime.ReadAgentStyled(ctx, resolved.Handle, send.DefaultLines)
+		screen, err := deps.Runtime.ReadAgentStyled(ctx, resolved.Handle, resolved.Screen.ReadSource(), send.DefaultLines)
 		switch {
 		case err == nil:
-			cls, err := send.ClassifyComposer(resolved.Kind, screen)
-			if err != nil {
-				return crewstate.Result{}, err
-			}
+			cls := send.ClassifyComposer(resolved.Screen, screen)
 			in.AgentFound = true
 			in.Composer = composerReading(cls.State)
 			in.Evidence = cls.Evidence

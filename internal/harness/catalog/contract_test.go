@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -120,8 +121,40 @@ func TestContractRequiredParts(t *testing.T) {
 		if p.Screen() == nil {
 			t.Fatal("Screen() is nil")
 		}
-		if _, err := p.Screen().ClassifyStartup(""); err != nil {
-			t.Errorf("Screen().ClassifyStartup on an empty pane: %v", err)
+	})
+}
+
+// The screen profile reads its pane through a source the runtime knows, and
+// its own ready screen - what the fake runtime shows for a clean start -
+// classifies as ready at startup and as an idle, empty composer afterwards.
+func TestContractScreenReadsItsOwnReadyScreen(t *testing.T) {
+	eachProfile(t, func(t *testing.T, p harness.Profile) {
+		s := p.Screen()
+		switch src := s.ReadSource(); src {
+		case harness.ReadRecentUnwrapped, harness.ReadVisible:
+		default:
+			t.Errorf("ReadSource() = %q, not a source the runtime reads", src)
+		}
+		ready := s.ReadyScreen()
+		if got := s.ClassifyStartup(ready); got != harness.StartupScreenReady {
+			t.Errorf("ClassifyStartup(ReadyScreen()) = %s, want %s", got, harness.StartupScreenReady)
+		}
+		if got := s.ClassifyStartup(""); got != harness.StartupScreenUnrecognized {
+			t.Errorf("ClassifyStartup on an empty pane = %s, want %s", got, harness.StartupScreenUnrecognized)
+		}
+		lines := strings.Split(ready, "\n")
+		if evidence, busy := s.Busy(lines); busy {
+			t.Errorf("Busy(ReadyScreen()) found a turn in flight: %q", evidence)
+		}
+		content, ok := s.Composer(lines)
+		if !ok {
+			t.Fatal("Composer(ReadyScreen()) found no composer")
+		}
+		if c := strings.TrimSpace(content); c != "" && !slices.Contains(s.ComposerPlaceholders(), c) {
+			t.Errorf("ReadyScreen()'s composer holds %q, neither empty nor a placeholder", c)
+		}
+		if s.ComposerGlyph() == "" {
+			t.Error("ComposerGlyph() is empty")
 		}
 	})
 }

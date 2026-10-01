@@ -10,6 +10,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -127,7 +128,7 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 		t.Fatalf("MateHandle: %v", err)
 	}
 	mateTail := func() string {
-		s, readErr := rt.ReadAgent(ctx, mateHandle, send.DefaultLines)
+		s, readErr := rt.ReadAgent(ctx, mateHandle, harness.ReadRecentUnwrapped, send.DefaultLines)
 		if readErr != nil {
 			return "(mate pane not readable: " + readErr.Error() + ")"
 		}
@@ -151,7 +152,7 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 		Name:    crewRes.Agent, RawID: "k3", Kind: harness.KindCodex,
 	}
 	crewTail := func() string {
-		screen, readErr := rt.ReadAgent(ctx, crewHandle, send.DefaultLines)
+		screen, readErr := rt.ReadAgent(ctx, crewHandle, harness.ReadRecentUnwrapped, send.DefaultLines)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}
@@ -337,13 +338,15 @@ func waitForComposerState(t *testing.T, ctx context.Context, rt runtime.Adapter,
 	deadline := time.Now().Add(within)
 	var last send.Classification
 	for time.Now().Before(deadline) {
-		screen, err := rt.ReadAgentStyled(ctx, handle, send.DefaultLines)
+		profile, err := catalog.Default().Lookup(kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		screen, err := rt.ReadAgentStyled(ctx, handle, profile.Screen().ReadSource(), send.DefaultLines)
 		if err == nil {
-			if c, cerr := send.ClassifyComposer(kind, screen); cerr == nil {
-				last = c
-				if c.State == want {
-					return c
-				}
+			last = send.ClassifyComposer(profile.Screen(), screen)
+			if last.State == want {
+				return last
 			}
 		}
 		select {

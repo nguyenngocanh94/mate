@@ -145,12 +145,12 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 		t.Fatalf("second start did not resume %s: resumed=%v note=%q", ref, resumed.Resumed, resumed.ResumeNote)
 	}
 	rh := lab.handle(resumed)
-	pane, err := lab.rt.ReadAgent(ctx, rh, 40)
+	pane, err := lab.rt.ReadAgent(ctx, rh, harness.ReadRecentUnwrapped, 40)
 	if err != nil {
 		t.Fatalf("ReadAgent after resume: %v", err)
 	}
-	if class, err := harness.ClassifyStartupScreen(harness.KindCodex, pane); err != nil || class != harness.StartupScreenReady {
-		t.Fatalf("resumed pane classifies as %q (%v); pane:\n%s", class, err, pane)
+	if class := (harness.Codex{}).Screen().ClassifyStartup(pane); class != harness.StartupScreenReady {
+		t.Fatalf("resumed pane classifies as %q; pane:\n%s", class, pane)
 	}
 
 	before := len(codexAnswers(t, rollout))
@@ -259,19 +259,16 @@ func settleCodexLab(t *testing.T, ctx context.Context, lab liveLab, h runtime.Ag
 	deadline := time.Now().Add(90 * time.Second)
 	sawReview := false
 	for {
-		screen, err := lab.rt.ReadAgent(ctx, h, 40)
+		screen, err := lab.rt.ReadAgent(ctx, h, harness.ReadRecentUnwrapped, 40)
 		if err != nil {
 			t.Fatalf("ReadAgent: %v", err)
 		}
-		class, err := harness.ClassifyStartupScreen(harness.KindCodex, screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		class := harness.Codex{}.Screen().ClassifyStartup(screen)
 		switch {
 		case class == harness.StartupScreenReady:
 			return
 		case class == harness.StartupScreenTrustDialog:
-			answer, err := harness.TrustDialogAnswerFor(harness.KindCodex)
+			answer, err := harness.Codex{}.Screen().StartupAnswer(harness.StartupScreenTrustDialog)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -289,7 +286,7 @@ func settleCodexLab(t *testing.T, ctx context.Context, lab liveLab, h runtime.Ag
 				t.Fatal(err)
 			}
 			time.Sleep(500 * time.Millisecond)
-			screen, err = lab.rt.ReadAgent(ctx, h, 40)
+			screen, err = lab.rt.ReadAgent(ctx, h, harness.ReadRecentUnwrapped, 40)
 			if err != nil {
 				t.Fatal(err)
 			}

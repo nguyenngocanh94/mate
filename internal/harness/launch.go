@@ -146,6 +146,9 @@ type LaunchPlan struct {
 	// resolved, recorded on the spec.
 	CodexHome       string
 	ClaudeConfigDir string
+	// Screen is the profile the launched pane is read with. Every plan
+	// names one, so whoever starts the pane knows what it looks like.
+	Screen ScreenProfile
 	// CheckContext is the harness's own check that the context is
 	// deliverable. It runs after the generic checks, here and again each
 	// time ValidateRequiredContext runs, so the runtime boundary repeats it.
@@ -158,6 +161,10 @@ type LaunchPlan struct {
 // required context that exists, fits and is what the argv names - and then
 // the harness's CheckContext, and returns no spec when any of them fails.
 func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
+	if p.Screen == nil {
+		return LaunchSpec{}, observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("harness %q launch names no screen profile; mate refuses a pane it cannot read", p.RuntimeKind))
+	}
 	env, err := filterLaunchEnv(p.Env)
 	if err != nil {
 		return LaunchSpec{}, err
@@ -182,6 +189,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		claudeConfigDir: p.ClaudeConfigDir,
 		unsetEnv:        append([]string(nil), p.UnsetEnv...),
 		checkContext:    p.CheckContext,
+		screen:          p.Screen,
 	}
 	if len(p.ContextFiles) == 0 {
 		s.contextFiles = nil

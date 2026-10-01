@@ -266,7 +266,7 @@ func TestNewLaunchSpecRunsTheHarnessCheckEachTime(t *testing.T) {
 	path := writeAbs(t, cwd, "context.md", "you are a crew")
 	refuse := false
 	plan := LaunchPlan{
-		RuntimeKind: "fake", Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile,
+		RuntimeKind: "fake", Screen: claudeScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile,
 		Args: []string{"--append-system-prompt-file", path}, ContextPath: path, ContextRequired: true,
 		CheckContext: func(LaunchSpec) error {
 			if refuse {
@@ -296,13 +296,30 @@ func TestNewLaunchSpecRunsTheHarnessCheckEachTime(t *testing.T) {
 // The cwd is absolute on every launch, not only one whose context is
 // required: a relative one would resolve against the Mate process cwd.
 func TestNewLaunchSpecRefusesARelativeCwdWithoutRequiredContext(t *testing.T) {
-	plan := LaunchPlan{RuntimeKind: "claude", Cwd: "rel/dir", Delivery: DeliveryCwdManual, Args: []string{"--x"}}
+	plan := LaunchPlan{RuntimeKind: "claude", Screen: claudeScreen{}, Cwd: "rel/dir", Delivery: DeliveryCwdManual, Args: []string{"--x"}}
 	if spec, err := NewLaunchSpec(plan); err == nil {
 		t.Fatalf("NewLaunchSpec accepted cwd %q: %+v", plan.Cwd, spec)
 	}
 	plan.Cwd = t.TempDir()
 	if _, err := NewLaunchSpec(plan); err != nil {
 		t.Fatalf("NewLaunchSpec refused an absolute cwd: %v", err)
+	}
+}
+
+// A launch names the screen profile its pane is read with; a plan without
+// one is refused rather than started into a pane nobody can classify.
+func TestNewLaunchSpecRefusesAPlanWithoutAScreen(t *testing.T) {
+	plan := LaunchPlan{RuntimeKind: "claude", Cwd: t.TempDir(), Delivery: DeliveryCwdManual, Args: []string{"--x"}}
+	if spec, err := NewLaunchSpec(plan); err == nil {
+		t.Fatalf("NewLaunchSpec accepted a plan with no screen profile: %+v", spec)
+	}
+	plan.Screen = claudeScreen{}
+	spec, err := NewLaunchSpec(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Screen() != (claudeScreen{}) {
+		t.Fatalf("spec screen = %#v, want the plan's", spec.Screen())
 	}
 }
 

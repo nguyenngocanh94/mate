@@ -122,10 +122,14 @@ type LaunchSpec struct {
 	claudeConfigDir string
 	unsetEnv        []string
 	checkContext    func(LaunchSpec) error
+	screen          ScreenProfile
 }
 
 // Kind is the harness kind string (claude, codex).
 func (s LaunchSpec) Kind() string { return s.kind }
+
+// Screen is the profile the launched pane is read with.
+func (s LaunchSpec) Screen() ScreenProfile { return s.screen }
 
 // Args returns a copy of the extra harness argv (placed after `agent start --`).
 func (s LaunchSpec) Args() []string {

@@ -111,7 +111,7 @@ func TestFakeSendKeysRecordsPressesAndRunsTheScreenHook(t *testing.T) {
 	if err := f.SendKeys(context.Background(), h, []string{"1"}); err != nil {
 		t.Fatal(err)
 	}
-	screen, err := f.ReadAgent(context.Background(), h, 10)
+	screen, err := f.ReadAgent(context.Background(), h, harness.ReadRecentUnwrapped, 10)
 	if err != nil || screen != "selected" {
 		t.Fatalf("screen after hook = %q err=%v", screen, err)
 	}
@@ -137,7 +137,7 @@ func TestFakeStartedAgentShowsAReadyScreenByDefault(t *testing.T) {
 	f := runtime.NewFake()
 	launch := claudeLaunch(t)
 	h := startFakeAgent(t, f, launch)
-	screen, err := f.ReadAgent(context.Background(), h, 40)
+	screen, err := f.ReadAgent(context.Background(), h, harness.ReadRecentUnwrapped, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestFakeStartedAgentShowsAReadyScreenByDefault(t *testing.T) {
 	f2 := runtime.NewFake()
 	f2.NextStartupScreen = "Something else entirely"
 	h2 := startFakeAgent(t, f2, launch)
-	if screen, _ := f2.ReadAgent(context.Background(), h2, 40); screen != "Something else entirely" {
+	if screen, _ := f2.ReadAgent(context.Background(), h2, harness.ReadRecentUnwrapped, 40); screen != "Something else entirely" {
 		t.Fatalf("scripted screen = %q", screen)
 	}
 	if f2.NextStartupScreen != "" {

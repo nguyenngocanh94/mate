@@ -176,7 +176,7 @@ func TestLiveHerdrClaudeStopHookFiresWithRealPayload(t *testing.T) {
 	// default configuration. StartAgent must clear the inherited value in this
 	// pane before Claude resolves its account; otherwise the child lands on the
 	// pre-login screen and no Stop hook can fire.
-	if text, readErr := rt.ReadAgent(ctx, agent, 60); readErr == nil {
+	if text, readErr := rt.ReadAgent(ctx, agent, harness.ReadRecentUnwrapped, 60); readErr == nil {
 		lower := strings.ToLower(text)
 		if strings.Contains(lower, "select login method") || strings.Contains(lower, "not logged in") {
 			t.Fatalf("Claude retained the stale Herdr CLAUDE_CONFIG_DIR and reached the pre-login screen; pane:\n%s", text)
@@ -194,7 +194,7 @@ func TestLiveHerdrClaudeStopHookFiresWithRealPayload(t *testing.T) {
 		if err == nil && len(strings.TrimSpace(string(markerBytes))) > 0 {
 			break
 		}
-		if text, readErr := rt.ReadAgent(ctx, agent, 60); readErr == nil {
+		if text, readErr := rt.ReadAgent(ctx, agent, harness.ReadRecentUnwrapped, 60); readErr == nil {
 			lower := strings.ToLower(text)
 			if strings.Contains(lower, "select login method") || strings.Contains(lower, "not logged in") {
 				t.Fatalf("Claude retained the stale Herdr CLAUDE_CONFIG_DIR and reached the pre-login screen; pane:\n%s", text)
@@ -276,7 +276,7 @@ func waitForAssistantAnswer(ctx context.Context, rt *runtime.Herdr, agent runtim
 	deadline := time.Now().Add(within)
 	var lastErr error
 	for {
-		if text, err := rt.ReadAgent(ctx, agent, 60); err == nil {
+		if text, err := rt.ReadAgent(ctx, agent, harness.ReadRecentUnwrapped, 60); err == nil {
 			for _, line := range strings.Split(text, "\n") {
 				if !strings.Contains(line, claudeAnswerMarker) {
 					continue

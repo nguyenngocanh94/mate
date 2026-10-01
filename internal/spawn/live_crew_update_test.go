@@ -117,7 +117,7 @@ func TestLiveSpawnCrewCodexSkipsUpdateDialog(t *testing.T) {
 		Kind:    harness.KindCodex,
 	}
 	status := waitForStatus(t, ctx, w, "u1", "wait-mate:", 150*time.Second, func() string {
-		screen, readErr := rt.ReadAgent(ctx, handle, 40)
+		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}

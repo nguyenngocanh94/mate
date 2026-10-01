@@ -56,7 +56,7 @@ func (Codex) Info() Info {
 func (c Codex) Launcher() Launcher { return c }
 
 // Screen implements Profile.
-func (Codex) Screen() ScreenProfile { return kindScreen(KindCodex) }
+func (Codex) Screen() ScreenProfile { return codexScreen{} }
 
 // Capabilities implements Profile.
 func (Codex) Capabilities() Capabilities {
@@ -180,6 +180,7 @@ func (c Codex) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	fallback := append([]string(nil), c.FallbackFilenames...)
 	return NewLaunchSpec(LaunchPlan{
 		RuntimeKind:     c.Info().RuntimeKind,
+		Screen:          c.Screen(),
 		Args:            args,
 		Cwd:             cwd,
 		Env:             envInput,

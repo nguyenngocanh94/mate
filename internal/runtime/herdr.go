@@ -1142,43 +1142,55 @@ func (h *Herdr) InspectAgent(ctx context.Context, handle AgentHandle) (ObservedA
 
 // ReadAgent implements Adapter. Herdr owns the bounded snapshot; mate never
 // reads a pane directly.
-func (h *Herdr) ReadAgent(ctx context.Context, handle AgentHandle, lines int) (string, error) {
+func (h *Herdr) ReadAgent(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	if strings.TrimSpace(handle.Session.Name) == "" || strings.TrimSpace(handle.Name) == "" {
 		return "", observability.NewError(observability.CodeUsage, "agent read requires a named session and agent")
 	}
 	if lines <= 0 {
 		return "", observability.NewError(observability.CodeUsage, "agent read lines must be positive")
 	}
-	return h.readAgent(ctx, handle, lines, "text")
+	return h.readAgent(ctx, handle, source, lines, "text")
 }
 
 // ReadAgentStyled implements Adapter as the same read in `--format ansi`.
-func (h *Herdr) ReadAgentStyled(ctx context.Context, handle AgentHandle, lines int) (string, error) {
+func (h *Herdr) ReadAgentStyled(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	if strings.TrimSpace(handle.Session.Name) == "" || strings.TrimSpace(handle.Name) == "" {
 		return "", observability.NewError(observability.CodeUsage, "agent read requires a named session and agent")
 	}
 	if lines <= 0 {
 		return "", observability.NewError(observability.CodeUsage, "agent read lines must be positive")
 	}
-	return h.readAgent(ctx, handle, lines, "ansi")
+	return h.readAgent(ctx, handle, source, lines, "ansi")
 }
 
-// readAgent reads the agent's recent output unwrapped, or - while Herdr
-// refuses that because a harness drawn on the alternate screen is working
-// (HerdrAgentNotIdle, which is Codex for its whole turn) - the screen as it
-// is drawn, which is the read that refusal itself names. The visible screen
-// is the bottom of the same pane, rows wrapped at the pane width; it still
-// carries the composer and the in-flight line a caller decides from.
-func (h *Herdr) readAgent(ctx context.Context, handle AgentHandle, lines int, format string) (string, error) {
-	read := func(source string) (process.Result, error) {
+// readAgent reads the agent's pane through the harness's source.
+//
+// A recent-unwrapped read falls back, while Herdr refuses it because a
+// harness drawn on the alternate screen is working (HerdrAgentNotIdle, which
+// is Codex for its whole turn), to the screen as it is drawn, which is the
+// read that refusal itself names. The visible screen is the bottom of the
+// same pane, rows wrapped at the pane width; it still carries the composer
+// and the in-flight line a caller decides from.
+func (h *Herdr) readAgent(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int, format string) (string, error) {
+	read := func(source harness.ReadSource) (process.Result, error) {
 		return h.run(ctx, handle.Session.Name, []string{
-			"agent", "read", handle.Name, "--source", source,
+			"agent", "read", handle.Name, "--source", string(source),
 			"--lines", fmt.Sprintf("%d", lines), "--format", format,
 		})
 	}
-	res, err := read("recent-unwrapped")
-	if herdrCodeOf(err) == HerdrAgentNotIdle {
-		res, err = read("visible")
+	var res process.Result
+	var err error
+	switch source {
+	case harness.ReadRecentUnwrapped:
+		res, err = read(source)
+		if herdrCodeOf(err) == HerdrAgentNotIdle {
+			res, err = read(harness.ReadVisible)
+		}
+	case harness.ReadVisible:
+		res, err = read(source)
+	default:
+		return "", observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("agent read source %q is not one mate reads", source))
 	}
 	if err != nil {
 		return "", err

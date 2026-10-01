@@ -69,7 +69,7 @@ func peekCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, project,
 		return err
 	}
 	if resolved.AgentRecorded && resolved.SessionRunning {
-		screen, err := deps.Runtime.ReadAgent(ctx, resolved.Handle, lines)
+		screen, err := deps.Runtime.ReadAgent(ctx, resolved.Handle, resolved.Screen.ReadSource(), lines)
 		switch {
 		case err == nil:
 			fmt.Fprint(stdout, screen)

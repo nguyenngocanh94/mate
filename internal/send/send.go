@@ -77,13 +77,13 @@ var (
 // purpose: this package can read a pane, type, press keys and wait, and it
 // structurally cannot start, stop, attach or prompt anything.
 type Runtime interface {
-	ReadAgent(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
+	ReadAgent(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 	// ReadAgentStyled is the same snapshot with SGR attributes intact. The
 	// composer classifier needs them: a harness's own faint suggestion and
 	// a person's unsubmitted line are the same characters (classify.go's
 	// faintPlaceholder), and typing over the second is the mistake this
 	// package exists to prevent.
-	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
+	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 	SendText(ctx context.Context, handle runtime.AgentHandle, text string) error
 	SendKeys(ctx context.Context, handle runtime.AgentHandle, keys []string) error
 	WaitAgent(ctx context.Context, handle runtime.AgentHandle, until runtime.WaitCondition) (runtime.ObservedAgent, error)
@@ -211,9 +211,12 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if deps.Runtime == nil {
 		return report, observability.NewError(observability.CodeUsage, "send requires a runtime")
 	}
-	if _, err := deps.Harnesses.Lookup(kind); err != nil {
+	profile, err := deps.Harnesses.Lookup(kind)
+	if err != nil {
 		return report, err
 	}
+	screens := profile.Screen()
+	source := screens.ReadSource()
 	if strings.ContainsAny(text, "\r\n") {
 		return report, observability.NewError(observability.CodeUsage,
 			"send refuses a multi-line message: one line per send, long content goes in a file the agent is pointed at")
@@ -234,17 +237,14 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	}
 
 	// The styled read, not the plain one: see the Runtime interface above.
-	screen, err := deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
+	screen, err := deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
 	if err != nil {
 		return report, err
 	}
-	before, err := ClassifyComposer(kind, screen)
-	if err != nil {
-		return report, err
-	}
+	before := ClassifyComposer(screens, screen)
 	report.Before = before
 	report.Steps = append(report.Steps, Step{What: "classify", State: before.State, Evidence: before.Evidence})
-	if opts.ResumePending && (before.State != StatePending || !pendingMatches(kind, screen, payload)) {
+	if opts.ResumePending && (before.State != StatePending || !pendingMatches(screens, screen, payload)) {
 		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
 			"recorded send no longer matches the whole pending composer; inspect the pane, do not retype",
 			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
@@ -294,7 +294,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if opts.ResumePending {
 		// A human can edit during the settle interval. Do not submit the
 		// earlier snapshot's text without reading the composer again.
-		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
+		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
 		if err != nil {
 			return report, err
 		}
@@ -304,7 +304,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	// the composer, so retyping would submit it twice.
 	var after Classification
 	for attempt := 1; attempt <= opts.Retries; attempt++ {
-		if (attempt > 1 || opts.ResumePending) && !pendingMatches(kind, screen, payload) {
+		if (attempt > 1 || opts.ResumePending) && !pendingMatches(screens, screen, payload) {
 			return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
 				"pending composer changed or cannot be fully read; no further Enter sent",
 				map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
@@ -316,14 +316,11 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		if err := sleep(ctx, deps, opts.RetrySleep); err != nil {
 			return report, err
 		}
-		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, opts.Lines)
+		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
 		if err != nil {
 			return report, err
 		}
-		after, err = ClassifyComposer(kind, screen)
-		if err != nil {
-			return report, err
-		}
+		after = ClassifyComposer(screens, screen)
 		report.After = after
 		report.Steps = append(report.Steps, Step{
 			What:     "enter",

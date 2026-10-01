@@ -296,9 +296,9 @@ func TestWatchChecksTheSessionWithNoCrews(t *testing.T) {
 	ws := newWorkspace(t)
 	w := watch.New(ws, watch.Deps{
 		Runtime: runtime.NewFake(),
-		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.Kind, error) {
+		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.ScreenProfile, error) {
 			t.Fatal("a workspace with no open crews asked for a crew handle")
-			return runtime.AgentHandle{}, "", nil
+			return runtime.AgentHandle{}, nil, nil
 		},
 		Session: func(context.Context) error {
 			return observability.NewError(observability.CodeRuntimeUnavailable, "no herdr server is running")

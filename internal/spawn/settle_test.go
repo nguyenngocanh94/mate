@@ -67,13 +67,10 @@ func TestStartMateAnswersTheClaudeTrustDialog(t *testing.T) {
 	if len(pressedOn) != 2 {
 		t.Fatalf("recorded %d presses, want 2", len(pressedOn))
 	}
-	if selected, _ := harness.TrustDialogAcceptSelected(harness.KindClaude, pressedOn[0]); selected {
+	if selected := (harness.Claude{}).Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[0]); selected {
 		t.Fatal("the fixture must start with the accept option NOT selected")
 	}
-	selected, err := harness.TrustDialogAcceptSelected(harness.KindClaude, pressedOn[1])
-	if err != nil {
-		t.Fatal(err)
-	}
+	selected := harness.Claude{}.Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[1])
 	if !selected {
 		t.Fatal("enter was sent while the highlight was not on the accept option")
 	}
@@ -256,10 +253,7 @@ func TestStartMateSkipsTheCodexUpdateDialogThenReachesTheComposer(t *testing.T) 
 	if len(on) != 3 {
 		t.Fatalf("recorded %d presses, want 3", len(on))
 	}
-	selected, err := harness.UpdateDialogSkipSelected(harness.KindCodex, on[2])
-	if err != nil {
-		t.Fatal(err)
-	}
+	selected := harness.Codex{}.Screen().StartupTargetSelected(harness.StartupScreenUpdateDialog, on[2])
 	if !selected {
 		t.Fatal("enter was sent while the highlight was not on \"3. Skip until next version\"")
 	}

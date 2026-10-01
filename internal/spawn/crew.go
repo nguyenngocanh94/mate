@@ -448,7 +448,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	// document typed into a TUI composer is fragile (a blank line submits,
 	// a leading slash opens a command popup), and the file is already on
 	// disk where the harness can read it whole.
-	delivered, warning, tail, err := deliverBrief(ctx, deps, handle, briefPath, plan.kind)
+	delivered, warning, tail, err := deliverBrief(ctx, deps, handle, briefPath, plan.profile)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -858,13 +858,13 @@ func BriefPrompt(briefPath string) string {
 // A pane that stayed idle is reported as a warning with its screen tail, not
 // as a failure: the crew, its worktree and its meta are all real, and the
 // line can be re-sent.
-func deliverBrief(ctx context.Context, deps Deps, handle runtime.AgentHandle, briefPath string, kind harness.Kind) (delivered bool, warning, tail string, err error) {
-	return deliverPrompt(ctx, deps, handle, BriefPrompt(briefPath), kind)
+func deliverBrief(ctx context.Context, deps Deps, handle runtime.AgentHandle, briefPath string, profile harness.Profile) (delivered bool, warning, tail string, err error) {
+	return deliverPrompt(ctx, deps, handle, BriefPrompt(briefPath), profile)
 }
 
 // deliverPrompt is deliverBrief for any one-line prompt. A relaunch uses it
 // to carry a progress note with the same brief pointer.
-func deliverPrompt(ctx context.Context, deps Deps, handle runtime.AgentHandle, prompt string, kind harness.Kind) (delivered bool, warning, tail string, err error) {
+func deliverPrompt(ctx context.Context, deps Deps, handle runtime.AgentHandle, prompt string, profile harness.Profile) (delivered bool, warning, tail string, err error) {
 	if err := deps.Runtime.PromptAgent(ctx, handle, prompt); err != nil {
 		return false, "", "", err
 	}
@@ -875,13 +875,13 @@ func deliverPrompt(ctx context.Context, deps Deps, handle runtime.AgentHandle, p
 	if waitErr == nil {
 		return true, "", "", nil
 	}
-	screen, readErr := deps.Runtime.ReadAgent(ctx, handle, startupScreenLines)
+	screen, readErr := deps.Runtime.ReadAgent(ctx, handle, profile.Screen().ReadSource(), startupScreenLines)
 	if readErr != nil {
 		screen = "(pane not readable: " + readErr.Error() + ")"
 	}
 	tail = harness.StartupScreenTail(screen, startupErrorTailLines)
 	warning = fmt.Sprintf("brief may not have been delivered: after prompting %s the %s pane was still %s after %s",
-		handle.Name, kind, observed.Status, deps.briefDeliveryTimeout().Round(time.Millisecond))
+		handle.Name, profile.Kind(), observed.Status, deps.briefDeliveryTimeout().Round(time.Millisecond))
 	return false, warning, tail, nil
 }
 

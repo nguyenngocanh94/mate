@@ -7,8 +7,18 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
+
+// screenOf is the screen profile catalog.Default() registers for a kind.
+func screenOf(kind harness.Kind) harness.ScreenProfile {
+	profile, err := catalog.Default().Lookup(kind)
+	if err != nil {
+		panic(err)
+	}
+	return profile.Screen()
+}
 
 // capture loads one committed live capture. Every screen under
 // testdata/screens is the verbatim stdout of `herdr agent read --source
@@ -221,10 +231,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := send.ClassifyComposer(tc.kind, capture(t, tc.screen))
-			if err != nil {
-				t.Fatalf("ClassifyComposer: %v", err)
-			}
+			got := send.ClassifyComposer(screenOf(tc.kind), capture(t, tc.screen))
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
 			}
@@ -266,10 +273,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	if !strings.Contains(plain, "• Working (2s • esc to interrupt)") {
 		t.Fatal("the capture no longer holds the quoted Codex busy line this test is about")
 	}
-	got, err := send.ClassifyComposer(harness.KindClaude, styled)
-	if err != nil {
-		t.Fatalf("ClassifyComposer: %v", err)
-	}
+	got := send.ClassifyComposer(harness.Claude{}.Screen(), styled)
 	if got.State != send.StateEmpty || !strings.Contains(got.Evidence, "faint") {
 		t.Fatalf("state = %q (evidence %q), want empty: an idle Claude quoting a busy Codex is idle", got.State, got.Evidence)
 	}
@@ -277,7 +281,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	// A quoted Claude spinner - indented, as every quoted line is - is not
 	// this pane's spinner either.
 	quoted := strings.Replace(plain, "• Working (2s • esc to interrupt)", "✻ Pollinating…", 1)
-	if got, _ := send.ClassifyComposer(harness.KindClaude, quoted); got.State == send.StateBusy {
+	if got := send.ClassifyComposer(harness.Claude{}.Screen(), quoted); got.State == send.StateBusy {
 		t.Fatalf("a quoted, indented spinner classified busy (evidence %q)", got.Evidence)
 	}
 
@@ -286,7 +290,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	if own == plain {
 		t.Fatal("the capture no longer holds the finished line this test replaces")
 	}
-	if got, _ := send.ClassifyComposer(harness.KindClaude, own); got.State != send.StateBusy {
+	if got := send.ClassifyComposer(harness.Claude{}.Screen(), own); got.State != send.StateBusy {
 		t.Fatalf("the pane's own spinner classified %q, want busy", got.State)
 	}
 }
@@ -294,10 +298,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
 	styled := captureFile(t, "claude_ghost_suggestion.ansi")
 
-	got, err := send.ClassifyComposer(harness.KindClaude, styled)
-	if err != nil {
-		t.Fatalf("ClassifyComposer: %v", err)
-	}
+	got := send.ClassifyComposer(harness.Claude{}.Screen(), styled)
 	if got.State != send.StateEmpty {
 		t.Fatalf("state = %q, want empty (evidence %q, pending %q)", got.State, got.Evidence, got.Pending)
 	}
@@ -315,10 +316,7 @@ func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
 	if strings.Contains(plain, "\x1b") {
 		t.Fatalf("StripSGR left escape bytes in the screen:\n%q", plain)
 	}
-	blind, err := send.ClassifyComposer(harness.KindClaude, plain)
-	if err != nil {
-		t.Fatalf("ClassifyComposer on the plain screen: %v", err)
-	}
+	blind := send.ClassifyComposer(harness.Claude{}.Screen(), plain)
 	if blind.State != send.StatePending || blind.Pending != "Use checkout-express.html" {
 		t.Fatalf("the plain screen classifies %q/%q; without the attributes mate must assume the text is somebody's",
 			blind.State, blind.Pending)
@@ -334,10 +332,7 @@ func TestClassifyComposerKeepsTypedTextThatIsNotFaint(t *testing.T) {
 	// whose composer holds plain white text.
 	screen := rule + "\r\n❯ \x1b[0m\x1b[38;2;255;255;255mhalf typed\x1b[0m\r\n" + rule +
 		"\r\n  \x1b[0m\x1b[2mFable 5.1 · high | tok 0 in / 0 out\x1b[0m\r\n"
-	got, err := send.ClassifyComposer(harness.KindClaude, screen)
-	if err != nil {
-		t.Fatalf("ClassifyComposer: %v", err)
-	}
+	got := send.ClassifyComposer(harness.Claude{}.Screen(), screen)
 	if got.State != send.StatePending || got.Pending != "half typed" {
 		t.Fatalf("state = %q, pending = %q, want pending/half typed", got.State, got.Pending)
 	}
@@ -345,24 +340,9 @@ func TestClassifyComposerKeepsTypedTextThatIsNotFaint(t *testing.T) {
 	// And a composer holding both: one faint rune is not enough to make the
 	// whole line the harness's.
 	mixed := rule + "\r\n❯ \x1b[2mUse \x1b[22mthe classic page\x1b[0m\r\n" + rule + "\r\n"
-	got, err = send.ClassifyComposer(harness.KindClaude, mixed)
-	if err != nil {
-		t.Fatalf("ClassifyComposer: %v", err)
-	}
+	got = send.ClassifyComposer(harness.Claude{}.Screen(), mixed)
 	if got.State != send.StatePending {
 		t.Fatalf("state = %q, want pending: only a wholly faint line is a suggestion", got.State)
-	}
-}
-
-// TestClassifyComposerRefusesAnUnmeasuredHarness pins the fail-closed edge:
-// a kind with no measured profile is an error, not a hopeful verdict.
-func TestClassifyComposerRefusesAnUnmeasuredHarness(t *testing.T) {
-	got, err := send.ClassifyComposer(harness.Kind("pi"), "❯\n")
-	if err == nil {
-		t.Fatalf("classifying an unmeasured harness succeeded with %q", got.State)
-	}
-	if got.State != send.StateUnknown {
-		t.Fatalf("state on error = %q, want unknown", got.State)
 	}
 }
 
@@ -448,10 +428,7 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := send.ClassifyComposer(tc.kind, tc.screen)
-			if err != nil {
-				t.Fatalf("ClassifyComposer: %v", err)
-			}
+			got := send.ClassifyComposer(screenOf(tc.kind), tc.screen)
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
 			}
@@ -479,10 +456,7 @@ func TestClassifyCodexComposerIgnoresFooterHeight(t *testing.T) {
 		for i := 0; i < extra; i++ {
 			screen += "\n  some future footer line " + strings.Repeat("·", i+1)
 		}
-		got, err := send.ClassifyComposer(harness.KindCodex, screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := send.ClassifyComposer(harness.Codex{}.Screen(), screen)
 		if got.State != send.StateEmpty {
 			t.Fatalf("%d extra footer line(s): state = %q, want empty", extra, got.State)
 		}
@@ -516,10 +490,7 @@ func TestClassifyCodexComposerFailsClosedOnMenus(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := send.ClassifyComposer(harness.KindCodex, tc.screen)
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := send.ClassifyComposer(harness.Codex{}.Screen(), tc.screen)
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
 			}

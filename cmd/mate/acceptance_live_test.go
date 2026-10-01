@@ -286,7 +286,7 @@ func waitForMateReport(t *testing.T, ctx context.Context, w *store.Workspace, pr
 func acceptancePanes(ctx context.Context, rt runtime.Adapter, mate runtime.AgentHandle, w *store.Workspace, project string) string {
 	var b strings.Builder
 	b.WriteString("mate pane:\n")
-	if screen, err := rt.ReadAgent(ctx, mate, 60); err == nil {
+	if screen, err := rt.ReadAgent(ctx, mate, harness.ReadRecentUnwrapped, 60); err == nil {
 		b.WriteString(harness.StartupScreenTail(screen, 60))
 	} else {
 		fmt.Fprintf(&b, "(not readable: %v)", err)

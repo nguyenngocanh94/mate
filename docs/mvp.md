@@ -545,7 +545,7 @@ internal/facts/          `project facts`: chỉ metadata git, không mở file n
 internal/host/           the Console's sibling columns: WezTerm/Ghostty Layout (M10, M13)
 internal/panerun/        the program each column runs; swaps what it shows (M13)
 internal/runtime/        copy v1
-internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec); Claude và Codex hiện thực tại chỗ
+internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec, ScreenProfile: nguồn đọc pane, dialog startup, composer); Claude và Codex hiện thực tại chỗ
 internal/harness/catalog/ danh sách harness biên dịch sẵn và harness mặc định theo vai; chỉ binary import
 internal/process/        copy v1
 assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
@@ -896,6 +896,7 @@ Daemon xét mỗi `DefaultInterval` (90s), nên auto có thể về muộn tới
 
 Kèm theo (2026-09-26/27, đã xong): codex-cli 0.157.1 thêm dòng footer thứ hai (`? for shortcuts`, `⚠ 1 warning · f2 to view`) nên mọi `mate send` tới crew Codex rảnh bị từ chối là màn hình lạ; composer Codex giờ tìm theo cấu trúc (dòng `›` cuối, không có hàng menu `N. …` bên dưới), không đếm dòng footer.
 Herdr 0.8.2 từ chối `agent read --source recent-unwrapped` khi Codex đang chạy (`agent_not_idle`); `Herdr.readAgent` đọc lại bằng `--source visible`.
+Từ 2026-10-01 (phương án registry harness, PR 3) nguồn đọc là của `ScreenProfile` từng harness: Claude và Codex giữ `recent-unwrapped` kèm fallback đó, harness khai báo `visible` thì được đọc thẳng bằng `visible`.
 
 Sau M8: replay theo tốc độ cho content; skin tuỳ biến (`.mate/dashboard/`) nếu còn cần.
 

@@ -136,15 +136,12 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 		RawID:   "shop",
 		Kind:    harness.KindClaude,
 	}
-	pane, err := rt.ReadAgent(ctx, handle, 40)
+	pane, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 	if err != nil {
 		t.Fatalf("ReadAgent: %v", err)
 	}
 	t.Logf("pane after start:\n%s", harness.StartupScreenTail(pane, 12))
-	class, err := harness.ClassifyStartupScreen(harness.KindClaude, pane)
-	if err != nil {
-		t.Fatal(err)
-	}
+	class := harness.Claude{}.Screen().ClassifyStartup(pane)
 	if class != harness.StartupScreenReady {
 		t.Fatalf("pane classifies as %q, want the Claude composer", class)
 	}

@@ -167,14 +167,11 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 	if refused.Typed {
 		t.Fatal("the refused send typed into the pane anyway")
 	}
-	screen, err := rt.ReadAgent(ctx, handle, 40)
+	screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 	if err != nil {
 		t.Fatal(err)
 	}
-	still, err := send.ClassifyComposer(harness.KindClaude, screen)
-	if err != nil {
-		t.Fatal(err)
-	}
+	still := send.ClassifyComposer(harness.Claude{}.Screen(), screen)
 	if still.State != send.StatePending || still.Pending != halfTyped {
 		t.Fatalf("after the refusal the composer holds %q (%s), want exactly %q untouched", still.Pending, still.State, halfTyped)
 	}
@@ -200,7 +197,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 	deadline := time.Now().Add(60 * time.Second)
 	var last string
 	for time.Now().Before(deadline) {
-		last, err = rt.ReadAgent(ctx, handle, 40)
+		last, err = rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -242,14 +239,11 @@ func waitForComposer(ctx context.Context, t *testing.T, rt *runtime.Herdr, handl
 	deadline := time.Now().Add(2 * time.Minute)
 	var last send.Classification
 	for time.Now().Before(deadline) {
-		screen, err := rt.ReadAgent(ctx, handle, 40)
+		screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if err != nil {
 			t.Fatalf("ReadAgent: %v", err)
 		}
-		last, err = send.ClassifyComposer(handle.Kind, screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		last = send.ClassifyComposer(screenOf(handle.Kind), screen)
 		if last.State == want {
 			return
 		}

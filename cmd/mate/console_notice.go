@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/notice"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -100,18 +101,23 @@ func consoleNoticeAction(ws *store.Workspace, deps spawn.Deps, classifier notice
 			return "", err
 		}
 		var handle runtime.AgentHandle
+		var kind harness.Kind
 		switch {
 		case req.TargetKind == "mate" && req.Crew == "":
-			handle, _, err = spawn.MateHandle(ctx, fresh, deps, req.Target)
+			handle, kind, err = spawn.MateHandle(ctx, fresh, deps, req.Target)
 		case req.TargetKind == "crew" && req.Crew != "":
-			handle, _, err = spawn.CrewHandle(ctx, fresh, deps, req.Target, req.Crew)
+			handle, kind, err = spawn.CrewHandle(ctx, fresh, deps, req.Target, req.Crew)
 		default:
 			return "", errors.New("notice explanation needs a Mate or Crew")
 		}
 		if err != nil {
 			return "", err
 		}
-		screen, err := deps.Runtime.ReadAgentStyled(ctx, handle, notice.MaxLines)
+		screens, err := screenOf(deps, kind)
+		if err != nil {
+			return "", err
+		}
+		screen, err := deps.Runtime.ReadAgentStyled(ctx, handle, screens.ReadSource(), notice.MaxLines)
 		if err != nil {
 			return "", errors.New("cannot read terminal for notice explanation")
 		}

@@ -166,6 +166,9 @@ type resolvedCrew struct {
 	SessionRunning bool
 	Handle         runtime.AgentHandle
 	Kind           harness.Kind
+	// Screen is the harness's screen profile: how its pane is read and
+	// classified.
+	Screen harness.ScreenProfile
 }
 
 // resolveCrewHandle reads crews/<id>.meta and, when it names an agent,
@@ -188,6 +191,10 @@ func resolveCrewHandle(ctx context.Context, w *store.Workspace, deps spawn.Deps,
 	if err != nil {
 		return resolvedCrew{}, err
 	}
+	screens, err := screenOf(deps, kind)
+	if err != nil {
+		return resolvedCrew{}, err
+	}
 	spec, err := spawn.SessionSpec(deps, w)
 	if err != nil {
 		return resolvedCrew{}, err
@@ -207,7 +214,18 @@ func resolveCrewHandle(ctx context.Context, w *store.Workspace, deps spawn.Deps,
 		Label:       spawn.CrewTabLabelPrefix + crew,
 	}
 	handle := runtime.AgentHandle{Session: session, Name: agent, RawID: crew, Kind: kind, Tab: tab}
-	return resolvedCrew{AgentRecorded: true, SessionRunning: true, Handle: handle, Kind: kind}, nil
+	return resolvedCrew{AgentRecorded: true, SessionRunning: true, Handle: handle, Kind: kind, Screen: screens}, nil
+}
+
+// screenOf is the screen profile of a registered harness: every read of an
+// agent's pane goes through its source, and every verdict on it through its
+// layout.
+func screenOf(deps spawn.Deps, kind harness.Kind) (harness.ScreenProfile, error) {
+	profile, err := deps.Harnesses.Lookup(kind)
+	if err != nil {
+		return nil, err
+	}
+	return profile.Screen(), nil
 }
 
 // printSendRefusalDetails prints whatever pending text or screen tail a

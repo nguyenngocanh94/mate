@@ -105,8 +105,9 @@ type Fake struct {
 	OnSendText func(handle AgentHandle, text string)
 	// NextStartupScreen is what the pane of the next StartAgent shows when
 	// read, consumed by that one start. Empty means the harness's own empty
-	// composer (a clean start), which is what every launch that does not
-	// exercise a startup dialog expects to find.
+	// composer (a clean start), taken from the launch's screen profile
+	// (harness.ScreenProfile.ReadyScreen), which is what every launch that
+	// does not exercise a startup dialog expects to find.
 	NextStartupScreen string
 	seq               int
 }
@@ -386,7 +387,7 @@ func (f *Fake) StartAgent(_ context.Context, spec AgentStartSpec) (AgentHandle, 
 	screen := f.NextStartupScreen
 	f.NextStartupScreen = ""
 	if screen == "" {
-		screen = startupReadyScreen(spec.Kind())
+		screen = spec.Launch().Screen().ReadyScreen()
 	}
 	f.ReadOutputs[session.Name+"/"+spec.Name()] = screen
 	if f.StartErrAfterCreate != nil {
@@ -468,12 +469,16 @@ func (f *Fake) InspectAgent(ctx context.Context, handle AgentHandle) (ObservedAg
 }
 
 // ReadAgent implements Adapter.
-func (f *Fake) ReadAgent(_ context.Context, handle AgentHandle, lines int) (string, error) {
+func (f *Fake) ReadAgent(_ context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("ReadAgent")
 	if lines <= 0 {
 		return "", observability.NewError(observability.CodeUsage, "agent read lines must be positive")
+	}
+	if source != harness.ReadRecentUnwrapped && source != harness.ReadVisible {
+		return "", observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("agent read source %q is not one mate reads", source))
 	}
 	key := handle.Session.Name + "/" + handle.Name
 	f.ReadCalls = append(f.ReadCalls, key+":"+fmt.Sprint(lines))
@@ -490,17 +495,17 @@ func (f *Fake) ReadAgent(_ context.Context, handle AgentHandle, lines int) (stri
 // text, which is a screen with no attributes set rather than a screen whose
 // attributes were thrown away, so the styled read returns the same bytes
 // unless a test scripted a styled screen of its own with SetStyledOutput.
-func (f *Fake) ReadAgentStyled(ctx context.Context, handle AgentHandle, lines int) (string, error) {
+func (f *Fake) ReadAgentStyled(ctx context.Context, handle AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	f.mu.Lock()
 	styled, ok := f.StyledOutputs[handle.Session.Name+"/"+handle.Name]
 	f.mu.Unlock()
 	if ok {
-		if _, err := f.ReadAgent(ctx, handle, lines); err != nil {
+		if _, err := f.ReadAgent(ctx, handle, source, lines); err != nil {
 			return "", err
 		}
 		return styled, nil
 	}
-	return f.ReadAgent(ctx, handle, lines)
+	return f.ReadAgent(ctx, handle, source, lines)
 }
 
 // SetStyledOutput scripts what ReadAgentStyled returns for one agent, for a
@@ -512,20 +517,6 @@ func (f *Fake) SetStyledOutput(handle AgentHandle, screen string) {
 		f.StyledOutputs = map[string]string{}
 	}
 	f.StyledOutputs[handle.Session.Name+"/"+handle.Name] = screen
-}
-
-// startupReadyScreen is the smallest snapshot harness.ClassifyStartupScreen
-// calls ready for a kind: a fake agent that started cleanly shows its empty
-// composer. Kinds with no profile show nothing.
-func startupReadyScreen(kind harness.Kind) string {
-	switch kind {
-	case harness.KindClaude:
-		return "──────\n" + harness.ClaudeComposerMarker + "\n──────\n"
-	case harness.KindCodex:
-		return "› " + harness.CodexComposerPlaceholder + "\n"
-	default:
-		return ""
-	}
 }
 
 // SetReadOutput scripts what ReadAgent returns for one agent.
