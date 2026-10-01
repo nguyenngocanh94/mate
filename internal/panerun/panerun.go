@@ -101,6 +101,9 @@ type Server struct {
 // Serve listens on socket until ctx ends, starting each Command it is sent
 // in place of the last. A stale socket file is replaced.
 func (s *Server) Serve(ctx context.Context, socket string) error {
+	if err := checkSocketPath(socket); err != nil {
+		return err
+	}
 	_ = os.Remove(socket)
 	ln, err := net.Listen("unix", socket)
 	if err != nil {
@@ -378,6 +381,9 @@ func sameCommand(a, b Command) bool {
 // pane - is ErrGone.
 func Send(ctx context.Context, socket string, cmd Command) error {
 	if err := cmd.valid(); err != nil {
+		return err
+	}
+	if err := checkSocketPath(socket); err != nil {
 		return err
 	}
 	var d net.Dialer

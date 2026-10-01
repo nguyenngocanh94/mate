@@ -132,6 +132,31 @@ func TestCodexTrustLinkedWorktreeInheritsTheMainCheckout(t *testing.T) {
 	}
 }
 
+// A Crew's worktree does not exist before `git worktree add`, and the
+// workspace it will be added under may itself be a checkout. Walking up from
+// the missing path stopped at that enclosing checkout and reported its trust
+// instead of the project repository's (found 2026-10-01 with TMPDIR inside a
+// git checkout).
+func TestCodexTrustPlannedWorktreeIgnoresAnEnclosingCheckout(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	workspace := resolvedTempDir(t)
+	mkGitDir(t, workspace)
+	repo := filepath.Join(workspace, "shop")
+	mkGitDir(t, repo)
+	writeCodexConfig(t, home, "[projects."+tomlKey(workspace)+"]\ntrust_level = \"untrusted\"\n"+
+		"[projects."+tomlKey(repo)+"]\ntrust_level = \"trusted\"\n")
+
+	planned := filepath.Join(workspace, ".worktrees", "shop-crew")
+	got, err := CheckCodexProjectTrust(CodexTrustRequest{Cwd: planned, RepoPath: repo, CodexHome: home})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TrustRoot != repo || got.Level != CodexTrustTrusted || got.TrustKey != repo {
+		t.Fatalf("planned worktree report = %+v, want the project repository %s", got, repo)
+	}
+}
+
 func TestCodexTrustReportsUntrustedNoneAndMissingConfig(t *testing.T) {
 	t.Parallel()
 	repo := resolvedTempDir(t)

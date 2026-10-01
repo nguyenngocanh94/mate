@@ -30,6 +30,21 @@ type pendingEvent struct {
 	RefPath    string
 	RefOffset  int64
 	CauseDedup string
+	// ClockPath and ClockOffset, when set, are the source byte whose
+	// timestamp this fact borrowed: a status line has no time of its own and
+	// is dated by the transcript command that echoed it. The fact sorts as if
+	// read there, so it lands right after that command whatever the two
+	// files are called.
+	ClockPath   string
+	ClockOffset int64
+}
+
+// sortRef is the source byte that orders e among facts of the same instant.
+func (e pendingEvent) sortRef() (string, int64) {
+	if e.ClockPath != "" {
+		return e.ClockPath, e.ClockOffset
+	}
+	return e.RefPath, e.RefOffset
 }
 
 type pendingTurn struct {
@@ -179,20 +194,23 @@ func (b *batch) cursor(path string, at int64) { b.cursors[path] = at }
 
 // sortEvents puts a pass's events into the one order a rebuild will also
 // produce. Time first, because that is the story's order; then the source
-// byte the fact came from, which is exact and total within one file; then the
-// kind and the natural key, which break the remaining ties between facts read
-// from different files in the same instant.
+// byte the fact came from (or borrowed its time from, see ClockPath), which
+// is exact and total within one file; then the kind and the natural key,
+// which break the remaining ties between facts read from different files in
+// the same instant.
 func (b *batch) sortEvents() {
 	sort.SliceStable(b.events, func(i, j int) bool {
 		a, c := b.events[i], b.events[j]
 		if !a.At.Equal(c.At) {
 			return a.At.Before(c.At)
 		}
-		if a.RefPath != c.RefPath {
-			return a.RefPath < c.RefPath
+		pathA, offA := a.sortRef()
+		pathC, offC := c.sortRef()
+		if pathA != pathC {
+			return pathA < pathC
 		}
-		if a.RefOffset != c.RefOffset {
-			return a.RefOffset < c.RefOffset
+		if offA != offC {
+			return offA < offC
 		}
 		if rankA, rankC := kindRank(a.Kind), kindRank(c.Kind); rankA != rankC {
 			return rankA < rankC
@@ -204,11 +222,12 @@ func (b *batch) sortEvents() {
 	})
 }
 
-// kindRank orders two facts read from the same byte of the same file. Only
+// kindRank orders two facts that sort at the same byte of the same file. Only
 // that case reaches it, and in that case alphabetical order would tell the
 // story backwards: a crew's `question.asked` and the `status.appended` that
 // carries it share a line, and the question is what the line says, not what
-// happened before it was written.
+// happened before it was written. A status line dated by the command that
+// echoed it sorts at that command's byte too, and the command ran first.
 func kindRank(kind string) int {
 	switch kind {
 	case KindTurnStarted:

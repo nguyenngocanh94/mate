@@ -251,7 +251,7 @@ func TestCodexAcceptsChainUnderBudget(t *testing.T) {
 
 func TestCodexWithoutGitDoesNotWalkParents(t *testing.T) {
 	t.Parallel()
-	parent := t.TempDir()
+	parent := noGitTempDir(t)
 	cwd := filepath.Join(parent, "proj")
 	if err := os.Mkdir(cwd, 0o755); err != nil {
 		t.Fatal(err)
@@ -273,7 +273,7 @@ func TestCodexWithoutGitDoesNotWalkParents(t *testing.T) {
 
 func TestCodexOverrideTakesPrecedenceOverBaseAtSameDir(t *testing.T) {
 	t.Parallel()
-	cwd := t.TempDir()
+	cwd := noGitTempDir(t)
 	if err := os.WriteFile(filepath.Join(cwd, CodexBaseName), []byte("BASE"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestCodexRelativeCwdRejected(t *testing.T) {
 
 func TestCodexFallbackFilenamesCannotEscapeDir(t *testing.T) {
 	t.Parallel()
-	cwd := t.TempDir()
+	cwd := noGitTempDir(t)
 	if err := os.WriteFile(CodexInstructionPath(cwd), []byte("LOCAL"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestCodexFallbackFilenamesCannotEscapeDir(t *testing.T) {
 func TestCodexGlobalHomeIsPrefixedWhenAbsolute(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
-	cwd := t.TempDir()
+	cwd := noGitTempDir(t)
 	if err := os.WriteFile(filepath.Join(home, CodexOverrideName), []byte("GLOBAL"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -343,6 +343,48 @@ func TestCodexGlobalHomeIsPrefixedWhenAbsolute(t *testing.T) {
 	}
 	if len(chain.Project) != 1 || string(chain.Project[0].Bytes) != "LOCAL" {
 		t.Fatalf("project chain = %+v", chain.Project)
+	}
+}
+
+// noGitTempDir is a fresh directory with no .git entry in it or in any
+// ancestor: what a test means by "without git", since Codex walks up to the
+// nearest .git and reads every AGENTS.md on the way. t.TempDir lives under
+// TMPDIR, which may itself sit inside a checkout, so that case gets a
+// directory under /tmp instead, and a machine with neither fails saying so
+// rather than letting a stranger's AGENTS.md into the chain.
+func noGitTempDir(t *testing.T) string {
+	t.Helper()
+	dir := resolvedTempDir(t)
+	enclosing := nearestDotGitAbove(dir)
+	if enclosing == "" {
+		return dir
+	}
+	fallback, err := os.MkdirTemp("/tmp", "mate-nogit-")
+	if err != nil {
+		t.Fatalf("TMPDIR is inside the checkout at %s and /tmp is unusable: %v", enclosing, err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(fallback) })
+	if fallback, err = filepath.EvalSymlinks(fallback); err != nil {
+		t.Fatal(err)
+	}
+	if outer := nearestDotGitAbove(fallback); outer != "" {
+		t.Fatalf("no directory outside a git checkout: TMPDIR is inside %s and /tmp inside %s", enclosing, outer)
+	}
+	return fallback
+}
+
+// nearestDotGitAbove is the closest directory at or above dir holding a .git
+// entry of any kind, or "".
+func nearestDotGitAbove(dir string) string {
+	for {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
 	}
 }
 

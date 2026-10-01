@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -822,6 +823,13 @@ func ClassifyClaudeTool(name string) CommandClass {
 // adoption must still validate the file's owner and provider session id (ADR
 // 0016, "Unproven": correctness does not depend on the slug when the validated
 // Stop path/session id identifies the file).
+//
+// A slug longer than claudeSlugMax is cut to that length and suffixed with
+// '-' and a hash of the whole cwd, so a deep path still fits in one directory
+// name (read from claude-code 2.1.286's bundle, where the same rule names its
+// cache directories; TestLiveClaudeProjectSlugOfALongCwd measures it on a
+// real CLI). Without the cut a long cwd names a directory no filesystem can
+// hold.
 func ClaudeProjectSlug(cwd string) string {
 	units := utf16.Encode([]rune(cwd))
 	var b strings.Builder
@@ -833,7 +841,31 @@ func ClaudeProjectSlug(cwd string) string {
 		}
 		b.WriteByte('-')
 	}
-	return b.String()
+	slug := b.String()
+	if len(slug) <= claudeSlugMax {
+		return slug
+	}
+	// The slug is ASCII, one byte per UTF-16 code unit, so a byte cut is
+	// the CLI's code-unit cut.
+	return slug[:claudeSlugMax] + "-" + strconv.FormatInt(claudeSlugHash(units), 36)
+}
+
+// claudeSlugMax is the longest slug Claude Code uses whole.
+const claudeSlugMax = 200
+
+// claudeSlugHash is the CLI's hash of a long cwd: Java's String.hashCode
+// over the UTF-16 code units, in 32-bit two's complement, then made
+// non-negative the way JavaScript's Math.abs does (so -2^31 stays 2^31).
+func claudeSlugHash(units []uint16) int64 {
+	var h int32
+	for _, u := range units {
+		h = h*31 + int32(u)
+	}
+	v := int64(h)
+	if v < 0 {
+		v = -v
+	}
+	return v
 }
 
 // ClaudeTranscriptFileName is the basename of a session's transcript:

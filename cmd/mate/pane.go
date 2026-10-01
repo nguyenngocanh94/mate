@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -60,11 +59,9 @@ func cmdPane(args []string, stdout, stderr io.Writer) error {
 		}
 	}()
 	s := &panerun.Server{Idle: idle, Owner: *owner, Term: paneTerminal(), Occupants: ttyOccupants(os.Getpid())}
-	if err := s.Serve(ctx, *socket); err != nil {
-		fmt.Fprintln(stderr, err)
-		return err
-	}
-	return nil
+	// main prints the error once, prefixed; printing it here as well put it
+	// on the pane twice.
+	return s.Serve(ctx, *socket)
 }
 
 // paneTerminal is this process's tty, with the modes it started in saved

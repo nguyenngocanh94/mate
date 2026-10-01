@@ -236,7 +236,7 @@ func (l layoutCounter) Close(_ context.Context, roles ...string) error {
 
 func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "mc")
+	dir, err := panerun.SocketDir("mc", "stage.sock", "review.sock", "absent.sock")
 	if err != nil {
 		t.Fatal(err)
 	}

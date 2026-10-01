@@ -49,7 +49,7 @@ func startServer(t *testing.T) (string, *capture, *atomic.Int32) {
 	}()
 	var restores atomic.Int32
 	// A short path: a unix socket path is limited to about 100 bytes.
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestARefusalComesBackToTheSender(t *testing.T) {
 }
 
 func TestSendToAClosedPaneIsErrGone(t *testing.T) {
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestSendToAClosedPaneIsErrGone(t *testing.T) {
 // An exit request ends the runner and its child: the Console closing its
 // columns.
 func TestExitEndsTheRunnerAndItsChild(t *testing.T) {
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestExitEndsTheRunnerAndItsChild(t *testing.T) {
 
 // A runner whose Console is gone ends by itself.
 func TestTheRunnerEndsWhenItsConsoleIsGone(t *testing.T) {
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestTheRunnerEndsWhenItsConsoleIsGone(t *testing.T) {
 // too, the same command is still a no-op meanwhile, and a new command ends
 // the viewer before it starts.
 func TestWhatAChildLeftOnTheTerminalIsPartOfTheColumn(t *testing.T) {
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
 // The exit reply comes only once the child is gone: whoever closes the
 // pane next closes an empty one.
 func TestExitRepliesAfterTheChildIsGone(t *testing.T) {
-	dir, err := os.MkdirTemp("", "pr")
+	dir, err := SocketDir("pr", "none.sock")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -59,6 +59,7 @@ func TestConsoleNewProjectRefusalsMatchTheCLI(t *testing.T) {
 	if err := os.MkdirAll(plain, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	outsideAnyCheckout(t, w.Root())
 	for _, tc := range []struct{ repo, want string }{
 		{"plain", "not a git repository"},
 		{"missing", "no such file"},
