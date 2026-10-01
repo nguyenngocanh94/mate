@@ -1,6 +1,7 @@
 package console
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -180,5 +181,52 @@ func TestTheModeEntryNamesTheModeItFlipsTo(t *testing.T) {
 	m, _ = send(t, m, key("a"))
 	if e := actEntry(t, m, "m"); e.label != "Mode → auto" || !e.enabled {
 		t.Fatalf("mode entry on a manual Project = %+v", e)
+	}
+}
+
+// The picker starts from the workspace's own default Mate harness
+// (workspace.yaml's `mate_harness`, carried on the snapshot): it is listed
+// first and the cursor starts on it, so Enter alone creates the Mate the
+// workspace is configured for. A workspace that names no known kind keeps
+// the built-in order.
+func TestTheHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		def    query.HarnessKind
+		golden string
+		want   []query.HarnessKind
+	}{
+		{"claude", query.HarnessClaude, "harness-picker-claude-default-40x36", []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}},
+		{"codex", query.HarnessCodex, "harness-picker-codex-default-40x36", []query.HarnessKind{query.HarnessCodex, query.HarnessClaude}},
+		{"none", "", "", []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tree := actMateTree(absentMate("this Project has no Mate"), actMateCaps(true, false, false))
+			tree.Workspace.Value.MateHarness = tc.def
+			m, got := actRunner(t, tree, "Mate created", nil)
+			m, _ = send(t, m, key("enter"))
+			m, _ = send(t, m, key("s"))
+			if !m.harnessPick {
+				t.Fatal("setup: s did not open the harness picker")
+			}
+			if order := m.harnessOrder(); !slices.Equal(order, tc.want) {
+				t.Fatalf("picker order = %v, want %v", order, tc.want)
+			}
+			view := renderFrame(t, m)
+			if first, second := strings.Index(view, string(tc.want[0])), strings.Index(view, string(tc.want[1])); first < 0 || second < 0 || first > second {
+				t.Fatalf("the sheet does not draw %s above %s:\n%s", tc.want[0], tc.want[1], view)
+			}
+			if tc.golden != "" {
+				assertGolden(t, tc.golden, view)
+			}
+			m, cmd := send(t, m, key("enter"))
+			if cmd == nil {
+				t.Fatal("Enter on the picker dispatched nothing")
+			}
+			_, _ = send(t, m, cmd())
+			if len(*got) != 1 || (*got)[0].Harness != tc.want[0] {
+				t.Fatalf("requests = %+v, want one create carrying %s", *got, tc.want[0])
+			}
+		})
 	}
 }

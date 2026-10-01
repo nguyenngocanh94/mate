@@ -1,0 +1,36 @@
+─ acme › payments-api ───────────── !1 ─
+▌ 👨‍💻 payments-api                   !   
+     no mate                            
+─ 👨‍💻 payments-api ──────────────────────
+  status   no mate                      
+  repo     repos/payments-api           
+  mode     manual                       
+  start    s creates one                
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+                                        
+─ harness · new mate ───────────── esc ─
+▌ ⌬ codex                               
+  ✻ claude                              
+                                        
+  Creates and starts the Mate of        
+  payments-api with this harness.       
+→ next pane · no host                   
+ ↑↓ move  enter use  esc cancel         

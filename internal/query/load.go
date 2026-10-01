@@ -54,8 +54,9 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 		// runtime handle and not this workspace.
 		WorkspaceID: filepath.Base(root),
 		Workspace: KnownField(WorkspaceValue{
-			Name: filepath.Base(root),
-			Root: root,
+			Name:        filepath.Base(root),
+			Root:        root,
+			MateHarness: defaultMateHarness(ws),
 		}),
 	}
 	for _, ref := range ws.Projects() {
@@ -68,6 +69,16 @@ func load(ctx context.Context, ws *store.Workspace, now func() time.Time) (Snaps
 	snap.Warnings = w.list
 	deriveActions(&snap)
 	return snap, nil
+}
+
+// defaultMateHarness is the workspace's resolved default Mate harness, or
+// "" when workspace.yaml names a kind this package does not know.
+func defaultMateHarness(ws *store.Workspace) HarnessKind {
+	kind, err := ParseHarnessKind(ws.Defaults().MateHarness)
+	if err != nil {
+		return ""
+	}
+	return kind
 }
 
 func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) ProjectNode {

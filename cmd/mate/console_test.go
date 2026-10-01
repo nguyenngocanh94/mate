@@ -61,6 +61,67 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 	}
 }
 
+// TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst is the picker on
+// the real wire: a workspace whose workspace.yaml says `mate_harness: codex`,
+// read through query.Load, must open the create-a-Mate picker with codex
+// first and under the cursor, so Enter alone creates the Mate the workspace
+// is configured for.
+func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
+	root := t.TempDir()
+	ws, err := store.Init(root)
+	if err != nil {
+		t.Fatalf("init workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "shop", ".git"), 0o755); err != nil {
+		t.Fatalf("create repo: %v", err)
+	}
+	if err := ws.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+		t.Fatalf("add project: %v", err)
+	}
+	raw, err := os.ReadFile(ws.WorkspaceFile())
+	if err != nil {
+		t.Fatalf("read workspace.yaml: %v", err)
+	}
+	edited := strings.Replace(string(raw), "mate_harness: claude", "mate_harness: codex", 1)
+	if edited == string(raw) {
+		t.Fatalf("setup: workspace.yaml has no mate_harness line to edit:\n%s", raw)
+	}
+	if err := os.WriteFile(ws.WorkspaceFile(), []byte(edited), 0o644); err != nil {
+		t.Fatalf("write workspace.yaml: %v", err)
+	}
+
+	var got []console.ActionRequest
+	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws) }
+	act := func(_ context.Context, req console.ActionRequest) (string, error) {
+		got = append(got, req)
+		return "ok", nil
+	}
+	var model tea.Model = console.New(load, act)
+	step := func(msg tea.Msg) tea.Cmd {
+		t.Helper()
+		var cmd tea.Cmd
+		model, cmd = model.Update(msg)
+		return cmd
+	}
+	step(tea.WindowSizeMsg{Width: 40, Height: 36})
+	step(model.Init()())
+	step(tea.KeyMsg{Type: tea.KeyEnter})                     // into shop; its Mate row
+	step(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")}) // create: the harness picker
+	frame := model.View()
+	codex, claude := strings.Index(frame, "codex"), strings.Index(frame, "claude")
+	if codex < 0 || claude < 0 || codex > claude {
+		t.Fatalf("picker order: codex at %d, claude at %d; want the workspace default codex first:\n%s", codex, claude, frame)
+	}
+	cmd := step(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatalf("Enter on the picker dispatched nothing:\n%s", model.View())
+	}
+	cmd()
+	if len(got) != 1 || got[0].Harness != query.HarnessCodex {
+		t.Fatalf("requests = %+v, want one create carrying the workspace default codex", got)
+	}
+}
+
 // TestConsoleRefusesANonTerminal: `mate <dir> > file` must refuse with a
 // usage error instead of starting Bubble Tea against a pipe.
 func TestConsoleRefusesANonTerminal(t *testing.T) {

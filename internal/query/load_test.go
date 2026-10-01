@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -445,5 +446,43 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	}
 	if got := p.Mate.LastEvent; got.State != Known || !got.Value.OccurredAt.Equal(at) {
 		t.Fatalf("mate last event = %+v, want the line typed at %s", got, at)
+	}
+}
+
+// The snapshot carries the workspace's default Mate harness, resolved the
+// way the store resolves it: workspace.yaml's `mate_harness`, the store's
+// own default when the key is missing, and "" for a kind nothing can start.
+func TestLoadCarriesTheWorkspaceDefaultMateHarness(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		line string // replaces "mate_harness: claude" in workspace.yaml
+		want HarnessKind
+	}{
+		{"store default", "mate_harness: claude", HarnessClaude},
+		{"codex", "mate_harness: codex", HarnessCodex},
+		{"missing key", "", HarnessKind(store.DefaultMateHarness)},
+		{"unknown kind", "mate_harness: gemini", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ws := newWorkspace(t, "shop")
+			raw, err := os.ReadFile(ws.WorkspaceFile())
+			if err != nil {
+				t.Fatalf("read workspace.yaml: %v", err)
+			}
+			edited := strings.Replace(string(raw), "mate_harness: claude", tc.line, 1)
+			if !strings.Contains(string(raw), "mate_harness: claude") {
+				t.Fatalf("setup: workspace.yaml has no mate_harness line:\n%s", raw)
+			}
+			if err := os.WriteFile(ws.WorkspaceFile(), []byte(edited), 0o644); err != nil {
+				t.Fatalf("write workspace.yaml: %v", err)
+			}
+			snap, err := Load(context.Background(), ws)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if snap.Workspace.State != Known || snap.Workspace.Value.MateHarness != tc.want {
+				t.Fatalf("workspace field = %+v, want mate harness %q", snap.Workspace, tc.want)
+			}
+		})
 	}
 }

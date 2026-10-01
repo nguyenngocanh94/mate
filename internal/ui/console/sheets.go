@@ -289,7 +289,7 @@ func (m Model) newProjectNameProblem(name string) string {
 
 func (m Model) harnessSheetLines(p framePlan) []gline {
 	var out []gline
-	for i, kind := range harnessOrder {
+	for i, kind := range m.harnessOrder() {
 		on := i == m.harnessIndex
 		lead := gl().pad(1)
 		if on {
