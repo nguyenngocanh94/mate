@@ -161,7 +161,7 @@ func (s codexSessions) Resumable(id string) error {
 		return fmt.Errorf("cannot look for the Codex session %s to resume (%v)", id, err)
 	}
 	if _, ok := CodexRolloutPath(dir, id); !ok {
-		return fmt.Errorf("the Codex session %s has no rollout in %s", id, dir)
+		return &NoSessionError{Session: "the Codex session " + id, Missing: dir + " has no rollout for it"}
 	}
 	return nil
 }

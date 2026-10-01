@@ -260,6 +260,10 @@ func checkResume(profile harness.Profile, decision resumeDecision) resumeDecisio
 			profile.Kind(), capReason(session.Status, session.Reason), decision.SessionID)}
 	}
 	if err := session.Impl.Resumable(decision.SessionID); err != nil {
+		var gone *harness.NoSessionError
+		if errors.As(err, &gone) {
+			return resumeDecision{Note: fmt.Sprintf("mate.meta recorded %s but %s; starting a fresh session instead", gone.Session, gone.Missing)}
+		}
 		return resumeDecision{Note: fmt.Sprintf("%v; starting a fresh session instead", err)}
 	}
 	return decision

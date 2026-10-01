@@ -156,7 +156,7 @@ func TestStopMateAdoptsTheCodexRolloutWhenHerdrHasNoSession(t *testing.T) {
 func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 	w := newWorkspace(t, "blog")
 	rt := runtime.NewFake()
-	deps, _ := codexDeps(t, rt)
+	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
 	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
@@ -175,8 +175,10 @@ func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 	if second.Resumed {
 		t.Fatal("a session with no rollout must not be resumed")
 	}
-	if !strings.Contains(second.ResumeNote, codexSessionA) || !strings.Contains(second.ResumeNote, "no rollout") {
-		t.Fatalf("ResumeNote = %q, want it to name the session and the missing rollout", second.ResumeNote)
+	// The note is the one mate has always printed for a Codex Mate.
+	want := "mate.meta recorded the Codex session " + codexSessionA + " but " + sessions + " has no rollout for it; starting a fresh session instead"
+	if second.ResumeNote != want {
+		t.Fatalf("ResumeNote = %q, want %q", second.ResumeNote, want)
 	}
 	if slices.Contains(lastArgv(t, rt), "resume") {
 		t.Fatalf("fresh argv %v must not carry resume", lastArgv(t, rt))

@@ -145,9 +145,21 @@ type SessionIdentity interface {
 	// its session at launch always answers empty.
 	AtStop(cwd string, launched time.Time, runtimeRef string) string
 	// Resumable is nil when the session id can be resumed, or says why not,
-	// before anything is launched.
+	// before anything is launched: a *NoSessionError when the harness
+	// looked and holds no record of it.
 	Resumable(id string) error
 }
+
+// NoSessionError is Resumable's answer when the harness looked for a
+// session and holds no record of it. Session is how the harness names it
+// ("the Codex session <id>"); Missing says, as a clause, what is missing
+// where. The caller, which knows where the id came from, frames the two.
+type NoSessionError struct {
+	Session string
+	Missing string
+}
+
+func (e *NoSessionError) Error() string { return e.Session + ": " + e.Missing }
 
 // HookInstaller is the hooks a Mate's launch installs. Launcher.Prepare
 // names their files; this is what the rest of the core asks about them.

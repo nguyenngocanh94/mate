@@ -127,6 +127,33 @@ func TestStopMateForcesWhenGracefulStopIsNotVerified(t *testing.T) {
 	}
 }
 
+// A verified graceful stop that does not end the agent is followed by a
+// force, and the result names the exit prompt that failed.
+func TestStopMateForcesWhenTheExitPromptLeavesTheAgent(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"}); err != nil {
+		t.Fatalf("StartMate: %v", err)
+	}
+	rt.GracefulStopLeavesAgent = true
+	res, err := spawn.StopMate(context.Background(), w, deps, "shop")
+	if err != nil {
+		t.Fatalf("StopMate: %v", err)
+	}
+	graceful := slices.Index(rt.Calls, "StopAgent:graceful")
+	force := slices.Index(rt.Calls, "StopAgent:force")
+	if graceful < 0 || force < graceful {
+		t.Fatalf("calls %v: want the graceful stop, then a force", rt.Calls)
+	}
+	if len(rt.Agents) != 0 || !res.Confirmed {
+		t.Fatalf("agents %v, confirmed %v: the force must end the agent", rt.Agents, res.Confirmed)
+	}
+	if !strings.Contains(res.Forced, `exit prompt "/exit" did not end the agent`) {
+		t.Fatalf("Forced = %q, want the exit prompt that did not end the agent", res.Forced)
+	}
+}
+
 // A Codex Mate has no verified graceful stop either: it is forced, and the
 // result says so rather than leaving the force to be guessed.
 func TestStopMateRecordsWhyACodexMateWasForced(t *testing.T) {

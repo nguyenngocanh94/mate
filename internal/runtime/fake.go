@@ -47,6 +47,10 @@ type Fake struct {
 	// agent. That is the unconfirmed-stop case: the call looked fine, the
 	// inventory still has the name.
 	StopLeavesAgent bool
+	// GracefulStopLeavesAgent makes only a graceful StopAgent return success
+	// without removing the agent: the exit prompt was typed and the agent
+	// kept running. A force stop still removes it.
+	GracefulStopLeavesAgent bool
 	// ExitPrompts are, in order, the exit prompts graceful stops typed.
 	ExitPrompts []string
 	Now         time.Time
@@ -742,7 +746,7 @@ func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, stop Stop) err
 	if _, ok := f.Agents[key]; !ok {
 		return NewHerdrError(HerdrAgentNotFound, "agent target not found")
 	}
-	if f.StopLeavesAgent {
+	if f.StopLeavesAgent || (f.GracefulStopLeavesAgent && stop.Mode() == StopModeGraceful) {
 		return nil
 	}
 	delete(f.Agents, key)

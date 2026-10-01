@@ -182,12 +182,15 @@ func TestAutomaticRefreshUsesOnlyCurrentSessionAndHonorsThreshold(t *testing.T) 
 			// Quietness is judged by answers the Stop hook logs; a harness
 			// whose turn-end evidence is not that log is never refreshed
 			// automatically, whether it is Codex or a Claude declaring none.
+			// The Codex Mate shows an empty Codex composer, so the turn-end
+			// gate is the only thing that keeps it from being refreshed.
 			if scenario == "codex-meta" {
 				meta, _ := w.ReadMateMeta("shop")
 				meta[spawn.MetaHarness] = string(harness.KindCodex)
 				if err := w.WriteMateMeta("shop", meta); err != nil {
 					t.Fatal(err)
 				}
+				rt.SetReadOutput(h, codexEmptyScreen)
 			}
 			if scenario == "no-turn-end" {
 				reg, err := harness.NewRegistry(nil, claudeWithoutTurnEnd{})
