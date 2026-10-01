@@ -199,7 +199,7 @@ Treat it as a failed spawn: tell the captain the Crew could not start and what i
 
 Load the `stuck-crew-recovery` skill when a Crew reads `blocked`, loops, repeats the same confusion, asks a question its own brief already answered, or does not respond to a steer.
 A `blocked` item you learn about from an auto-mode digest (section 10) is the same open incident, found by a different route, not a different problem; work it on the same ladder as a `blocked` you noticed yourself in `crew list` or `state`.
-The short version, which the skill expands: peek, then one specific steering line, then a relaunch with what was already tried, then closing the Crew as failed and telling the captain so.
+The short version, which the skill expands: peek, then one specific steering line, then `mate crew relaunch` if only its pane died (the branch and worktree survive a Herdr restart), then a replacement Crew with what was already tried if it is looping, then closing the Crew as failed and telling the captain so.
 Never leave a task silently stuck; each step either recovers it or moves it one step closer to an honest failure you report.
 `failed` is a state only you can set, with `crew stop --discard`: a stuck Crew cannot declare itself failed.
 

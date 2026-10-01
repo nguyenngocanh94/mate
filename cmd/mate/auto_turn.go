@@ -37,6 +37,11 @@ func turnSendLine(crew string) string {
 	return fmt.Sprintf(turnLinePrefix+"end it now; a digest will tell you when %s hands back.", crew)
 }
 
+// turnRelaunchLine ends `mate crew relaunch`.
+func turnRelaunchLine(crew string) string {
+	return fmt.Sprintf(turnLinePrefix+"end it now; %s is running again and the console will wake you when it speaks.", crew)
+}
+
 // printTurnEnd writes line to stdout.
 func printTurnEnd(stdout io.Writer, line string) {
 	fmt.Fprintln(stdout, line)

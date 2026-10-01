@@ -193,6 +193,93 @@ func TestMateClaudeIsLocatedFromItsSessionIDWhenTheHookHasNotWrittenThePath(t *t
 	}
 }
 
+// `mate crew relaunch` gives a crew a fresh Claude session under the same
+// actor and clears `transcript=`. The dead session's file is still on disk
+// and was recorded by an earlier pass, so a locator that re-used the actor's
+// newest recorded path would read it forever and never ingest the new one.
+// The recorded session id no longer matching the meta's is what refuses it;
+// both files are written after the relaunch here, so time alone cannot.
+func TestRelaunchedClaudeCrewIsLocatedInItsNewSession(t *testing.T) {
+	f := newFixture(t)
+	const oldSession = "8414030c-5d90-4925-94cc-c94e12aae4a9"
+	const newSession = "5a0c3b1e-2f44-4d1a-9a7e-0c1d2e3f4a5b"
+	projects := filepath.Join(f.root, "claude-projects")
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
+		Now:               func() time.Time { return fixtureNow },
+		ClaudeProjectsDir: projects,
+		CodexSessionsDir:  filepath.Join(f.root, "no-codex-sessions"),
+	})
+	oldPath := filepath.Join(f.root, "old-session.jsonl")
+	copyFile(t, abs(t, claudeFixture), oldPath)
+	writeCrewBinding(t, f, map[string]string{
+		"harness": "claude", timeline.MetaSessionID: oldSession, timeline.MetaTranscript: oldPath,
+	})
+	f.ingest(t)
+
+	// The relaunch: a new session id, no transcript yet, a later launch.
+	cwd := filepath.Join(f.ws.Root(), ".worktrees", "shop-buybtn")
+	newPath := harness.ClaudeTranscriptPath(projects, cwd, newSession)
+	if err := os.MkdirAll(filepath.Dir(newPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	copyFile(t, abs(t, claudeFixture), newPath)
+	writeCrewBinding(t, f, map[string]string{
+		timeline.MetaSessionID: newSession, timeline.MetaTranscript: "",
+		"launched_at": mustTime("2026-09-20T09:00:00Z").Format(time.RFC3339),
+	})
+	f.ingest(t)
+
+	var path string
+	if err := f.db.SQL().QueryRow(`SELECT transcript_path FROM session WHERE actor_id = ? AND harness_session_id = ?`,
+		f.crewActor(), newSession).Scan(&path); err != nil {
+		t.Fatalf("read the new session: %v", err)
+	}
+	if path != newPath {
+		t.Fatalf("the relaunched session names %q, want its own transcript %q", path, newPath)
+	}
+}
+
+// A Codex crew records no session id, so after a relaunch the dead agent's
+// rollout is told apart by time: it stopped growing when the agent died,
+// before the new one was launched. The locator then asks the runtime again
+// and finds the new rollout.
+func TestRelaunchedCodexCrewIsLocatedInItsNewRollout(t *testing.T) {
+	f := newFixture(t)
+	const oldSession = "01a0b944-33bb-7503-9db7-cd51ff61855a"
+	const newSession = "7c2d9e10-4b5a-4c3d-8e9f-a0b1c2d3e4f5"
+	sessions := filepath.Join(f.root, "codex-sessions", "2026", "09", "19")
+	if err := os.MkdirAll(sessions, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	oldRollout := filepath.Join(sessions, "rollout-2026-09-19T17-44-09-"+oldSession+".jsonl")
+	copyFile(t, abs(t, codexFixture), oldRollout)
+	clearCrewTranscript(t, f)
+	ref := oldSession
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
+		Now:               func() time.Time { return fixtureNow },
+		SessionRef:        func(context.Context, string, string) (string, error) { return ref, nil },
+		ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
+		CodexSessionsDir:  filepath.Join(f.root, "codex-sessions"),
+	})
+	f.ingest(t)
+
+	// The agent died at the end of the captured run; the relaunch came a day
+	// later and Herdr now reports the new agent's rollout.
+	if err := os.Chtimes(oldRollout, fixtureNow, fixtureNow); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+	newRollout := filepath.Join(sessions, "rollout-2026-09-20T09-00-05-"+newSession+".jsonl")
+	copyFile(t, abs(t, codexFixture), newRollout)
+	writeCrewBinding(t, f, map[string]string{"launched_at": mustTime("2026-09-20T09:00:00Z").Format(time.RFC3339)})
+	ref = newSession
+	f.ingest(t)
+
+	if n := f.count(t, `SELECT COUNT(*) FROM session WHERE actor_id = ? AND transcript_path = ?`,
+		f.crewActor(), newRollout); n != 1 {
+		t.Fatalf("%d session row(s) name the new rollout, want 1: the dead agent's rollout was re-used", n)
+	}
+}
+
 // The observer's findings become incidents, opened and resolved as pairs.
 func TestIncidentsBecomeOpenAndResolvedEvents(t *testing.T) {
 	f := newFixture(t)
@@ -369,6 +456,22 @@ func clearCrewTranscript(t *testing.T, f *fixture) {
 	}
 	meta[timeline.MetaTranscript] = ""
 	meta[timeline.MetaSessionID] = ""
+	if err := f.ws.WriteCrewMeta(fixtureProject, fixtureCrew, meta); err != nil {
+		t.Fatalf("WriteCrewMeta: %v", err)
+	}
+}
+
+// writeCrewBinding overwrites keys of the fixture crew's `.meta`, the way a
+// relaunch rewrites the keys that name its agent.
+func writeCrewBinding(t *testing.T, f *fixture, keys map[string]string) {
+	t.Helper()
+	meta, err := f.ws.ReadCrewMeta(fixtureProject, fixtureCrew)
+	if err != nil {
+		t.Fatalf("ReadCrewMeta: %v", err)
+	}
+	for k, v := range keys {
+		meta[k] = v
+	}
 	if err := f.ws.WriteCrewMeta(fixtureProject, fixtureCrew, meta); err != nil {
 		t.Fatalf("WriteCrewMeta: %v", err)
 	}

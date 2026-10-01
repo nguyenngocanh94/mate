@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -258,5 +259,25 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 	}
 	if !strings.Contains(got, "1 closed") {
 		t.Fatalf("crew list = %q, want the hidden count", got)
+	}
+}
+
+func TestCrewRelaunchReportNamesTheLaunchProfileAndEndsTheTurn(t *testing.T) {
+	var out bytes.Buffer
+	writeCrewRelaunchReport(&out, spawn.RelaunchResult{
+		Project: "shop", Crew: "k3", Agent: "crew-k3", Pane: "p9", Harness: harness.KindClaude,
+		Model: "haiku", Effort: harness.EffortLow, Repo: "shop", Branch: "mate/k3",
+		Worktree: "/w/.worktrees/shop-k3", BriefPath: "/w/brief.md", Stopped: true,
+	})
+	got := out.String()
+	for _, want := range []string{
+		"relaunched shop/k3: agent crew-k3 in pane p9 (harness claude, model haiku, effort low,",
+		"the previous agent was stopped",
+		"brief /w/brief.md",
+		turnRelaunchLine("k3"),
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("report lacks %q:\n%s", want, got)
+		}
 	}
 }

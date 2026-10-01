@@ -94,3 +94,28 @@ func actionByName(actions []ActionAvailability, name string) ActionAvailability 
 	}
 	return ActionAvailability{Action: name, Reason: "not found"}
 }
+
+// restart_crew needs an open crew with a branch to relaunch into. It does not
+// need a binding: the case it exists for is a crew whose agent Herdr lost.
+func TestRestartCrewNeedsAnOpenCrewWithABranch(t *testing.T) {
+	branch := KnownField(WorktreeValue{Branch: "mate/k3"})
+	s := Snapshot{Projects: []ProjectNode{{
+		Crews: []CrewNode{
+			{CrewID: "lost", Status: CrewWorking, Worktree: branch, Binding: AbsentField[BindingValue]("no binding")},
+			{CrewID: "closed", Status: CrewFinished, Closed: true, Worktree: branch},
+			{CrewID: "nobranch", Status: CrewWorking, Worktree: AbsentField[WorktreeValue]("no worktree")},
+			{CrewID: "unread", Status: CrewWorking, Worktree: UnknownField[WorktreeValue]("read failed")},
+		},
+	}}}
+	deriveActions(&s)
+	crews := s.Projects[0].Crews
+	if got := actionByName(crews[0].Actions, "restart_crew"); !got.Available {
+		t.Fatalf("restart_crew for a lost crew = %+v, want available", got)
+	}
+	for i, want := range map[int]string{1: "closed", 2: "no branch", 3: "could not be read"} {
+		got := actionByName(crews[i].Actions, "restart_crew")
+		if got.Available || !strings.Contains(got.Reason, want) {
+			t.Fatalf("restart_crew for %s = %+v, want refused with %q", crews[i].CrewID, got, want)
+		}
+	}
+}

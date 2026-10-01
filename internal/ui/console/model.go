@@ -94,6 +94,14 @@ const (
 	// restriction: a reader looks at a branch to decide whether it is worth
 	// landing, which is before, not after, the Crew says `wait-mate`.
 	ActionMerge Action = "merge"
+	// ActionRestartCrew starts a crew's recorded harness again in the
+	// worktree it already has, replacing an agent that died with its Herdr
+	// pane (a Herdr server lost to a machine restart, a harness process
+	// that exited). It is the console's counterpart of `mate crew relaunch`
+	// and, unlike `crew spawn`, it does not need a new branch or worktree.
+	// It is dangerous - a live crew would be stopped first - so the menu's
+	// confirmation stands in front of it, like ActionRestartMate.
+	ActionRestartCrew Action = "restart_crew"
 	// TODO: v1 also had retry, discard and switch_harness. mate has no
 	// retry (a Crew runs once), and no discard action: throwing work away
 	// is `mate crew stop --discard`, on the captain's explicit word.

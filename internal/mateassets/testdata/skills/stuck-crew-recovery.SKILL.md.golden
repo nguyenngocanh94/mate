@@ -28,7 +28,7 @@ The line is `state: <one of seven> · health: <a reading of the pane>`.
 - `state: needs-decision` means it is waiting for you. Go to step 2.
 - `state: wait-mate` means it stopped on purpose and handed the task back. This skill does not apply; review it, or read the reason it gave.
 - `state: blocked` means the watcher has an open incident for it. Go to step 1 and look.
-- `health: agent-gone` means the harness no longer has its agent. Go to step 4.
+- `health: agent-gone` means the harness no longer has its agent. Go to step 3.
 - `health: unrecognised` means nothing on screen looks like a composer. Go to step 1.
 
 Never conclude a Crew is stuck from the status file alone, and never from the state column alone.
@@ -47,7 +47,7 @@ Read the last 40 lines and name what you see, in one of four ways:
 3. A question, or a plan it is waiting for approval on - it is waiting on you. Go to step 2.
 4. A genuinely progressing transcript - it is working. Leave it alone and say nothing.
 
-If the pane will not read at all, or reads `agent absent`, the Crew's process is gone: go to step 4.
+If the pane will not read at all, or reads `agent absent`, the Crew's process is gone: go to step 3.
 
 ## Step 2 - answer it, in one line
 
@@ -65,9 +65,26 @@ A successful send prints a trace ending in `working`; if it ends any other way, 
 Send one steering line, not three.
 If the first specific line does not move it, more lines will not either - go to step 3.
 
-## Step 3 - relaunch with what was already tried
+## Step 3 - start it again when only its pane died
+
+A dead pane is not a failed task.
+If the worktree is still there, the branch still carries the work, and the `.status` file still says what it did, the Crew can be started again in place:
+
+```text
+mate crew relaunch shop <id> [--note "<one line of progress so far>"]
+```
+
+This is the recovery for a Herdr server lost to a machine restart, or a harness process that exited: the branch, worktree and `.status` file are kept, the recorded harness is started again in a fresh session, and the brief on disk is pointed at once more. `crew spawn` cannot be used for it - the branch and worktree already exist and a spawn refuses both.
+The optional `--note` is one line the new agent reads in its first prompt, for something that lived only in the dead pane ("tests pass, only the docs are left").
+The captain can do the same from the console with Actions -> Restart crew on the row.
+
+A relaunch is a fresh session, not a resume: what the Crew knows is its brief and its own `.status` file, so make sure both say what the replacement needs before you run it.
+If the relaunch fails too, or the worktree is gone, go to step 4.
+
+## Step 4 - if it is looping or confused, replace it
 
 There is no interrupt key available to you, so a looping or unresponsive Crew is recovered by replacement, not by rescue.
+A relaunch is not the tool for it: replacing the agent would leave the same brief and the same confusion in the new session.
 
 1. Read the branch it has so far: `mate diff shop <id> --stat`, which compares it with the default branch of its own repo. Committed work is not lost.
 2. Copy the `# Task` part of `/ws/.mate/projects/shop/crews/<id>/brief.md` - the app's copy, which also holds any captain's words appended since spawn - to `briefs/<new-id>.md`, and add `- Already tried (crew <id>): ...` lines to its `## What we already know`, above the `Unknown:` line: what it attempted, where it got stuck, and what not to repeat.
@@ -80,7 +97,7 @@ There is no interrupt key available to you, so a looping or unresponsive Crew is
 A low context reading is not stuck.
 Harnesses compact and keep going; do not relaunch a Crew that is simply deep into a long task.
 
-## Step 4 - fail honestly
+## Step 5 - fail honestly
 
 If a second Crew fails the same way, the task is failed and saying so is the correct outcome.
 

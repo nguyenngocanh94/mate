@@ -25,6 +25,7 @@ Exit 2 is a usage mistake you made, exit 1 is a refusal or a real failure, and t
 mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]
 mate crew dispatch [--workspace <dir>] [--example]
 mate crew list <project> [--workspace <dir>]
+mate crew relaunch <project> <id> [--note "<one line>"] [--workspace <dir>]
 mate crew stop <project> <id> [--discard] [--workspace <dir>]
 ```
 
@@ -61,6 +62,11 @@ The last of those is worth a `mate peek` before you assume the Crew started.
 A crew is open until `crew stop` has run on it; a crew that appended `wait-mate:` is still open, because that is its report, not the end of its task (section 9, "Closing a Crew").
 `--all` includes the closed ones.
 It is the cheapest way to answer "what is in flight"; `mate backlog` (below) is what you use at bootstrap.
+
+`crew relaunch` starts a crew's harness again in the worktree it already has, for a pane that died - a Herdr server lost to a machine restart, a harness process that exited - while the branch, worktree and `.status` file are intact.
+`crew spawn` cannot do it: the branch and worktree already exist and a spawn refuses both.
+The recorded harness runs in a fresh session and the brief on disk is pointed at once more; `--note "<one line>"` is carried into that first prompt for progress that lived only in the dead pane.
+A closed crew, or one whose worktree is gone, is refused: spawn a new crew instead. `restart` is accepted as the same verb.
 
 `crew stop` ends a task. It checks the branch **first**: unlanded in the default branch of the Crew's repo, or a dirty worktree, without `--discard`, and it refuses and changes nothing at all - the Crew still running, its pane still open.
 That is a refusal to destroy work, not an error to route around: get the branch merged, or ask the captain whether the work should be thrown away. Never reach for `--discard` to make the message go away.

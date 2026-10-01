@@ -214,6 +214,47 @@ func (m Model) repairChoice(r row) actionChoice {
 	return c
 }
 
+// restartCrewChoice is the Crew row's recovery entry (mvp.md M13): start the
+// crew's harness again in the worktree it already has, for a pane or agent
+// that a Herdr restart or a dead harness took away. `crew spawn` cannot do
+// it - the branch and worktree already exist and a spawn refuses both - so
+// the entry names the exact recovery the command performs.
+//
+// It is offered whenever an open crew records a worktree with a branch, because
+// the console cannot tell a dead agent from a live one through the
+// snapshot's recorded fields alone: the binding is a recorded fact, not a
+// liveness probe, and the health column is Absent exactly when Herdr is down
+// - the case this exists for. It is dangerous because a live crew is stopped
+// first, and the confirmation says so.
+func (m Model) restartCrewChoice(r row) actionChoice {
+	c := actionChoice{action: ActionRestartCrew, dangerous: true, desc: "unavailable · applies to a Crew"}
+	if r.kind != rowCrew || m.cur().kind != frameProject {
+		return c
+	}
+	project := m.currentProject().ProjectID
+	c.req = ActionRequest{Action: ActionRestartCrew, Target: project, TargetKind: "crew", Crew: r.id}
+	if project == "" {
+		c.desc = "unavailable · no Project is open"
+		return c
+	}
+	crew, ok := m.crewByID(r.id)
+	if !ok {
+		c.desc = "unavailable · this Crew is not in the snapshot"
+		return c
+	}
+	switch {
+	case crew.Closed:
+		c.desc = "unavailable · this Crew is closed; spawn a new one if the task is not over"
+	case crew.Worktree.IsKnown() && crew.Worktree.Value.Branch != "":
+		c.enabled, c.desc = true, "Start this Crew's harness again in its worktree ("+crew.Worktree.Value.Branch+")"
+	case crew.Worktree.IsKnown(), crew.Worktree.State == query.Absent:
+		c.desc = "unavailable · this Crew records no branch to relaunch into; spawn a new crew"
+	default:
+		c.desc = "unavailable · the worktree record could not be read; r re-reads"
+	}
+	return c
+}
+
 func (m Model) onboardChoice(r row) actionChoice {
 	c := actionChoice{action: ActionOnboard, desc: "unavailable · use this action at the workspace or a Project without a Mate", req: m.actionRequest(ActionOnboard, r)}
 	if m.cur().kind == frameWorkspace {

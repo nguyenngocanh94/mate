@@ -877,7 +877,13 @@ func BriefPrompt(briefPath string) string {
 // as a failure: the crew, its worktree and its meta are all real, and the
 // line can be re-sent.
 func deliverBrief(ctx context.Context, deps Deps, handle runtime.AgentHandle, briefPath string, kind harness.Kind) (delivered bool, warning, tail string, err error) {
-	if err := deps.Runtime.PromptAgent(ctx, handle, BriefPrompt(briefPath)); err != nil {
+	return deliverPrompt(ctx, deps, handle, BriefPrompt(briefPath), kind)
+}
+
+// deliverPrompt is deliverBrief for any one-line prompt. A relaunch uses it
+// to carry a progress note with the same brief pointer.
+func deliverPrompt(ctx context.Context, deps Deps, handle runtime.AgentHandle, prompt string, kind harness.Kind) (delivered bool, warning, tail string, err error) {
+	if err := deps.Runtime.PromptAgent(ctx, handle, prompt); err != nil {
 		return false, "", "", err
 	}
 	observed, waitErr := deps.Runtime.WaitAgent(ctx, handle, runtime.WaitCondition{

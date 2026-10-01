@@ -114,13 +114,15 @@ func (p *pass) locateCrew(ctx context.Context, crew crewRecord) (Located, string
 		loc.Path, loc.Source = path, LocatorMeta
 		return loc, ""
 	}
-	// A crew's transcript binding never moves: a crew is spawned once and is
-	// never resumed (docs/mvp.md section 4b), so a path this workspace has
-	// already resolved for it is still the right file. Re-using it keeps the
-	// ingest from asking the runtime about every crew on every poll, which is
-	// two more `herdr` calls per crew per five seconds on top of the
-	// observer's three.
-	if path, session, ok := p.recordedTranscript(ctx, crew.ActorID); ok {
+	// A crew's transcript binding does not move while one agent runs: a
+	// crew is never resumed (docs/mvp.md section 4b), so a path this
+	// workspace has already resolved for the current launch is still the
+	// right file. Re-using it keeps the ingest from asking the runtime about
+	// every crew on every poll, which is two more `herdr` calls per crew per
+	// five seconds on top of the observer's three. `mate crew relaunch`
+	// starts a new session under the same actor, so a recorded path is only
+	// re-used when it belongs to the launch the meta names now.
+	if path, session, ok := p.recordedTranscript(ctx, crew.ActorID, loc.SessionID, launchTime(crew.Meta)); ok {
 		loc.Path, loc.Source = path, LocatorRecorded
 		if loc.SessionID == "" {
 			loc.SessionID = session
@@ -163,17 +165,43 @@ func (p *pass) locateCrew(ctx context.Context, crew crewRecord) (Located, string
 }
 
 // recordedTranscript is a transcript an earlier pass of this database already
-// resolved for an actor, if the file is still there. A file that has gone is
-// not a locate: the rules are tried again from the top.
-func (p *pass) recordedTranscript(ctx context.Context, actorID string) (path, sessionID string, ok bool) {
-	err := p.tx.QueryRowContext(ctx,
+// resolved for an actor, if the file is still there and belongs to the
+// current launch. A file that has gone is not a locate: the rules are tried
+// again from the top.
+//
+// A crew relaunched in place (`mate crew relaunch`) keeps its actor and gets
+// a fresh harness session, so the actor's newest row may be the dead
+// session's. Two facts tell them apart: a recorded harness session id that is
+// not the one the meta names now (Claude records it at launch), and a file
+// last written before the current agent was launched (Codex records none,
+// and a dead agent's rollout stops growing when it dies).
+func (p *pass) recordedTranscript(ctx context.Context, actorID, currentSession string, launchedAt time.Time) (path, sessionID string, ok bool) {
+	rows, err := p.tx.QueryContext(ctx,
 		`SELECT transcript_path, harness_session_id FROM session
-		  WHERE actor_id = ? AND transcript_path <> '' ORDER BY started_at DESC LIMIT 1`,
-		actorID).Scan(&path, &sessionID)
-	if err != nil || !fileExists(path) {
+		  WHERE actor_id = ? AND transcript_path <> '' ORDER BY started_at DESC, rowid DESC`,
+		actorID)
+	if err != nil {
 		return "", "", false
 	}
-	return path, sessionID, true
+	defer rows.Close()
+	for rows.Next() {
+		var candidate, session string
+		if err := rows.Scan(&candidate, &session); err != nil {
+			return "", "", false
+		}
+		if currentSession != "" && session != "" && session != currentSession {
+			continue
+		}
+		fi, err := os.Stat(candidate)
+		if err != nil || fi.IsDir() {
+			continue
+		}
+		if !launchedAt.IsZero() && fi.ModTime().Before(launchedAt) {
+			continue
+		}
+		return candidate, session, true
+	}
+	return "", "", false
 }
 
 func (p *pass) sessionRef(ctx context.Context, crew string) string {

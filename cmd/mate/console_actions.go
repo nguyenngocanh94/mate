@@ -74,6 +74,8 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return crewDiffAction(ctx, ws, req)
 		case console.ActionRestartMate:
 			return restartMateAction(ctx, ws, deps, req, holds)
+		case console.ActionRestartCrew:
+			return relaunchCrewAction(ctx, ws, deps, req)
 		case console.ActionClearComposer:
 			return clearComposerAction(ctx, ws, deps, req)
 		case console.ActionMerge:
@@ -83,6 +85,27 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 				fmt.Sprintf("%s is not wired in this build", req.Action))
 		}
 	}
+}
+
+// relaunchCrewAction is the Console's `Restart crew…` entry (mvp.md M13).
+// It calls the same function `mate crew relaunch` calls, so the console and
+// the command line report one event in the same words, and it passes no
+// note: the console has no place to type one, and the crew's `.status` file
+// already carries what it said before the pane died.
+func relaunchCrewAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" || req.Crew == "" {
+		return "", observability.NewError(observability.CodeUsage,
+			"restart crew needs both a Project and one of its Crews; the request named "+req.Target+"/"+req.Crew)
+	}
+	res, err := spawn.RelaunchCrew(ctx, ws, deps, req.Target, req.Crew, "")
+	if err != nil {
+		return "", err
+	}
+	old := "no live agent was recorded"
+	if res.Stopped {
+		old = "the previous agent was stopped"
+	}
+	return fmt.Sprintf("crew %s is running again in pane %s (%s); %s", res.Crew, res.Pane, res.Worktree, old), nil
 }
 
 // crewDiffAction is the Console's `diff` entry (mvp.md task 21). It calls
