@@ -1,7 +1,7 @@
 # Phương án registry harness: thêm harness mà không sửa lõi
 
 - Ngày: 2026-09-30; sửa theo review 2026-10-01.
-- Trạng thái: đề xuất; chưa sửa production code.
+- Trạng thái: đã chốt 2026-10-01. PR 0 và các sửa lỗi độc lập đã merge (#7 đến #13); PR 1 đến 7 làm theo mục 6.
 - Hai lỗi hygiene độc lập, sửa ở PR riêng, không thuộc phương án này: hai test Console phụ thuộc locale (`TestConsoleGalleryRendersRegisteredProjects`, `TestRefreshUpdatesAsOfAndTheAgesMeasuredFromIt`), và doc comment của `TranscriptParser.ParseTranscriptFinal` khẳng định "no caller establishes that today" trong khi `timeline/telemetry.go` đã gọi nó sau `StopMate.confirmGone → FreezeMateSession → Located.Finalized` từ `d584f0e`.
 - Baseline đã review: `5d93926`, Herdr 0.8.2, Claude Code 2.1.285, codex-cli 0.156.1, pi 0.99.1 trên máy.
 - Liên quan: [phương án probe TUI](tui-probe-redesign-2026-09-27.md), [crew observability](crew-harness-observability-2026-09-28.md).
@@ -118,6 +118,13 @@ Ba trạng thái dùng đúng nghĩa của phương án probe TUI mục 5.1, đ�
 | `TurnEndEvidence` | Bằng chứng một turn đã kết thúc sau thời điểm cho trước | Nhánh kind trong `outbox.Stow`, điều kiện Claude trong `contextRefresh` |
 | `QuotaProvider` | Tên provider và lane của `quota-axi` | Bảng `quota.providers` |
 
+Quyết định của captain sau khi đo pi ([evidence](../evidence/pi-contract-2026-10-01.md)):
+
+- `ScreenProfile` khai báo nguồn đọc pane. `runtime.Herdr.readAgent` đọc theo nguồn đó thay vì cố định `recent-unwrapped`; Claude và Codex giữ `recent-unwrapped` như hôm nay, pi dùng `visible`, vì với pi `recent-unwrapped` có lúc gộp khung composer thành một dòng.
+- Effort của pi là `--thinking`: năm mức `Effort` truyền thẳng, không từ chối mức nào. pi kẹp mức theo model mà không báo, nên mức thật được đọc lại từ bản ghi `thinking_level_change` của session và báo ra như crew relaunch đang báo model và effort; mate không giữ bảng kẹp.
+- `Quota` của pi là `unsupported` có `Reason`: provider đi theo `--model`, không theo harness.
+- `Hooks` của pi là `unsupported` có `Reason`: chưa viết shim TypeScript. Khi cần Mate trên pi, hook là một extension `.ts` do mate sinh và giữ version, gọi `mate hook`, chèn recall qua `before_agent_start`; `HookInstaller` khi đó phải nhận hook là file mã, và `LiveOnly()` không dựa được vào `session_start.reason` của pi.
+
 `Prepare` trả dữ liệu, không tự ghi file.
 `spawn` vẫn là nơi duy nhất ghi, qua `store` và `gitx`, nên luật đường dẫn của workspace không đổi và package harness không import `store`.
 
@@ -186,7 +193,7 @@ Một luật duy nhất cho mọi call site: hỏi capability, và nếu không 
 | `Hooks` | Từ chối vai Mate với thông báo nêu capability; vai Crew không bị ảnh hưởng |
 | `Transcript` | Timeline ghi "không quan sát được"; không có số token, không đoán |
 | `TurnEnd` | Dùng composer làm bằng chứng dự phòng như hiện nay |
-| `Quota` | Dispatch coi harness là không có số quota |
+| `Quota` | Dispatch coi harness là còn 100% quota; nhãn `quota_exhausted` của Jev là cách nhận ra giả định này sai |
 
 Không còn nhánh im lặng.
 Riêng `settleStartupPrompt` hiện bỏ qua cả bước settle khi không có profile; sau thay đổi, `ScreenProfile` là bắt buộc nên trường hợp đó không thể xảy ra.
@@ -201,6 +208,7 @@ Một suite chạy trên mọi profile trong `catalog.Default()`.
    Suite chạy phân loại trên chính các capture đó.
 4. Nếu `Transcript` là `verified`: fixture transcript parse không có record hỏng, và tổng usage khớp số ghi trong manifest.
 5. Live, chỉ khi `MATE_LIVE=1`: `TestLiveConformance/<kind>` spawn trong lab cô lập, settle, gửi một dòng, thấy bận rồi rảnh, stop.
+   Viết test này, nhưng chuỗi PR 1 đến 7 không bắt buộc chạy nó (mục 6).
 
 Thêm một test ratchet, chạy bằng `go/ast` trên mọi file không phải test ngoài `internal/harness/...`.
 Nó đếm hai loại tham chiếu: identifier riêng harness xuất từ `harness` (`KindClaude`, `Claude{}`, `CodexRolloutPath`, `ClaudeSettings`, ...) và literal chuỗi trùng với một tên harness.
@@ -239,10 +247,10 @@ Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
 | 1 | Hợp đồng, `Registry`, tiêm qua `Deps`; Claude và Codex hiện thực `Profile` bằng lớp bọc mỏng tại chỗ; xoá `Validate` và `CapabilitySet` | Không call site nào gọi `AdapterFor` hay `ParseKind` toàn cục; test đặc tả không đổi |
 | 2 | Launch: `Prepare` và `Build`; thu gọn `AgentSpec`; builder kín cho `LaunchSpec` | `spawn` không còn `switch kind` cho launch; argv và file sinh ra giống từng byte |
 | 3 | Màn hình: chuyển `startupProfileFor`, `composerProfileFor`, `pendingMatches` và `startupReadyScreen` vào `ScreenProfile`, giữ nguyên verdict như hôm nay; `send`, `watch`, `mate state` và fake nhận profile. Chỉ chuyển chỗ; việc tách quan sát khỏi policy (hình dạng đích ở mục 3.2) là probe-TUI PR 1, đi sau | Toàn bộ capture hiện có phân loại như cũ; không còn nhánh bỏ qua settle |
-| 4 | Stop, session, hook, turn-end thành capability; `runtime` bỏ so sánh kind; `outbox`, `context_refresh` và `mate hook` hỏi capability | Live hiện có về resume, stow và recall hook pass trên cả hai harness |
+| 4 | Stop, session, hook, turn-end thành capability; `runtime` bỏ so sánh kind; `outbox`, `context_refresh` và `mate hook` hỏi capability | Test đặc tả và test unit hiện có về resume, stow và recall hook pass trên cả hai harness |
 | 5 | Transcript, usage và quota thành capability, gồm đọc tăng dần và snapshot đã đóng băng; `timeline` còn một đường chuẩn hoá turn | `mate usage` và dashboard cho cùng số trên corpus fixture trước và sau; `telemetry.go` không còn nhánh kind |
-| 6 | Chuyển file vào `harness/claude` và `harness/codex`; harness mặc định và danh mục harness cho `store`, `query` và Console lấy từ `catalog`, picker Console xếp mặc định đã giải quyết của workspace lên đầu; skill `harness-adapters` sinh từ registry; ratchet về 0; suite hợp đồng đầy đủ | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai; diff của PR này chỉ là di chuyển và nối dây |
-| 7 | Onboard harness thứ ba, vai Crew trước | Diff chỉ gồm package mới, một dòng trong `catalog`, một hàng trong bảng dispatch mặc định, fixture và tài liệu; suite hợp đồng và live conformance pass |
+| 6 | Chuyển file vào `harness/claude` và `harness/codex`; harness mặc định và danh mục harness cho `store`, `query` và Console lấy từ `catalog` (picker đã xếp mặc định của workspace lên đầu từ #8; PR này chỉ đổi nguồn của giá trị mặc định); skill `harness-adapters` sinh từ registry; ratchet về 0; suite hợp đồng đầy đủ | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai; diff của PR này chỉ là di chuyển và nối dây |
+| 7 | Onboard pi, chỉ vai Crew, theo các quyết định ở mục 3.2 | Diff chỉ gồm package mới, một dòng trong `catalog`, một hàng trong bảng dispatch mặc định, fixture và tài liệu; suite hợp đồng pass; vai Mate trên pi bị từ chối nêu `Hooks`, picker tạo Mate không đưa pi ra |
 
 Đồ thị phụ thuộc, gồm cả phương án probe TUI:
 
@@ -265,7 +273,9 @@ PR 6 cố ý đi sau: tách "đổi chỗ ở" khỏi "đổi hình dạng" đ�
 PR 7 là phép thử của cả phương án: nếu phải sửa lõi để thêm harness thì thiết kế chưa đạt, và chỗ phải sửa là lỗi của hợp đồng.
 Hàng dispatch mặc định của harness mới là chính sách của captain, nên nó nằm trong diff của PR 7 mà không phải là sửa lõi.
 
-Mỗi PR chạy `make check`; PR 2 đến 5 chạy thêm các test live liên quan với `MATE_LIVE=1` và lưu evidence dưới `docs/evidence/`.
+Mỗi PR chạy `make check` và có review độc lập trước khi merge.
+Captain quyết định 2026-10-01: chuỗi này không chạy test live; lỗi chỉ lộ ra khi dùng thật thì sửa sau.
+Vì vậy một chuỗi xanh chỉ chứng minh hành vi mà test đặc tả, capture và test unit phủ tới.
 
 ## 7. Thử hợp đồng trên giấy với pi
 
@@ -295,7 +305,9 @@ Vì vậy `HookInstaller` và `Prepare` phải trả được cả file lẫn th
 | Trừu tượng hoá quá tay | Không interface nào có trước call site dùng nó; không plugin, không cấu hình động |
 | Live test chậm và tốn quota | Suite live tối thiểu cho conformance; lab cô lập như `codexlab` cho từng harness |
 
-## 9. Câu hỏi cần captain chốt
+## 9. Câu hỏi đã chốt
+
+Captain chốt cả bốn theo đề xuất dưới đây (2026-10-01).
 
 1. **Thứ tự với phương án probe TUI.**
    Đề xuất: đồ thị ở mục 6; PR 0 đến 3 ở đây đi trước, PR 0 của probe TUI chạy song song, PR 1 của probe TUI đổi hình bên trong `ScreenProfile` sau PR 3 ở đây, PR 3 của probe TUI đi sau PR 4 ở đây, PR 6 ở đây mở trong một cửa sổ không có PR probe TUI nào đang mở trên các file bị dời.
