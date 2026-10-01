@@ -1,0 +1,219 @@
+starts: 2
+
+== herdr argv (last start) ==
+"agent"
+"start"
+"crew-k3"
+"--kind"
+"codex"
+"--pane"
+"w1:p3"
+"--session"
+"{{HERDR_SESSION}}"
+"--timeout"
+"10000"
+"--"
+"--dangerously-bypass-approvals-and-sandbox"
+"-c"
+"check_for_update_on_startup=false"
+"-c"
+"project_doc_max_bytes=131072"
+"-m"
+"gpt-5.5"
+"-c"
+"model_reasoning_effort=\"low\""
+
+== launch spec ==
+kind: codex
+cwd: {{WORKSPACE}}/.worktrees/shop-k3
+delivery: instruction_file
+context_path: {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md
+context_required: true
+context_file: {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md role=codex_override
+max_inline_bytes: 0
+max_file_bytes: 131072
+model: gpt-5.5
+effort: low
+effort_omitted: false
+codex_home: {{CODEX_HOME}}
+claude_config_dir: 
+task_prompt: ""
+
+== launch args ==
+"--dangerously-bypass-approvals-and-sandbox"
+"-c"
+"check_for_update_on_startup=false"
+"-c"
+"project_doc_max_bytes=131072"
+"-m"
+"gpt-5.5"
+"-c"
+"model_reasoning_effort=\"low\""
+
+== launch env (set) ==
+CODEX_HOME={{CODEX_HOME}}
+
+== launch env (exported into the pane before start) ==
+CODEX_HOME={{CODEX_HOME}}
+
+== launch env (unset) ==
+CLAUDECODE
+CLAUDE_CODE_SESSION_ID
+CLAUDE_CODE_CHILD_SESSION
+CLAUDE_CODE_SESSION_ATTENDED
+CLAUDE_CODE_ENTRYPOINT
+CLAUDE_CODE_EXECPATH
+CLAUDE_CODE_MESSAGING_SOCKET
+CLAUDE_CODE_MESSAGING_TOKEN
+CLAUDE_PID
+CLAUDE_EFFORT
+
+== pane env (tab create) ==
+label: crew-k3
+cwd: {{WORKSPACE}}/.worktrees/shop-k3
+MATE_PROJECT_ID=shop
+MATE_AGENT_ID=crew-k3
+MATE_AGENT_ROLE=crew
+MATE_CREW_ID=k3
+MATE_RUNTIME_SESSION_ID={{HERDR_SESSION}}
+MATE_STATUS={{WORKSPACE}}/.mate/projects/shop/crews/k3.status
+MATE_CALLER=crew
+
+== prompts ==
+"Read and follow the brief at {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md. Progress so far: pushed two commits. Start now."
+
+== notes ==
+- the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code
+- the captain first chose the narrower --ask-for-approval never --sandbox workspace-write pair, then reversed that ruling the same day: a linked Crew worktree's .git is a pointer file into the primary repo's git dir, outside workspace-write's writable root, so a Codex Crew under the narrow pair could do work but could never git commit it (measured both directions) - and mate never commits on a Crew's behalf, it only fast-forwards the Crew branch, so uncommitted work can never be delivered
+- this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.mate/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit
+- this puts gomate in the same posture firstmate's own tooling already runs Codex in
+- this does not clear Codex's per-absolute-path directory-trust confirmation; that dialog is a separate wall no flag removes, measured 2026-09-14
+- the launch also carries -c check_for_update_on_startup=false: codex-cli draws a three-option release-update prompt ahead of everything else while a newer version is published, which blocks the composer (measured 2026-09-18 with 0.154.0 installed and 0.155.0 out); the key is documented and the override is per-launch, so the operator's own config.toml is never written
+- the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation
+- Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered); the launch raises that cap to CodexDefaultMaxBytes with -c project_doc_max_bytes= and mate meters against the same number
+- missing or empty project files do not fail Codex; mate refuses to start instead
+
+== files the launch created or changed ==
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta mode=-rw-r--r-- bytes=312 ---
+agent=crew-k3
+branch=mate/k3
+effort=low
+harness=codex
+kind=ship
+launched_at=2026-09-17T10:00:00Z
+model=gpt-5.5
+pane=w1:p3
+repo=shop
+session={{HERDR_SESSION}}
+session_id=
+started_at=2026-09-17T10:00:00Z
+state=spawned
+tab=w1:t3
+task=Add a healthcheck endpoint.
+transcript=
+workspace=w1
+worktree=.worktrees/shop-k3
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.status mode=-rw-r--r-- bytes=0 ---
+(empty)
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.status ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7634 ---
+(rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md ---
+
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2245 ---
+{
+  "version": 1,
+  "captured_at": "2026-09-17T10:00:00Z",
+  "source": "launch",
+  "project": "shop",
+  "crew": "k3",
+  "repo": "shop",
+  "harness": "codex",
+  "mate_version": "dev",
+  "requested_model": "gpt-5.5",
+  "requested_effort": "low",
+  "effort_omitted": false,
+  "repo_commit": "{{HEAD}}",
+  "repo_dirty": false,
+  "documents": [
+    {
+      "path": ".mate/projects/shop/crews/k3/brief.md",
+      "role": "task_brief",
+      "sha256": "{{sha256 of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}}",
+      "bytes": {{bytes of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}},
+      "state": "configured"
+    },
+    {
+      "path": ".mate/CREW.md",
+      "role": "workspace_crew_rules",
+      "sha256": "a3403b12a400203117618302ad02acfbd23a0a107d9a7d1ea9c5df6a5f0b8894",
+      "bytes": 441,
+      "state": "configured"
+    },
+    {
+      "path": ".mate/projects/shop/CREW.md",
+      "role": "project_crew_rules",
+      "sha256": "9603c2a33aa9ba8608a4f7565ed121371fdc7a3fa3454e9ba530aff31af82d58",
+      "bytes": 370,
+      "state": "configured"
+    },
+    {
+      "path": ".worktrees/shop-k3/AGENTS.md",
+      "role": "repo_agents",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/CLAUDE.md",
+      "role": "repo_claude",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/AGENTS.override.md",
+      "role": "generated_prompt",
+      "sha256": "{{sha256 of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}}",
+      "bytes": {{bytes of {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md}},
+      "state": "configured"
+    },
+    {
+      "path": ".worktrees/shop-k3/.codex/config.toml",
+      "role": "repo_codex_config",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": ".worktrees/shop-k3/.claude/settings.json",
+      "role": "repo_claude_settings",
+      "bytes": 0,
+      "state": "missing"
+    },
+    {
+      "path": "embedded:crew/brief.md.tmpl",
+      "role": "crew_prompt_template",
+      "sha256": "8375b828647af556f67e98066eba1ccb6107cf7aaf6041e730b5f3f174a9b7b5",
+      "bytes": 9578,
+      "state": "configured"
+    }
+  ],
+  "fingerprint": "80e2e1c7536b165b69b77040a6282201d1435876e08ffdf3047e216a9868919c"
+}
+--- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json ---
+
+--- created {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md mode=-rw-r--r-- bytes=7634 ---
+(rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
+--- end {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md ---
+
+--- created {{WORKSPACE}}/.worktrees/shop-k3/README.md mode=-rw-r--r-- bytes=5 ---
+shop
+--- end {{WORKSPACE}}/.worktrees/shop-k3/README.md ---
+
+--- appended to {{WORKSPACE}}/shop/.git/info/exclude mode=-rw-r--r-- bytes=76 ---
+
+# mate generated crew context (local, never committed)
+/AGENTS.override.md
+--- end {{WORKSPACE}}/shop/.git/info/exclude ---

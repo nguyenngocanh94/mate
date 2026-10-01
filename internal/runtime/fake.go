@@ -52,6 +52,10 @@ type Fake struct {
 	StyledOutputs map[string]string
 	ReadCalls     []string
 	StartArgv     [][]string
+	// StartLaunches is, in start order, the validated harness launch each
+	// recorded StartArgv entry was built from, so a test can pin what the
+	// argv alone does not show: env assignments, unsets and delivery.
+	StartLaunches []harness.LaunchSpec
 	// StartEnv is, per pane, the environment the latest start in it would
 	// have exported into the pane's shell (Herdr.StartAgent's `export`),
 	// through the same allowlist.
@@ -361,6 +365,7 @@ func (f *Fake) StartAgent(_ context.Context, spec AgentStartSpec) (AgentHandle, 
 		return AgentHandle{}, err
 	}
 	f.StartArgv = append(f.StartArgv, argv)
+	f.StartLaunches = append(f.StartLaunches, spec.Launch())
 	if f.StartEnv == nil {
 		f.StartEnv = map[string][]EnvVar{}
 	}
