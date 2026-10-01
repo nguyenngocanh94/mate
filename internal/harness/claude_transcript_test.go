@@ -836,6 +836,16 @@ func TestClaudeProjectSlug(t *testing.T) {
 		// over UTF-16 code units, so an astral character is two dashes and a
 		// BMP accented character is one.
 		{"unicode_utf16_units", "/private/tmp/g5s6b-slug-probe-74669/acc\u00e9nt-\U0001F600-x", "-private-tmp-g5s6b-slug-probe-74669-acc-nt----x"},
+		// Past 200 code units the CLI cuts the slug and appends a hash of the
+		// whole cwd. Expected values come from running the functions copied
+		// out of claude-code 2.1.286's bundle under node, not from this code.
+		{"exactly_200_is_whole", "/" + strings.Repeat("a", 199), "-" + strings.Repeat("a", 199)},
+		{"201_is_cut_and_hashed", "/" + strings.Repeat("a", 200), "-" + strings.Repeat("a", 199) + "-b6ymvl"},
+		{"long_tmpdir", "/private/tmp/mate-long-tmpdir-" + strings.Repeat("a", 64) + "/" + strings.Repeat("b", 58) +
+			"/TestMateClaudeIsLocatedFromItsSessionIDWhenTheHookHasNotWrittenT1521853395/001/.mate/projects/shop/mate",
+			"-private-tmp-mate-long-tmpdir-" + strings.Repeat("a", 64) + "-" + strings.Repeat("b", 58) +
+				"-TestMateClaudeIsLocatedFromItsSessionIDWhenThe-d83bm9"},
+		{"cut_counts_utf16_units", "/w/" + strings.Repeat("x", 196) + "\U0001F600\u00e9/tail", "-w-" + strings.Repeat("x", 196) + "-" + "-8eh65c"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

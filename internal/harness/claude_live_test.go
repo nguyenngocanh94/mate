@@ -117,6 +117,48 @@ func TestLiveClaudeProjectSlugResolution(t *testing.T) {
 	})
 }
 
+// TestLiveClaudeProjectSlugOfALongCwd measures the CLI's rule for a cwd whose
+// slug passes 200 characters: cut, then '-' and a hash of the whole cwd. The
+// rule was read out of the CLI's bundle on 2026-10-01 after a long TMPDIR put
+// a fixture's slug past the filesystem's name limit. Opt in with MATE_LIVE=1;
+// it runs the CLI once and removes what it wrote.
+func TestLiveClaudeProjectSlugOfALongCwd(t *testing.T) {
+	requireLive(t)
+	claudePath, err := exec.LookPath("claude")
+	if err != nil {
+		t.Fatalf("MATE_LIVE=1 but no claude CLI on PATH: %v", err)
+	}
+	projectsDir := claudeProjectsDir(t)
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	deep := filepath.Join(base, strings.Repeat("a", 80), strings.Repeat("b", 80), "slug.\U0001F600probe")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatalf("create %s: %v", deep, err)
+	}
+	wantSlug := ClaudeProjectSlug(deep)
+	if len(wantSlug) <= claudeSlugMax {
+		t.Fatalf("slug %q is not past the cut; lengthen the fixture", wantSlug)
+	}
+	wantDir := filepath.Join(projectsDir, wantSlug)
+	session := newClaudeSessionID(t)
+	// The project directory is this test's own: its name carries the random
+	// TempDir name, so nothing else can have run there. The CLI also leaves
+	// project state (memory/) in it, so the whole directory goes.
+	t.Cleanup(func() {
+		if err := os.RemoveAll(wantDir); err != nil {
+			t.Errorf("cleanup: remove %s: %v", wantDir, err)
+		}
+	})
+	runClaudeProbe(t, claudePath, deep, deep, session)
+	path := waitForClaudeTranscript(t, projectsDir, session)
+	if dir := filepath.Dir(path); dir != wantDir {
+		t.Fatalf("transcript landed in %s, want %s", dir, wantDir)
+	}
+	t.Logf("claude %s slugs a %d-byte cwd as %s", claudeVersion(t, claudePath), len(deep), wantSlug)
+}
+
 // claudeProjectsDir resolves the directory the CLI writes its transcripts
 // under, honouring the same override the CLI does.
 func claudeProjectsDir(t *testing.T) string {
