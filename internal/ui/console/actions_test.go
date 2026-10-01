@@ -361,6 +361,26 @@ func TestTheCrewRowSheetRestartsTheCrew(t *testing.T) {
 	}
 }
 
+// A closed crew's task is over: the entry is withheld rather than offered
+// and then refused by `crew relaunch` after the captain confirmed it.
+func TestRestartCrewIsUnavailableForAClosedCrew(t *testing.T) {
+	tree := sampleTree()
+	crew := &tree.Projects[0].Crews[1]
+	crew.Status, crew.Closed = query.CrewFinished, true
+	if !crew.Worktree.IsKnown() || crew.Worktree.Value.Branch == "" {
+		t.Fatalf("setup: the crew must record a branch, or the refusal proves nothing: %+v", crew.Worktree)
+	}
+	m := loaded(t, tree, nil)
+	m, _ = send(t, m, key("enter"))
+	c := m.restartCrewChoice(row{kind: rowCrew, id: crew.CrewID})
+	if c.enabled {
+		t.Fatalf("restart crew on a closed crew = %+v, want unavailable", c)
+	}
+	if !strings.Contains(c.desc, "closed") {
+		t.Fatalf("restart crew reason = %q, want it to say the crew is closed", c.desc)
+	}
+}
+
 // Each kind has one fixed order, so muscle memory holds across objects.
 func TestTheSheetOrderIsFixedPerKind(t *testing.T) {
 	keys := func(m Model) string {

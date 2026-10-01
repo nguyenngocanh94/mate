@@ -108,6 +108,21 @@ func crewActions(c CrewNode) []ActionAvailability {
 		diffReason = "the worktree record could not be read; refresh before diffing"
 	}
 	out = append(out, action("diff", diff, diffReason))
+	// restart_crew (`mate crew relaunch`) starts the crew's harness again in
+	// the worktree it already has. A closed crew is refused - its task is
+	// over and a relaunch would resurrect a decision nobody made - and so is
+	// one with no branch to relaunch into. It is not tied to the binding: a
+	// recorded binding does not prove the agent is alive, and the case this
+	// exists for is the one where Herdr no longer answers at all.
+	restart, restartReason := c.Worktree.IsKnown() && c.Worktree.Value.Branch != "",
+		"this Crew records no branch to relaunch into; spawn a new crew"
+	switch {
+	case c.Closed:
+		restart, restartReason = false, "this Crew is closed; spawn a new one if the task is not over"
+	case !c.Worktree.IsKnown() && c.Worktree.State != Absent:
+		restartReason = "the worktree record could not be read; refresh before restarting"
+	}
+	out = append(out, action("restart_crew", restart, restartReason))
 	return out
 }
 
