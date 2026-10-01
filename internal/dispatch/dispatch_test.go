@@ -111,7 +111,8 @@ func TestTheBuiltInTableIsTheCaptains(t *testing.T) {
 		return out
 	}
 	want := [][]string{
-		{"--harness claude --model sonnet --effort medium", "--harness codex --model gpt-6-luna --effort medium"},
+		{"--harness claude --model sonnet --effort medium", "--harness codex --model gpt-6-luna --effort medium",
+			"--harness pi --model deepseek/deepseek-flash --effort high"},
 		{"--harness claude --model sonnet --effort high", "--harness codex --model gpt-6-luna --effort high",
 			"--harness claude --model opus --effort medium", "--harness codex --model gpt-5.6-terra --effort medium"},
 		{"--harness claude --model opus --effort high", "--harness codex --model gpt-5.6-terra --effort high"},
