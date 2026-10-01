@@ -1,6 +1,7 @@
 package pi
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -127,11 +128,28 @@ func TestPiTurnEndsInTheSession(t *testing.T) {
 	if sessionTurnEnded(data, last) {
 		t.Fatal("a turn end was seen after the last one")
 	}
-	// The first call ran a tool; up to its message, no turn has ended.
-	first := parseSession(data).batch.Turns[0]
+	// The first call stopped to run a tool: through its message and the
+	// tool's result, no turn has ended.
+	first := turns[0]
+	if first.StopReason != stopToolUse {
+		t.Fatalf("first call stopped with %q, want %q", first.StopReason, stopToolUse)
+	}
 	if sessionTurnEnded(data[:first.Offset], time.Time{}) {
 		t.Fatal("a session holding only the prompt read as ended")
 	}
+	toolResult := lineEnd(data, lineEnd(data, first.Offset))
+	if sessionTurnEnded(data[:toolResult], first.OccurredAt.Add(-time.Millisecond)) {
+		t.Fatal("an assistant message that stopped to run a tool read as a turn end")
+	}
+}
+
+// lineEnd is the offset just past the JSONL record that starts at off.
+func lineEnd(data []byte, off int64) int64 {
+	i := bytes.IndexByte(data[off:], '\n')
+	if i < 0 {
+		return int64(len(data))
+	}
+	return off + int64(i) + 1
 }
 
 func TestPiLocatesTheSessionByID(t *testing.T) {
