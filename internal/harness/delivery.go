@@ -152,7 +152,8 @@ func (s LaunchSpec) ContextRequired() bool { return s.contextRequired }
 // MaxInlineBytes is the inline fallback budget (Claude).
 func (s LaunchSpec) MaxInlineBytes() int { return s.maxInlineBytes }
 
-// MaxFileBytes is the file/chain size budget (0 means strategy default).
+// MaxFileBytes is the file/chain size budget. An instruction-file delivery
+// needs one; 0 is refused.
 func (s LaunchSpec) MaxFileBytes() int { return s.maxFileBytes }
 
 // TaskPrompt is the Crew task to send through runtime.PromptAgent after the

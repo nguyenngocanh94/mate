@@ -510,11 +510,10 @@ func ratchetAllowed(h ratchetHit) int {
 	return -1
 }
 
-// TestRatchetLiteralMatchingIsWholeToken pins the matching rule the ratchet
-// depends on: a name counts as a whole token, never as a substring.
-// A harness's own package is knowledge of that harness: importing it is
-// counted, and so is every use of it, under whatever name the file gives
-// it. The core, its test helpers and the catalog are not harness packages.
+// TestRatchetCountsAHarnessPackage: a harness's own package is knowledge of
+// that harness. Importing it is counted, and so is every use of it, under
+// whatever name the file gives it. The core, its test helpers and the
+// catalog are not harness packages.
 func TestRatchetCountsAHarnessPackage(t *testing.T) {
 	root := t.TempDir()
 	src := `package x
@@ -553,6 +552,8 @@ var (
 	}
 }
 
+// TestRatchetLiteralMatchingIsWholeToken pins the matching rule the ratchet
+// depends on: a name counts as a whole token, never as a substring.
 func TestRatchetLiteralMatchingIsWholeToken(t *testing.T) {
 	for _, tc := range []struct {
 		in   string

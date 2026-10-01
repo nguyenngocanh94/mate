@@ -149,12 +149,14 @@ type LaunchPlan struct {
 	ContextRequired bool
 	ContextFiles    []GeneratedFile
 	MaxInlineBytes  int
-	MaxFileBytes    int
-	TaskPrompt      string
-	Model           string
-	Effort          Effort
-	EffortOmitted   bool
-	Notes           []string
+	// MaxFileBytes is the file/chain size budget. An instruction-file
+	// delivery needs one; 0 is refused.
+	MaxFileBytes  int
+	TaskPrompt    string
+	Model         string
+	Effort        Effort
+	EffortOmitted bool
+	Notes         []string
 	// CodexHome and ClaudeConfigDir are the provider roots the launch
 	// resolved, recorded on the spec.
 	CodexHome       string
