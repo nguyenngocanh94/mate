@@ -11,6 +11,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -29,7 +31,7 @@ import (
 func mergeLiveWorkspace(t *testing.T, session string, yolo bool) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -91,7 +93,7 @@ const shipBrief = "Append the single line `merged by mate` to README.md in this 
 func crewPaneTail(ctx context.Context, rt *runtime.Herdr, session, configHome, agent, crew string) func() string {
 	handle := runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
-		Name:    agent, RawID: crew, Kind: harness.KindCodex,
+		Name:    agent, RawID: crew, Kind: codex.KindCodex,
 	}
 	return func() string {
 		screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
@@ -142,7 +144,7 @@ func assertMergedAndFinished(t *testing.T, w *store.Workspace, project, crew, br
 	}
 
 	// The console's own read: a finished crew is not a row any more.
-	snap, err := query.Load(ctx, w)
+	snap, err := query.Load(ctx, w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -185,7 +187,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 	})
 
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship(shipBrief),
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, BriefText: brieftest.Ship(shipBrief),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -203,7 +205,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 
 	// The console only offers merge on a `wait-mate` row, so the snapshot
 	// the menu is built from has to agree before the action is driven.
-	snap, err := query.Load(ctx, w)
+	snap, err := query.Load(ctx, w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -261,7 +263,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 		_, _ = spawn.StopMate(stopCtx, w, deps, "shop")
 	})
 
-	mateRes, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	mateRes, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -283,7 +285,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	}
 
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship(shipBrief),
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, BriefText: brieftest.Ship(shipBrief),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -312,7 +314,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	// for the Mate to have run `mate merge`.
 	mateHandle := runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
-		Name:    mateRes.Agent, RawID: "shop", Kind: harness.KindClaude,
+		Name:    mateRes.Agent, RawID: "shop", Kind: claude.KindClaude,
 	}
 	mateTail := func() string {
 		screen, readErr := rt.ReadAgent(ctx, mateHandle, harness.ReadRecentUnwrapped, 60)

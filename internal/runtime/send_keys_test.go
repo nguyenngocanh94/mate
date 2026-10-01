@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -21,7 +23,7 @@ func claudeLaunch(t *testing.T) harness.LaunchSpec {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{Kind: harness.KindClaude, Cwd: cwd, ContextPath: path})
+	launch, err := claude.Claude{}.Build(context.Background(), harness.AgentSpec{Kind: claude.KindClaude, Cwd: cwd, ContextPath: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +48,7 @@ func TestHerdrSendKeysIsAgentAddressedOneCallPerPress(t *testing.T) {
 		t.Fatalf("unexpected argv %#v", spec.Args)
 		return process.Result{}, nil
 	}})
-	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab"}, Name: "mate-g4-01", Kind: harness.KindClaude, Tab: runtime.TabHandle{PaneID: "w9:p9"}}
+	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab"}, Name: "mate-g4-01", Kind: claude.KindClaude, Tab: runtime.TabHandle{PaneID: "w9:p9"}}
 	if err := rt.SendKeys(context.Background(), h, []string{"down"}); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestFakeSendKeysRecordsPressesAndRunsTheScreenHook(t *testing.T) {
 	t.Parallel()
 	f := runtime.NewFake()
 	session := runtime.SessionHandle{Name: "lab"}
-	h := runtime.AgentHandle{Session: session, Name: "crew-1", Kind: harness.KindCodex, Tab: runtime.TabHandle{PaneID: "w1:p1"}}
+	h := runtime.AgentHandle{Session: session, Name: "crew-1", Kind: codex.KindCodex, Tab: runtime.TabHandle{PaneID: "w1:p1"}}
 	f.SeedAgent(h, runtime.AgentIdle)
 	f.SetReadOutput(h, "dialog")
 	f.OnSendKeys = func(handle runtime.AgentHandle, keys []string) {

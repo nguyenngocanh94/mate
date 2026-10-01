@@ -23,7 +23,7 @@ func TestPromptMarkerMatchesSend(t *testing.T) {
 
 func newWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

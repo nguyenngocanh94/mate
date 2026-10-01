@@ -206,7 +206,7 @@ func TestResetDerivedEmptiesTheDerivedTablesAndTheEventSequence(t *testing.T) {
 func TestPathRefusesASymlinkOutOfTheWorkspace(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
-	ws, err := store.Init(root)
+	ws, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

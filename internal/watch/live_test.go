@@ -14,7 +14,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
-	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -50,7 +51,7 @@ func liveLabSession(t *testing.T) (session, configHome string) {
 		t.Fatal("HOME is required to resolve the Herdr socket")
 	}
 	// Every live test that reaches a lab session runs Codex in a lab
-	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codex/codexlab).
 	codexlab.Home(t)
 	return session, filepath.Join(home, ".config")
 }
@@ -96,7 +97,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 	res, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project:   "shop",
 		Crew:      "k3",
-		Harness:   harness.KindCodex,
+		Harness:   codex.KindCodex,
 		BriefText: brieftest.Ship("Reply with the single word ok and do nothing else. Do not run any command and do not write to any file."),
 	})
 	if err != nil {
@@ -113,7 +114,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    res.Agent,
 		RawID:   "k3",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 		Tab: runtime.TabHandle{
 			Session:     runtime.SessionHandle{Name: session, ConfigHome: configHome},
 			WorkspaceID: res.Workspace,
@@ -139,7 +140,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 
 	// 2. A line into the pane is movement: the composer holds it, then the
 	// turn starts. Either way the screen changed, and the incident closes.
-	if _, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: rt}, handle, harness.KindCodex,
+	if _, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: rt}, handle, codex.KindCodex,
 		"reply with the single word ack", send.Options{}); err != nil {
 		t.Fatalf("send into the crew pane: %v", err)
 	}
@@ -173,7 +174,7 @@ func waitForComposer(t *testing.T, ctx context.Context, rt runtime.Adapter,
 		if err != nil {
 			t.Fatalf("ReadAgent: %v", err)
 		}
-		class := send.ClassifyComposer(harness.Codex{}.Screen(), screen)
+		class := send.ClassifyComposer(codex.Codex{}.Screen(), screen)
 		last = class
 		if class.State == want {
 			t.Logf("pane reached composer %s (%q)", class.State, class.Evidence)
@@ -267,7 +268,7 @@ func liveWorkspace(t *testing.T, session string) *store.Workspace {
 	// symlinks resolved and the launch guard compares the two (mvp.md
 	// section 7).
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

@@ -111,7 +111,7 @@ func TestConsoleRestartMateKeepsItsHarness(t *testing.T) {
 	ws, deps := consoleFixture(t, "shop")
 	action := consoleAction(ws, deps)
 	if _, err := action(context.Background(), console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessCodex,
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("codex"),
 	}); err != nil {
 		t.Fatalf("start a Codex Mate: %v", err)
 	}

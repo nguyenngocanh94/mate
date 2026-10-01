@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -48,8 +50,8 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	mateDir := w.MateDir("shop")
-	source := harness.CodexHooksPath(mateDir)
-	command := harness.SessionHookCommand(deps.Binary, harness.KindCodex)
+	source := codex.CodexHooksPath(mateDir)
+	command := codex.CodexSessionHookCommand(deps.Binary)
 
 	own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
 	pane := newScriptedPane(t, rt,
@@ -60,7 +62,7 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 		scriptStep{screen: screen(t, "codex-0.156.1-hooks-table-trusted.txt"), key: "esc"},
 		scriptStep{screen: screen(t, "codex-0.156.1-ready.txt")},
 	)
-	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -71,7 +73,7 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 		t.Fatalf("presses = %s, want enter (Review hooks), enter (SessionStart), t, esc, esc", got)
 	}
 	// The first enter confirmed "1. Review hooks", never "2. Trust all".
-	if !(harness.Codex{}).Screen().StartupTargetSelected(harness.StartupScreenHooksReview, pane.screensPressedOn()[0]) {
+	if !(codex.Codex{}).Screen().StartupTargetSelected(harness.StartupScreenHooksReview, pane.screensPressedOn()[0]) {
 		t.Fatal("enter was pressed on the dialog while the highlight was not on 1. Review hooks")
 	}
 
@@ -93,8 +95,8 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 		t.Fatalf("hooks.json = %s, want one SessionStart hook and nothing else", data)
 	}
 	h := entries[0].Hooks[0]
-	if h["command"] != command || h["additionalContextLimit"] != float64(harness.CodexHookContextLimit) {
-		t.Fatalf("hook = %+v, want %q with additionalContextLimit %d", h, command, harness.CodexHookContextLimit)
+	if h["command"] != command || h["additionalContextLimit"] != float64(codex.CodexHookContextLimit) {
+		t.Fatalf("hook = %+v, want %q with additionalContextLimit %d", h, command, codex.CodexHookContextLimit)
 	}
 }
 
@@ -110,7 +112,7 @@ func TestStartMateCodexRefusesAReviewThatListsAForeignHook(t *testing.T) {
 		scriptStep{screen: screen(t, "codex-0.156.1-hooks-table-review-two.txt"), key: "enter"},
 		scriptStep{screen: foreignFirst},
 	)
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil {
 		t.Fatal("StartMate trusted a review that lists the operator's own hook")
 	}
@@ -140,7 +142,7 @@ func TestStartMateCodexRefusesAReviewOutsideSessionStart(t *testing.T) {
 		scriptStep{screen: screen(t, "codex-0.156.1-hooks-review-two.txt"), key: "enter"},
 		scriptStep{screen: table},
 	)
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil || !strings.Contains(err.Error(), "2 hook(s) need review, 1 of them under SessionStart") {
 		t.Fatalf("StartMate = %v, want a refusal naming the counts", err)
 	}
@@ -153,10 +155,10 @@ func TestStartMateClaudeWritesNoCodexHooks(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude}); err != nil {
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude}); err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
-	if _, err := os.Stat(harness.CodexHooksPath(w.MateDir("shop"))); !os.IsNotExist(err) {
+	if _, err := os.Stat(codex.CodexHooksPath(w.MateDir("shop"))); !os.IsNotExist(err) {
 		t.Fatalf("a Claude Mate got a Codex hooks file: %v", err)
 	}
 }

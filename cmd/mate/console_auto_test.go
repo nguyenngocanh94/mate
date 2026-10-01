@@ -58,7 +58,7 @@ func TestConsolePilotDigestsToAStartedMate(t *testing.T) {
 	}
 
 	// And the snapshot the Console draws carries the daemon's own state.
-	snap, err := query.Load(context.Background(), w)
+	snap, err := query.Load(context.Background(), w, consoleHarnesses())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

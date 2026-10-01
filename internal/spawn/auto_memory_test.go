@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -30,7 +30,7 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	path := harness.ClaudeSettingsPath(w.MateDir("shop"))
+	path := claude.ClaudeSettingsPath(w.MateDir("shop"))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestStartMateTurnsAutoMemoryOffInAnExistingSettingsFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	keys := settingsKeys(t, data)
-	if string(keys[harness.AutoMemoryKey]) != "false" {
+	if string(keys[claude.AutoMemoryKey]) != "false" {
 		t.Fatalf("auto-memory not turned off: %s", data)
 	}
 	if !json.Valid(keys["hooks"]) || !strings.Contains(string(keys["hooks"]), "/old/mate") {

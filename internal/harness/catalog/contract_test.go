@@ -12,16 +12,17 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
 // The contract suite (docs/plans/harness-registry-2026-09-30.md, section 4)
 // runs over every harness catalog.Default() registers. A harness is
 // onboarded when this suite passes for it; nothing here names one.
 //
-// Items 1, 2 and 4 are here: every capability declared, a launch built for
-// each role, and a verified transcript read against its fixture. The screen
-// captures (item 3) and the live conformance run (item 5) join it with the
-// plan PRs that give the contract those parts.
+// Items 1 to 4 are here: every capability declared, a launch built for each
+// role, the profile's screen captures classified, and a verified transcript
+// read against its fixture. The live conformance run (item 5) is not
+// written yet.
 
 func eachProfile(t *testing.T, run func(t *testing.T, p harness.Profile)) {
 	t.Helper()
@@ -307,6 +308,85 @@ func TestContractTranscriptReadsItsFixture(t *testing.T) {
 		want := harness.TokenUsage{Input: m.Usage.Input, CacheRead: m.Usage.CacheRead, CacheWrite: m.Usage.CacheWrite, Output: m.Usage.Output, Reasoning: m.Usage.Reasoning}
 		if len(b.UsageTurns) != m.Turns || sum != want {
 			t.Errorf("%d usage turns summing to %+v, want %d summing to %+v", len(b.UsageTurns), sum, m.Turns, want)
+		}
+	})
+}
+
+type screenManifest struct {
+	Captures []struct {
+		File    string `json:"file"`
+		Version string `json:"version"`
+		Pane    string `json:"pane"`
+		Source  string `json:"source"`
+		Want    string `json:"want"`
+	} `json:"captures"`
+}
+
+// composerStates are what a capture of a running harness's composer can be
+// expected to classify as, through the policy mate sends with.
+var composerStates = map[string]send.ComposerState{
+	"empty": send.StateEmpty,
+	"busy":  send.StateBusy,
+	"draft": send.StatePending,
+}
+
+// startupDialogs are the startup screens a profile may declare by answering
+// them; each one it answers must be in its captures.
+var startupDialogs = []harness.StartupScreen{
+	harness.StartupScreenTrustDialog,
+	harness.StartupScreenUpdateDialog,
+	harness.StartupScreenHooksReview,
+}
+
+// Item 3: every profile ships captures of its own screens, each recorded
+// with the harness version, the pane size and the read source it was taken
+// through, and the suite classifies them. A profile needs at least an
+// empty composer, a busy pane, a draft, a ready startup screen and every
+// startup dialog it answers, each read through its own ReadSource.
+func TestContractScreensClassifyTheirCaptures(t *testing.T) {
+	eachProfile(t, func(t *testing.T, p harness.Profile) {
+		dir := filepath.Join("testdata", "screens")
+		raw, err := os.ReadFile(filepath.Join(dir, string(p.Kind())+".json"))
+		if err != nil {
+			t.Fatalf("a profile needs a screen capture manifest: %v", err)
+		}
+		var m screenManifest
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("manifest: %v", err)
+		}
+		screen := p.Screen()
+		need := map[string]bool{"empty": true, "busy": true, "draft": true, string(harness.StartupScreenReady): true}
+		for _, d := range startupDialogs {
+			if _, err := screen.StartupAnswer(d); err == nil {
+				need[string(d)] = true
+			}
+		}
+		for _, c := range m.Captures {
+			if c.Version == "" || c.Pane == "" {
+				t.Errorf("%s: a capture records the harness version and the pane size", c.File)
+			}
+			source := harness.ReadSource(c.Source)
+			if source != harness.ReadRecentUnwrapped && source != harness.ReadVisible {
+				t.Errorf("%s: unknown read source %q", c.File, c.Source)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, c.File))
+			if err != nil {
+				t.Errorf("%s: %v", c.File, err)
+				continue
+			}
+			if state, ok := composerStates[c.Want]; ok {
+				if got := send.ClassifyComposer(screen, string(data)); got.State != state {
+					t.Errorf("%s classifies as %s (%s), want %s", c.File, got.State, got.Evidence, state)
+				}
+			} else if got := screen.ClassifyStartup(string(data)); string(got) != c.Want {
+				t.Errorf("%s classifies at startup as %s, want %s", c.File, got, c.Want)
+			}
+			if source == screen.ReadSource() {
+				delete(need, c.Want)
+			}
+		}
+		for want := range need {
+			t.Errorf("no capture read through %s shows %s", screen.ReadSource(), want)
 		}
 	})
 }

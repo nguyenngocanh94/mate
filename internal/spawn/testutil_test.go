@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -22,7 +24,7 @@ import (
 func newWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -108,7 +110,7 @@ func codexSessionsIn(t *testing.T, sessions string) harness.Registry {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if codex, ok := p.(harness.Codex); ok {
+		if codex, ok := p.(codex.Codex); ok {
 			codex.SessionsDir = sessions
 			p = codex
 		}
@@ -121,10 +123,12 @@ func codexSessionsIn(t *testing.T, sessions string) harness.Registry {
 	return reg
 }
 
-// screen loads one captured startup screen from the harness testdata.
+// screen loads one captured startup screen from the testdata of the harness
+// that drew it, which its name begins with.
 func screen(t *testing.T, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "harness", "testdata", "startup", name))
+	kind, _, _ := strings.Cut(strings.ReplaceAll(name, "_", "-"), "-")
+	data, err := os.ReadFile(filepath.Join("..", "harness", kind, "testdata", "startup", name))
 	if err != nil {
 		t.Fatalf("read capture %s: %v", name, err)
 	}

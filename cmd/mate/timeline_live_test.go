@@ -43,7 +43,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 	defer pilot.Stop()
 
 	out, err := action(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessClaude})
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("start the shop Mate: %v", err)
 	}

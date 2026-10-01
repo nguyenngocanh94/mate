@@ -19,6 +19,7 @@ import (
 func actEmptyWorkspace() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
+		Harnesses:   testHarnesses,
 		Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme", Root: "/Users/dev/work/acme"}),
 		Actions:     []query.ActionAvailability{{Action: "onboard", Available: true, Reason: "add a Project to this workspace"}},
 	}

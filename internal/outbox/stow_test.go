@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
@@ -80,7 +82,7 @@ func TestStowEndsOnTheStopHookAnswer(t *testing.T) {
 			f.rt.SetReadOutput(f.handle, claudeScreen(""))
 		}
 	}}
-	res, err := f.stowSender(harness.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
+	res, err := f.stowSender(claude.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +116,7 @@ func TestStowEndsOnACodexComposerBackToEmpty(t *testing.T) {
 			f.rt.SetReadOutput(f.handle, codexEmpty)
 		}
 	}}
-	res, err := f.stowSender(harness.KindCodex, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
+	res, err := f.stowSender(codex.KindCodex, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +172,7 @@ func TestStowWaitsForTheCodexRolloutToFinishTheTurn(t *testing.T) {
 			fh.Close()
 		}
 	}}
-	res, err := f.stowSender(harness.KindCodex, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
+	res, err := f.stowSender(codex.KindCodex, sleeper).Stow(context.Background(), project, outbox.StowOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +185,7 @@ func TestStowWaitsForTheCodexRolloutToFinishTheTurn(t *testing.T) {
 }
 
 // codexWithoutTurnEnd is Codex declaring no turn-end evidence.
-type codexWithoutTurnEnd struct{ harness.Codex }
+type codexWithoutTurnEnd struct{ codex.Codex }
 
 func (c codexWithoutTurnEnd) Capabilities() harness.Capabilities {
 	caps := c.Codex.Capabilities()
@@ -219,7 +221,7 @@ func TestStowFallsBackToTheComposerWithoutTurnEndEvidence(t *testing.T) {
 	}
 	d := f.deps()
 	d.Harnesses, d.Sleeper, d.Handle = reg, sleeper, func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
-		return f.handle, harness.KindCodex, nil
+		return f.handle, codex.KindCodex, nil
 	}
 	ws, err := store.Open(f.ws.Root())
 	if err != nil {
@@ -250,7 +252,7 @@ func TestCodexTurnCompletedAfter(t *testing.T) {
 		{"started only", rec("task_started", at.Add(time.Second)), false},
 		{"garbage then finished", "not json\n" + rec("task_complete", at.Add(time.Millisecond)), true},
 	} {
-		if got := harness.CodexTurnCompletedAfter([]byte(c.rollout), at); got != c.want {
+		if got := codex.CodexTurnCompletedAfter([]byte(c.rollout), at); got != c.want {
 			t.Errorf("%s: CodexTurnCompletedAfter = %v, want %v", c.name, got, c.want)
 		}
 	}
@@ -262,7 +264,7 @@ func TestCodexTurnCompletedAfter(t *testing.T) {
 func TestStowWithdrawsALineThatNeverGotIn(t *testing.T) {
 	f := newFixture(t)
 	f.rt.SetReadOutput(f.handle, claudeBusyScreen())
-	res, err := f.stowSender(harness.KindClaude, &tickSleeper{clock: f.clock}).Stow(context.Background(), project, outbox.StowOptions{Ceiling: time.Minute})
+	res, err := f.stowSender(claude.KindClaude, &tickSleeper{clock: f.clock}).Stow(context.Background(), project, outbox.StowOptions{Ceiling: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +301,7 @@ func TestStowRefusalsQueueNothing(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t)
 			f.rt.SetReadOutput(f.handle, tc.screen)
-			res, err := f.stowSender(harness.KindClaude, &tickSleeper{clock: f.clock}).Stow(context.Background(), project, tc.opts)
+			res, err := f.stowSender(claude.KindClaude, &tickSleeper{clock: f.clock}).Stow(context.Background(), project, tc.opts)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -319,7 +321,7 @@ func TestStowRefusalsQueueNothing(t *testing.T) {
 func TestStrictStowRejectsEmptyComposerWithoutTurnEnd(t *testing.T) {
 	f := newFixture(t)
 	sleeper := &tickSleeper{clock: f.clock}
-	res, err := f.stowSender(harness.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
+	res, err := f.stowSender(claude.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +337,7 @@ func TestStrictStowIgnoresMateMessagesToCrews(t *testing.T) {
 			_ = f.ws.AppendSent(project, store.SentEntry{Source: store.SourceMate, Target: "crew-x", Text: "continue"})
 		}
 	}}
-	res, err := f.stowSender(harness.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
+	res, err := f.stowSender(claude.KindClaude, sleeper).Stow(context.Background(), project, outbox.StowOptions{RequireCompletion: true, Ceiling: 20 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}

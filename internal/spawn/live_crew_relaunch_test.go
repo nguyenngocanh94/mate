@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -28,7 +28,7 @@ func TestLiveCrewRelaunchAfterThePaneDies(t *testing.T) {
 	session, configHome := liveLabSession(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestLiveCrewRelaunchAfterThePaneDies(t *testing.T) {
 	})
 
 	res, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k9", Harness: harness.KindCodex,
+		Project: "shop", Crew: "k9", Harness: codex.KindCodex,
 		BriefText: brieftest.Ship("Reply with the single word ok and do nothing else."),
 	})
 	if err != nil {
@@ -90,7 +90,7 @@ func TestLiveCrewRelaunchAfterThePaneDies(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session},
 		Name:    res.Agent,
 		RawID:   "k9",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 		Tab: runtime.TabHandle{
 			Session: runtime.SessionHandle{Name: session}, WorkspaceID: res.Workspace,
 			TabID: res.Tab, PaneID: res.Pane, Label: spawn.CrewTabLabelPrefix + "k9",
@@ -114,7 +114,7 @@ func TestLiveCrewRelaunchAfterThePaneDies(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session},
 		Name:    again.Agent,
 		RawID:   "k9",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 		Tab: runtime.TabHandle{
 			Session: runtime.SessionHandle{Name: session}, WorkspaceID: again.Workspace,
 			TabID: again.Tab, PaneID: again.Pane, Label: spawn.CrewTabLabelPrefix + "k9",

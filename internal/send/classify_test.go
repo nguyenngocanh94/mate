@@ -8,6 +8,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
@@ -56,14 +58,14 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 	}{
 		{
 			name:     "claude empty composer",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_empty",
 			want:     send.StateEmpty,
 			evidence: "❯",
 		},
 		{
 			name:     "claude composer holding a half typed line",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_pending",
 			want:     send.StatePending,
 			pending:  "half typed",
@@ -73,7 +75,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// The composer under the spinner is empty; only the ordering
 			// of the checks keeps this out of StateEmpty.
 			name:     "claude mid turn spinner over an empty composer",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_busy",
 			want:     send.StateBusy,
 			evidence: "✶ Pollinating…",
@@ -82,14 +84,14 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// Measured with no spinner on screen at all: the placeholder
 			// is the only in-flight evidence this snapshot carries.
 			name:     "claude mid turn with a queued message",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_busy_queued",
 			want:     send.StateBusy,
 			evidence: "❯\u00a0Press up to edit queued messages",
 		},
 		{
 			name:     "claude trust dialog is not a composer",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_trust_dialog",
 			want:     send.StateUnknown,
 			evidence: "harness directory-trust dialog",
@@ -104,7 +106,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// closing rule into one line - and the composer under the
 			// splash is an empty composer all the same.
 			name:     "claude startup splash at the console's own pane width",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_startup_splash",
 			want:     send.StateEmpty,
 			evidence: "❯",
@@ -114,7 +116,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// the joined rules must not turn somebody's text into an empty
 			// composer that mate would type over.
 			name:     "claude startup splash holding a half typed line",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_startup_splash_pending",
 			want:     send.StatePending,
 			pending:  "half typed",
@@ -125,21 +127,21 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// survive on their own lines: the splash's banner is still
 			// joined, and the verdict must be the same one.
 			name:     "claude startup splash at 80x24",
-			kind:     harness.KindClaude,
+			kind:     claude.KindClaude,
 			screen:   "claude_startup_splash_80x24",
 			want:     send.StateEmpty,
 			evidence: "❯",
 		},
 		{
 			name:     "codex empty composer shows its placeholder",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_empty",
 			want:     send.StateEmpty,
 			evidence: "› Ask Codex to do anything",
 		},
 		{
 			name:     "codex composer holding a half typed line",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_pending",
 			want:     send.StatePending,
 			pending:  "half typed",
@@ -149,14 +151,14 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// Codex redraws its placeholder while working, so the busy
 			// line is what must decide this screen.
 			name:     "codex mid turn",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_busy",
 			want:     send.StateBusy,
 			evidence: "• Working (2s • esc to interrupt)",
 		},
 		{
 			name:     "codex trust dialog is not a composer",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_trust_dialog",
 			want:     send.StateUnknown,
 			evidence: "harness directory-trust dialog",
@@ -165,7 +167,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// The model picker marks its current option with the same
 			// glyph the composer uses.
 			name:   "codex model picker modal is not a composer",
-			kind:   harness.KindCodex,
+			kind:   codex.KindCodex,
 			screen: "codex_modal",
 			want:   send.StateUnknown,
 		},
@@ -175,7 +177,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// live Mate's every send to an idle Codex crew was refused as
 			// an unnamed screen because of it (2026-09-26).
 			name:     "codex 0.157 empty composer above a two-line footer",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_empty_v157",
 			want:     send.StateEmpty,
 			evidence: "› Ask Codex to do anything",
@@ -184,7 +186,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// The screen that crew showed: a finished turn, its time and a
 			// tip above the composer.
 			name:     "codex 0.157 composer after a finished turn",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_after_turn_v157",
 			want:     send.StateEmpty,
 			evidence: "› Ask Codex to do anything",
@@ -194,7 +196,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// only naming the dialog first keeps it from reading as a
 			// composer holding "1. Trust and continue".
 			name:     "codex 0.157 trust dialog is not a composer",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_trust_dialog_v157",
 			want:     send.StateUnknown,
 			evidence: "harness directory-trust dialog",
@@ -202,7 +204,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 		{
 			// Typing drops the hint and keeps the warning on that line.
 			name:     "codex 0.157 composer holding a half typed line",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_pending_v157",
 			want:     send.StatePending,
 			pending:  "half typed",
@@ -212,7 +214,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// herdr refuses a recent-unwrapped read of a working Codex, so
 			// this one is the `--source visible` read mate falls back to.
 			name:     "codex 0.157 mid turn, read from the visible screen",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_busy_visible_v157",
 			want:     send.StateBusy,
 			evidence: "• Working (5s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to c…",
@@ -221,7 +223,7 @@ func TestClassifyComposerOnCapturedScreens(t *testing.T) {
 			// A slash command typed but not yet submitted is the caller's
 			// own pending text, popup and all.
 			name:     "codex slash command popup is pending text",
-			kind:     harness.KindCodex,
+			kind:     codex.KindCodex,
 			screen:   "codex_slash_popup",
 			want:     send.StatePending,
 			pending:  "/model",
@@ -273,7 +275,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	if !strings.Contains(plain, "• Working (2s • esc to interrupt)") {
 		t.Fatal("the capture no longer holds the quoted Codex busy line this test is about")
 	}
-	got := send.ClassifyComposer(harness.Claude{}.Screen(), styled)
+	got := send.ClassifyComposer(claude.Claude{}.Screen(), styled)
 	if got.State != send.StateEmpty || !strings.Contains(got.Evidence, "faint") {
 		t.Fatalf("state = %q (evidence %q), want empty: an idle Claude quoting a busy Codex is idle", got.State, got.Evidence)
 	}
@@ -281,7 +283,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	// A quoted Claude spinner - indented, as every quoted line is - is not
 	// this pane's spinner either.
 	quoted := strings.Replace(plain, "• Working (2s • esc to interrupt)", "✻ Pollinating…", 1)
-	if got := send.ClassifyComposer(harness.Claude{}.Screen(), quoted); got.State == send.StateBusy {
+	if got := send.ClassifyComposer(claude.Claude{}.Screen(), quoted); got.State == send.StateBusy {
 		t.Fatalf("a quoted, indented spinner classified busy (evidence %q)", got.Evidence)
 	}
 
@@ -290,7 +292,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 	if own == plain {
 		t.Fatal("the capture no longer holds the finished line this test replaces")
 	}
-	if got := send.ClassifyComposer(harness.Claude{}.Screen(), own); got.State != send.StateBusy {
+	if got := send.ClassifyComposer(claude.Claude{}.Screen(), own); got.State != send.StateBusy {
 		t.Fatalf("the pane's own spinner classified %q, want busy", got.State)
 	}
 }
@@ -298,7 +300,7 @@ func TestClassifyComposerIgnoresAnotherHarnessBusyLineQuotedByClaude(t *testing.
 func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
 	styled := captureFile(t, "claude_ghost_suggestion.ansi")
 
-	got := send.ClassifyComposer(harness.Claude{}.Screen(), styled)
+	got := send.ClassifyComposer(claude.Claude{}.Screen(), styled)
 	if got.State != send.StateEmpty {
 		t.Fatalf("state = %q, want empty (evidence %q, pending %q)", got.State, got.Evidence, got.Pending)
 	}
@@ -316,7 +318,7 @@ func TestClassifyComposerReadsAFaintSuggestionAsAnEmptyComposer(t *testing.T) {
 	if strings.Contains(plain, "\x1b") {
 		t.Fatalf("StripSGR left escape bytes in the screen:\n%q", plain)
 	}
-	blind := send.ClassifyComposer(harness.Claude{}.Screen(), plain)
+	blind := send.ClassifyComposer(claude.Claude{}.Screen(), plain)
 	if blind.State != send.StatePending || blind.Pending != "Use checkout-express.html" {
 		t.Fatalf("the plain screen classifies %q/%q; without the attributes mate must assume the text is somebody's",
 			blind.State, blind.Pending)
@@ -332,7 +334,7 @@ func TestClassifyComposerKeepsTypedTextThatIsNotFaint(t *testing.T) {
 	// whose composer holds plain white text.
 	screen := rule + "\r\n❯ \x1b[0m\x1b[38;2;255;255;255mhalf typed\x1b[0m\r\n" + rule +
 		"\r\n  \x1b[0m\x1b[2mFable 5.1 · high | tok 0 in / 0 out\x1b[0m\r\n"
-	got := send.ClassifyComposer(harness.Claude{}.Screen(), screen)
+	got := send.ClassifyComposer(claude.Claude{}.Screen(), screen)
 	if got.State != send.StatePending || got.Pending != "half typed" {
 		t.Fatalf("state = %q, pending = %q, want pending/half typed", got.State, got.Pending)
 	}
@@ -340,7 +342,7 @@ func TestClassifyComposerKeepsTypedTextThatIsNotFaint(t *testing.T) {
 	// And a composer holding both: one faint rune is not enough to make the
 	// whole line the harness's.
 	mixed := rule + "\r\n❯ \x1b[2mUse \x1b[22mthe classic page\x1b[0m\r\n" + rule + "\r\n"
-	got = send.ClassifyComposer(harness.Claude{}.Screen(), mixed)
+	got = send.ClassifyComposer(claude.Claude{}.Screen(), mixed)
 	if got.State != send.StatePending {
 		t.Fatalf("state = %q, want pending: only a wholly faint line is a suggestion", got.State)
 	}
@@ -358,31 +360,31 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 	}{
 		{
 			name:   "claude scrolled transcript with no composer box",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "some output\nmore output\n",
 			want:   send.StateUnknown,
 		},
 		{
 			name:   "claude echoed prompt is not the composer",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "❯ an earlier prompt\nsome answer\n",
 			want:   send.StateUnknown,
 		},
 		{
 			name:   "claude composer inside its rules",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: rule + "\n❯ \n" + rule + "\n",
 			want:   send.StateEmpty,
 		},
 		{
 			name:   "a finished claude turn is not busy",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "✻ Sautéed for 23s · done 7:17 PM\n" + rule + "\n❯ \n" + rule + "\n",
 			want:   send.StateEmpty,
 		},
 		{
 			name:   "a bullet list item is not a spinner",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "· a point, and then some more…\n" + rule + "\n❯ \n" + rule + "\n",
 			want:   send.StateEmpty,
 		},
@@ -390,13 +392,13 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 			// The shape the unwrapped read hands back at the Console's own
 			// pane width: one line carrying both rules and the composer.
 			name:   "claude composer whose rules were joined onto its own line",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "  " + rule + "❯   " + rule + "\n  status line\n",
 			want:   send.StateEmpty,
 		},
 		{
 			name:   "claude joined rules around a composer holding text",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "  " + rule + "❯ half typed  " + rule + "\n  status line\n",
 			want:   send.StatePending,
 		},
@@ -405,7 +407,7 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 			// rune inside a sentence must not split a line and manufacture
 			// a composer out of an echoed prompt.
 			name:   "a short run of the rule rune is not a rule",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: "a ───── b ❯ an earlier prompt ───── c\nmore output\n",
 			want:   send.StateUnknown,
 		},
@@ -415,13 +417,13 @@ func TestClassifyComposerOnSyntheticEdges(t *testing.T) {
 			// as a composer: the option below it is what a composer never
 			// has.
 			name:   "a dialog option under a rule is not a composer",
-			kind:   harness.KindClaude,
+			kind:   claude.KindClaude,
 			screen: rule + "\n❯ No, exit\n  Yes, I trust this folder\n" + rule + "\n",
 			want:   send.StateUnknown,
 		},
 		{
 			name:   "an interrupt hint far above the tail does not make a pane busy",
-			kind:   harness.KindCodex,
+			kind:   codex.KindCodex,
 			screen: "quoting: esc to interrupt\n" + manyLines(25) + "› Ask Codex to do anything\n\n  model · cwd\n",
 			want:   send.StateEmpty,
 		},
@@ -456,7 +458,7 @@ func TestClassifyCodexComposerIgnoresFooterHeight(t *testing.T) {
 		for i := 0; i < extra; i++ {
 			screen += "\n  some future footer line " + strings.Repeat("·", i+1)
 		}
-		got := send.ClassifyComposer(harness.Codex{}.Screen(), screen)
+		got := send.ClassifyComposer(codex.Codex{}.Screen(), screen)
 		if got.State != send.StateEmpty {
 			t.Fatalf("%d extra footer line(s): state = %q, want empty", extra, got.State)
 		}
@@ -490,7 +492,7 @@ func TestClassifyCodexComposerFailsClosedOnMenus(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := send.ClassifyComposer(harness.Codex{}.Screen(), tc.screen)
+			got := send.ClassifyComposer(codex.Codex{}.Screen(), tc.screen)
 			if got.State != tc.want {
 				t.Fatalf("state = %q, want %q (evidence %q)", got.State, tc.want, got.Evidence)
 			}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 )
 
 // TestRenderSkillGolden pins each installed skill's rendered text, the same
@@ -127,5 +129,31 @@ func TestWriteRegeneratesSkills(t *testing.T) {
 	}
 	if bytes.Contains(got, []byte(marker)) {
 		t.Errorf("%s was not regenerated: %q", path, got)
+	}
+}
+
+// The harness sections come from the registry, so who runs on what follows
+// the Mate's own harness: a Codex Mate is not told it runs on Claude Code.
+func TestHarnessAdaptersFollowTheMatesHarness(t *testing.T) {
+	p := fixedParams()
+	harnesses, err := HarnessesFrom(catalog.Default(), "codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Harness, p.Harnesses = "codex", harnesses
+	got, err := RenderSkill("harness-adapters", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"## codex\n\nCodex is what you run on, and the default Crew harness.\n",
+		"## claude\n\nA Crew runs on Claude Code when a spawn is given `--harness claude`.\n",
+	} {
+		if !bytes.Contains(got, []byte(want)) {
+			t.Errorf("the skill for a Codex Mate does not say %q:\n%s", want, got)
+		}
+	}
+	if bytes.Contains(got, []byte("Claude Code is what you run on")) {
+		t.Error("the skill tells a Codex Mate it runs on Claude Code")
 	}
 }

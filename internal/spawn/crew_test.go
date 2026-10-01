@@ -14,7 +14,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -72,7 +72,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
-	if res.Harness != harness.KindCodex {
+	if res.Harness != codex.KindCodex {
 		t.Fatalf("harness = %q, want codex (the workspace default for a crew)", res.Harness)
 	}
 	if res.Agent != "crew-k3" {
@@ -117,7 +117,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		t.Error("brief.md still carries the {TASK} placeholder")
 	}
 	// Codex reads AGENTS.override.md at its cwd and nothing else.
-	override, err := os.ReadFile(harness.CodexInstructionPath(res.Worktree))
+	override, err := os.ReadFile(codex.CodexInstructionPath(res.Worktree))
 	if err != nil {
 		t.Fatalf("AGENTS.override.md: %v", err)
 	}

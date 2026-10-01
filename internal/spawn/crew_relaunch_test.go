@@ -8,6 +8,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -234,7 +236,7 @@ func TestRelaunchCrewStartsAFreshClaudeSession(t *testing.T) {
 		return id
 	}
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindClaude, BriefText: brieftest.Ship("work"),
+		Project: "shop", Crew: "k3", Harness: claude.KindClaude, BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
@@ -261,7 +263,7 @@ func TestRelaunchCrewReportsTheRecordedModelAndEffort(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow,
+		Project: "shop", Crew: "k3", Harness: claude.KindClaude, Model: "haiku", Effort: harness.EffortLow,
 		BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
@@ -272,7 +274,7 @@ func TestRelaunchCrewReportsTheRecordedModelAndEffort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RelaunchCrew: %v", err)
 	}
-	if again.Harness != harness.KindClaude || again.Model != "haiku" || again.Effort != harness.EffortLow {
+	if again.Harness != claude.KindClaude || again.Model != "haiku" || again.Effort != harness.EffortLow {
 		t.Fatalf("relaunch reports harness %q model %q effort %q, want claude, haiku, low",
 			again.Harness, again.Model, again.Effort)
 	}
@@ -285,13 +287,13 @@ func TestRelaunchCrewThatCannotPrepareLeavesALiveAgentRunning(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship("work"),
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, BriefText: brieftest.Ship("work"),
 	})
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
 	// Codex's discovery file can no longer be written.
-	override := harness.CodexInstructionPath(res.Worktree)
+	override := codex.CodexInstructionPath(res.Worktree)
 	if err := os.Remove(override); err != nil {
 		t.Fatal(err)
 	}

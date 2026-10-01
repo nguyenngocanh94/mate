@@ -33,7 +33,7 @@ func TestHarnessProfileFingerprintSeparatesConfigurationFromTask(t *testing.T) {
 }
 
 func TestHarnessProfileRetainsPriorLaunchAndRejectsEscapingSource(t *testing.T) {
-	w, err := Init(t.TempDir())
+	w, err := Init(t.TempDir(), Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}

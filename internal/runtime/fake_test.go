@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
@@ -178,8 +179,8 @@ func TestAgentStartSpecKindDerivesFromLaunchSpec(t *testing.T) {
 	rt, launch, session, tab := boot(t)
 	res := mustReserve(t, rt, session, "mate_001")
 	spec := mustStartSpec(t, tab, res, launch)
-	if spec.Kind() != harness.KindClaude {
-		t.Fatalf("kind = %q, want %q (derived from the launch spec)", spec.Kind(), harness.KindClaude)
+	if spec.Kind() != claude.KindClaude {
+		t.Fatalf("kind = %q, want %q (derived from the launch spec)", spec.Kind(), claude.KindClaude)
 	}
 	if _, err := rt.StartAgent(ctx, spec); err != nil {
 		t.Fatal(err)
@@ -187,12 +188,12 @@ func TestAgentStartSpecKindDerivesFromLaunchSpec(t *testing.T) {
 	argv := rt.StartArgv[0]
 	found := false
 	for i, a := range argv {
-		if a == "--kind" && i+1 < len(argv) && argv[i+1] == string(harness.KindClaude) {
+		if a == "--kind" && i+1 < len(argv) && argv[i+1] == string(claude.KindClaude) {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("argv must carry --kind %s: %#v", harness.KindClaude, argv)
+		t.Fatalf("argv must carry --kind %s: %#v", claude.KindClaude, argv)
 	}
 }
 
@@ -461,8 +462,8 @@ func boot(t *testing.T) (*runtime.Fake, harness.LaunchSpec, runtime.SessionHandl
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
-		Kind: harness.KindClaude, Cwd: cwd, ContextPath: path,
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind: claude.KindClaude, Cwd: cwd, ContextPath: path,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -560,8 +561,8 @@ func TestNewAgentStartSpecAcceptsSymlinkedSpellingOfPaneCwd(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
-		Kind: harness.KindClaude, Cwd: link, ContextPath: path,
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind: claude.KindClaude, Cwd: link, ContextPath: path,
 	})
 	if err != nil {
 		t.Fatal(err)

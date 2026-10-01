@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -34,7 +36,7 @@ func TestHerdrSendTextResolvesThePaneLiveBeforeTyping(t *testing.T) {
 		t.Fatalf("unexpected argv %#v", spec.Args)
 		return process.Result{}, nil
 	}})
-	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab"}, Name: "mate-shop", Kind: harness.KindClaude, Tab: runtime.TabHandle{PaneID: "w9:p9"}}
+	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab"}, Name: "mate-shop", Kind: claude.KindClaude, Tab: runtime.TabHandle{PaneID: "w9:p9"}}
 	if err := rt.SendText(context.Background(), h, "say PONG"); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +100,7 @@ func TestFakeSendTextRecordsTypingAndRunsTheScreenHook(t *testing.T) {
 	t.Parallel()
 	f := runtime.NewFake()
 	session := runtime.SessionHandle{Name: "lab"}
-	h := runtime.AgentHandle{Session: session, Name: "crew-1", Kind: harness.KindCodex, Tab: runtime.TabHandle{PaneID: "w1:p1"}}
+	h := runtime.AgentHandle{Session: session, Name: "crew-1", Kind: codex.KindCodex, Tab: runtime.TabHandle{PaneID: "w1:p1"}}
 	f.SeedAgent(h, runtime.AgentIdle)
 	f.SetReadOutput(h, "empty")
 	f.OnSendText = func(handle runtime.AgentHandle, text string) {

@@ -3,10 +3,13 @@ package mateassets
 import (
 	"bytes"
 	"fmt"
+	"slices"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/assets"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -46,8 +49,13 @@ type Params struct {
 	Mode string
 	// Yolo reports whether the Mate may approve merges without asking.
 	Yolo bool
-	// Harness names the harness the Mate itself runs on (e.g. "claude-code").
+	// Harness names the harness the Mate itself runs on: its kind, as
+	// `--harness` takes it.
 	Harness string
+	// Harnesses are the harnesses this binary launches, the default Crew
+	// harness first and then the rest in the registry's order, each with
+	// its section of the harness-adapters skill.
+	Harnesses []HarnessParams
 	// SkillsDir is where the skills are written, relative to MateDir: the
 	// directory the Mate's harness discovers them in (harness.Info). The
 	// manual names it for a harness that does not.
@@ -79,6 +87,79 @@ type Params struct {
 // console turns auto mode back on, as the manual says it.
 func (Params) QuietAfter() string {
 	return fmt.Sprintf("%d minutes", int(store.QuietAfter/time.Minute))
+}
+
+// HarnessParams is one harness as the harness-adapters skill describes it.
+type HarnessParams struct {
+	// Kind is the harness as `--harness` takes it.
+	Kind string
+	// Name is the harness as people call it.
+	Name string
+	// CrewDefault reports whether a Crew runs on it when a spawn names none.
+	CrewDefault bool
+	// Mate reports whether the Mate reading the skill runs on it.
+	Mate bool
+	// Notes is its section of the skill (harness.Info.AdapterNotes).
+	Notes string
+}
+
+// HarnessesFrom is every harness reg launches, as the skill lists them: the
+// default Crew harness first, then the rest in registration order. mate is
+// the harness the Mate runs on.
+func HarnessesFrom(reg harness.Registry, mate harness.Kind) ([]HarnessParams, error) {
+	crew, err := reg.Default(harness.RoleCrew)
+	if err != nil {
+		return nil, err
+	}
+	kinds := append([]harness.Kind{crew}, slices.DeleteFunc(reg.Kinds(), func(k harness.Kind) bool { return k == crew })...)
+	out := make([]HarnessParams, 0, len(kinds))
+	for _, k := range kinds {
+		p, err := reg.Lookup(k)
+		if err != nil {
+			return nil, err
+		}
+		info := p.Info()
+		out = append(out, HarnessParams{
+			Kind: string(k), Name: info.Name, CrewDefault: k == crew, Mate: k == mate, Notes: info.AdapterNotes,
+		})
+	}
+	return out, nil
+}
+
+// Lead is the sentence that opens the harness's section: who runs on it.
+func (h HarnessParams) Lead() string {
+	switch {
+	case h.CrewDefault && h.Mate:
+		return h.Name + " is what you run on, and the default Crew harness."
+	case h.CrewDefault:
+		return h.Name + " is the default Crew harness."
+	case h.Mate:
+		return h.Name + " is what you run on, and what a Crew runs on when a spawn is given `--harness " + h.Kind + "`."
+	}
+	return "A Crew runs on " + h.Name + " when a spawn is given `--harness " + h.Kind + "`."
+}
+
+// CrewDefault is the harness a Crew runs on when a spawn names none.
+func (p Params) CrewDefault() HarnessParams {
+	for _, h := range p.Harnesses {
+		if h.CrewDefault {
+			return h
+		}
+	}
+	return HarnessParams{}
+}
+
+// HarnessNames lists the harnesses by name, in Harnesses order: "A", "A
+// and B", "A, B and C".
+func (p Params) HarnessNames() string {
+	names := make([]string, 0, len(p.Harnesses))
+	for _, h := range p.Harnesses {
+		names = append(names, h.Name)
+	}
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 // RepoParams is one repo of the project, as the manual lists it.

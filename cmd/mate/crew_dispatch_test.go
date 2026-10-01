@@ -12,6 +12,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/dispatch"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/quota"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -19,7 +21,7 @@ import (
 
 func dispatchWorkspace(t *testing.T, table string) *store.Workspace {
 	t.Helper()
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +60,7 @@ func TestCrewSpawnParsesModelAndEffort(t *testing.T) {
 // A spawn that names its harness keeps its profile exactly as given,
 // whatever the table says.
 func TestAnExplicitProfileIsKept(t *testing.T) {
-	want := spawn.SpawnCrewRequest{Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow}
+	want := spawn.SpawnCrewRequest{Harness: claude.KindClaude, Model: "haiku", Effort: harness.EffortLow}
 	for _, table := range []string{sampleTable, ""} {
 		got, note, err := applyDispatch(dispatchWorkspace(t, table), want)
 		if err != nil || note != "" || got != want {
@@ -76,8 +78,8 @@ func TestNoHarnessTakesTheTablesDefault(t *testing.T) {
 		want        spawn.SpawnCrewRequest
 		source      string
 	}{
-		{"built-in", "", spawn.SpawnCrewRequest{Harness: harness.KindCodex, Model: "gpt-6-luna", Effort: harness.EffortHigh}, "built-in"},
-		{"workspace", sampleTable, spawn.SpawnCrewRequest{Harness: harness.KindCodex, Effort: harness.EffortMedium}, dispatch.FileName},
+		{"built-in", "", spawn.SpawnCrewRequest{Harness: codex.KindCodex, Model: "gpt-6-luna", Effort: harness.EffortHigh}, "built-in"},
+		{"workspace", sampleTable, spawn.SpawnCrewRequest{Harness: codex.KindCodex, Effort: harness.EffortMedium}, dispatch.FileName},
 	} {
 		got, note, err := applyDispatch(dispatchWorkspace(t, tc.table), spawn.SpawnCrewRequest{})
 		if err != nil || got != tc.want {
@@ -108,7 +110,7 @@ func TestTheDefaultFollowsTheWorkspaceHarness(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _, err := applyDispatch(w, spawn.SpawnCrewRequest{})
-	want := spawn.SpawnCrewRequest{Harness: harness.KindClaude, Model: "sonnet", Effort: harness.EffortHigh}
+	want := spawn.SpawnCrewRequest{Harness: claude.KindClaude, Model: "sonnet", Effort: harness.EffortHigh}
 	if err != nil || got != want {
 		t.Fatalf("got %+v err %v, want %+v", got, err, want)
 	}
@@ -129,7 +131,7 @@ func TestModelOrEffortWithoutHarnessIsRefused(t *testing.T) {
 // never quietly replaced by the built-in one.
 func TestAMalformedDispatchTableStopsEverySpawn(t *testing.T) {
 	w := dispatchWorkspace(t, `{"rules": [{"when": "x", "use": {"harness": "codex", "effort": "max"}}]}`)
-	_, _, err := applyDispatch(w, spawn.SpawnCrewRequest{Harness: harness.KindCodex})
+	_, _, err := applyDispatch(w, spawn.SpawnCrewRequest{Harness: codex.KindCodex})
 	var ue *usageError
 	if !errors.Is(err, dispatch.ErrInvalid) || !errors.As(err, &ue) {
 		t.Fatalf("err = %v, want the table's own refusal, exit 2", err)
@@ -225,8 +227,8 @@ func withQuota(t *testing.T, snap quota.Snapshot, err error) {
 func sampleQuota() quota.Snapshot {
 	sp := 1.5
 	return quota.Snapshot{Version: "0.1.54", Read: time.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC), Readings: []quota.Reading{
-		{Harness: harness.KindCodex, Provider: "codex", Known: true, PercentLeft: 93, SpendPriority: &sp, Runway: quota.RunwayThroughReset, Status: "fresh"},
-		{Harness: harness.KindClaude, Provider: "claude", PercentLeft: -1, Runway: quota.RunwayUnknown, Status: "auth_required", Remedy: "quota-axi --allow-keychain-prompt"},
+		{Harness: codex.KindCodex, Provider: "codex", Known: true, PercentLeft: 93, SpendPriority: &sp, Runway: quota.RunwayThroughReset, Status: "fresh"},
+		{Harness: claude.KindClaude, Provider: "claude", PercentLeft: -1, Runway: quota.RunwayUnknown, Status: "auth_required", Remedy: "quota-axi --allow-keychain-prompt"},
 	}}
 }
 
@@ -277,10 +279,10 @@ func TestQuotaWarningNamesAUsedUpHarness(t *testing.T) {
 	snap := sampleQuota()
 	snap.Readings[0].Runway = quota.RunwayExhausted
 	withQuota(t, snap, nil)
-	if w := quotaWarning(harness.KindCodex); !strings.Contains(w, "codex quota is used up") {
+	if w := quotaWarning(codex.KindCodex); !strings.Contains(w, "codex quota is used up") {
 		t.Fatalf("warning = %q", w)
 	}
-	if w := quotaWarning(harness.KindClaude); w != "" {
+	if w := quotaWarning(claude.KindClaude); w != "" {
 		t.Fatalf("an unmeasured harness was warned about: %q", w)
 	}
 }

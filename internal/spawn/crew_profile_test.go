@@ -8,6 +8,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -19,7 +20,7 @@ func TestSpawnCrewLaunchesAndRecordsTheProfile(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, Model: "gpt-5.5", Effort: harness.EffortHigh,
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, Model: "gpt-5.5", Effort: harness.EffortHigh,
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
 	})
 	if err != nil {
@@ -55,7 +56,7 @@ func TestSpawnCrewRecordsButOmitsAnEffortTheHarnessDoesNotTake(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex, Effort: harness.EffortMax,
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, Effort: harness.EffortMax,
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
 	})
 	if err != nil {

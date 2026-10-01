@@ -10,6 +10,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -23,7 +24,7 @@ func TestCrewHarnessSnapshotSurvivesLaterInstructionChanges(t *testing.T) {
 	git(t, w.RepoDir("shop"), "add", "AGENTS.md")
 	git(t, w.RepoDir("shop"), "commit", "-m", "Add crew instructions")
 	res, err := spawn.SpawnCrew(context.Background(), w, fakeDeps(t, runtime.NewFake()), spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "snapshot", Harness: harness.KindCodex, Model: "gpt-5.5", Effort: harness.EffortHigh,
+		Project: "shop", Crew: "snapshot", Harness: codex.KindCodex, Model: "gpt-5.5", Effort: harness.EffortHigh,
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
 	})
 	if err != nil {

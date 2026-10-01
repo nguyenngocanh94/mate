@@ -65,7 +65,7 @@ func fakeSpawnDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 func liveCrewWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

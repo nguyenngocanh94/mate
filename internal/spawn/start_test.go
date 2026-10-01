@@ -9,7 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -28,7 +29,7 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 	if res.Agent != "mate-shop" {
 		t.Fatalf("agent = %q, want mate-shop", res.Agent)
 	}
-	if res.Harness != harness.KindClaude {
+	if res.Harness != claude.KindClaude {
 		t.Fatalf("harness = %q, want claude (the workspace default)", res.Harness)
 	}
 	if res.StaleMeta {
@@ -50,7 +51,7 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("settings.json: %v", err)
 	}
-	wantSettings, err := harness.ClaudeSettings(deps.Binary)
+	wantSettings, err := claude.ClaudeSettings(deps.Binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,14 +210,14 @@ func TestStartMateCodexWritesTheDiscoveryFile(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 
-	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
+	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate codex: %v", err)
 	}
 	if res.SessionID != "" {
 		t.Fatalf("session id = %q, want empty for Codex", res.SessionID)
 	}
-	override := harness.CodexInstructionPath(w.MateDir("blog"))
+	override := codex.CodexInstructionPath(w.MateDir("blog"))
 	manual, err := os.ReadFile(override)
 	if err != nil {
 		t.Fatalf("%s: %v", override, err)
@@ -344,7 +345,7 @@ func TestStartMateHarnessMismatchFallsBackToFresh(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 
-	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindClaude, Resume: true})
+	first, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: claude.KindClaude, Resume: true})
 	if err != nil {
 		t.Fatalf("first StartMate: %v", err)
 	}
@@ -352,7 +353,7 @@ func TestStartMateHarnessMismatchFallsBackToFresh(t *testing.T) {
 		t.Fatalf("StopMate: %v", err)
 	}
 
-	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	second, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate with a different harness: %v", err)
 	}
@@ -408,7 +409,7 @@ func startedManual(t *testing.T, w *store.Workspace) string {
 // TestStartMateForAProjectWithNoRepo: a project with no repo still gets a
 // Mate (docs/mvp.md M9); its manual says no Crew can be spawned yet.
 func TestStartMateForAProjectWithNoRepo(t *testing.T) {
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,13 +517,13 @@ func TestStartMateAdoptionKeepsTheRunningHarness(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude}); err != nil {
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude}); err != nil {
 		t.Fatalf("first StartMate: %v", err)
 	}
 	if err := os.Remove(w.MateMeta("shop")); err != nil {
 		t.Fatal(err)
 	}
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil || !strings.Contains(err.Error(), "left a claude Mate running") {
 		t.Fatalf("err = %v, want a refusal naming the running claude Mate", err)
 	}

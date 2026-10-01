@@ -13,7 +13,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/db"
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -41,7 +41,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	session, configHome := consoleLiveLab(t)
 
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	// ledger forever, not because nothing happened but because the ingest
 	// cannot yet prove that group is finished.
 	startOut, err := action(ctx, console.ActionRequest{
-		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessClaude})
+		Action: console.ActionStart, Target: "shop", TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("start the Mate: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 	// --- The Crew: one turn that reports and stops, so its rollout is short
 	// and unambiguous to re-read. ---
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindCodex,
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex,
 		BriefText: brieftest.Ship(`Append the line wait-mate: done to the status file and do nothing else.`),
 	})
 	if err != nil {

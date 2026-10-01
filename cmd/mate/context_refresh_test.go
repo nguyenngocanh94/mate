@@ -9,6 +9,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -120,7 +122,7 @@ func TestRefreshQuietRequiresAnAnsweredCaptainAndFiveMinutes(t *testing.T) {
 }
 
 // claudeWithoutTurnEnd is Claude declaring no turn-end evidence.
-type claudeWithoutTurnEnd struct{ harness.Claude }
+type claudeWithoutTurnEnd struct{ claude.Claude }
 
 func (c claudeWithoutTurnEnd) Capabilities() harness.Capabilities {
 	caps := c.Claude.Capabilities()
@@ -186,7 +188,7 @@ func TestAutomaticRefreshUsesOnlyCurrentSessionAndHonorsThreshold(t *testing.T) 
 			// gate is the only thing that keeps it from being refreshed.
 			if scenario == "codex-meta" {
 				meta, _ := w.ReadMateMeta("shop")
-				meta[spawn.MetaHarness] = string(harness.KindCodex)
+				meta[spawn.MetaHarness] = string(codex.KindCodex)
 				if err := w.WriteMateMeta("shop", meta); err != nil {
 					t.Fatal(err)
 				}

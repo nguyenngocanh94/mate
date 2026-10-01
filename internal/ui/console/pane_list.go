@@ -338,7 +338,7 @@ func (m Model) crewRowLines(r row, p framePlan) []gline {
 //	                             ✻ · crew_01J9…B8DT · 33m
 //	one line:               ▌ 🤖 Backfill ledger v2      ! decide
 func (m Model) agentRowLines(p framePlan, name gline, bang int, failed bool, word, harness, agent, since string) []gline {
-	icon := harnessIcon(harness, m.g)
+	icon := m.harnessIcon(harness)
 	switch {
 	case !p.tall:
 		return []gline{m.rowLine(name, statusCell(bangCell(bang, failed, true, 1), word, statusTok(word)), p.w)}

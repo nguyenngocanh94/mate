@@ -57,25 +57,6 @@ const (
 	// DefaultMaxInlineBytes stays well under the Darwin ARG_MAX observed in
 	// G1 (1048576; 900000-byte --append-system-prompt still exec'd).
 	DefaultMaxInlineBytes = 100_000
-	// CodexFactoryMaxBytes is project_doc_max_bytes as Codex ships it
-	// (observed 0.151.0 through 0.154.0): the concatenated instruction
-	// chain is silently truncated to this many bytes.
-	CodexFactoryMaxBytes = 32 * 1024
-	// CodexDefaultMaxBytes is the cap every mate Codex launch runs under.
-	// The launch raises Codex's own cap to this value with
-	// `-c project_doc_max_bytes=` (CodexProjectDocMaxBytesOverride), and the
-	// meter in this package charges against the same number, so the two
-	// can never disagree. 128 KiB is four times the factory cap: the Mate
-	// manual with its seven-state table sits near 29 KiB and grew past
-	// the factory cap on 2026-09-18, and cutting prose to fit a limit a
-	// flag can lift was the wrong trade. Mate still refuses to start past
-	// this cap rather than trust Codex to complain.
-	CodexDefaultMaxBytes = 128 * 1024
-	// CodexOverrideName is the Mate-written discovery file at the process cwd.
-	CodexOverrideName = "AGENTS.override.md"
-	// CodexBaseName is the tracked project file Codex loads only when no
-	// override exists at that directory.
-	CodexBaseName = "AGENTS.md"
 )
 
 var (
@@ -121,6 +102,7 @@ type LaunchSpec struct {
 	codexHome       string
 	claudeConfigDir string
 	unsetEnv        []string
+	envKeys         []string
 	checkContext    func(LaunchSpec) error
 	screen          ScreenProfile
 }
@@ -170,7 +152,8 @@ func (s LaunchSpec) ContextRequired() bool { return s.contextRequired }
 // MaxInlineBytes is the inline fallback budget (Claude).
 func (s LaunchSpec) MaxInlineBytes() int { return s.maxInlineBytes }
 
-// MaxFileBytes is the file/chain size budget (0 means strategy default).
+// MaxFileBytes is the file/chain size budget. An instruction-file delivery
+// needs one; 0 is refused.
 func (s LaunchSpec) MaxFileBytes() int { return s.maxFileBytes }
 
 // TaskPrompt is the Crew task to send through runtime.PromptAgent after the
@@ -195,6 +178,10 @@ func (s LaunchSpec) CodexHome() string { return s.codexHome }
 // transcript search root. Whether CLAUDE_CONFIG_DIR is set in the pane is
 // represented separately by Env and UnsetEnv.
 func (s LaunchSpec) ClaudeConfigDir() string { return s.claudeConfigDir }
+
+// EnvKeys are the variables, besides the identity keys, the launch was
+// allowed to carry: the runtime's pane allowlist for this launch.
+func (s LaunchSpec) EnvKeys() []string { return append([]string(nil), s.envKeys...) }
 
 // UnsetEnv lists environment variables the runtime must remove from the
 // pane's shell before starting the harness. This is distinct from setting an
@@ -253,9 +240,11 @@ func (s LaunchSpec) deliveryLimit() (deliveryLimit, error) {
 		}
 		return deliveryLimit{max: max, inArgv: true}, nil
 	case DeliveryInstructionFile:
+		// The harness that reads an instruction file names its budget
+		// (LaunchPlan.MaxFileBytes); the core has no default to guess.
 		max := int64(s.maxFileBytes)
 		if max <= 0 {
-			max = CodexDefaultMaxBytes
+			return deliveryLimit{}, s.codedRequired(fmt.Sprintf("%s delivery names no size budget", s.delivery))
 		}
 		return deliveryLimit{
 			max:  max,
@@ -386,13 +375,8 @@ func (s LaunchSpec) argvValue(flag string) (string, error) {
 	return found[0], nil
 }
 
-// CodexInstructionPath is the Mate-written discovery file at cwd.
-func CodexInstructionPath(cwd string) string {
-	return filepath.Join(cwd, CodexOverrideName)
-}
-
-func filterLaunchEnv(vars []EnvVar) ([]EnvVar, error) {
-	keys := config.LaunchEnvKeys()
+func filterLaunchEnv(vars []EnvVar, providerKeys []string) ([]EnvVar, error) {
+	keys := append(config.IdentityEnvKeys(), providerKeys...)
 	allow := make(map[string]struct{}, len(keys))
 	for _, k := range keys {
 		allow[k] = struct{}{}

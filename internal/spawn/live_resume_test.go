@@ -10,6 +10,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -27,7 +28,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 
 	// TMPDIR must not go through a symlink (docs/mvp.md section 7).
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -74,7 +75,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 	defer cancel()
 
 	// 1. First start: a fresh session, nothing to resume yet.
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude, Resume: true})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate (first): %v", err)
 	}
@@ -87,7 +88,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 			Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 			Name:    started.Agent,
 			RawID:   "shop",
-			Kind:    harness.KindClaude,
+			Kind:    claude.KindClaude,
 		}
 	}()
 
@@ -113,7 +114,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 	}
 
 	// 3. Restart: must resume, not start fresh.
-	resumed, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude, Resume: true})
+	resumed, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate (resume): %v", err)
 	}
@@ -135,14 +136,14 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    resumed.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 	}
 	pane, err := rt.ReadAgent(ctx, resumedHandle, harness.ReadRecentUnwrapped, 60)
 	if err != nil {
 		t.Fatalf("ReadAgent after resume: %v", err)
 	}
 	t.Logf("pane after resume:\n%s", pane)
-	class := harness.Claude{}.Screen().ClassifyStartup(pane)
+	class := claude.Claude{}.Screen().ClassifyStartup(pane)
 	if class != harness.StartupScreenReady {
 		t.Fatalf("resumed pane classifies as %q (not the composer); pane:\n%s", class, pane)
 	}

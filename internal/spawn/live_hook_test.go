@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -27,7 +27,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 
 	// TMPDIR must not go through a symlink (docs/mvp.md section 7).
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 	// wired to the same mate binary the Mate's manual names - otherwise a
 	// silent fallback to an empty {} would make the rest of this test prove
 	// nothing about the real hooks.
-	settingsPath := harness.ClaudeSettingsPath(started.MateDir)
+	settingsPath := claude.ClaudeSettingsPath(started.MateDir)
 	settings, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read %s: %v", settingsPath, err)
@@ -101,7 +101,7 @@ func TestLiveHookMateRoundTrip(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 	}
 	if err := rt.PromptAgent(ctx, handle, "say PONG"); err != nil {
 		t.Fatalf("PromptAgent: %v", err)

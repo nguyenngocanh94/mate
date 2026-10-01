@@ -1,6 +1,15 @@
 package harness
 
-import "time"
+import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/nguyenngocanh94/mate/internal/telemetry"
+)
 
 // TranscriptParser is the parse half of a harness's TranscriptSource: it
 // turns one format's bytes into normalized facts. It is not part of the
@@ -138,11 +147,6 @@ type TranscriptParseState struct {
 // strings transcript_cursor.source and every fact table's source column
 // accept (migration 0007 CHECK constraints).
 type TranscriptFormat string
-
-const (
-	TranscriptClaude TranscriptFormat = "claude_transcript"
-	TranscriptCodex  TranscriptFormat = "codex_rollout"
-)
 
 // TranscriptKind is the storage classification of one raw transcript record,
 // matching agent_transcript_record.kind. Not every harness produces every
@@ -402,4 +406,66 @@ type TranscriptBatch struct {
 	// next read of the same file, such as Codex's running usage totals. It
 	// is opaque: the core keeps it with the batch and never reads it.
 	HarnessState any
+}
+
+// MessageText is a message's text as a transcript record carries it: a JSON
+// string, or the text of a list of content blocks joined by newlines, or
+// else the compacted JSON itself.
+func MessageText(raw json.RawMessage) string {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return ""
+	}
+	if trimmed[0] == '"' {
+		var text string
+		if json.Unmarshal(trimmed, &text) == nil {
+			return text
+		}
+	}
+	var blocks []struct {
+		Text string `json:"text"`
+	}
+	if trimmed[0] == '[' && json.Unmarshal(trimmed, &blocks) == nil {
+		parts := make([]string, 0, len(blocks))
+		for _, block := range blocks {
+			if block.Text != "" {
+				parts = append(parts, block.Text)
+			}
+		}
+		return strings.Join(parts, "\n")
+	}
+	return CompactJSON(trimmed, string(trimmed))
+}
+
+// CompactJSON is raw with insignificant whitespace removed, the trimmed raw
+// text when it is not valid JSON, or fallback when it is empty.
+func CompactJSON(raw json.RawMessage, fallback string) string {
+	t := bytes.TrimSpace(raw)
+	if len(t) == 0 {
+		return fallback
+	}
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, t); err != nil {
+		return string(t)
+	}
+	return buf.String()
+}
+
+// HashText is the hex SHA-256 of s, as telemetry records a text it does not
+// keep.
+func HashText(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// OutputFact is the telemetry fact for one tool output: its size, hash and a
+// bounded preview, and whether the harness said it truncated it.
+func OutputFact(s string, n *int64) *telemetry.Output {
+	preview := s
+	if len(preview) > 1200 {
+		preview = preview[:1200]
+	}
+	o := &telemetry.Output{Bytes: int64(len(s)), SHA256: HashText(s), NewBytes: n, Preview: preview}
+	if strings.Contains(s, "Warning: truncated output") || strings.Contains(s, "tokens truncated") || strings.Contains(s, "Output truncated") {
+		yes := true
+		o.Truncated = &yes
+	}
+	return o
 }

@@ -326,6 +326,9 @@ Captain chốt cả bốn theo đề xuất dưới đây (2026-10-01).
 - Mục 10: một milestone mới cho các PR trên, số task cấp khi thêm vào bảng.
 - Skill `harness-adapters`: mục "Adding a harness" trỏ tới suite hợp đồng thay cho câu "chỉ Codex và Claude được kiểm chứng".
 
+PR 6 (2026-10-01) cập nhật mục 2, mục 9, mục 10 (milestone M16, task 63 đến 70) và skill; skill giờ sinh từ registry, mỗi harness tự mang phần của mình (`Info.AdapterNotes`).
+Mục 7 chờ PR 7, vì PR 6 không thêm harness nào.
+
 ## 11. Tiêu chí hoàn tất toàn phương án
 
 - Không còn tham chiếu tới tên harness cụ thể ngoài `internal/harness/...`, trừ allowlist có lý do của ratchet.

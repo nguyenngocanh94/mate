@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/watch"
@@ -67,13 +68,13 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: harness.Codex{}.Screen()}
+	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: codex.Codex{}.Screen()}
 	f.ws = newWorkspace(t)
 	f.handle = runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "mate-lab"},
 		Name:    "crew-k3",
 		RawID:   "k3",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 		Tab:     runtime.TabHandle{PaneID: "pane-k3"},
 	}
 	f.recordCrew("k3")
@@ -117,7 +118,7 @@ func newWorkspace(t *testing.T) *store.Workspace {
 	if err := os.MkdirAll(filepath.Join(dir, "shop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	w, err := store.Init(dir)
+	w, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}

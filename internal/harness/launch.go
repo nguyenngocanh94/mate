@@ -40,7 +40,10 @@ type PrepareRequest struct {
 	NewSessionID func() string
 }
 
-func (r PrepareRequest) check(kind Kind) error {
+// Check refuses a request a harness cannot lay out: a path that is not
+// absolute, or a role that is neither a Mate nor a Crew. kind names the
+// harness in the refusal.
+func (r PrepareRequest) Check(kind Kind) error {
 	for _, p := range []struct{ name, path string }{
 		{"cwd", r.Cwd}, {"state directory", r.StateDir}, {"context path", r.ContextPath},
 	} {
@@ -56,7 +59,9 @@ func (r PrepareRequest) check(kind Kind) error {
 	return nil
 }
 
-func (r PrepareRequest) newSessionID() string {
+// MintSessionID is the id of a fresh session: NewSessionID's, or a random
+// UUID.
+func (r PrepareRequest) MintSessionID() string {
 	if r.NewSessionID != nil {
 		return r.NewSessionID()
 	}
@@ -108,6 +113,11 @@ type AgentSpec struct {
 	// a fresh one (docs/mvp.md task 10).
 	ResumeSessionID string
 	Env             []EnvVar
+	// EnvKeys are the variables of every registered harness
+	// (Registry.EnvKeys). Env may carry them besides the identity keys,
+	// because an agent may launch another harness; the harness's own
+	// Info().EnvKeys are allowed without them.
+	EnvKeys []string
 	// TaskPrompt is a Crew's first user message. It is intentionally separate
 	// from ContextPath: every harness instruction delivery is passive.
 	TaskPrompt string
@@ -128,6 +138,9 @@ type LaunchPlan struct {
 	Args        []string
 	Cwd         string
 	Env         []EnvVar
+	// EnvKeys are the variables Env may carry besides the identity keys
+	// (config.IdentityEnvKeys).
+	EnvKeys []string
 	// UnsetEnv are variables removed from the pane before the start, besides
 	// NestedSessionEnv, which every launch removes.
 	UnsetEnv        []string
@@ -136,12 +149,14 @@ type LaunchPlan struct {
 	ContextRequired bool
 	ContextFiles    []GeneratedFile
 	MaxInlineBytes  int
-	MaxFileBytes    int
-	TaskPrompt      string
-	Model           string
-	Effort          Effort
-	EffortOmitted   bool
-	Notes           []string
+	// MaxFileBytes is the file/chain size budget. An instruction-file
+	// delivery needs one; 0 is refused.
+	MaxFileBytes  int
+	TaskPrompt    string
+	Model         string
+	Effort        Effort
+	EffortOmitted bool
+	Notes         []string
 	// CodexHome and ClaudeConfigDir are the provider roots the launch
 	// resolved, recorded on the spec.
 	CodexHome       string
@@ -165,7 +180,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage,
 			fmt.Sprintf("harness %q launch names no screen profile; mate refuses a pane it cannot read", p.RuntimeKind))
 	}
-	env, err := filterLaunchEnv(p.Env)
+	env, err := filterLaunchEnv(p.Env, p.EnvKeys)
 	if err != nil {
 		return LaunchSpec{}, err
 	}
@@ -188,6 +203,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		codexHome:       p.CodexHome,
 		claudeConfigDir: p.ClaudeConfigDir,
 		unsetEnv:        append([]string(nil), p.UnsetEnv...),
+		envKeys:         append([]string(nil), p.EnvKeys...),
 		checkContext:    p.CheckContext,
 		screen:          p.Screen,
 	}

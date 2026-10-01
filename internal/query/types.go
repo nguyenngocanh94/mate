@@ -30,6 +30,9 @@ type Snapshot struct {
 	// different question than "how stale is what I am looking at".
 	AsOf     time.Time
 	Projects []ProjectNode
+	// Harnesses are the harnesses the binary launches, in registration
+	// order (Harnesses.List): what a UI offers and how it draws each.
+	Harnesses []Harness
 	// Warnings lists every Unknown field in the tree, in tree order. Empty
 	// means every field either read successfully or is legitimately absent -
 	// it does not mean the snapshot is fresh.
@@ -63,10 +66,10 @@ type WorkspaceValue struct {
 	Name string
 	Root string
 	// MateHarness is the harness a new Mate gets when nobody picks one:
-	// workspace.yaml's `mate_harness`, resolved by the store (which fills
-	// in its own default when the key is missing). It is "" when the value
-	// names no harness kind this package knows, so a UI falls back to its
-	// own order rather than offering a kind nothing can start.
+	// workspace.yaml's `mate_harness`, else the catalog's default for a
+	// Mate (defaultMateHarness). It is "" when the workspace names a kind
+	// the catalog does not hold, so a UI falls back to the catalog's order
+	// rather than offering first a kind nothing can start.
 	MateHarness HarnessKind
 }
 

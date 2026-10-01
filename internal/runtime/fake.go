@@ -227,7 +227,7 @@ func (f *Fake) EnsureProjectWorkspace(_ context.Context, spec WorkspaceSpec) (Wo
 	if err := CheckWorkspaceSpec(spec); err != nil {
 		return WorkspaceHandle{}, err
 	}
-	env, err := AllowlistedEnv(spec.Env)
+	env, err := AllowlistedEnv(spec.Env, spec.EnvKeys)
 	if err != nil {
 		return WorkspaceHandle{}, err
 	}
@@ -294,7 +294,7 @@ func (f *Fake) CreateAgentTab(_ context.Context, spec TabSpec) (TabHandle, error
 	if err := CheckTabSpec(spec); err != nil {
 		return TabHandle{}, err
 	}
-	env, err := AllowlistedEnv(spec.Env)
+	env, err := AllowlistedEnv(spec.Env, spec.EnvKeys)
 	if err != nil {
 		return TabHandle{}, err
 	}
@@ -377,7 +377,7 @@ func (f *Fake) StartAgent(_ context.Context, spec AgentStartSpec) (AgentHandle, 
 	if err := f.Names.Reserve(session.Name, spec.Name(), spec.RawID()); err != nil {
 		return AgentHandle{}, err
 	}
-	env, err := AllowlistedEnv(runtimeEnv(spec.Launch().Env()))
+	env, err := PaneEnv(spec.Launch())
 	if err != nil {
 		return AgentHandle{}, err
 	}

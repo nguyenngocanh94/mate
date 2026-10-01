@@ -26,7 +26,7 @@ import (
 // passed on.
 func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 	root := t.TempDir()
-	ws, err := store.Init(root)
+	ws, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 		}
 	}
 
-	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws) }
+	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws, consoleHarnesses()) }
 	// New picks the glyph set from the locale, and the assertions spell the
 	// Unicode arrow; force that set so a shell without UTF-8 draws the same.
 	t.Setenv("MATE_ASCII", "0")
@@ -71,7 +71,7 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 // is configured for.
 func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 	root := t.TempDir()
-	ws, err := store.Init(root)
+	ws, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 	}
 
 	var got []console.ActionRequest
-	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws) }
+	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws, consoleHarnesses()) }
 	act := func(_ context.Context, req console.ActionRequest) (string, error) {
 		got = append(got, req)
 		return "ok", nil
@@ -120,7 +120,7 @@ func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 		t.Fatalf("Enter on the picker dispatched nothing:\n%s", model.View())
 	}
 	cmd()
-	if len(got) != 1 || got[0].Harness != query.HarnessCodex {
+	if len(got) != 1 || got[0].Harness != query.HarnessKind("codex") {
 		t.Fatalf("requests = %+v, want one create carrying the workspace default codex", got)
 	}
 }
@@ -129,7 +129,7 @@ func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 // usage error instead of starting Bubble Tea against a pipe.
 func TestConsoleRefusesANonTerminal(t *testing.T) {
 	root := t.TempDir()
-	if _, err := store.Init(root); err != nil {
+	if _, err := store.Init(root, workspaceDefaults()); err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
 	var stdout, stderr bytes.Buffer

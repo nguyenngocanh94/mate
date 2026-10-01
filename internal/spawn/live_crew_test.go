@@ -13,6 +13,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -32,7 +33,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 	// TMPDIR must not go through a symlink: Herdr reports a pane cwd with
 	// symlinks resolved and the launch guard compares the two.
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 	res, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project: "shop",
 		Crew:    "k3",
-		Harness: harness.KindCodex,
+		Harness: codex.KindCodex,
 		BriefText: brieftest.Ship(`Append the line "hello from crew" to README.md, commit it, ` +
 			`then append wait-mate: ready in branch to the status file`),
 	})
@@ -115,7 +116,7 @@ func TestLiveSpawnCrewCodex(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    res.Agent,
 		RawID:   "k3",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 	}
 	status := waitForStatus(t, ctx, w, "k3", "wait-mate:", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)

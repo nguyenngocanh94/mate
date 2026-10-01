@@ -1,0 +1,19 @@
+{
+  "captures": [
+    {"file": "../../../../send/testdata/screens/codex_empty.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../send/testdata/screens/codex_empty_v157.txt", "version": "codex-cli 0.157.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../send/testdata/screens/codex_after_turn_v157.txt", "version": "codex-cli 0.157.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../send/testdata/screens/codex_busy.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "busy"},
+    {"file": "../../../../send/testdata/screens/codex_busy_visible_v157.txt", "version": "codex-cli 0.157.1", "pane": "unrecorded", "source": "visible", "want": "busy"},
+    {"file": "../../../../send/testdata/screens/codex_pending.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "draft"},
+    {"file": "../../../../send/testdata/screens/codex_pending_v157.txt", "version": "codex-cli 0.157.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "draft"},
+    {"file": "../../../codex/testdata/startup/codex-0.154.0-trust-dialog.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "trust_dialog"},
+    {"file": "../../../codex/testdata/startup/codex-0.156.1-trust-dialog.txt", "version": "codex-cli 0.156.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "trust_dialog"},
+    {"file": "../../../codex/testdata/startup/codex_update_dialog.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "update_dialog"},
+    {"file": "../../../codex/testdata/startup/codex-0.154.0-hooks-review.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "hooks_review"},
+    {"file": "../../../codex/testdata/startup/codex-0.156.1-hooks-review.txt", "version": "codex-cli 0.156.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "hooks_review"},
+    {"file": "../../../codex/testdata/startup/codex-0.154.0-ready.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "ready"},
+    {"file": "../../../codex/testdata/startup/codex-0.156.1-ready.txt", "version": "codex-cli 0.156.1", "pane": "unrecorded", "source": "recent-unwrapped", "want": "ready"},
+    {"file": "../../../codex/testdata/startup/codex_update_banner_ready.txt", "version": "codex-cli 0.154.0", "pane": "unrecorded", "source": "recent-unwrapped", "want": "ready"}
+  ]
+}

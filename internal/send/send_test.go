@@ -9,6 +9,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -114,7 +116,7 @@ func target() runtime.AgentHandle {
 	return runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "fm-lab-test"},
 		Name:    "crew-k3",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 		Tab:     runtime.TabHandle{PaneID: "w1:p1"},
 	}
 }
@@ -128,7 +130,7 @@ func TestSendTypesOnceAndConfirmsTheComposerCleared(t *testing.T) {
 	// fails below.
 	deps.Harnesses = harnesstest.ReadingVisible(deps.Harnesses)
 
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -180,7 +182,7 @@ func TestSendRefusesAComposerHoldingSomeoneElsesText(t *testing.T) {
 	rt := &scripted{screens: []string{claudeScreen("half typed")}}
 	deps, _ := testDeps(rt)
 
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if !errors.Is(err, send.ErrComposerPending) {
 		t.Fatalf("err = %v, want ErrComposerPending", err)
 	}
@@ -203,7 +205,7 @@ func TestSendRefusesABusyPaneUnlessTheCallerQueues(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeBusyScreen()}}
 	deps, _ := testDeps(rt)
-	_, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if !errors.Is(err, send.ErrAgentBusy) {
 		t.Fatalf("err = %v, want ErrAgentBusy", err)
 	}
@@ -217,7 +219,7 @@ func TestSendRefusesABusyPaneUnlessTheCallerQueues(t *testing.T) {
 
 	queued := &scripted{screens: []string{claudeBusyScreen(), claudeScreen("")}}
 	qdeps, _ := testDeps(queued)
-	report, err := send.Send(context.Background(), qdeps, target(), harness.KindClaude, "say PONG", send.Options{QueueWhileBusy: true})
+	report, err := send.Send(context.Background(), qdeps, target(), claude.KindClaude, "say PONG", send.Options{QueueWhileBusy: true})
 	if err != nil {
 		t.Fatalf("queued send: %v", err)
 	}
@@ -231,7 +233,7 @@ func TestSendRefusesAScreenItCannotName(t *testing.T) {
 	dialog := "a dialog\n  1. one\n  2. two\n  Press enter\n"
 	rt := &scripted{screens: []string{dialog}}
 	deps, _ := testDeps(rt)
-	_, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if !errors.Is(err, send.ErrComposerUnknown) {
 		t.Fatalf("err = %v, want ErrComposerUnknown", err)
 	}
@@ -258,7 +260,7 @@ func TestSendRetriesEnterOnlyAndSucceedsWhenTheComposerClears(t *testing.T) {
 	}
 	deps, slept := testDeps(rt)
 
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -288,7 +290,7 @@ func TestSendReportsAnEnterThatNeverSubmits(t *testing.T) {
 	rt.onType = func(text string) []string { return []string{claudeScreen(text)} }
 	deps, _ := testDeps(rt)
 
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 	if !errors.Is(err, send.ErrEnterSwallowed) {
 		t.Fatalf("err = %v, want ErrEnterSwallowed", err)
 	}
@@ -313,7 +315,7 @@ func TestSendRefusesAMultiLineMessageBeforeTouchingThePane(t *testing.T) {
 	rt := &scripted{screens: []string{claudeScreen("")}}
 	deps, _ := testDeps(rt)
 	for _, text := range []string{"two\nlines", "carriage\rreturn", "", "   "} {
-		_, err := send.Send(context.Background(), deps, target(), harness.KindClaude, text, send.Options{})
+		_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, text, send.Options{})
 		var coded *observability.Error
 		if !errors.As(err, &coded) || coded.Code != observability.CodeUsage {
 			t.Fatalf("text %q: err = %v, want a usage refusal", text, err)
@@ -328,7 +330,7 @@ func TestSendPrefixesTheFromAppMarkerOnRequest(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
 	deps, _ := testDeps(rt)
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "signal: crews/k3.status", send.Options{Marker: true})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "signal: crews/k3.status", send.Options{Marker: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +348,7 @@ func TestSendWaitsLongerBeforeSubmittingASlashCommand(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
 	deps, slept := testDeps(rt)
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "/help", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "/help", send.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +358,7 @@ func TestSendWaitsLongerBeforeSubmittingASlashCommand(t *testing.T) {
 
 	plain := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
 	pdeps, pslept := testDeps(plain)
-	if _, err := send.Send(context.Background(), pdeps, target(), harness.KindClaude, "hello", send.Options{}); err != nil {
+	if _, err := send.Send(context.Background(), pdeps, target(), claude.KindClaude, "hello", send.Options{}); err != nil {
 		t.Fatal(err)
 	}
 	if (*pslept)[0] != send.DefaultSettle {
@@ -370,7 +372,7 @@ func TestSendTreatsAnUnconfirmedWaitAsAWarningNotAFailure(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}, waitErr: errors.New("timeout")}
 	deps, _ := testDeps(rt)
-	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{WaitForWorking: true})
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{WaitForWorking: true})
 	if err != nil {
 		t.Fatalf("an unconfirmed wait failed the send: %v", err)
 	}
@@ -383,7 +385,7 @@ func TestSendTreatsAnUnconfirmedWaitAsAWarningNotAFailure(t *testing.T) {
 
 	ok := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}, status: runtime.AgentWorking}
 	odeps, _ := testDeps(ok)
-	rep, err := send.Send(context.Background(), odeps, target(), harness.KindClaude, "say PONG", send.Options{WaitForWorking: true})
+	rep, err := send.Send(context.Background(), odeps, target(), claude.KindClaude, "say PONG", send.Options{WaitForWorking: true})
 	if err != nil || len(rep.Warnings) != 0 {
 		t.Fatalf("confirmed wait: err=%v warnings=%#v", err, rep.Warnings)
 	}
@@ -397,10 +399,10 @@ func TestSendTreatsAnUnconfirmedWaitAsAWarningNotAFailure(t *testing.T) {
 // placeholder (internal/send/testdata/screens/codex_empty.txt).
 func TestSendDrivesACodexComposer(t *testing.T) {
 	t.Parallel()
-	empty := "  Tip: something\n\n› " + harness.CodexComposerPlaceholder + "\n\n  gpt-5.6-terra high · /repo\n"
+	empty := "  Tip: something\n\n› " + codex.CodexComposerPlaceholder + "\n\n  gpt-5.6-terra high · /repo\n"
 	rt := &scripted{screens: []string{empty, empty}}
 	deps, _ := testDeps(rt)
-	report, err := send.Send(context.Background(), deps, target(), harness.KindCodex, "read brief.md", send.Options{})
+	report, err := send.Send(context.Background(), deps, target(), codex.KindCodex, "read brief.md", send.Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -414,19 +416,19 @@ func TestSendSurfacesRuntimeFailures(t *testing.T) {
 	boom := errors.New("herdr is down")
 	typeFail := &scripted{screens: []string{claudeScreen("")}, textErr: boom}
 	deps, _ := testDeps(typeFail)
-	if _, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "x", send.Options{}); !errors.Is(err, boom) {
+	if _, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "x", send.Options{}); !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want the runtime failure", err)
 	}
 	keyFail := &scripted{screens: []string{claudeScreen("")}, keysErr: boom}
 	kdeps, _ := testDeps(keyFail)
-	report, err := send.Send(context.Background(), kdeps, target(), harness.KindClaude, "x", send.Options{})
+	report, err := send.Send(context.Background(), kdeps, target(), claude.KindClaude, "x", send.Options{})
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want the runtime failure", err)
 	}
 	if !report.Typed {
 		t.Fatal("the report must still say the text was typed before the enter failed")
 	}
-	if _, err := send.Send(context.Background(), send.Deps{}, target(), harness.KindClaude, "x", send.Options{}); err == nil {
+	if _, err := send.Send(context.Background(), send.Deps{}, target(), claude.KindClaude, "x", send.Options{}); err == nil {
 		t.Fatal("a send with no runtime must be refused")
 	}
 }
@@ -436,12 +438,12 @@ func TestSendSurfacesRuntimeFailures(t *testing.T) {
 func TestSendRefusesAnUnregisteredKind(t *testing.T) {
 	rt := &scripted{screens: []string{claudeBusyScreen()}}
 	deps, _ := testDeps(rt)
-	reg, err := harness.NewRegistry(nil, harness.Codex{})
+	reg, err := harness.NewRegistry(nil, codex.Codex{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	deps.Harnesses = reg
-	if _, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "x", send.Options{}); err == nil {
+	if _, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "x", send.Options{}); err == nil {
 		t.Fatal("a send to a kind the registry does not hold was not refused")
 	}
 	if rt.reads != 0 || len(rt.typed) != 0 {

@@ -5,7 +5,7 @@ description: Read before spawning a Crew.
 
 ## 7. Spawn
 
-You yourself run on the `claude-code` harness; that has no bearing on which harness a Crew runs.
+You yourself run on the `claude` harness; that has no bearing on which harness a Crew runs.
 
 **Choose the profile first.** Load the `crew-dispatch` skill and run `/usr/local/bin/mate crew dispatch` before every spawn.
 It prints the table in force, the captain's own or the built-in one, and the skill says how a task is matched to a rule and which of the rule's profiles to pass.

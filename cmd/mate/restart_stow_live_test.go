@@ -27,7 +27,7 @@ func TestLiveRestartMateStowsFirst(t *testing.T) {
 	requireConsoleLive(t)
 	session, configHome := consoleLiveLab(t)
 	root := t.TempDir()
-	w, err := store.Init(root)
+	w, err := store.Init(root, workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestLiveRestartMateStowsFirst(t *testing.T) {
 	defer cancel()
 	action := consoleAction(w, deps)
 
-	out, err := action(ctx, console.ActionRequest{Action: console.ActionStart, Target: stowProject, TargetKind: "mate", Harness: query.HarnessClaude})
+	out, err := action(ctx, console.ActionRequest{Action: console.ActionStart, Target: stowProject, TargetKind: "mate", Harness: query.HarnessKind("claude")})
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}

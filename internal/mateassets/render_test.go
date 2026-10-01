@@ -10,18 +10,24 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/brief"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 )
 
 var update = flag.Bool("update", false, "update golden files in testdata/")
 
 func fixedParams() Params {
+	harnesses, err := HarnessesFrom(catalog.Default(), "claude")
+	if err != nil {
+		panic(err)
+	}
 	return Params{
 		ProjectName:      "shop",
 		WorkspaceRoot:    "/ws",
 		Repos:            []RepoParams{{Name: "shop", Path: "/ws/shop", DefaultBranch: "main"}},
 		Mode:             "local-only",
 		Yolo:             false,
-		Harness:          "claude-code",
+		Harness:          "claude",
+		Harnesses:        harnesses,
 		SkillsDir:        ".claude/skills",
 		WorkspaceDoc:     "/ws/.mate/WORKSPACE.md",
 		ProjectDoc:       "/ws/.mate/projects/shop/PROJECT.md",

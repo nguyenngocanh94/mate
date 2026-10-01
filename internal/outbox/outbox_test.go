@@ -12,6 +12,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -62,7 +63,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	ws, err := store.Init(t.TempDir())
+	ws, err := store.Init(t.TempDir(), store.Defaults{})
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
@@ -78,7 +79,7 @@ func newFixture(t *testing.T) *fixture {
 		Session: runtime.SessionHandle{Name: "fm-lab-test"},
 		Name:    "mate-" + project,
 		RawID:   project,
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 		Tab:     runtime.TabHandle{PaneID: "w1:p1"},
 	}
 	rt.PutAgent(handle, runtime.AgentIdle)
@@ -94,7 +95,7 @@ func (f *fixture) deps() outbox.Deps {
 			if f.handleErr != nil {
 				return runtime.AgentHandle{}, "", f.handleErr
 			}
-			return f.handle, harness.KindClaude, nil
+			return f.handle, claude.KindClaude, nil
 		},
 		Clock:   f.clock,
 		Sleeper: instant{},

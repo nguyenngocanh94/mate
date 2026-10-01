@@ -84,7 +84,7 @@ func TestReviewVerdictDoesNotInferApprovalFromProse(t *testing.T) {
 	}
 }
 func nilSafeReviewWorkspace(t *testing.T) *store.Workspace {
-	w, err := store.Init(t.TempDir())
+	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
 	}

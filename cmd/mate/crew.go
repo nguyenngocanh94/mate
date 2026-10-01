@@ -40,11 +40,11 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	fs := flag.NewFlagSet("crew spawn", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]`)
+		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness `+harnessChoices(harness.RoleCrew, "|")+`] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
-	harnessFlag := fs.String("harness", "", "harness to launch (codex or claude; default: the dispatch table's default profile)")
+	harnessFlag := fs.String("harness", "", "harness to launch ("+harnessChoices(harness.RoleCrew, " or ")+"; default: the dispatch table's default profile)")
 	modelFlag := fs.String("model", "", "model the harness runs, as it names it (default: the harness's own)")
 	effortFlag := fs.String("effort", "", "reasoning effort: low, medium, high, xhigh or max (default: the harness's own)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")

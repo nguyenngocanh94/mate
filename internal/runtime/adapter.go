@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
@@ -114,6 +113,9 @@ type WorkspaceSpec struct {
 	// Env is allowlisted MATE_* for the workspace-create root pane (the Mate
 	// tab). Crew env still goes through TabSpec on tab create.
 	Env []EnvVar
+	// EnvKeys are the variables Env may carry besides the identity keys:
+	// the registered harnesses' own (harness.Registry.EnvKeys).
+	EnvKeys []string
 }
 
 // WorkspaceHandle is an opaque Herdr workspace id (for example w1).
@@ -133,6 +135,8 @@ type TabSpec struct {
 	Label     string
 	Cwd       string
 	Env       []EnvVar
+	// EnvKeys are as WorkspaceSpec.EnvKeys.
+	EnvKeys []string
 }
 
 // EnvVar is a single allowlisted environment assignment.
@@ -242,7 +246,7 @@ func CheckWorkspaceSpec(spec WorkspaceSpec) error {
 	if strings.TrimSpace(spec.Label) == "" {
 		return observability.NewError(observability.CodeUsage, "workspace requires a label")
 	}
-	if _, err := AllowlistedEnv(spec.Env); err != nil {
+	if _, err := AllowlistedEnv(spec.Env, spec.EnvKeys); err != nil {
 		return err
 	}
 	return checkAgentCwd("workspace", spec.Cwd)
@@ -258,7 +262,7 @@ func CheckTabSpec(spec TabSpec) error {
 	if strings.TrimSpace(spec.Workspace.WorkspaceID) == "" {
 		return observability.NewError(observability.CodeUsage, "tab requires a workspace")
 	}
-	if _, err := AllowlistedEnv(spec.Env); err != nil {
+	if _, err := AllowlistedEnv(spec.Env, spec.EnvKeys); err != nil {
 		return err
 	}
 	return checkAgentCwd("tab", spec.Cwd)
@@ -503,7 +507,7 @@ func KnownAssumptions() []Assumption {
 		{
 			ID:      AssumptionCodexChainSeparatorBytes,
 			Status:  AssumptionDisproven,
-			Summary: "Live probe 2026-09-01 (codex-cli 0.151.0, codex debug prompt-input): project_doc_max_bytes meters only project files' raw content bytes; the per-file joiners, the --- project-doc --- marker, and the global $CODEX_HOME doc are rendered after metering and never charged. harness.CodexChain derives the budget from that metered stream.",
+			Summary: "Live probe 2026-09-01 (codex-cli 0.151.0, `debug prompt-input`): project_doc_max_bytes meters only project files' raw content bytes; the per-file joiners, the --- project-doc --- marker, and the global doc of the Codex home are rendered after metering and never charged. The Codex profile's instruction chain derives the budget from that metered stream.",
 		},
 		{
 			ID:      AssumptionWindowsDirectAttach,
@@ -713,13 +717,6 @@ func checkSessionName(name string) error {
 		return fmt.Errorf("session: name %q is not a single path segment", name)
 	}
 	return nil
-}
-
-// AllowlistedEnvKeys are identity and provider-root keys injected at pane
-// create. HERDR_* keys are injected by Herdr itself and must not be set by
-// Mate. Unknown keys are refused rather than dropped.
-func AllowlistedEnvKeys() []string {
-	return config.LaunchEnvKeys()
 }
 
 // DetachKey is the proven Herdr 0.8.2 detach binding. Detach does not stop

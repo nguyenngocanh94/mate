@@ -641,28 +641,25 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 // lists everything; these are shortcuts into the same choices, so both
 // surfaces read availability from the store-backed loader and cannot disagree.
 
-// harnessKinds is every harness a Mate can be created on, in the picker's
-// order when the workspace names no default of its own.
-var harnessKinds = []query.HarnessKind{query.HarnessClaude, query.HarnessCodex}
-
-// harnessOrder is the picker's order: the workspace's default Mate harness
-// (workspace.yaml's `mate_harness`, which query.Load resolves into the
-// snapshot) first, so the cursor starts on it and Enter alone creates the
-// Mate the workspace is configured for, then the rest in harnessKinds order.
+// harnessOrder is the picker's order: the default Mate harness (the
+// workspace's `mate_harness`, else the catalog's own, which query.Load
+// resolves into the snapshot) first, so the cursor starts on it and Enter
+// alone creates the Mate the workspace is configured for, then the rest of
+// the snapshot's harness catalog in its order.
 func (m Model) harnessOrder() []query.HarnessKind {
 	def := query.HarnessKind("")
 	if m.tree.Workspace.IsKnown() {
 		def = m.tree.Workspace.Value.MateHarness
 	}
-	order := make([]query.HarnessKind, 0, len(harnessKinds))
-	for _, kind := range harnessKinds {
-		if kind == def {
-			order = append(order, kind)
+	order := make([]query.HarnessKind, 0, len(m.tree.Harnesses))
+	for _, h := range m.tree.Harnesses {
+		if h.Kind == def {
+			order = append(order, h.Kind)
 		}
 	}
-	for _, kind := range harnessKinds {
-		if kind != def {
-			order = append(order, kind)
+	for _, h := range m.tree.Harnesses {
+		if h.Kind != def {
+			order = append(order, h.Kind)
 		}
 	}
 	return order
@@ -813,8 +810,14 @@ func (m Model) onHarnessKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
+		order := m.harnessOrder()
+		if m.harnessIndex >= len(order) {
+			// A snapshot that carries no harness catalog offers nothing
+			// to pick; Enter is not a choice of a harness nobody listed.
+			return m.closeHarnessPick(), nil
+		}
 		choice := m.pendingChoice
-		choice.req.Harness = m.harnessOrder()[m.harnessIndex]
+		choice.req.Harness = order[m.harnessIndex]
 		m = m.closeHarnessPick()
 		return m.runPending(choice)
 	default:

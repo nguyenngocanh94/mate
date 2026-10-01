@@ -39,21 +39,6 @@ func ParseEffort(s string) (Effort, error) {
 	return "", fmt.Errorf("effort %q: want one of low, medium, high, xhigh, max", s)
 }
 
-// SupportsEffort reports whether the harness takes e as a launch flag.
-// Claude takes all five (claude 2.1.282 --help). Codex's
-// model_reasoning_effort advertises low through xhigh for its catalogue
-// models and max for some only (firstmate's codex record, codex-cli 0.142.1
-// and 0.153.4), so max is not passed to Codex.
-func (k Kind) SupportsEffort(e Effort) bool {
-	switch k {
-	case KindClaude:
-		return e != ""
-	case KindCodex:
-		return e != "" && e != EffortMax
-	}
-	return false
-}
-
 // ParseModel accepts "" (the harness default) or one model name as the
 // harness spells it - an alias like "opus" or a full id like "gpt-5.5". It
 // becomes one argv element, so anything that could be read as a flag or a
@@ -67,26 +52,4 @@ func ParseModel(s string) (string, error) {
 		return "", fmt.Errorf("model %q: want one model name, like opus or gpt-5.5", s)
 	}
 	return s, nil
-}
-
-// profileArgs are a launch's model and effort flags, and whether a
-// requested effort was left out because the harness does not take it.
-func profileArgs(k Kind, model string, effort Effort) (args []string, effortOmitted bool) {
-	switch k {
-	case KindClaude:
-		if model != "" {
-			args = append(args, "--model", model)
-		}
-		if k.SupportsEffort(effort) {
-			args = append(args, "--effort", string(effort))
-		}
-	case KindCodex:
-		if model != "" {
-			args = append(args, "-m", model)
-		}
-		if k.SupportsEffort(effort) {
-			args = append(args, "-c", `model_reasoning_effort="`+string(effort)+`"`)
-		}
-	}
-	return args, effort != "" && !k.SupportsEffort(effort)
 }

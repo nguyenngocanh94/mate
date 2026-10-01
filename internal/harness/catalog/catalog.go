@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 )
 
 // Default is every harness this binary launches, and the one each role gets
@@ -15,11 +17,11 @@ import (
 func Default() harness.Registry {
 	r, err := harness.NewRegistry(
 		map[harness.AgentRole]harness.Kind{
-			harness.RoleMate: harness.KindClaude,
-			harness.RoleCrew: harness.KindCodex,
+			harness.RoleMate: claude.KindClaude,
+			harness.RoleCrew: codex.KindCodex,
 		},
-		harness.Claude{},
-		harness.Codex{},
+		claude.Claude{},
+		codex.Codex{},
 	)
 	if err != nil {
 		// The list above is fixed at compile time; a refusal is a bug in
