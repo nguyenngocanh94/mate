@@ -2,7 +2,7 @@
 
 - Ngày: 2026-09-30; sửa theo review 2026-10-01.
 - Trạng thái: đề xuất; chưa sửa production code.
-- Hai test Console phụ thuộc locale (`TestConsoleGalleryRendersRegisteredProjects`, `TestRefreshUpdatesAsOfAndTheAgesMeasuredFromIt`) là lỗi hygiene độc lập, sửa ở PR riêng, không thuộc phương án này.
+- Hai lỗi hygiene độc lập, sửa ở PR riêng, không thuộc phương án này: hai test Console phụ thuộc locale (`TestConsoleGalleryRendersRegisteredProjects`, `TestRefreshUpdatesAsOfAndTheAgesMeasuredFromIt`), và doc comment của `TranscriptParser.ParseTranscriptFinal` khẳng định "no caller establishes that today" trong khi `timeline/telemetry.go` đã gọi nó sau `StopMate.confirmGone → FreezeMateSession → Located.Finalized` từ `d584f0e`.
 - Baseline đã review: `5d93926`, Herdr 0.8.2, Claude Code 2.1.285, codex-cli 0.156.1, pi 0.99.1 trên máy.
 - Liên quan: [phương án probe TUI](tui-probe-redesign-2026-09-27.md), [crew observability](crew-harness-observability-2026-09-28.md).
 - Spec cần cập nhật khi triển khai: [MVP](../mvp.md) mục 2, 7, 9 và 10.
@@ -145,8 +145,11 @@ Không dùng `init()` để tự đăng ký: test của lõi tiêm harness giả
 `ParseKind` toàn cục biến mất.
 Một kind hợp lệ là một kind có trong registry.
 
-`catalog` cũng công bố harness mặc định cho vai Mate và vai Crew.
-`cmd/mate` truyền hai giá trị đó vào `store.Init`; `store` vẫn là tầng thấp, không import `catalog`, và không còn tự quyết `DefaultMateHarness`.
+`catalog` cũng công bố harness mặc định cho vai Mate và vai Crew, đọc được qua `Registry.Default(role)`.
+`store` không điền mặc định ở cả `Init` lẫn đường đọc `workspace.yaml` (hôm nay `workspace.go:224-229` tự điền khi field trống); `Defaults()` trả đúng những gì file ghi.
+Chuỗi rỗng được giải quyết ở ba chỗ đọc hiện có (`spawn/start.go`, `spawn/crew.go`, `cmd/mate/crew_dispatch.go`), nơi đã có `Registry` qua `Deps`.
+`Init` ghi giá trị `cmd/mate` truyền vào, để file của workspace mới vẫn tự mô tả.
+`store` vẫn là tầng thấp, không import `catalog`, và không còn hằng `DefaultMateHarness`.
 Bảng dispatch mặc định vẫn là chính sách của captain về model và effort theo loại task, không sinh từ registry; registry chỉ kiểm tra hàng của nó lúc đọc, như `dispatch.go` đang làm.
 
 ### 3.5. `LaunchSpec` vẫn kín
@@ -198,9 +201,16 @@ Một suite chạy trên mọi profile trong `catalog.Default()`.
 5. Live, chỉ khi `MATE_LIVE=1`: `TestLiveConformance/<kind>` spawn trong lab cô lập, settle, gửi một dòng, thấy bận rồi rảnh, stop.
 
 Thêm một test ratchet, chạy bằng `go/ast` trên mọi file không phải test ngoài `internal/harness/...`.
-Nó đếm hai loại tham chiếu: identifier riêng harness xuất từ `harness` (`KindClaude`, `Claude{}`, `CodexRolloutPath`, `ClaudeSettings`, ...) và literal chuỗi chứa `claude`, `codex`, `CLAUDE.md`, `.claude`, `.codex`, `CODEX_HOME`, `CLAUDE_CONFIG_DIR`.
+Nó đếm hai loại tham chiếu: identifier riêng harness xuất từ `harness` (`KindClaude`, `Claude{}`, `CodexRolloutPath`, `ClaudeSettings`, ...) và literal chuỗi trùng với một tên harness.
+Tập tên không liệt kê tay: nó là `Kinds()` của `catalog.Default()` cộng những tên mỗi profile tự khai báo trong `Info()` (thư mục config, tên file chỉ dẫn, khoá env), nên harness mới tự động vào ratchet.
+Literal được so khớp nguyên vẹn hoặc theo từng đoạn đường dẫn, không so substring: với tên ngắn như `pi`, so substring sẽ dính `"api"`, `"pipe"`, `"spin"` và biến ratchet thành nhiễu.
 Đếm chỉ bằng `harness.Kind*` là không đủ: con số đó về 0 trong khi `config`, `store`, `dispatch`, `mateassets`, `spawn/harness_profile.go` và `timeline/telemetry.go` vẫn biết tên harness.
-Một allowlist có lý do cho từng mục giữ các tên là tên chung chứ không phải hiểu biết về harness, ví dụ `CLAUDE.md` trong `facts.docNames` là một tên tài liệu của repo.
+Một allowlist có lý do cho từng mục giữ những chỗ được phép nhắc tên harness:
+
+| Mục | Lý do |
+| --- | --- |
+| `CLAUDE.md` trong `facts.docNames` | Tên tài liệu chung của repo, không phải hiểu biết về harness |
+| `dispatch/builtin.go` | Chính sách của captain về model và effort; mỗi hàng được registry kiểm lúc đọc |
 Con số bắt đầu ở mức hiện tại, fail nếu tăng, và phải về 0 ngoài allowlist ở PR 6.
 
 ## 5. Quan hệ với hai phương án đang có
@@ -225,24 +235,28 @@ Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
 | 0 | Chuẩn bị: bổ sung test đặc tả argv và file sinh ra cho cả hai harness, cả hai vai; thêm test ratchet; đo nhanh pi để thử hợp đồng trên giấy | Ratchet ghi con số hiện tại và allowlist; bảng khớp hợp đồng của pi nằm trong evidence |
 | 1 | Hợp đồng, `Registry`, tiêm qua `Deps`; Claude và Codex hiện thực `Profile` bằng lớp bọc mỏng tại chỗ; xoá `Validate` và `CapabilitySet` | Không call site nào gọi `AdapterFor` hay `ParseKind` toàn cục; test đặc tả không đổi |
 | 2 | Launch: `Prepare` và `Build`; thu gọn `AgentSpec`; builder kín cho `LaunchSpec` | `spawn` không còn `switch kind` cho launch; argv và file sinh ra giống từng byte |
-| 3 | Màn hình: startup, vùng input và dấu hiệu đang chạy về `ScreenProfile` dưới dạng quan sát; `send`, `watch`, `mate state` và fake nhận profile; khớp draft và `CanType` thành policy chung | Toàn bộ capture hiện có phân loại như cũ; không còn nhánh bỏ qua settle |
+| 3 | Màn hình: chuyển `startupProfileFor`, `composerProfileFor`, `pendingMatches` và `startupReadyScreen` vào `ScreenProfile`, giữ nguyên verdict như hôm nay; `send`, `watch`, `mate state` và fake nhận profile. Chỉ chuyển chỗ; việc tách quan sát khỏi policy (hình dạng đích ở mục 3.2) là probe-TUI PR 1, đi sau | Toàn bộ capture hiện có phân loại như cũ; không còn nhánh bỏ qua settle |
 | 4 | Stop, session, hook, turn-end thành capability; `runtime` bỏ so sánh kind; `outbox`, `context_refresh` và `mate hook` hỏi capability | Live hiện có về resume, stow và recall hook pass trên cả hai harness |
-| 5 | Transcript, usage và quota thành capability, gồm đọc tăng dần và snapshot đã đóng băng; `timeline` còn một đường chuẩn hoá turn; sửa doc comment cũ của `ParseTranscriptFinal` | `mate usage` và dashboard cho cùng số trên corpus fixture trước và sau; `telemetry.go` không còn nhánh kind |
+| 5 | Transcript, usage và quota thành capability, gồm đọc tăng dần và snapshot đã đóng băng; `timeline` còn một đường chuẩn hoá turn | `mate usage` và dashboard cho cùng số trên corpus fixture trước và sau; `telemetry.go` không còn nhánh kind |
 | 6 | Chuyển file vào `harness/claude` và `harness/codex`; harness mặc định và danh mục harness cho `store`, `query` và Console lấy từ `catalog`; skill `harness-adapters` sinh từ registry; ratchet về 0; suite hợp đồng đầy đủ | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai; diff của PR này chỉ là di chuyển và nối dây |
 | 7 | Onboard harness thứ ba, vai Crew trước | Diff chỉ gồm package mới, một dòng trong `catalog`, một hàng trong bảng dispatch mặc định, fixture và tài liệu; suite hợp đồng và live conformance pass |
 
 Đồ thị phụ thuộc, gồm cả phương án probe TUI:
 
 ```text
-PR0 ─ PR1 ─ PR2 ─┬─ PR4 (stop, session, hook, turn-end) ─┐
-                 ├─ PR5 (transcript, usage, quota) ──────┼─ PR6 (di chuyển) ─ PR7 (pi)
-                 └─ probe-TUI PR1 (thay PR3) ────────────┘
+PR0 ─ PR1 ─ PR2 ─┬─ PR3 (màn hình, chỉ chuyển chỗ) ─┐
+                 ├─ PR4 (stop, session, hook, turn-end) ─┼─ PR6 (di chuyển) ─ PR7 (pi)
+                 └─ PR5 (transcript, usage, quota) ──────┘
 probe-TUI PR0 (lab tương thích) chạy song song từ đầu
-probe-TUI PR3 (hook collector) đi sau PR4, vì PR4 dựng HookInstaller làm chỗ đặt
+probe-TUI PR1 (tách quan sát khỏi policy) đi sau PR3 ở đây và sau probe-TUI PR0
+probe-TUI PR3 (hook collector) đi sau PR4 ở đây, vì PR4 dựng HookInstaller làm chỗ đặt
 ```
 
-PR4 và PR5 không chờ màn hình; chỉ PR6 chờ tất cả.
-Nếu probe TUI chưa sẵn sàng, PR3 ở đây vẫn làm được như một bước chuyển chỗ thuần tuý, và probe-TUI PR1 đổi hình bên trong `ScreenProfile` sau đó.
+PR3, PR4 và PR5 độc lập với nhau; chỉ PR6 chờ cả ba.
+
+PR6 dời file, nên nó là một rebase lớn cho mọi PR đang mở trên `send/`, `harness/` và `hook/`.
+Luật: PR6 không chờ cả chuỗi probe TUI, nhưng chỉ mở khi không còn PR probe TUI nào đang mở trên ba thư mục đó; nó dùng `git mv` để rename detection còn tác dụng; PR nào mở sau PR6 thì rebase theo.
+PR6 là một cửa sổ ngắn được hẹn trước, không phải một PR treo lâu.
 
 PR 6 cố ý đi sau: tách "đổi chỗ ở" khỏi "đổi hình dạng" để từng diff đọc được.
 PR 7 là phép thử của cả phương án: nếu phải sửa lõi để thêm harness thì thiết kế chưa đạt, và chỗ phải sửa là lỗi của hợp đồng.
@@ -281,7 +295,7 @@ Vì vậy `HookInstaller` và `Prepare` phải trả được cả file lẫn th
 ## 9. Câu hỏi cần captain chốt
 
 1. **Thứ tự với phương án probe TUI.**
-   Đề xuất: đồ thị ở mục 6; PR 0 đến 2 ở đây đi trước, PR 0 của probe TUI chạy song song, PR 1 của probe TUI đáp vào `ScreenProfile` thay cho PR 3 ở đây, PR 3 của probe TUI đi sau PR 4 ở đây.
+   Đề xuất: đồ thị ở mục 6; PR 0 đến 3 ở đây đi trước, PR 0 của probe TUI chạy song song, PR 1 của probe TUI đổi hình bên trong `ScreenProfile` sau PR 3 ở đây, PR 3 của probe TUI đi sau PR 4 ở đây, PR 6 ở đây mở trong một cửa sổ không có PR probe TUI nào đang mở trên các file bị dời.
 2. **Harness thứ ba là pi, và chỉ vai Crew trước?**
    Đề xuất: đúng cả hai; vai Mate chờ kết quả đo hook.
 3. **Harness không có hệ hook tương đương thì không làm Mate được.**
