@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,8 @@ import (
 type Command struct {
 	Dir  string
 	Args []string
+	// Env is added to the inherited environment, as KEY=value entries.
+	Env []string
 }
 
 // Result is the observed outcome. A non-zero exit is a result, not an
@@ -64,6 +67,9 @@ func (r ExecRunner) Run(ctx context.Context, cmd Command) (Result, error) {
 	}
 	argv = append(argv, cmd.Args...)
 	c := exec.CommandContext(ctx, bin, argv...)
+	if len(cmd.Env) > 0 {
+		c.Env = append(os.Environ(), cmd.Env...)
+	}
 	var stdout, stderr strings.Builder
 	c.Stdout = &stdout
 	c.Stderr = &stderr
@@ -101,7 +107,12 @@ func (g Git) runner() Runner {
 
 // run executes one command and turns a non-zero exit into a coded error.
 func (g Git) run(ctx context.Context, dir string, args ...string) (string, error) {
-	res, err := g.runner().Run(ctx, Command{Dir: dir, Args: args})
+	return g.runEnv(ctx, dir, nil, args...)
+}
+
+// runEnv is run with extra environment entries.
+func (g Git) runEnv(ctx context.Context, dir string, env []string, args ...string) (string, error) {
+	res, err := g.runner().Run(ctx, Command{Dir: dir, Args: args, Env: env})
 	if err != nil {
 		return "", err
 	}
@@ -176,6 +187,84 @@ func (g Git) RemoveWorktree(ctx context.Context, repo, path string) error {
 		err = pruneErr
 	}
 	return err
+}
+
+// WorktreeAttached reports whether git still treats path as a working tree
+// of its own: `git -C path rev-parse --show-toplevel` succeeds and names
+// path. It is false for a directory whose `.git` link points at a gitdir
+// that no longer exists - the shape a worktree takes after its workspace
+// was copied to another machine - and for a directory that has no `.git`
+// at all.
+func (g Git) WorktreeAttached(ctx context.Context, path string) (bool, error) {
+	res, err := g.runner().Run(ctx, Command{Dir: path, Args: []string{"rev-parse", "--show-toplevel"}})
+	if err != nil {
+		return false, err
+	}
+	return res.ExitCode == 0 && SamePath(res.Stdout, path), nil
+}
+
+// PruneWorktrees is `git -C repo worktree prune`: it drops the
+// administrative entries of worktrees whose directories are gone.
+func (g Git) PruneWorktrees(ctx context.Context, repo string) error {
+	_, err := g.run(ctx, repo, "worktree", "prune")
+	return err
+}
+
+// SnapshotTree hashes the files of dir, as repo's git sees them, into a
+// tree object and returns its id. dir need not be a working tree git still
+// knows: the snapshot uses repo's object store and ignore rules with a
+// throwaway index, so neither repo's index nor dir is changed. Ignored
+// files are left out, as `git status` leaves them out. It is how a
+// detached directory is compared with history (CommitWithTree).
+func (g Git) SnapshotTree(ctx context.Context, repo, dir string) (string, error) {
+	gitDir, err := g.run(ctx, repo, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return "", err
+	}
+	tmp, err := os.MkdirTemp("", "mate-snapshot-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tmp)
+	env := []string{"GIT_INDEX_FILE=" + filepath.Join(tmp, "index")}
+	prefix := []string{"--git-dir=" + strings.TrimSpace(gitDir), "--work-tree=" + dir}
+	if _, err := g.runEnv(ctx, dir, env, append(prefix, "add", "--all")...); err != nil {
+		return "", err
+	}
+	out, err := g.runEnv(ctx, dir, env, append(prefix, "write-tree")...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// CommitWithTree reports whether any commit reachable from revs has exactly
+// the tree tree: whether git already holds those files as a commit.
+func (g Git) CommitWithTree(ctx context.Context, repo, tree string, revs ...string) (bool, error) {
+	out, err := g.run(ctx, repo, append([]string{"log", "--format=%T"}, revs...)...)
+	if err != nil {
+		return false, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == tree {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// ChangedPaths is the number of paths that differ between two trees (or
+// commits): `git diff-tree -r --name-only a b`.
+func (g Git) ChangedPaths(ctx context.Context, repo, a, b string) (int, error) {
+	out, err := g.run(ctx, repo, "diff-tree", "-r", "--name-only", a, b)
+	if err != nil {
+		return 0, err
+	}
+	trimmed := strings.TrimRight(out, "\n")
+	if trimmed == "" {
+		return 0, nil
+	}
+	return len(strings.Split(trimmed, "\n")), nil
 }
 
 // DeleteBranch is `git -C repo branch -D <branch>`.

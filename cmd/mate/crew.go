@@ -331,13 +331,17 @@ func crewStopReport(project, crew string, res spawn.StopResult) string {
 	if !res.TabClosed {
 		tab = "not confirmed closed"
 	}
+	orphan := ""
+	if res.OrphanedWorktree && res.WorktreeRemoved {
+		orphan = " (git no longer knew the worktree, so its directory was deleted)"
+	}
 	switch res.Teardown {
 	case spawn.TeardownClean:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed (%s was already landed in default); state %s",
-			project, crew, agent, stopped, tab, res.Branch, res.State)
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree%s and branch removed (%s was already landed in default); state %s",
+			project, crew, agent, stopped, tab, orphan, res.Branch, res.State)
 	case spawn.TeardownDiscarded:
-		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch removed with --discard (%d commit(s) ahead, %d dirty file(s) discarded); state %s",
-			project, crew, agent, stopped, tab, res.Ahead, res.DirtyFiles, res.State)
+		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree%s and branch removed with --discard (%d commit(s) ahead, %d dirty file(s) discarded); state %s",
+			project, crew, agent, stopped, tab, orphan, res.Ahead, res.DirtyFiles, res.State)
 	default:
 		return fmt.Sprintf("%s/%s: agent %s (%s), tab %s; worktree and branch kept; state %s",
 			project, crew, agent, stopped, tab, res.State)

@@ -358,3 +358,57 @@ func TestExecRunnerReportsANonZeroExitAsAResult(t *testing.T) {
 		t.Fatal("exit code = 0, want non-zero for a missing ref")
 	}
 }
+
+// A worktree whose `.git` link names a gitdir that is gone - a workspace
+// copied to another machine - is no longer attached, yet its files can
+// still be compared with history through the primary repository.
+func TestDetachedWorktreeIsSnapshottedAgainstHistory(t *testing.T) {
+	repo := newRepo(t)
+	g := gitx.New()
+	ctx := context.Background()
+	wt := filepath.Join(t.TempDir(), "shop-k3")
+	if err := g.AddWorktree(ctx, repo, wt, "mate/k3", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if attached, err := g.WorktreeAttached(ctx, wt); err != nil || !attached {
+		t.Fatalf("WorktreeAttached(fresh worktree) = %v, %v; want true", attached, err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: /nowhere/.git/worktrees/shop-k3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(repo, ".git", "worktrees")); err != nil {
+		t.Fatal(err)
+	}
+	if attached, err := g.WorktreeAttached(ctx, wt); err != nil || attached {
+		t.Fatalf("WorktreeAttached(orphan) = %v, %v; want false", attached, err)
+	}
+
+	tree, err := g.SnapshotTree(ctx, repo, wt)
+	if err != nil {
+		t.Fatalf("SnapshotTree: %v", err)
+	}
+	if want := strings.TrimSpace(run(t, repo, "rev-parse", "main^{tree}")); tree != want {
+		t.Fatalf("snapshot of an untouched checkout = %s, want main's tree %s", tree, want)
+	}
+	if held, err := g.CommitWithTree(ctx, repo, tree, "main"); err != nil || !held {
+		t.Fatalf("CommitWithTree(main's tree) = %v, %v; want true", held, err)
+	}
+
+	if err := os.WriteFile(filepath.Join(wt, "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tree, err = g.SnapshotTree(ctx, repo, wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held, err := g.CommitWithTree(ctx, repo, tree, "main", "mate/k3"); err != nil || held {
+		t.Fatalf("CommitWithTree(tree with a new file) = %v, %v; want false", held, err)
+	}
+	if n, err := g.ChangedPaths(ctx, repo, "main^{tree}", tree); err != nil || n != 1 {
+		t.Fatalf("ChangedPaths = %d, %v; want 1", n, err)
+	}
+	// The snapshot used a throwaway index: the primary checkout is untouched.
+	if status := run(t, repo, "status", "--porcelain"); status != "" {
+		t.Fatalf("SnapshotTree changed the primary checkout:\n%s", status)
+	}
+}

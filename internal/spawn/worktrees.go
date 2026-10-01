@@ -2,6 +2,7 @@ package spawn
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -73,9 +74,15 @@ func (g GitWorktrees) Acquire(ctx context.Context, lease WorktreeLease) error {
 
 // Release removes the worktree (`worktree remove --force` and a prune)
 // and deletes the branch, as parts asks. The first failure is returned.
+//
+// A directory git no longer treats as a worktree (its `.git` link names a
+// gitdir that is gone, as after the workspace moved machines) cannot be
+// removed by `git worktree remove`; it is deleted as a plain directory and
+// the repo's stale entries are pruned. Callers decide beforehand whether
+// its files may go - StopCrew compares them with history first.
 func (g GitWorktrees) Release(ctx context.Context, lease WorktreeLease, parts ReleaseParts) error {
 	if parts.Worktree {
-		if err := g.Git.RemoveWorktree(ctx, lease.Repo, lease.Path); err != nil {
+		if err := g.releaseWorktree(ctx, lease); err != nil {
 			return err
 		}
 	}
@@ -85,6 +92,23 @@ func (g GitWorktrees) Release(ctx context.Context, lease WorktreeLease, parts Re
 		}
 	}
 	return nil
+}
+
+func (g GitWorktrees) releaseWorktree(ctx context.Context, lease WorktreeLease) error {
+	attached, err := g.Git.WorktreeAttached(ctx, lease.Path)
+	if err != nil {
+		return err
+	}
+	if attached {
+		return g.Git.RemoveWorktree(ctx, lease.Repo, lease.Path)
+	}
+	if lease.Path == "" || gitx.SamePath(lease.Path, lease.Repo) {
+		return fmt.Errorf("spawn: refusing to delete %q as a detached worktree of %q", lease.Path, lease.Repo)
+	}
+	if err := os.RemoveAll(lease.Path); err != nil {
+		return err
+	}
+	return g.Git.PruneWorktrees(ctx, lease.Repo)
 }
 
 // discard is the best-effort undo of an Acquire, used when a guard fails

@@ -10,6 +10,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/box"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -163,7 +164,16 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	if worktree != "" {
 		if _, statErr := os.Stat(worktree); statErr == nil {
 			worktreeExists = true
-			dirty, err = git.IsDirty(ctx, worktree)
+			attached, err := git.WorktreeAttached(ctx, worktree)
+			if err != nil {
+				return StopResult{}, err
+			}
+			if attached {
+				dirty, err = git.IsDirty(ctx, worktree)
+			} else {
+				out.OrphanedWorktree = true
+				dirty, err = orphanedWorktreeChanges(ctx, git, repo, worktree, branch, branchExists, repoCfg.DefaultBranch)
+			}
 			if err != nil {
 				return StopResult{}, err
 			}
@@ -176,10 +186,14 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		// Nothing has been changed and nothing will be: the crew is still
 		// running, its pane is still open, and the reader can go and look
 		// at the branch before deciding.
-		return out, observability.WrapError(observability.CodeStateConflict,
-			fmt.Sprintf("branch %s is %d commit(s) ahead of %s and the worktree has %d dirty file(s); nothing was stopped - land the branch, or rerun with --discard to throw the work away",
-				branch, ahead, repoCfg.DefaultBranch, dirty), ErrUnlandedWork).
-			WithDetails(map[string]any{"branch": branch, "ahead": ahead, "dirty_files": dirty})
+		msg := fmt.Sprintf("branch %s is %d commit(s) ahead of %s and the worktree has %d dirty file(s); nothing was stopped - land the branch, or rerun with --discard to throw the work away",
+			branch, ahead, repoCfg.DefaultBranch, dirty)
+		if out.OrphanedWorktree {
+			msg = fmt.Sprintf("worktree %s is no longer registered with git (moved from another machine?) and %d of its file(s) match no commit of %s or %s; branch %s is %d commit(s) ahead of %s; nothing was stopped - copy out what you need, or rerun with --discard to throw the work away",
+				worktree, dirty, branch, repoCfg.DefaultBranch, branch, ahead, repoCfg.DefaultBranch)
+		}
+		return out, observability.WrapError(observability.CodeStateConflict, msg, ErrUnlandedWork).
+			WithDetails(map[string]any{"branch": branch, "ahead": ahead, "dirty_files": dirty, "orphaned_worktree": out.OrphanedWorktree})
 	}
 
 	// 2 & 3. Stop the agent (if Herdr still has one) and close the tab. A
@@ -271,6 +285,36 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	}
 	out.Teardown, out.State = teardown, state
 	return out, writeCrewTeardownMeta(w, project, crew, stoppedMeta, deps.now(), teardown, state)
+}
+
+// orphanedWorktreeChanges answers "would removing this directory lose
+// anything?" for a worktree git no longer knows, where `git status` cannot
+// run. The worktree's own HEAD went with its gitdir, so the files are
+// compared with history instead: when they are exactly the tree of some
+// commit on the crew's branch or the default branch, git already holds
+// them and the answer is 0. Otherwise it is the number of paths that differ
+// from the branch (or, with no branch, the default branch) - at least 1,
+// because something in the directory is held nowhere else.
+func orphanedWorktreeChanges(ctx context.Context, git gitx.Git, repo, worktree, branch string, branchExists bool, defaultBranch string) (int, error) {
+	tree, err := git.SnapshotTree(ctx, repo, worktree)
+	if err != nil {
+		return 0, err
+	}
+	baseline := defaultBranch
+	revs := []string{defaultBranch}
+	if branchExists {
+		baseline = branch
+		revs = append(revs, branch)
+	}
+	held, err := git.CommitWithTree(ctx, repo, tree, revs...)
+	if err != nil || held {
+		return 0, err
+	}
+	changed, err := git.ChangedPaths(ctx, repo, baseline+"^{tree}", tree)
+	if err != nil {
+		return 0, err
+	}
+	return max(changed, 1), nil
 }
 
 // clearCrewRunMeta drops the keys that named a live pane and keeps
