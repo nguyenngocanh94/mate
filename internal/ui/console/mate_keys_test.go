@@ -188,7 +188,8 @@ func TestTheModeEntryNamesTheModeItFlipsTo(t *testing.T) {
 // (workspace.yaml's `mate_harness`, carried on the snapshot): it is listed
 // first and the cursor starts on it, so Enter alone creates the Mate the
 // workspace is configured for. A workspace that names no known kind keeps
-// the built-in order.
+// the built-in order, and so does one that names a harness that cannot run
+// a Mate: the catalog draws it, the picker never offers it.
 func TestTheHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -199,6 +200,7 @@ func TestTheHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 		{"claude", query.HarnessKind("claude"), "harness-picker-claude-default-40x36", []query.HarnessKind{query.HarnessKind("claude"), query.HarnessKind("codex")}},
 		{"codex", query.HarnessKind("codex"), "harness-picker-codex-default-40x36", []query.HarnessKind{query.HarnessKind("codex"), query.HarnessKind("claude")}},
 		{"none", "", "", []query.HarnessKind{query.HarnessKind("claude"), query.HarnessKind("codex")}},
+		{"crew-only", query.HarnessKind("pi"), "", []query.HarnessKind{query.HarnessKind("claude"), query.HarnessKind("codex")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := actMateTree(absentMate("this Project has no Mate"), actMateCaps(true, false, false))

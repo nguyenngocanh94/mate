@@ -1575,14 +1575,20 @@ func (h *Herdr) agentNameInPane(ctx context.Context, session, pane string) strin
 
 // StopAgent implements Adapter. There is no `herdr agent stop`. A graceful
 // stop is `agent prompt <exit>` with the exit prompt the harness declared
-// (Claude's `/exit`, G1). Force is pane close. When to stop
+// (Claude's `/exit`, G1), after `agent send-keys` of the keys it declared to
+// clear its composer first (pi's ctrl+u). Force is pane close. When to stop
 // (stop-before-switch) is G4-06.
 func (h *Herdr) StopAgent(ctx context.Context, handle AgentHandle, stop Stop) error {
 	switch stop.Mode() {
 	case StopModeGraceful:
-		exit, err := stop.exitPrompt()
+		clear, exit, err := stop.exitPrompt()
 		if err != nil {
 			return err
+		}
+		if len(clear) > 0 {
+			if err := h.SendKeys(ctx, handle, clear); err != nil && herdrCodeOf(err) != HerdrAgentNotFound {
+				return err
+			}
 		}
 		if err := h.PromptAgent(ctx, handle, exit); err != nil && herdrCodeOf(err) != HerdrAgentNotFound {
 			return err

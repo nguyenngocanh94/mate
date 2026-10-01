@@ -18,9 +18,11 @@ import (
 type Delivery string
 
 const (
-	// DeliveryAppendSystemPromptFile is the Claude default: pass the canonical
-	// context path via --append-system-prompt-file. Claude 2.1.251 exits 1 on
-	// a missing file.
+	// DeliveryAppendSystemPromptFile passes the canonical context path as the
+	// value of one flag the harness names (LaunchPlan.ContextFlag): Claude's
+	// --append-system-prompt-file, pi's --append-system-prompt. Claude 2.1.251
+	// exits 1 on a missing file; pi 0.99.1 reads a missing path as text, so
+	// the file is checked here before any launch.
 	DeliveryAppendSystemPromptFile Delivery = "append_system_prompt_file"
 	// DeliveryAppendSystemPrompt is the bounded Claude fallback. It inlines
 	// file *contents* (never an @path token — Claude does not resolve those)
@@ -94,6 +96,7 @@ type LaunchSpec struct {
 	contextRequired bool
 	maxInlineBytes  int
 	maxFileBytes    int
+	contextFlag     string
 	taskPrompt      string
 	model           string
 	effort          Effort
@@ -251,11 +254,16 @@ func (s LaunchSpec) deliveryLimit() (deliveryLimit, error) {
 			note: " (Codex 0.151.0 project_doc_max_bytes silently truncates the concatenated chain)",
 		}, nil
 	case DeliveryAppendSystemPromptFile:
+		// The flag is the harness's spelling (LaunchPlan.ContextFlag); the
+		// core has no default to guess.
+		if s.contextFlag == "" {
+			return deliveryLimit{}, s.codedRequired(fmt.Sprintf("%s delivery names no context flag", s.delivery))
+		}
 		max := int64(s.maxFileBytes)
 		if max <= 0 {
 			max = math.MaxInt64
 		}
-		return deliveryLimit{max: max, argvRef: "--append-system-prompt-file"}, nil
+		return deliveryLimit{max: max, argvRef: s.contextFlag}, nil
 	default:
 		return deliveryLimit{}, s.codedRequired(fmt.Sprintf("unknown delivery %q", s.delivery))
 	}

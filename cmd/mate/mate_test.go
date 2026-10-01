@@ -34,10 +34,21 @@ func TestMateSubcommandsRequireExactlyOneProject(t *testing.T) {
 
 func TestMateStartRejectsAnUnknownHarness(t *testing.T) {
 	var out, errw bytes.Buffer
-	err := run([]string{"mate", "start", "shop", "--harness", "pi"}, &out, &errw)
+	err := run([]string{"mate", "start", "shop", "--harness", "gemini"}, &out, &errw)
 	var ue *usageError
 	if !errors.As(err, &ue) {
 		t.Fatalf("err = %v, want *usageError", err)
+	}
+}
+
+// A harness that is registered but cannot run a Mate is a usage error that
+// names the capability it lacks, before any workspace is looked for.
+func TestMateStartRefusesACrewOnlyHarness(t *testing.T) {
+	var out, errw bytes.Buffer
+	err := run([]string{"mate", "start", "shop", "--harness", "pi"}, &out, &errw)
+	var ue *usageError
+	if !errors.As(err, &ue) || !strings.Contains(err.Error(), "Hooks") {
+		t.Fatalf("err = %v, want a *usageError naming Hooks", err)
 	}
 }
 

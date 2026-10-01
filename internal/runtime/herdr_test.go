@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1522,7 +1523,46 @@ func TestHerdrStopDoesNotCallAgentStop(t *testing.T) {
 // exitLine is a GracefulStopper of a test's own.
 type exitLine string
 
+func (exitLine) ClearKeys() []string  { return nil }
 func (e exitLine) ExitPrompt() string { return string(e) }
+
+// clearThenExit is a GracefulStopper that empties the composer first.
+type clearThenExit struct {
+	keys []string
+	line string
+}
+
+func (c clearThenExit) ClearKeys() []string { return c.keys }
+func (c clearThenExit) ExitPrompt() string  { return c.line }
+
+// A stop that declares clear keys presses them, by the agent's name, before
+// the exit prompt is typed: the order is what lets the line land in an empty
+// composer rather than at the end of somebody's draft.
+func TestHerdrGracefulStopClearsTheComposerFirst(t *testing.T) {
+	t.Parallel()
+	var calls []string
+	rt, _, session, tab := bootHerdr(t, func(_ context.Context, spec process.Spec) (process.Result, error) {
+		switch {
+		case argvHas(spec.Args, "agent", "send-keys", "crew-g4-01", "ctrl+u"):
+			calls = append(calls, "send-keys ctrl+u")
+			return process.Result{Stdout: []byte(`{"id":"cli:agent:send-keys","result":{"type":"ok"}}`)}, nil
+		case argvHas(spec.Args, "agent", "prompt", "crew-g4-01", "/quit"):
+			calls = append(calls, "prompt /quit")
+			return process.Result{Stdout: []byte(`{"id":"cli:agent:prompt","result":{"type":"agent_prompted"}}`)}, nil
+		case argvHas(spec.Args, "agent", "get"):
+			return process.Result{ExitCode: 1, Stderr: readRuntimeTestdata(t, "error-agent-not-found-get.json")}, nil
+		}
+		t.Fatalf("unexpected argv %#v", spec.Args)
+		return process.Result{}, nil
+	})
+	h := runtime.AgentHandle{Session: session, Name: "crew-g4-01", Kind: "pi", Tab: tab}
+	if err := rt.StopAgent(context.Background(), h, runtime.StopGraceful(clearThenExit{keys: []string{"ctrl+u"}, line: "/quit"})); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"send-keys ctrl+u", "prompt /quit"}; !slices.Equal(calls, want) {
+		t.Fatalf("calls %q, want %q", calls, want)
+	}
+}
 
 // A graceful stop types the exit prompt the stop carries, whatever the
 // agent's kind: the runtime knows no harness's exit of its own.

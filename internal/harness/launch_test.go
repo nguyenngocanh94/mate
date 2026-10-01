@@ -28,7 +28,7 @@ func TestNewLaunchSpecRunsTheHarnessCheckEachTime(t *testing.T) {
 	path := writeAbs(t, cwd, "context.md", "you are a crew")
 	refuse := false
 	plan := LaunchPlan{
-		RuntimeKind: "fake", Screen: stubScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile,
+		RuntimeKind: "fake", Screen: stubScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile, ContextFlag: "--append-system-prompt-file",
 		Args: []string{"--append-system-prompt-file", path}, ContextPath: path, ContextRequired: true,
 		CheckContext: func(LaunchSpec) error {
 			if refuse {
@@ -90,7 +90,7 @@ func TestHandAssembledSpecRejectsDuplicateAndTerminator(t *testing.T) {
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", "you are mate")
 	spec, err := NewLaunchSpec(LaunchPlan{
-		RuntimeKind: "fake", Screen: stubScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile,
+		RuntimeKind: "fake", Screen: stubScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile, ContextFlag: "--append-system-prompt-file",
 		Args: []string{"--append-system-prompt-file", path}, ContextPath: path, ContextRequired: true,
 	})
 	if err != nil {
@@ -108,6 +108,31 @@ func TestHandAssembledSpecRejectsDuplicateAndTerminator(t *testing.T) {
 	spec.delivery = DeliveryAppendSystemPrompt
 	if err := spec.ValidateRequiredContext(); !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("path token: err = %v", err)
+	}
+}
+
+// A file appended by path is checked against the flag the harness spells
+// it with, so a plan that names none is refused rather than checked
+// against some other harness's flag; one that names its own is checked
+// against that one.
+func TestAppendedFileDeliveryNamesItsFlag(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	path := writeAbs(t, cwd, "context.md", "you are a crew")
+	plan := LaunchPlan{
+		RuntimeKind: "fake", Screen: stubScreen{}, Cwd: cwd, Delivery: DeliveryAppendSystemPromptFile,
+		Args: []string{"--append-system-prompt", path}, ContextPath: path, ContextRequired: true,
+	}
+	if _, err := NewLaunchSpec(plan); !errors.Is(err, ErrContextRequired) {
+		t.Fatalf("no context flag: err = %v", err)
+	}
+	plan.ContextFlag = "--append-system-prompt"
+	if _, err := NewLaunchSpec(plan); err != nil {
+		t.Fatalf("its own flag: err = %v", err)
+	}
+	plan.ContextFlag = "--append-system-prompt-file"
+	if _, err := NewLaunchSpec(plan); !errors.Is(err, ErrContextRequired) {
+		t.Fatalf("a flag the argv does not carry: err = %v", err)
 	}
 }
 

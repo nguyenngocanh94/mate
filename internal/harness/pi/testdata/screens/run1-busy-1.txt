@@ -1,0 +1,16 @@
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 0.99.2 is available. Run pi update
+ Changelog: https://pi.dev/changelog
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run the bash command: sleep 6; echo pi-ok . Then reply with only its output.
+
+
+── ⠹ Working ────────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+/Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/tmp/lab/w1 (docs...
+0.5%/1.0M (auto)                                              (deepseek) deepseek-flash • low

@@ -53,9 +53,12 @@ type Fake struct {
 	GracefulStopLeavesAgent bool
 	// ExitPrompts are, in order, the exit prompts graceful stops typed.
 	ExitPrompts []string
-	Now         time.Time
-	Calls       []string
-	ReadOutputs map[string]string
+	// ExitClearKeys are, in order, the keys graceful stops pressed before
+	// their exit prompt; a stop that pressed none adds nothing.
+	ExitClearKeys [][]string
+	Now           time.Time
+	Calls         []string
+	ReadOutputs   map[string]string
 	// StyledOutputs are the screens ReadAgentStyled returns, for the tests
 	// that need SGR attributes. An agent with no entry here falls back to
 	// its plain ReadOutputs screen.
@@ -733,9 +736,12 @@ func (f *Fake) StopAgent(ctx context.Context, handle AgentHandle, stop Stop) err
 	}
 	switch stop.Mode() {
 	case StopModeGraceful:
-		exit, err := stop.exitPrompt()
+		clear, exit, err := stop.exitPrompt()
 		if err != nil {
 			return err
+		}
+		if len(clear) > 0 {
+			f.ExitClearKeys = append(f.ExitClearKeys, append([]string(nil), clear...))
 		}
 		f.ExitPrompts = append(f.ExitPrompts, exit)
 	case StopModeForce:

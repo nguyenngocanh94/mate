@@ -13,6 +13,13 @@ import (
 // are its catalogue slugs (codex models_cache.json, 2026-09-26): luna is
 // gpt-6-luna, terra exists only as gpt-5.6-terra, sol is gpt-6-sol.
 //
+// A small ship may also go to pi on deepseek/deepseek-flash
+// (docs/plans/harness-registry-2026-09-30.md, PR 7). Its effort is high
+// because that is what the model thinks at when asked for medium: pi clamps
+// medium to high on deepseek-flash without saying so
+// (docs/evidence/pi-contract-2026-10-01/probe/thinking-levels.tsv), and the
+// table names the level the Crew really runs at.
+//
 // The three change rules say "ship" and the two scout rules say "scout", so
 // the first rule that fits is the only one: a ship never matches a scout
 // rule, and the other way round.
@@ -22,7 +29,8 @@ const BuiltInJSON = `{
       "when": "A ship that is a small change: a narrow edit in one or a few files with a clear, low-risk outcome, such as a bug fix whose cause is known, a copy or config tweak, or a rote rename.",
       "use": [
         { "harness": "claude", "model": "sonnet", "effort": "medium" },
-        { "harness": "codex", "model": "gpt-6-luna", "effort": "medium" }
+        { "harness": "codex", "model": "gpt-6-luna", "effort": "medium" },
+        { "harness": "pi", "model": "deepseek/deepseek-flash", "effort": "high" }
       ],
       "why": "A mid-size model at medium effort is enough when the change is narrow and the outcome is clear."
     },

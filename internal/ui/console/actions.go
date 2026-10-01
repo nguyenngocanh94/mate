@@ -645,7 +645,8 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 // workspace's `mate_harness`, else the catalog's own, which query.Load
 // resolves into the snapshot) first, so the cursor starts on it and Enter
 // alone creates the Mate the workspace is configured for, then the rest of
-// the snapshot's harness catalog in its order.
+// the snapshot's harness catalog in its order. A harness that cannot run a
+// Mate (query.Harness.Mate) is never offered, even as the default.
 func (m Model) harnessOrder() []query.HarnessKind {
 	def := query.HarnessKind("")
 	if m.tree.Workspace.IsKnown() {
@@ -653,12 +654,12 @@ func (m Model) harnessOrder() []query.HarnessKind {
 	}
 	order := make([]query.HarnessKind, 0, len(m.tree.Harnesses))
 	for _, h := range m.tree.Harnesses {
-		if h.Kind == def {
+		if h.Mate && h.Kind == def {
 			order = append(order, h.Kind)
 		}
 	}
 	for _, h := range m.tree.Harnesses {
-		if h.Kind != def {
+		if h.Mate && h.Kind != def {
 			order = append(order, h.Kind)
 		}
 	}

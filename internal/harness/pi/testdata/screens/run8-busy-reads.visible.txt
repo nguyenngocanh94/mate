@@ -1,0 +1,12 @@
+
+
+ $ sleep 6; echo pi-ok (timeout 30s)
+
+ Elapsed 1.0s
+
+
+── ⠴ Working ────────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+/Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/tmp/lab/w1 (docs...
+↑365 ↓79 R3.8k CH90.7% $0.000 0.2%/1.0M (auto)                (deepseek) deepseek-flash • low

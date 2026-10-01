@@ -28,7 +28,7 @@ func TestCrewSpawnRequiresProjectIDAndBrief(t *testing.T) {
 		{"crew", "spawn"},
 		{"crew", "spawn", "shop"},
 		{"crew", "spawn", "shop", "k3"}, // no --brief
-		{"crew", "spawn", "shop", "k3", "--brief", "b", "--harness", "pi"}, // unknown harness
+		{"crew", "spawn", "shop", "k3", "--brief", "b", "--harness", "gemini"}, // unknown harness
 	}
 	for _, args := range cases {
 		var out, errw bytes.Buffer

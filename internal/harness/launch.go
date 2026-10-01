@@ -151,7 +151,10 @@ type LaunchPlan struct {
 	MaxInlineBytes  int
 	// MaxFileBytes is the file/chain size budget. An instruction-file
 	// delivery needs one; 0 is refused.
-	MaxFileBytes  int
+	MaxFileBytes int
+	// ContextFlag is the flag whose value is ContextPath, as the harness
+	// spells it. DeliveryAppendSystemPromptFile needs one; "" is refused.
+	ContextFlag   string
 	TaskPrompt    string
 	Model         string
 	Effort        Effort
@@ -195,6 +198,7 @@ func NewLaunchSpec(p LaunchPlan) (LaunchSpec, error) {
 		contextRequired: p.ContextRequired,
 		maxInlineBytes:  p.MaxInlineBytes,
 		maxFileBytes:    p.MaxFileBytes,
+		contextFlag:     p.ContextFlag,
 		taskPrompt:      p.TaskPrompt,
 		model:           p.Model,
 		effort:          p.Effort,
