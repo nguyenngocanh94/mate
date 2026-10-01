@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -17,16 +16,12 @@ import (
 // ingestTranscripts reads every agent's transcript into turns, tool calls,
 // usage samples and the events that go with them.
 //
-// A transcript is re-read whole on every pass rather than tailed from a
-// cursor. That is deliberate: harness.ParseTranscript withholds the trailing
-// message group because a later write may still extend it (see
-// internal/harness/transcript.go), so a tail would have to carry the parser's
-// own state across passes and a resume that got it wrong would charge one
-// turn's tokens to another, permanently. Re-reading costs one JSON pass over
-// a file that is hundreds of kilobytes at most, and every fact carries a
-// natural key, so nothing is recorded twice. `cursor` still records how far
-// the parser trusted the file, which is what makes a withheld group visible
-// rather than silent.
+// The harness's TranscriptSource reads the file - whole, or by appending
+// what it grew by, which is the harness's call - and every pass records the
+// whole batch it returns. Every fact carries a natural key, so nothing is
+// recorded twice. `cursor` still records how far the parser trusted the
+// file, which is what makes a withheld message group visible rather than
+// silent.
 func (p *pass) ingestTranscripts(ctx context.Context) error {
 	p.statusClock = map[string][]datedCommand{}
 	p.commitSightings = map[string][]commitSighting{}
@@ -74,11 +69,12 @@ func (p *pass) ingestTranscripts(ctx context.Context) error {
 }
 
 func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
-	if loc.Kind != harness.KindCodex && loc.Kind != harness.KindClaude {
-		p.unresolved(loc.ActorID, string(loc.Kind), unresolvedNoHarness)
+	src, reason := p.ing.transcriptSource(loc.Kind)
+	if reason != "" {
+		p.unresolved(loc.ActorID, string(loc.Kind), reason)
 		return nil
 	}
-	tb, err := p.ing.cachedTranscript(loc)
+	tb, err := p.ing.cachedTranscript(src, loc)
 	if err != nil {
 		if os.IsNotExist(err) {
 			p.unresolved(loc.ActorID, string(loc.Kind), unresolvedNoFile)
@@ -104,7 +100,7 @@ func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
 		return err
 	}
 	p.b.cursor(loc.Path, tb.ConsumedBytes)
-	if err := p.ingestTelemetry(ctx, loc, rowID, tb); err != nil {
+	if err := p.ingestTelemetry(ctx, src, loc, rowID, tb); err != nil {
 		return err
 	}
 	if unchanged {
@@ -116,296 +112,59 @@ func (p *pass) ingestOneTranscript(ctx context.Context, loc Located) error {
 	}
 	mark := transcriptFactMark{len(p.b.turns), len(p.b.actions), len(p.b.events), len(p.b.usage)}
 
-	switch loc.Kind {
-	case harness.KindClaude:
-		p.claudeTurns(loc, rowID, tb)
-	case harness.KindCodex:
-		p.codexTurns(loc, rowID, tb)
-	}
+	p.usageTurns(loc, rowID, tb)
 	p.compactions(loc, rowID, tb)
 	p.filterTranscriptFacts(loc, rowID, tb, since, mark)
 	return nil
 }
 
-func transcriptParser(kind harness.Kind) (harness.TranscriptParser, error) {
-	switch kind {
-	case harness.KindClaude:
-		return harness.Claude{}, nil
-	case harness.KindCodex:
-		return harness.Codex{}, nil
-	default:
-		return nil, fmt.Errorf("timeline: no transcript parser for harness %q", kind)
-	}
-}
-
-// ---------------------------------------------------------------- Claude
-
-// claudeTurns records one turn per assistant message group, which is one API
-// response: the unit Claude restates usage on, and the unit
-// harness.ParseTranscript already keys by message id.
-//
-// context_tokens_after is the input side of that response - fresh input plus
-// both cache buckets - because that is what was carried into the call and
-// therefore what the context held when it returned.
-func (p *pass) claudeTurns(loc Located, sessionRow string, tb harness.TranscriptBatch) {
+// usageTurns records one turn per priced model call the harness normalised:
+// the turn row, the usage sample in the shape the harness wrote it, the two
+// turn events, and an action for every tool call the call issued. One path
+// serves every harness, because the harness has already made the numbers
+// mean the same thing (harness.UsageTurn).
+func (p *pass) usageTurns(loc Located, sessionRow string, tb harness.TranscriptBatch) {
 	results := resultsByCall(tb)
-	callsByTurn := map[string][]harness.TranscriptToolCall{}
-	for _, call := range tb.ToolCalls {
-		callsByTurn[call.TurnSourceRef] = append(callsByTurn[call.TurnSourceRef], call)
-	}
-
-	for ordinal, t := range tb.Turns {
+	for ordinal, t := range tb.UsageTurns {
 		turnID := turnRowID(sessionRow, t.SourceRef)
-		calls := callsByTurn[t.SourceRef]
-		ended := t.OccurredAt
-		for _, call := range calls {
-			if res, ok := results[call.SourceRef]; ok && res.CompletedAt.After(ended) {
-				ended = res.CompletedAt
-			} else if call.StartedAt.After(ended) {
-				ended = call.StartedAt
-			}
-		}
 		p.b.turn(pendingTurn{
 			ID: turnID, ActorID: loc.ActorID, SessionID: sessionRow, Ordinal: ordinal,
-			StartedAt: t.OccurredAt, EndedAt: ended,
-			Outcome: t.StopReason, Model: t.Model, HarnessTurnRef: t.HarnessTurnRef,
+			StartedAt: t.StartedAt, EndedAt: t.EndedAt,
+			Outcome: t.Outcome, Model: t.Model, HarnessTurnRef: t.HarnessTurnRef,
 			Input: t.Usage.Input, CacheRead: t.Usage.CacheRead, CacheWrite: t.Usage.CacheWrite,
 			Output: t.Usage.Output, Thinking: t.Usage.Reasoning,
-			ContextAfter: t.Usage.ContextTokens(), ToolCount: len(calls),
+			ContextAfter: t.ContextTokens, ToolCount: len(t.Calls),
 			RefPath: loc.Path, RefOffset: t.Offset,
 		})
 		p.b.usageSample(pendingUsage{
-			ID: usageRowID(sessionRow, t.Offset), SessionID: sessionRow, At: t.OccurredAt,
-			Cumulative: false,
-			Input:      t.Usage.Input, CacheRead: t.Usage.CacheRead, CacheWrite: t.Usage.CacheWrite,
-			Output: t.Usage.Output, Thinking: t.Usage.Reasoning,
+			ID: usageRowID(sessionRow, t.Offset), SessionID: sessionRow, At: t.Sample.At,
+			Cumulative: t.Sample.Cumulative,
+			Input:      t.Sample.Usage.Input, CacheRead: t.Sample.Usage.CacheRead, CacheWrite: t.Sample.Usage.CacheWrite,
+			Output: t.Sample.Usage.Output, Thinking: t.Sample.Usage.Reasoning,
 			RefPath: loc.Path, RefOffset: t.Offset,
 		})
-		p.turnEvents(loc, turnID, t.OccurredAt, ended, map[string]any{
+		p.turnEvents(loc, turnID, t.StartedAt, t.EndedAt, map[string]any{
 			"model":                t.Model,
 			"harness_turn":         t.HarnessTurnRef,
-			"outcome":              t.StopReason,
-			"tool_count":           len(calls),
+			"outcome":              t.Outcome,
+			"tool_count":           len(t.Calls),
 			"input_tokens":         t.Usage.Input,
 			"cache_read_tokens":    t.Usage.CacheRead,
 			"cache_write_tokens":   t.Usage.CacheWrite,
 			"output_tokens":        t.Usage.Output,
 			"thinking_tokens":      t.Usage.Reasoning,
-			"context_tokens_after": t.Usage.ContextTokens(),
+			"context_tokens_after": t.ContextTokens,
 		}, t.Offset)
-		for _, call := range calls {
+		for _, call := range t.Calls {
 			p.toolAction(loc, sessionRow, turnID, call, results)
 		}
 	}
-}
-
-// ---------------------------------------------------------------- Codex
-
-// codexTurns records one turn per `token_count` record: the group of work
-// between two of them is one model call, which is the same unit a Claude
-// assistant message group is. Codex's own `task_started`/`task_complete`
-// pair is the larger harness turn - a whole prompt and everything it caused -
-// and is carried on `turn.harness_turn_ref` rather than made the turn, so
-// both harnesses answer "what did one model call cost" the same way.
-//
-// Tokens come from the snapshot's delta, because Codex reports cumulative
-// totals; `context_tokens_after` comes from the same record's
-// `last_token_usage`, which is the prompt the call actually carried.
-//
-// `turn.input_tokens` is stored net of the cache-read delta, not the raw
-// delta Codex reports. Measured 2026-09-20 on the M5 acceptance fixture:
-// the rollout's last `total_token_usage` is
-// `{"input_tokens":232424,"cached_input_tokens":209152,...,"output_tokens":1544,"total_tokens":233968}`,
-// and 232424+1544 = 233968 exactly - Codex's own `input_tokens` already
-// counts every cached token, and `total_tokens` is simply input+output. A
-// Claude turn is the opposite: its `input_tokens` excludes both cache
-// buckets, so `input+cache_read+cache_write+output` is that call's real
-// cost with no overlap (docs/timeline.md's own turn.started example: 32
-// fresh + 57690 cache-read + 739 cache-write = 58461 = context_tokens_after).
-// Subtracting the cache-read delta here before it is stored makes
-// `turn.input_tokens` mean the same thing for both harnesses - "billed at
-// the input rate, not a cache rate" - so every sum across the four buckets
-// (`v_task_ledger`, `v_now.tokens_today`, the budget check, `mate usage`)
-// is correct without asking which harness a turn came from. Cache-write is
-// left alone: Codex's own `context_tokens_after` derivation
-// (`marks.lastTokenUsage`, below) already treats it as additional rather
-// than a subset of input, and this fixture's cache-write is always 0, so
-// there is nothing here to measure it against.
-func (p *pass) codexTurns(loc Located, sessionRow string, tb harness.TranscriptBatch) {
-	results := resultsByCall(tb)
-	marks := scanCodexMarks(tb)
-
-	// A rollout's own session start is where the first turn begins when
-	// nothing earlier dates it.
-	sessionStart := time.Time{}
-	if len(tb.Records) > 0 {
-		sessionStart = tb.Records[0].OccurredAt
+	// Tool calls no turn has priced yet are real work. They get an action
+	// with no turn rather than being dropped: the live test asks that every
+	// tool call in the transcript have one.
+	for _, call := range tb.UnpricedCalls {
+		p.toolAction(loc, sessionRow, "", call, results)
 	}
-
-	prevEnd := sessionStart
-	prevOffset := int64(-1)
-	for ordinal, snap := range tb.CodexUsageSnapshots {
-		started := prevEnd
-		if mark, ok := marks.lastTaskStartedBefore(snap.Offset); ok && mark.at.After(started) {
-			started = mark.at
-		}
-		if started.IsZero() || started.After(snap.OccurredAt) {
-			started = snap.OccurredAt
-		}
-		turnID := turnRowID(sessionRow, snap.SourceRef)
-
-		var calls []harness.TranscriptToolCall
-		for _, call := range tb.ToolCalls {
-			if call.Offset > prevOffset && call.Offset <= snap.Offset {
-				calls = append(calls, call)
-			}
-		}
-		outcome := "end_turn"
-		if len(calls) > 0 {
-			outcome = "tool_use"
-		}
-		if _, ok := marks.taskCompleteAt(snap.Offset); ok {
-			outcome = "end_turn"
-		}
-		// Cumulative.Input is cache-inclusive (see the function doc), so the
-		// fallback context size adds only the cache-write bucket - the same
-		// combination the primary `last_token_usage` rule below uses.
-		contextAfter := snap.Cumulative.Input + snap.Cumulative.CacheWrite
-		if last, ok := marks.lastTokenUsage[snap.Offset]; ok {
-			contextAfter = last
-		}
-		// freshInput is this call's input delta net of its cache-read delta:
-		// the portion Codex billed at the input rate rather than the cache
-		// rate. Clamped at zero defensively - Codex's own invariant is
-		// cached_input_tokens <= input_tokens at every cumulative snapshot,
-		// so a negative result here would mean that invariant broke, not
-		// that the crew somehow un-cached tokens.
-		freshInput := snap.Delta.Input - snap.Delta.CacheRead
-		if freshInput < 0 {
-			freshInput = 0
-		}
-		p.b.turn(pendingTurn{
-			ID: turnID, ActorID: loc.ActorID, SessionID: sessionRow, Ordinal: ordinal,
-			StartedAt: started, EndedAt: snap.OccurredAt,
-			Outcome: outcome, Model: snap.Model, HarnessTurnRef: snap.HarnessTurnRef,
-			Input: freshInput, CacheRead: snap.Delta.CacheRead, CacheWrite: snap.Delta.CacheWrite,
-			Output: snap.Delta.Output, Thinking: snap.Delta.Reasoning,
-			ContextAfter: contextAfter, ToolCount: len(calls),
-			RefPath: loc.Path, RefOffset: snap.Offset,
-		})
-		p.b.usageSample(pendingUsage{
-			ID: usageRowID(sessionRow, snap.Offset), SessionID: sessionRow, At: snap.OccurredAt,
-			// Cumulative, because that is what the record holds: keeping the
-			// raw shape is the reason usage_sample exists (M5's "lựa chọn có
-			// chủ ý"), and the delta beside it is this parser's arithmetic.
-			Cumulative: true,
-			Input:      snap.Cumulative.Input, CacheRead: snap.Cumulative.CacheRead,
-			CacheWrite: snap.Cumulative.CacheWrite, Output: snap.Cumulative.Output,
-			Thinking: snap.Cumulative.Reasoning,
-			RefPath:  loc.Path, RefOffset: snap.Offset,
-		})
-		p.turnEvents(loc, turnID, started, snap.OccurredAt, map[string]any{
-			"model":                snap.Model,
-			"harness_turn":         snap.HarnessTurnRef,
-			"outcome":              outcome,
-			"tool_count":           len(calls),
-			"input_tokens":         freshInput,
-			"cache_read_tokens":    snap.Delta.CacheRead,
-			"cache_write_tokens":   snap.Delta.CacheWrite,
-			"output_tokens":        snap.Delta.Output,
-			"thinking_tokens":      snap.Delta.Reasoning,
-			"context_tokens_after": contextAfter,
-		}, snap.Offset)
-		for _, call := range calls {
-			p.toolAction(loc, sessionRow, turnID, call, results)
-		}
-		prevEnd, prevOffset = snap.OccurredAt, snap.Offset
-	}
-
-	// Tool calls after the last snapshot are real work the rollout has not
-	// yet priced. They get an action with no turn rather than being dropped:
-	// the live test asks that every tool call in the transcript have one.
-	for _, call := range tb.ToolCalls {
-		if call.Offset > prevOffset {
-			p.toolAction(loc, sessionRow, "", call, results)
-		}
-	}
-}
-
-// codexMark is one dated rollout record the turn boundaries need.
-type codexMark struct {
-	offset int64
-	at     time.Time
-	turnID string
-}
-
-type codexMarks struct {
-	taskStarted  []codexMark
-	taskComplete map[int64]codexMark
-	// lastTokenUsage is the prompt the priced call carried, from the
-	// `last_token_usage` block of a `token_count` record. harness's
-	// CodexUsageSnapshot carries only the cumulative total and the delta, so
-	// this is read from the raw record rather than by changing the parser.
-	lastTokenUsage map[int64]int64
-}
-
-func (m codexMarks) lastTaskStartedBefore(offset int64) (codexMark, bool) {
-	var out codexMark
-	found := false
-	for _, mark := range m.taskStarted {
-		if mark.offset <= offset {
-			out, found = mark, true
-			continue
-		}
-		break
-	}
-	return out, found
-}
-
-func (m codexMarks) taskCompleteAt(offset int64) (codexMark, bool) {
-	mark, ok := m.taskComplete[offset]
-	return mark, ok
-}
-
-func scanCodexMarks(tb harness.TranscriptBatch) codexMarks {
-	marks := codexMarks{taskComplete: map[int64]codexMark{}, lastTokenUsage: map[int64]int64{}}
-	for _, rec := range tb.Records {
-		if !strings.Contains(rec.RawJSON, `"task_started"`) && !strings.Contains(rec.RawJSON, `"task_complete"`) && !strings.Contains(rec.RawJSON, `"token_count"`) {
-			continue
-		}
-		var env struct {
-			Type    string `json:"type"`
-			Payload struct {
-				Type   string `json:"type"`
-				TurnID string `json:"turn_id"`
-				Info   struct {
-					Last *struct {
-						Input      int64 `json:"input_tokens"`
-						CacheWrite int64 `json:"cache_write_input_tokens"`
-					} `json:"last_token_usage"`
-				} `json:"info"`
-			} `json:"payload"`
-		}
-		if json.Unmarshal([]byte(rec.RawJSON), &env) != nil || env.Type != "event_msg" {
-			continue
-		}
-		switch env.Payload.Type {
-		case "task_started":
-			marks.taskStarted = append(marks.taskStarted,
-				codexMark{offset: rec.Offset, at: rec.OccurredAt, turnID: env.Payload.TurnID})
-		case "task_complete":
-			marks.taskComplete[rec.Offset] = codexMark{offset: rec.Offset, at: rec.OccurredAt, turnID: env.Payload.TurnID}
-		case "token_count":
-			if last := env.Payload.Info.Last; last != nil {
-				// Codex's input_tokens already includes the cached part, so
-				// it is the prompt size; the cache-write bucket is the part
-				// of it the call paid to write.
-				marks.lastTokenUsage[rec.Offset] = last.Input + last.CacheWrite
-			}
-		}
-	}
-	sort.Slice(marks.taskStarted, func(i, j int) bool { return marks.taskStarted[i].offset < marks.taskStarted[j].offset })
-	return marks
 }
 
 // ---------------------------------------------------------------- shared
@@ -534,45 +293,16 @@ func commitSha(command, output string) (string, bool) {
 
 // compactions records `context.compacted`: the moment a harness threw the
 // conversation away and replaced it with a summary, which is the one event
-// that explains a context size falling instead of rising.
-//
-// Claude marks it on the summary record itself (`isCompactSummary`) or with a
-// `compact_boundary` system record; Codex writes a top-level `compacted`
-// record. Both are read from the raw record, because
-// harness.TranscriptBatch normalises them into ordinary records and the
-// marker is the only thing that distinguishes them.
+// that explains a context size falling instead of rising. The harness names
+// the marker that showed it (harness.TranscriptCompaction).
 func (p *pass) compactions(loc Located, sessionRow string, tb harness.TranscriptBatch) {
-	for _, rec := range tb.Records {
-		if !strings.Contains(rec.RawJSON, `"compacted"`) && !strings.Contains(rec.RawJSON, `"compact_boundary"`) && !strings.Contains(rec.RawJSON, `"isCompactSummary"`) {
-			continue
-		}
-		var probe struct {
-			Type             string          `json:"type"`
-			Subtype          string          `json:"subtype"`
-			IsCompactSummary bool            `json:"isCompactSummary"`
-			Payload          json.RawMessage `json:"payload"`
-		}
-		if json.Unmarshal([]byte(rec.RawJSON), &probe) != nil {
-			continue
-		}
-		trigger := ""
-		switch {
-		case probe.IsCompactSummary:
-			trigger = "claude.compact_summary"
-		case probe.Type == "system" && probe.Subtype == "compact_boundary":
-			trigger = "claude.compact_boundary"
-		case probe.Type == "compacted":
-			trigger = "codex.compacted"
-		}
-		if trigger == "" {
-			continue
-		}
+	for _, c := range tb.Compactions {
 		p.b.event(pendingEvent{
-			Dedup:   dedup(KindContextCompac, sessionRow, fmt.Sprint(rec.Offset)),
-			Project: p.project, At: rec.OccurredAt, ActorID: loc.ActorID, Kind: KindContextCompac,
+			Dedup:   dedup(KindContextCompac, sessionRow, fmt.Sprint(c.Offset)),
+			Project: p.project, At: c.OccurredAt, ActorID: loc.ActorID, Kind: KindContextCompac,
 			TaskActor: p.taskActor(loc.ActorID),
-			Payload:   map[string]any{"trigger": trigger, "harness": string(loc.Kind)},
-			RefPath:   loc.Path, RefOffset: rec.Offset,
+			Payload:   map[string]any{"trigger": c.Trigger, "harness": string(loc.Kind)},
+			RefPath:   loc.Path, RefOffset: c.Offset,
 		})
 	}
 }
@@ -820,8 +550,3 @@ func truncateRunes(s string, n int) string {
 	}
 	return string(r[:n]) + "…"
 }
-
-// ParserFor is the transcript parser of one harness. It is exported so a test
-// can re-parse the very file the ingest read and check that nothing was lost
-// between the parser and the database.
-func ParserFor(kind harness.Kind) (harness.TranscriptParser, error) { return transcriptParser(kind) }

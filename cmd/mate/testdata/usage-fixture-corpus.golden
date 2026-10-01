@@ -1,0 +1,18 @@
+== mate usage shop
+ID      STATE    TURNS  IN     CACHE-READ  CACHE-WRITE  OUT   TOTAL   COST  CTX    CTX%  ASKED  WAITED  SPAWN→CLOSE
+mate    -        11     292    633k        38.7k        3.9k  675.8k  ?     63.8k  32%   0      0s      -
+buybtn  spawned  11     23.3k  209.2k      0            1.5k  234k    ?     22.4k  6%    0      0s      10:44:09 → open
+total: 22 turn(s), 23.6k in, 880.8k cached, 5.4k out, 909.8k total, ? cost, 0 asked, 0s waited
+== mate usage shop buybtn
+TURN  STARTED   MODEL          IN    CACHED  OUT  TOTAL  CTX    DURATION  OUTCOME
+1     10:44:11  gpt-5.6-terra  4.9k  14.1k   173  19.2k  19k    7.468s    tool_use
+2     10:44:19  gpt-5.6-terra  5.2k  14.1k   111  19.4k  19.3k  4.236s    tool_use
+3     10:44:23  gpt-5.6-terra  2.5k  18.2k   188  20.9k  20.7k  5.176s    tool_use
+4     10:44:28  gpt-5.6-terra  757   20.2k   154  21.1k  21k    4.624s    tool_use
+5     10:44:33  gpt-5.6-terra  934   20.2k   42   21.2k  21.2k  2.576s    end_turn
+6     10:46:00  gpt-5.6-terra  1k    20.2k   202  21.5k  21.3k  5.693s    tool_use
+7     10:46:05  gpt-5.6-terra  1.3k  20.2k   208  21.8k  21.6k  5.534s    tool_use
+8     10:46:11  gpt-5.6-terra  3.6k  18.2k   110  21.9k  21.8k  4.052s    tool_use
+9     10:46:15  gpt-5.6-terra  764   21.2k   171  22.2k  22k    4.856s    tool_use
+10    10:46:20  gpt-5.6-terra  1k    21.2k   133  22.4k  22.3k  4.134s    tool_use
+11    10:46:24  gpt-5.6-terra  1.2k  21.2k   52   22.5k  22.4k  2.701s    end_turn

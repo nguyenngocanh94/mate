@@ -2,10 +2,10 @@ package harness
 
 import "time"
 
-// TranscriptParser is the harness-specific half of transcript ingest: it turns
-// one format's bytes into normalized facts. It is deliberately not part of
-// Adapter, because ingest never launches a process and a harness may be
-// launchable while its transcript is unreadable (ADR 0016).
+// TranscriptParser is the parse half of a harness's TranscriptSource: it
+// turns one format's bytes into normalized facts. It is not part of the
+// Profile; only the harness's own TranscriptSource calls it, because a
+// harness may be launchable while its transcript is unreadable (ADR 0016).
 //
 // The two methods differ only in what they do with a message whose records may
 // still be appended to; see ParseTranscript and ParseTranscriptFinal.
@@ -24,9 +24,10 @@ type TranscriptParser interface {
 	// finished session would never be ingested.
 	//
 	// "Positively stopped" means observed stopped, not asked to stop. The one
-	// caller is the timeline (internal/timeline/telemetry.go), and only for a
-	// Claude range whose Located.Finalized is set. That flag is earned by a
-	// chain, each link of which must hold:
+	// caller is Claude's TranscriptSource.Read, for a read whose AtRest the
+	// timeline (internal/timeline/telemetry.go) sets only when
+	// Located.Finalized is set. That flag is earned by a chain, each link of
+	// which must hold:
 	//
 	//   1. context refresh (cmd/mate/context_refresh.go) calls StopMate, and
 	//      StopMate reports Confirmed only through confirmGone
@@ -133,14 +134,14 @@ type TranscriptParseState struct {
 	CodexModel string
 }
 
-// TranscriptSource names a harness transcript format. These are the exact
+// TranscriptFormat names a harness transcript format. These are the exact
 // strings transcript_cursor.source and every fact table's source column
 // accept (migration 0007 CHECK constraints).
-type TranscriptSource string
+type TranscriptFormat string
 
 const (
-	TranscriptClaude TranscriptSource = "claude_transcript"
-	TranscriptCodex  TranscriptSource = "codex_rollout"
+	TranscriptClaude TranscriptFormat = "claude_transcript"
+	TranscriptCodex  TranscriptFormat = "codex_rollout"
 )
 
 // TranscriptKind is the storage classification of one raw transcript record,
@@ -340,16 +341,21 @@ const (
 // value, not a stream, so a caller can inspect every fact before deciding what
 // to commit (ADR 0016 G5-11 step 4 keeps parsing outside the write).
 type TranscriptBatch struct {
-	Source      TranscriptSource
+	Source      TranscriptFormat
 	Records     []TranscriptRecord
 	Turns       []TranscriptTurn
 	ToolCalls   []TranscriptToolCall
 	ToolResults []TranscriptToolResult
-	// CodexUsageSnapshots carries Codex cumulative snapshots and their
-	// computed deltas without pretending a usage record is an assistant
-	// response. No storage consumer exists yet; the attribution-schema task
-	// owns deciding where harness-turn usage lands.
-	CodexUsageSnapshots []CodexUsageSnapshot
+	// UsageTurns are the priced model calls, normalised: the same unit and
+	// the same meaning of every counter for every harness. TranscriptSource
+	// fills them; a bare parse leaves them empty.
+	UsageTurns []UsageTurn
+	// UnpricedCalls are tool calls no usage turn covers yet: real work the
+	// transcript has not priced. The core records them as actions with no
+	// turn rather than dropping them.
+	UnpricedCalls []TranscriptToolCall
+	// Compactions are the context compactions the transcript records.
+	Compactions []TranscriptCompaction
 	// UsageFailures are complete, recognized usage records that could not
 	// produce a trustworthy delta. They are progress-capable and do not set
 	// Malformed or stop the parse.
@@ -392,4 +398,8 @@ type TranscriptBatch struct {
 	// types alike; it is diagnostic only and is not persisted. A caller can
 	// surface a non-zero count for an unrecognised type without trusting it.
 	Skipped map[string]int
+	// HarnessState is what the harness that parsed the batch carries to its
+	// next read of the same file, such as Codex's running usage totals. It
+	// is opaque: the core keeps it with the batch and never reads it.
+	HarnessState any
 }

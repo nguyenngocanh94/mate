@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
@@ -124,9 +126,9 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatalf("db.Open: %v", err)
 	}
 	ing := timeline.New(ws, writer, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		ClaudeProjectsDir: filepath.Join(root, "no-claude-projects"),
-		CodexSessionsDir:  filepath.Join(root, "no-codex-sessions"),
+		Now:             func() time.Time { return fixtureNow },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(filepath.Join(root, "no-claude-projects"), filepath.Join(root, "no-codex-sessions")),
 	})
 	if err := ing.Reindex(context.Background()); err != nil {
 		t.Fatalf("Reindex: %v", err)
@@ -241,4 +243,10 @@ func initRepo(t *testing.T, dir string) {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
+}
+
+// transcriptRoots points the catalog's harnesses at fixture directories:
+// Claude's projects root and Codex's sessions root.
+func transcriptRoots(claudeProjects, codexSessions string) map[harness.Kind]string {
+	return map[harness.Kind]string{harness.KindClaude: claudeProjects, harness.KindCodex: codexSessions}
 }

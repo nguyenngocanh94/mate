@@ -12,12 +12,13 @@
 // moment that leaves no file behind.
 //
 // The ingest is incremental and idempotent. Append-only logs are read from
-// `cursor`; a transcript is re-read whole on every pass, because its trailing
-// message group may still grow and `harness.ParseTranscript` deliberately
-// withholds it (see internal/harness/transcript.go). Every fact carries a
-// natural key, so re-reading a source can only produce the row it already
-// produced: `event.dedup` is unique, and every other table is keyed by what
-// produced it.
+// `cursor`; a transcript is read by its harness's TranscriptSource, which
+// hands back the whole file's facts on every pass - re-read whole where a
+// trailing message group may still grow, appended to where records are
+// complete on their own (see internal/harness/transcript_source.go). Every
+// fact carries a natural key, so re-reading a source can only produce the
+// row it already produced: `event.dedup` is unique, and every other table is
+// keyed by what produced it.
 //
 // The observer inside the console calls Ingest at the end of each poll, and
 // is the only writer: `internal/db` takes an advisory lock, so a second one

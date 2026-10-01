@@ -2,13 +2,16 @@
 // (https://github.com/kunchenguid/axi, `quota-axi --json`), the data source
 // firstmate's quota-array-dispatch ranks a profile array by.
 //
-// quota-axi is data only. This package maps each mate harness to the one
-// quota-axi provider row that measures it, folds that row's provider-wide
-// scopes into one Reading, and names the harness the evidence favours:
-// the highest known spendPriority among harnesses that pass the gate
-// (not exhausted, some allowance left). Unknown is never zero and never
-// healthy; a harness quota-axi cannot measure stays eligible, and the
-// output says it is unknown.
+// quota-axi is data only. Each registered harness names the one quota-axi
+// provider row that measures it (its Quota capability); this package folds
+// that row's provider-wide scopes into one Reading, and names the harness
+// the evidence favours: the highest known spendPriority among harnesses
+// that pass the gate (not exhausted, some allowance left). Unknown is never
+// zero and never healthy; a harness quota-axi cannot measure stays
+// eligible, and the output says it is unknown. A harness that names no row
+// at all is assumed to have its whole allowance left
+// (docs/plans/harness-registry-2026-09-30.md, section 3.7), and the output
+// says that too.
 //
 // The read is strictly read-only (--no-credential-refresh): mate never
 // makes quota-axi renew a vendor session behind the captain's back.
@@ -75,6 +78,11 @@ type Reading struct {
 	// and Remedy the command quota-axi says would fix an unmeasured one.
 	Status string
 	Remedy string
+	// Assumed is set when the harness names no quota-axi row: the reading
+	// is the assumption that its whole allowance is left, and Assumed is
+	// the harness's reason for having no row. Jev's quota_exhausted label is
+	// how a wrong assumption shows.
+	Assumed string
 }
 
 // Eligible is the gate: not exhausted, and not known to be at zero. An
@@ -130,20 +138,48 @@ func (s Snapshot) Favoured() (harness.Kind, string, bool) {
 	return best.Harness, fmt.Sprintf("highest spendPriority %s among eligible harnesses", formatFloat(*best.SpendPriority)), true
 }
 
-// providers maps each mate harness to the quota-axi provider that measures
-// it, and to the account key a schema-6 snapshot files it under (firstmate
-// bin/fm-quota-axi-lib.sh quota_lane: native Codex is codex-home).
-var providers = []struct {
-	kind     harness.Kind
-	provider string
-	lane     string
-}{
-	{harness.KindCodex, "codex", "codex-home"},
-	{harness.KindClaude, "claude", ""},
+// harnessQuota is one registered harness and the quota-axi row that
+// measures it: the provider, and the account key a schema-6 snapshot files
+// it under. unmeasured is the harness's reason when it names no row.
+type harnessQuota struct {
+	kind       harness.Kind
+	provider   string
+	lane       string
+	unmeasured string
 }
 
-// Read runs quota-axi once, read-only, for every mate harness.
-func Read(ctx context.Context, r process.Runner, now time.Time) (Snapshot, error) {
+// harnessQuotas is every registered harness in the order a snapshot lists
+// them: the Crew's default first, since dispatch is a choice of a Crew's
+// harness, then the rest as registered.
+func harnessQuotas(harnesses harness.Registry) []harnessQuota {
+	kinds := harnesses.Kinds()
+	if first, err := harnesses.Default(harness.RoleCrew); err == nil {
+		ordered := []harness.Kind{first}
+		for _, k := range kinds {
+			if k != first {
+				ordered = append(ordered, k)
+			}
+		}
+		kinds = ordered
+	}
+	out := make([]harnessQuota, 0, len(kinds))
+	for _, k := range kinds {
+		profile, err := harnesses.Lookup(k)
+		if err != nil {
+			continue
+		}
+		q := profile.Capabilities().Quota
+		if !q.Verified() {
+			out = append(out, harnessQuota{kind: k, unmeasured: q.Reason})
+			continue
+		}
+		out = append(out, harnessQuota{kind: k, provider: q.Impl.QuotaProvider(), lane: q.Impl.QuotaLane()})
+	}
+	return out
+}
+
+// Read runs quota-axi once, read-only, for every registered harness.
+func Read(ctx context.Context, r process.Runner, harnesses harness.Registry, now time.Time) (Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, ReadTimeout)
 	defer cancel()
 	ver, err := r.Run(ctx, process.Spec{Name: Binary, Args: []string{"--version"}})
@@ -160,9 +196,14 @@ func Read(ctx context.Context, r process.Runner, now time.Time) (Snapshot, error
 	if !AtLeast(version, MinVersion) {
 		return Snapshot{}, fmt.Errorf("quota-axi %q is older than %s; run `quota-axi update`", version, MinVersion)
 	}
-	names := make([]string, len(providers))
-	for i, p := range providers {
-		names[i] = p.provider
+	var names []string
+	for _, q := range harnessQuotas(harnesses) {
+		if q.provider != "" {
+			names = append(names, q.provider)
+		}
+	}
+	if len(names) == 0 {
+		return Snapshot{Version: version, Read: now, Readings: fold(harnesses, rawSnapshot{})}, nil
 	}
 	res, err := r.Run(ctx, process.Spec{Name: Binary, Args: []string{"--json", "--no-credential-refresh", "--provider", strings.Join(names, ",")}})
 	if err != nil {
@@ -170,7 +211,7 @@ func Read(ctx context.Context, r process.Runner, now time.Time) (Snapshot, error
 	}
 	// quota-axi exits non-zero when a provider needs attention and still
 	// prints the whole snapshot; the JSON is the answer either way.
-	readings, err := Parse(res.Stdout)
+	readings, err := Parse(res.Stdout, harnesses)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -215,8 +256,8 @@ type rawScope struct {
 }
 
 // Parse folds a `quota-axi --json` snapshot, schema 5 or 6, into one
-// Reading per mate harness, in the order of providers.
-func Parse(raw []byte) ([]Reading, error) {
+// Reading per registered harness, in the order of harnessQuotas.
+func Parse(raw []byte, harnesses harness.Registry) ([]Reading, error) {
 	var s rawSnapshot
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return nil, fmt.Errorf("quota-axi --json: %w", err)
@@ -224,16 +265,27 @@ func Parse(raw []byte) ([]Reading, error) {
 	if s.SchemaVersion != 5 && s.SchemaVersion != 6 {
 		return nil, fmt.Errorf("quota-axi --json: schema %d, mate reads 5 and 6", s.SchemaVersion)
 	}
-	out := make([]Reading, 0, len(providers))
-	for _, p := range providers {
-		row, ok := pickRow(s, p.provider, p.lane)
-		r := Reading{Harness: p.kind, Provider: p.provider, PercentLeft: -1, Runway: RunwayUnknown, Status: "absent"}
+	return fold(harnesses, s), nil
+}
+
+// fold is one Reading per registered harness from a parsed snapshot. A
+// harness that names no row is assumed to have its whole allowance left.
+func fold(harnesses harness.Registry, s rawSnapshot) []Reading {
+	quotas := harnessQuotas(harnesses)
+	out := make([]Reading, 0, len(quotas))
+	for _, q := range quotas {
+		if q.provider == "" {
+			out = append(out, Reading{Harness: q.kind, PercentLeft: 100, Runway: RunwayUnknown, Status: "unmeasured", Assumed: q.unmeasured})
+			continue
+		}
+		row, ok := pickRow(s, q.provider, q.lane)
+		r := Reading{Harness: q.kind, Provider: q.provider, PercentLeft: -1, Runway: RunwayUnknown, Status: "absent"}
 		if ok {
-			r = fold(r, row)
+			r = foldRow(r, row)
 		}
 		out = append(out, r)
 	}
-	return out, nil
+	return out
 }
 
 // pickRow is firstmate's quota_row: schema 6 binds the lane's account, else
@@ -267,7 +319,7 @@ var providerWide = map[string]bool{"all": true, "all_models": true, "all_product
 // runwayRank orders runway statuses worst first.
 var runwayRank = map[string]int{RunwayExhausted: 0, RunwayProjected: 1, RunwayUnknown: 2, RunwayThroughReset: 3}
 
-func fold(r Reading, p rawProvider) Reading {
+func foldRow(r Reading, p rawProvider) Reading {
 	r.Status, r.Remedy = p.State.Status, p.State.RemedyCommand
 	runway := ""
 	for _, sc := range p.QuotaSemantics.EffectiveAvailability {
@@ -351,6 +403,9 @@ func formatFloat(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) 
 
 // Line is the reading as one line for `mate crew dispatch`.
 func (r Reading) Line() string {
+	if r.Assumed != "" {
+		return fmt.Sprintf("%-7s assumed 100%% left: no quota-axi row measures it (%s)", r.Harness, r.Assumed)
+	}
 	if !r.Known {
 		s := fmt.Sprintf("%-7s unknown (%s)", r.Harness, r.Status)
 		if r.Remedy != "" {

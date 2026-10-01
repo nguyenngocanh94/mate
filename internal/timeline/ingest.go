@@ -10,6 +10,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -37,9 +38,9 @@ type HealthReading struct {
 // the locator falls through to its next rule.
 type SessionRefFunc func(ctx context.Context, project, crew string) (string, error)
 
-// Deps are the ingest's collaborators. The zero value works: it reads the
-// real clock, the real git, the real harness directories, and resolves no
-// session refs.
+// Deps are the ingest's collaborators. The zero value reads the real clock
+// and the real git and resolves no session refs, but reads no transcript:
+// that takes Harnesses.
 type Deps struct {
 	Now        func() time.Time
 	SessionRef SessionRefFunc
@@ -47,11 +48,15 @@ type Deps struct {
 	// change in a reading into `health.changed`, and a busy stretch with no
 	// tool call inside it into a `thinking` action.
 	Health func() []HealthReading
-	// ClaudeProjectsDir and CodexSessionsDir override the harness transcript
-	// roots; tests point them at a fixture directory.
-	ClaudeProjectsDir string
-	CodexSessionsDir  string
-	Git               gitx.Git
+	// Harnesses are the harnesses whose transcripts the ingest reads. An
+	// agent whose harness is not registered here, or declares no transcript
+	// it can read, is recorded unresolved and never guessed at.
+	Harnesses harness.Registry
+	// TranscriptRoots override, by harness, where its transcripts are
+	// searched; tests point them at a fixture directory. A harness left
+	// out searches its own default.
+	TranscriptRoots map[harness.Kind]string
+	Git             gitx.Git
 	// ThinkingGap is the shortest uncovered stretch inside a turn that
 	// becomes a `thinking` action. Zero means DefaultThinkingGap.
 	ThinkingGap time.Duration

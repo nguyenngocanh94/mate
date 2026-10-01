@@ -108,7 +108,7 @@ func cmdCrewDispatch(args []string, stdout, stderr io.Writer) error {
 // a plain variable because this package's tests run serially (none calls
 // t.Parallel); a parallel test must not swap it.
 var readQuota = func(ctx context.Context) (quota.Snapshot, error) {
-	return quota.Read(ctx, process.ExecRunner{}, time.Now())
+	return quota.Read(ctx, process.ExecRunner{}, harnesses, time.Now())
 }
 
 // writeQuota prints the quota evidence for choosing between a rule's

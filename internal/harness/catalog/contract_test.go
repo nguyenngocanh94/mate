@@ -2,6 +2,7 @@ package catalog_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,9 +18,9 @@ import (
 // runs over every harness catalog.Default() registers. A harness is
 // onboarded when this suite passes for it; nothing here names one.
 //
-// This is the skeleton of items 1 and 2: every capability declared, and a
-// launch built for each role. The screen captures (item 3), transcript
-// fixtures (item 4) and the live conformance run (item 5) join it with the
+// Items 1, 2 and 4 are here: every capability declared, a launch built for
+// each role, and a verified transcript read against its fixture. The screen
+// captures (item 3) and the live conformance run (item 5) join it with the
 // plan PRs that give the contract those parts.
 
 func eachProfile(t *testing.T, run func(t *testing.T, p harness.Profile)) {
@@ -246,6 +247,66 @@ func TestContractLauncherBuildsEachRole(t *testing.T) {
 		}
 		if err := mate.ValidateRequiredContext(); err != nil {
 			t.Errorf("Mate launch fails the runtime's own context check: %v", err)
+		}
+	})
+}
+
+// transcriptManifest is a harness's transcript fixture and what reading it
+// must give: testdata/transcript/<kind>.json.
+type transcriptManifest struct {
+	Fixture string `json:"fixture"`
+	Version string `json:"version"`
+	Turns   int    `json:"turns"`
+	Usage   struct {
+		Input      int64 `json:"input"`
+		CacheRead  int64 `json:"cache_read"`
+		CacheWrite int64 `json:"cache_write"`
+		Output     int64 `json:"output"`
+		Reasoning  int64 `json:"reasoning"`
+	} `json:"usage"`
+}
+
+// Item 4: a verified transcript reads its fixture with no malformed record,
+// and its usage turns add up to the totals the manifest records. The
+// totals were summed from the turns the timeline stored before the
+// transcript became a capability, so they hold the normalisation to what it
+// was.
+func TestContractTranscriptReadsItsFixture(t *testing.T) {
+	eachProfile(t, func(t *testing.T, p harness.Profile) {
+		transcript := p.Capabilities().Transcript
+		if !transcript.Verified() {
+			// Nothing to read; item 1 already holds it to a reason.
+			return
+		}
+		raw, err := os.ReadFile(filepath.Join("testdata", "transcript", string(p.Kind())+".json"))
+		if err != nil {
+			t.Fatalf("a verified Transcript needs a fixture manifest: %v", err)
+		}
+		var m transcriptManifest
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("manifest: %v", err)
+		}
+		if !strings.Contains(transcript.Evidence.Version, m.Version) {
+			t.Errorf("the fixture is from %s, the evidence names %s", m.Version, transcript.Evidence.Version)
+		}
+		b, err := transcript.Impl.Read(harness.TranscriptReadRequest{Path: filepath.Join("testdata", "transcript", m.Fixture)})
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+		if b.Malformed != nil {
+			t.Errorf("the fixture has a malformed record: %+v", *b.Malformed)
+		}
+		var sum harness.TokenUsage
+		for _, turn := range b.UsageTurns {
+			sum.Input += turn.Usage.Input
+			sum.CacheRead += turn.Usage.CacheRead
+			sum.CacheWrite += turn.Usage.CacheWrite
+			sum.Output += turn.Usage.Output
+			sum.Reasoning += turn.Usage.Reasoning
+		}
+		want := harness.TokenUsage{Input: m.Usage.Input, CacheRead: m.Usage.CacheRead, CacheWrite: m.Usage.CacheWrite, Output: m.Usage.Output, Reasoning: m.Usage.Reasoning}
+		if len(b.UsageTurns) != m.Turns || sum != want {
+			t.Errorf("%d usage turns summing to %+v, want %d summing to %+v", len(b.UsageTurns), sum, m.Turns, want)
 		}
 	})
 }

@@ -85,6 +85,8 @@ causality projection from scanning all native evidence once per model call.
 ## 2. Locator rules
 
 An agent's transcript is found by the first rule that answers, and the rule that fired is recorded on the `session` row's path and in the `ingest.unresolved` payload when none does.
+Rule 1 and the recorded path of an earlier pass (`session.recorded`) are the timeline's own; rules 2 to 4 belong to the harness, behind its `Transcript` capability (`harness.TranscriptSource.Locate`), and the timeline asks the harness the agent runs on.
+A harness whose `Transcript` capability is not verified has no rules and no reader: the agent is recorded as `transcript_unobservable` and has no turns and no tokens, never guessed ones.
 
 1. `meta.transcript` - `.meta` already names the file.
    A Mate running Claude Code has it from the Stop hook's `transcript_path` (docs/mvp.md decision 9), which is exact.
@@ -318,7 +320,7 @@ The scene machine has the edge for it (`mate.reviews`) and, until something emit
 {"harness":"codex","reason":"rollout_not_adopted"}
 ```
 
-The reasons are `no_session_id`, `transcript_not_found`, `rollout_not_adopted`, `unknown_harness` and `no_worktree_recorded`.
+The reasons are `no_session_id`, `transcript_not_found`, `rollout_not_adopted`, `unknown_harness`, `transcript_unobservable` and `no_worktree_recorded`.
 
 ## 5. Causality rules
 

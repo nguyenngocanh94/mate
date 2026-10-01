@@ -12,6 +12,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief"
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
@@ -187,7 +188,7 @@ func Reindex(ctx context.Context, path string) error {
 		return err
 	}
 	defer handle.Close()
-	return timeline.New(w, handle, timeline.Deps{}).Reindex(ctx)
+	return timeline.New(w, handle, timeline.Deps{Harnesses: catalog.Default()}).Reindex(ctx)
 }
 
 // locate accepts a database file or a workspace directory.

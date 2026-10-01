@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
@@ -40,8 +41,8 @@ func TestCrewCodexIsLocatedFromTheRuntimesAgentSession(t *testing.T) {
 			asked = append(asked, project+"/"+crew)
 			return sessionID, nil
 		},
-		ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
-		CodexSessionsDir:  filepath.Join(f.root, "codex-sessions"),
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), filepath.Join(f.root, "codex-sessions")),
 	})
 	f.ingest(t)
 
@@ -81,9 +82,9 @@ func TestCrewCodexFallsBackToAdoptingARolloutByCwdAndLaunchTime(t *testing.T) {
 
 	clearCrewTranscript(t, f)
 	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
-		CodexSessionsDir:  sessions,
+		Now:             func() time.Time { return fixtureNow },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), sessions),
 	})
 	f.ingest(t)
 
@@ -140,9 +141,9 @@ func TestCrewCodexAdoptionAnchorsOnTheLaunchNotTheReadyTime(t *testing.T) {
 				t.Fatalf("WriteCrewMeta: %v", err)
 			}
 			f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-				Now:               func() time.Time { return fixtureNow },
-				ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
-				CodexSessionsDir:  sessions,
+				Now:             func() time.Time { return fixtureNow },
+				Harnesses:       catalog.Default(),
+				TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), sessions),
 			})
 			f.ingest(t)
 
@@ -182,9 +183,9 @@ func TestMateClaudeIsLocatedFromItsSessionIDWhenTheHookHasNotWrittenThePath(t *t
 		t.Fatalf("WriteMateMeta: %v", err)
 	}
 	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		ClaudeProjectsDir: projects,
-		CodexSessionsDir:  filepath.Join(f.root, "no-codex-sessions"),
+		Now:             func() time.Time { return fixtureNow },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(projects, filepath.Join(f.root, "no-codex-sessions")),
 	})
 	f.ingest(t)
 
@@ -205,9 +206,9 @@ func TestRelaunchedClaudeCrewIsLocatedInItsNewSession(t *testing.T) {
 	const newSession = "5a0c3b1e-2f44-4d1a-9a7e-0c1d2e3f4a5b"
 	projects := filepath.Join(f.root, "claude-projects")
 	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		ClaudeProjectsDir: projects,
-		CodexSessionsDir:  filepath.Join(f.root, "no-codex-sessions"),
+		Now:             func() time.Time { return fixtureNow },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(projects, filepath.Join(f.root, "no-codex-sessions")),
 	})
 	oldPath := filepath.Join(f.root, "old-session.jsonl")
 	copyFile(t, abs(t, claudeFixture), oldPath)
@@ -256,10 +257,10 @@ func TestRelaunchedCodexCrewIsLocatedInItsNewRollout(t *testing.T) {
 	clearCrewTranscript(t, f)
 	ref := oldSession
 	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		SessionRef:        func(context.Context, string, string) (string, error) { return ref, nil },
-		ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
-		CodexSessionsDir:  filepath.Join(f.root, "codex-sessions"),
+		Now:             func() time.Time { return fixtureNow },
+		SessionRef:      func(context.Context, string, string) (string, error) { return ref, nil },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), filepath.Join(f.root, "codex-sessions")),
 	})
 	f.ingest(t)
 
@@ -428,10 +429,10 @@ func TestHealthIsRecordedOnlyWhenTheComposerChanges(t *testing.T) {
 		Composer: "busy", At: mustTime("2026-09-19T10:44:15Z"),
 	}}
 	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
-		Now:               func() time.Time { return fixtureNow },
-		Health:            func() []timeline.HealthReading { return readings },
-		ClaudeProjectsDir: filepath.Join(f.root, "no-claude-projects"),
-		CodexSessionsDir:  filepath.Join(f.root, "no-codex-sessions"),
+		Now:             func() time.Time { return fixtureNow },
+		Health:          func() []timeline.HealthReading { return readings },
+		Harnesses:       catalog.Default(),
+		TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), filepath.Join(f.root, "no-codex-sessions")),
 	})
 	f.ingest(t)
 	f.ingest(t)
@@ -445,6 +446,47 @@ func TestHealthIsRecordedOnlyWhenTheComposerChanges(t *testing.T) {
 	f.ingest(t)
 	if n := f.count(t, `SELECT COUNT(*) FROM event WHERE kind = ?`, timeline.KindHealthChanged); n != 2 {
 		t.Fatalf("%d health.changed event(s) after the composer changed, want 2", n)
+	}
+}
+
+// unobserved is a registered harness that declares no transcript it can
+// read.
+type unobserved struct{ harness.Codex }
+
+func (unobserved) Kind() harness.Kind { return "unobserved" }
+
+func (u unobserved) Capabilities() harness.Capabilities {
+	c := u.Codex.Capabilities()
+	c.Transcript = harness.Cap[harness.TranscriptSource]{Status: harness.CapUnknown, Reason: "never measured"}
+	return c
+}
+
+// A crew on a harness with no transcript is recorded as unobservable, and
+// nothing is guessed in its place (plan section 3.7): no turn, no token,
+// even though its meta names a file the Codex harness could read.
+func TestAHarnessWithNoTranscriptIsUnobservedNotGuessed(t *testing.T) {
+	f := newFixture(t)
+	reg, err := harness.NewRegistry(nil, harness.Claude{}, harness.Codex{}, unobserved{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{
+		Now:             func() time.Time { return fixtureNow },
+		Harnesses:       reg,
+		TranscriptRoots: transcriptRoots(filepath.Join(f.root, "no-claude-projects"), filepath.Join(f.root, "no-codex-sessions")),
+	})
+	writeCrewBinding(t, f, map[string]string{"harness": "unobserved"})
+	f.ingest(t)
+
+	if n := f.count(t, `SELECT COUNT(*) FROM event WHERE kind = ? AND actor_id = ? AND json_extract(payload, '$.reason') = 'transcript_unobservable'`,
+		timeline.KindIngestUnresolved, f.crewActor()); n != 1 {
+		t.Fatalf("%d transcript_unobservable event(s) for the crew, want 1", n)
+	}
+	if n := f.count(t, `SELECT COUNT(*) FROM turn WHERE actor_id = ?`, f.crewActor()); n != 0 {
+		t.Fatalf("%d turn(s) recorded for an unobservable crew, want none", n)
+	}
+	if n := f.count(t, `SELECT COUNT(*) FROM turn WHERE actor_id = ?`, f.mateActor()); n == 0 {
+		t.Fatal("the Mate on Claude lost its turns too")
 	}
 }
 

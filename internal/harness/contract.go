@@ -126,6 +126,13 @@ type Capabilities struct {
 	// TurnEnd is evidence that a turn ended other than the composer, which
 	// can read empty mid-turn. Without it the composer is the only evidence.
 	TurnEnd Cap[TurnEndEvidence]
+	// Transcript is the harness's transcript, read into turns, tool calls
+	// and usage. Without it the timeline records the agent as unobserved
+	// and counts no token for it.
+	Transcript Cap[TranscriptSource]
+	// Quota names the quota-axi row that measures the harness. Without it
+	// dispatch treats the harness as having its whole allowance left.
+	Quota Cap[QuotaProvider]
 }
 
 // GracefulStopper is a harness's own way to exit.
@@ -191,6 +198,16 @@ type TurnEndEvidence interface {
 	TranscriptTurnEnded(transcript []byte, after time.Time) bool
 }
 
+// QuotaProvider names the quota-axi (https://github.com/kunchenguid/axi)
+// row that measures a harness's allowance.
+type QuotaProvider interface {
+	// QuotaProvider is quota-axi's provider name.
+	QuotaProvider() string
+	// QuotaLane is the account key a schema-6 snapshot files the harness
+	// under; empty means the provider's default account.
+	QuotaLane() string
+}
+
 // CapStatus is what is known about one capability of one harness. The words
 // are the ones the TUI probe plan uses (tui-probe-redesign-2026-09-27.md,
 // section 5.1), so the two plans share one vocabulary.
@@ -236,3 +253,12 @@ type exitPrompt string
 
 // ExitPrompt implements GracefulStopper.
 func (p exitPrompt) ExitPrompt() string { return string(p) }
+
+// quotaRow is a QuotaProvider that names one row.
+type quotaRow struct{ provider, lane string }
+
+// QuotaProvider implements QuotaProvider.
+func (q quotaRow) QuotaProvider() string { return q.provider }
+
+// QuotaLane implements QuotaProvider.
+func (q quotaRow) QuotaLane() string { return q.lane }

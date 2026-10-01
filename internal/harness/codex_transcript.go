@@ -12,8 +12,10 @@ import (
 // Codex's rollout is newline-delimited JSON. This file is the only place that
 // knows its record shapes; callers receive the normalized transcript types.
 // Unlike Claude, Codex's token_count usage is a session-wide cumulative
-// snapshot. Each snapshot becomes a CodexUsageSnapshot; it is deliberately
-// not a TranscriptTurn because a token snapshot is not an assistant response.
+// snapshot. Each snapshot becomes a CodexUsageSnapshot, kept in the batch's
+// opaque HarnessState; it is deliberately not a TranscriptTurn because a
+// token snapshot is not an assistant response. The usage turns the core
+// stores are derived from them (normaliseCodex).
 
 // CodexSessionMeta is the identity header of a rollout file.
 type CodexSessionMeta struct {
@@ -46,9 +48,8 @@ type CodexCumulativeUsage struct {
 
 // CodexUsageSnapshot is usage bounded by a Codex harness turn. Baseline is
 // the previous cumulative total (zero with HasBaseline=false on the first
-// snapshot); Delta is the non-negative difference from it. No storage
-// consumer exists yet: gomate-0016-attribution-schema owns deciding where
-// these harness-turn facts land.
+// snapshot); Delta is the non-negative difference from it. Only Codex's
+// own TranscriptSource reads them: it turns them into UsageTurns.
 type CodexUsageSnapshot struct {
 	SourceRef      string
 	Offset         int64
@@ -148,6 +149,7 @@ func (Codex) ParseTranscriptFinal(state TranscriptParseState, data []byte) Trans
 
 type codexParse struct {
 	batch         TranscriptBatch
+	snapshots     []CodexUsageSnapshot
 	turnRef       string
 	model         string
 	lastCumul     codexCumulative
@@ -238,6 +240,7 @@ func parseCodexRange(state TranscriptParseState, data []byte) TranscriptBatch {
 	}
 	p.batch.PendingBytes = p.batch.TotalBytes - p.batch.ConsumedBytes
 	p.batch.NextState = p.stateAt(p.batch.ConsumedBytes)
+	p.batch.HarnessState = codexTranscriptState{snapshots: p.snapshots}
 	return p.batch
 }
 
@@ -306,7 +309,7 @@ func (p *codexParse) add(rec codexEnvelope, raw string, offset int64, ordinal in
 			if !hasSnapshot {
 				return nil
 			}
-			p.batch.CodexUsageSnapshots = append(p.batch.CodexUsageSnapshots, CodexUsageSnapshot{
+			p.snapshots = append(p.snapshots, CodexUsageSnapshot{
 				SourceRef: sourceRef, Offset: offset, Ordinal: ordinal, OccurredAt: ts,
 				Model:          p.model,
 				HarnessTurnRef: p.turnRef, HasBaseline: p.hasCumulative,

@@ -1,0 +1,6 @@
+{
+  "fixture": "../../../../timeline/testdata/codex-0.154-rollout.jsonl",
+  "version": "codex-cli 0.154",
+  "turns": 11,
+  "usage": {"input": 23272, "cache_read": 209152, "cache_write": 0, "output": 1544, "reasoning": 351}
+}

@@ -135,7 +135,7 @@ func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 	var known bool
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		if err := timeline.New(w, handle, timeline.Deps{}).Ingest(ctx); err != nil {
+		if err := timeline.New(w, handle, timeline.Deps{Harnesses: harnesses}).Ingest(ctx); err != nil {
 			t.Fatal(err)
 		}
 		usage, known, err = handle.LatestContext(ctx, timeline.MateActorID("shop"), meta[spawn.MetaSessionID])

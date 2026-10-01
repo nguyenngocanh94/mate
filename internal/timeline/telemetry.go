@@ -145,7 +145,12 @@ func (p *pass) transcriptPreviouslyRecorded(ctx context.Context, loc Located, tb
 // cachedTranscript avoids decoding unchanged multi-megabyte transcripts on
 // every observer tick. The original ledger still sees its complete normalized
 // batch; native telemetry independently tails from its persisted byte cursor.
-func (i *Ingester) cachedTranscript(loc Located) (harness.TranscriptBatch, error) {
+//
+// A file that only grew - larger, with the leading bytes the last read saw -
+// is handed to the harness with the batch before it, and the harness decides
+// whether to carry on from there or read it whole. A frozen snapshot is read
+// at rest.
+func (i *Ingester) cachedTranscript(src harness.TranscriptSource, loc Located) (harness.TranscriptBatch, error) {
 	info, err := os.Stat(loc.Path)
 	if err != nil {
 		return harness.TranscriptBatch{}, err
@@ -154,94 +159,32 @@ func (i *Ingester) cachedTranscript(loc Located) (harness.TranscriptBatch, error
 	if cached && c.Size == info.Size() && c.MTime.Equal(info.ModTime()) && c.Finalized == loc.Finalized {
 		return c.Batch, nil
 	}
-	if cached && loc.Kind == harness.KindCodex && c.Size < info.Size() && c.Batch.ConsumedBytes <= info.Size() && c.Batch.Malformed == nil && c.HeaderBytes > 0 {
+	grown := false
+	if cached && c.Size < info.Size() && c.HeaderBytes > 0 {
 		header, err := readHead(loc.Path, c.HeaderBytes)
 		if err != nil {
 			return harness.TranscriptBatch{}, err
 		}
-		if fmt.Sprintf("%x", sha256.Sum256(header)) == c.HeaderSHA256 {
-			base := c.Batch.ConsumedBytes
-			file, err := os.Open(loc.Path)
-			if err != nil {
-				return harness.TranscriptBatch{}, err
-			}
-			data := make([]byte, info.Size()-base)
-			n, readErr := file.ReadAt(data, base)
-			_ = file.Close()
-			if readErr != nil && n == 0 {
-				return harness.TranscriptBatch{}, readErr
-			}
-			tail := (harness.Codex{}).ParseTranscript(c.Batch.NextState, data[:n])
-			b := appendCodexTranscript(c.Batch, tail, base)
-			c.Size, c.MTime, c.Batch = info.Size(), info.ModTime(), b
-			i.transcripts[loc.Path] = c
-			return b, nil
-		}
+		grown = fmt.Sprintf("%x", sha256.Sum256(header)) == c.HeaderSHA256
 	}
-	data, err := os.ReadFile(loc.Path)
+	b, err := src.Read(harness.TranscriptReadRequest{Path: loc.Path, Prior: c.Batch, Grown: grown, AtRest: loc.Finalized})
 	if err != nil {
 		return harness.TranscriptBatch{}, err
 	}
-	parser, err := transcriptParser(loc.Kind)
-	if err != nil {
+	header, err := readHead(loc.Path, 4096)
+	if err != nil && info.Size() > 0 {
 		return harness.TranscriptBatch{}, err
 	}
-	b := parser.ParseTranscript(harness.TranscriptParseState{}, data)
-	if loc.Kind == harness.KindClaude && loc.Finalized {
-		b = parser.ParseTranscriptFinal(harness.TranscriptParseState{}, data)
-	}
+	c.HeaderBytes, c.HeaderSHA256 = len(header), fmt.Sprintf("%x", sha256.Sum256(header))
 	if i.transcripts == nil {
 		i.transcripts = map[string]transcriptCache{}
 	}
-	headerBytes := len(data)
-	if headerBytes > 4096 {
-		headerBytes = 4096
-	}
-	i.transcripts[loc.Path] = transcriptCache{Size: info.Size(), MTime: info.ModTime(), Finalized: loc.Finalized, Batch: b, HeaderBytes: headerBytes, HeaderSHA256: fmt.Sprintf("%x", sha256.Sum256(data[:headerBytes]))}
+	c.Size, c.MTime, c.Finalized, c.Batch = info.Size(), info.ModTime(), loc.Finalized, b
+	i.transcripts[loc.Path] = c
 	return b, nil
 }
 
-// Codex source refs and ordinals are native, absolute record identities. Only
-// byte offsets need rebasing when appending a parsed tail to the cached batch.
-// The cursor parser already guarantees every emitted fact precedes ConsumedBytes.
-func appendCodexTranscript(prior, tail harness.TranscriptBatch, base int64) harness.TranscriptBatch {
-	for n := range tail.Records {
-		tail.Records[n].Offset += base
-	}
-	for n := range tail.Turns {
-		tail.Turns[n].Offset += base
-	}
-	for n := range tail.ToolCalls {
-		tail.ToolCalls[n].Offset += base
-	}
-	for n := range tail.ToolResults {
-		tail.ToolResults[n].Offset += base
-	}
-	for n := range tail.CodexUsageSnapshots {
-		tail.CodexUsageSnapshots[n].Offset += base
-	}
-	for n := range tail.UsageFailures {
-		tail.UsageFailures[n].Offset += base
-	}
-	prior.Records = append(prior.Records, tail.Records...)
-	prior.Turns = append(prior.Turns, tail.Turns...)
-	prior.ToolCalls = append(prior.ToolCalls, tail.ToolCalls...)
-	prior.ToolResults = append(prior.ToolResults, tail.ToolResults...)
-	prior.CodexUsageSnapshots = append(prior.CodexUsageSnapshots, tail.CodexUsageSnapshots...)
-	prior.UsageFailures = append(prior.UsageFailures, tail.UsageFailures...)
-	prior.ConsumedBytes, prior.TotalBytes, prior.PendingBytes = base+tail.ConsumedBytes, base+tail.TotalBytes, tail.PendingBytes
-	prior.NextState, prior.Malformed = tail.NextState, tail.Malformed
-	if prior.Malformed != nil {
-		prior.Malformed.Offset += base
-		prior.Malformed.EndOffset += base
-	}
-	for kind, count := range tail.Skipped {
-		prior.Skipped[kind] += count
-	}
-	return prior
-}
-
-func (p *pass) ingestTelemetry(ctx context.Context, loc Located, session string, tb harness.TranscriptBatch) error {
+func (p *pass) ingestTelemetry(ctx context.Context, src harness.TranscriptSource, loc Located, session string, tb harness.TranscriptBatch) error {
 	info, err := os.Stat(loc.Path)
 	if err != nil {
 		return err
@@ -282,26 +225,15 @@ func (p *pass) ingestTelemetry(ctx context.Context, loc Located, session string,
 		state = harness.TelemetryState{}
 	}
 	state.HeaderSHA256, state.HeaderBytes = headerHash, headerBytes
-	if loc.Kind == harness.KindCodex && offset < info.Size() {
-		f, err := os.Open(loc.Path)
-		if err != nil {
-			return err
-		}
-		data := make([]byte, info.Size()-offset)
-		n, readErr := f.ReadAt(data, offset)
-		_ = f.Close()
-		if readErr != nil && n == 0 {
-			return readErr
-		}
-		b := harness.ParseCodexTelemetry(state, data[:n], offset)
-		state = b.State
-		offset += b.Consumed
-		facts = append(facts, b.Facts...)
-		parseError = b.Error
-	} else if loc.Kind == harness.KindClaude && (offset != tb.ConsumedBytes || previousSize != info.Size() || raw == "") {
-		facts = append(facts, harness.NormalizedTelemetry(tb)...)
-		offset = tb.ConsumedBytes
+	up, err := src.Telemetry(harness.TelemetryRequest{
+		Path: loc.Path, Size: info.Size(), Offset: offset, State: state,
+		Changed: previousSize != info.Size() || raw == "", Batch: tb,
+	})
+	if err != nil {
+		return err
 	}
+	state, offset, parseError = up.State, up.Offset, up.Error
+	facts = append(facts, up.Facts...)
 	if tb.Malformed != nil {
 		if parseError != "" {
 			parseError += "; "
@@ -321,14 +253,9 @@ func (p *pass) ingestTelemetry(ctx context.Context, loc Located, session string,
 	for _, f := range facts {
 		p.telemetryFact(loc, session, f)
 	}
-	capability := telemetry.Fact{Version: telemetry.Version, ID: "capability", Kind: "capability", SourceRef: "adapter-v1", MeasurementKind: "observed", OccurredAt: time.Time{}, Gaps: []string{"child_usage_unavailable"}}
+	capability := telemetry.Fact{Version: telemetry.Version, ID: "capability", Kind: "capability", SourceRef: "adapter-v1", MeasurementKind: "observed", OccurredAt: time.Time{}, Gaps: up.Gaps}
 	if len(tb.Records) > 0 {
 		capability.OccurredAt = tb.Records[0].OccurredAt
-	}
-	if loc.Kind == harness.KindClaude {
-		capability.Gaps = append(capability.Gaps, "native_execution_unavailable", "native_process_unavailable", "native_timing_unavailable")
-	} else {
-		capability.Gaps = append(capability.Gaps, "wrapper_parent_unavailable")
 	}
 	p.telemetryFact(loc, session, capability)
 	encoded, err := json.Marshal(state)
