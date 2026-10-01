@@ -109,7 +109,10 @@ func growingTranscripts(t *testing.T, f *fixture) (claude, codex string) {
 
 // ledgerTables are the tables the transcript ingest writes, with the columns
 // that order them. event.id is an insertion counter and source_mtime the
-// clock of the test machine; both are left out.
+// clock of the test machine; both are left out. A column that references an
+// event by its id is written as that event's dedup key instead: the counter
+// follows the order the ingest meets its sources, and that order follows the
+// absolute paths of the checkout and TMPDIR.
 var ledgerTables = []struct{ name, order string }{
 	{"session", "id"},
 	{"turn", "id"},
@@ -131,23 +134,52 @@ func dumpLedger(t *testing.T, f *fixture) string {
 		t.Fatal(err)
 	}
 	clean := strings.NewReplacer(testdata, "{{TESTDATA}}", root, "{{ROOT}}", f.root, "{{ROOT}}")
+	dedups := eventDedups(t, f)
 	var out strings.Builder
 	for _, table := range ledgerTables {
 		rows, err := f.db.SQL().Query(fmt.Sprintf(`SELECT * FROM %s ORDER BY %s`, table.name, table.order))
 		if err != nil {
 			t.Fatalf("dump %s: %v", table.name, err)
 		}
-		lines := dumpRows(t, rows, table.name)
+		lines := dumpRows(t, rows, table.name, dedups)
+		// Sort once the placeholders are in, so the order does not follow
+		// where the checkout and TMPDIR sit.
+		for i, l := range lines {
+			lines[i] = clean.Replace(l)
+		}
 		sort.Strings(lines)
 		fmt.Fprintf(&out, "== %s (%d)\n", table.name, len(lines))
 		for _, l := range lines {
-			out.WriteString(clean.Replace(l) + "\n")
+			out.WriteString(l + "\n")
 		}
 	}
 	return out.String()
 }
 
-func dumpRows(t *testing.T, rows *sql.Rows, table string) []string {
+// eventDedups maps each event's insertion counter to its dedup key.
+func eventDedups(t *testing.T, f *fixture) map[int64]string {
+	t.Helper()
+	rows, err := f.db.SQL().Query(`SELECT id, dedup FROM event`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	dedups := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var dedup string
+		if err := rows.Scan(&id, &dedup); err != nil {
+			t.Fatal(err)
+		}
+		dedups[id] = dedup
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return dedups
+}
+
+func dumpRows(t *testing.T, rows *sql.Rows, table string, dedups map[int64]string) []string {
 	t.Helper()
 	defer rows.Close()
 	cols, err := rows.Columns()
@@ -172,6 +204,13 @@ func dumpRows(t *testing.T, rows *sql.Rows, table string) []string {
 			v := values[i]
 			if b, ok := v.([]byte); ok {
 				v = string(b)
+			}
+			if id, ok := v.(int64); ok && (c == "event_id" || strings.HasSuffix(c, "_event_id")) {
+				dedup, found := dedups[id]
+				if !found {
+					t.Fatalf("%s.%s references event %d, which is not in the ledger", table, c, id)
+				}
+				v = "event:" + dedup
 			}
 			cells = append(cells, fmt.Sprintf("%s=%v", c, v))
 		}
