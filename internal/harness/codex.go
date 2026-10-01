@@ -98,6 +98,26 @@ func (c Codex) Capabilities() Capabilities {
 				Proof:    "live TestLiveMemorySurvivesRestart codex: the stow ended on the rollout's task_complete, where the composer had read empty mid-turn",
 			},
 		},
+		Transcript: Cap[TranscriptSource]{
+			Status: CapVerified,
+			Impl:   codexTranscripts{home: c.Home},
+			Evidence: Evidence{
+				Version:  "codex-cli 0.154",
+				Measured: "2026-09-20 on the 2026-09-19 acceptance rollout (docs/evidence/m4-acceptance-2026-09-19.md)",
+				Proof:    "internal/timeline/testdata/codex-0.154-rollout.jsonl through TestLedgerCharacterization and the catalog contract suite",
+			},
+		},
+		Quota: Cap[QuotaProvider]{
+			Status: CapVerified,
+			// Native Codex is filed under the codex-home account (firstmate
+			// bin/fm-quota-axi-lib.sh quota_lane).
+			Impl: quotaRow{provider: "codex", lane: "codex-home"},
+			Evidence: Evidence{
+				Version:  "quota-axi 0.1.34",
+				Measured: "2026-09-26",
+				Proof:    "internal/quota/testdata/schema5-0.1.34.json through TestParseARealSchema5Snapshot and TestSchema6BindsTheHarnessAccount",
+			},
+		},
 	}
 }
 

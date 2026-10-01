@@ -52,7 +52,7 @@ func (c Claude) Launcher() Launcher { return c }
 func (Claude) Screen() ScreenProfile { return claudeScreen{} }
 
 // Capabilities implements Profile.
-func (Claude) Capabilities() Capabilities {
+func (c Claude) Capabilities() Capabilities {
 	return Capabilities{
 		GracefulStop: Cap[GracefulStopper]{
 			Status: CapVerified,
@@ -88,6 +88,24 @@ func (Claude) Capabilities() Capabilities {
 				Version:  "claude-code 2.1.281",
 				Measured: "2026-09-24 (docs/mvp.md task 37)",
 				Proof:    "live TestLiveRestartMateStowsFirst: the Stop hook's answer in sent.log ended the stow turn",
+			},
+		},
+		Transcript: Cap[TranscriptSource]{
+			Status: CapVerified,
+			Impl:   claudeTranscripts{configDir: c.ConfigDir},
+			Evidence: Evidence{
+				Version:  "claude-code 2.1.278",
+				Measured: "2026-09-19 acceptance run (docs/evidence/m4-acceptance-2026-09-19.md)",
+				Proof:    "internal/timeline/testdata/claude-2.1.278-transcript.jsonl through TestLedgerCharacterization and the catalog contract suite",
+			},
+		},
+		Quota: Cap[QuotaProvider]{
+			Status: CapVerified,
+			Impl:   quotaRow{provider: "claude"},
+			Evidence: Evidence{
+				Version:  "quota-axi 0.1.34",
+				Measured: "2026-09-26",
+				Proof:    "internal/quota/testdata/schema5-0.1.34.json through TestParseARealSchema5Snapshot",
 			},
 		},
 	}

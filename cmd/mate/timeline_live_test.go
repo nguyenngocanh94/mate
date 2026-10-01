@@ -193,6 +193,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 	}
 	ingest := timeline.New(ingestWorkspace, timelineDB, timeline.Deps{
 		SessionRef: consoleSessionRef(ingestWorkspace, deps),
+		Harnesses:  harnesses,
 	})
 	settle := func() error { return ingest.Ingest(ctx) }
 
@@ -369,9 +370,13 @@ func assertEveryToolCallHasAnAction(t *testing.T, handle *db.DB, actorID string,
 	if path == "" {
 		t.Fatalf("no transcript was located for %s; the timeline has no turns for it at all", actorID)
 	}
-	parser, err := timeline.ParserFor(kind)
+	profile, err := harnesses.Lookup(kind)
 	if err != nil {
-		t.Fatalf("no parser for %s: %v", kind, err)
+		t.Fatalf("no harness %s: %v", kind, err)
+	}
+	transcript := profile.Capabilities().Transcript
+	if !transcript.Verified() {
+		t.Fatalf("harness %s declares no transcript: %s", kind, transcript.Reason)
 	}
 
 	deadline := time.Now().Add(2 * time.Minute)
@@ -381,11 +386,10 @@ func assertEveryToolCallHasAnAction(t *testing.T, handle *db.DB, actorID string,
 		if err := settle(); err != nil {
 			t.Fatalf("ingest: %v", err)
 		}
-		data, err := os.ReadFile(path)
+		batch, err := transcript.Impl.Read(harness.TranscriptReadRequest{Path: path})
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}
-		batch := parser.ParseTranscript(harness.TranscriptParseState{}, data)
 		if len(batch.ToolCalls) == 0 {
 			t.Fatalf("%s's transcript at %s carries no tool call at all", actorID, path)
 		}

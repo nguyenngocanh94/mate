@@ -135,7 +135,7 @@ func TestLiveUsageMatchesTheHarness(t *testing.T) {
 		t.Fatalf("db.Open: %v", err)
 	}
 	defer handle.Close()
-	if err := timeline.New(w, handle, timeline.Deps{}).Reindex(ctx); err != nil {
+	if err := timeline.New(w, handle, timeline.Deps{Harnesses: harnesses}).Reindex(ctx); err != nil {
 		t.Fatalf("Reindex: %v", err)
 	}
 

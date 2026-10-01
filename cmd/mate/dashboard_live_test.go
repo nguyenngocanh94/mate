@@ -132,6 +132,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 	}
 	if err := timeline.New(w, writer, timeline.Deps{
 		SessionRef: consoleSessionRef(w, deps),
+		Harnesses:  harnesses,
 	}).Reindex(ctx); err != nil {
 		t.Fatalf("Reindex: %v", err)
 	}

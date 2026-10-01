@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
 func TestTelemetryReplaysWithoutDuplicatingLedgerAndHeartbeatAdvances(t *testing.T) {
 	f := newFixture(t)
 	now := fixtureNow
-	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return now }})
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return now }, Harnesses: catalog.Default()})
 	f.ingest(t)
 	ledger := f.count(t, `SELECT SUM(input_tokens+cache_read_tokens+cache_write_tokens+output_tokens) FROM turn WHERE actor_id=?`, f.crewActor())
 	facts := f.count(t, `SELECT COUNT(*) FROM event WHERE kind LIKE 'telemetry.%'`)
@@ -39,7 +40,7 @@ func TestTelemetryReplaysWithoutDuplicatingLedgerAndHeartbeatAdvances(t *testing
 		t.Fatalf("observer heartbeat stale: %s", observed)
 	}
 	// A process restart reconstructs parser/cache state from the committed rows.
-	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return now }})
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return now }, Harnesses: catalog.Default()})
 	f.ingest(t)
 	if n := f.count(t, `SELECT COUNT(*) FROM event WHERE kind LIKE 'telemetry.%'`); n != facts {
 		t.Fatalf("restart duplicated facts: %d ->%d", facts, n)
@@ -85,7 +86,7 @@ func TestTelemetryLateResultAfterRestartAndSourceReplacementGap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return fixtureNow }})
+	f.ing = timeline.New(f.ws, f.db, timeline.Deps{Now: func() time.Time { return fixtureNow }, Harnesses: catalog.Default()})
 	f.ingest(t)
 	if n := f.count(t, `SELECT COUNT(*) FROM event WHERE actor_id=? AND kind='telemetry.tool_result' AND json_extract(payload,'$.process_id')='81234' AND json_extract(payload,'$.output.new_bytes')=0`, f.crewActor()); n != 1 {
 		t.Fatalf("late result lost opener/progress: %d", n)

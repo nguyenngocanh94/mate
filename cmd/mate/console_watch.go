@@ -77,6 +77,7 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 	}
 	ingest := timeline.New(ws, handle, timeline.Deps{
 		SessionRef: consoleSessionRef(ws, deps),
+		Harnesses:  deps.Harnesses,
 		// The readings of the round that has just finished: Poll swaps the
 		// health snapshot in before it calls the ingest, and the closure
 		// reads `watcher` at call time, after it has been assigned.

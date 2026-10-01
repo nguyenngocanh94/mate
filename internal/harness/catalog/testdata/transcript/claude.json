@@ -1,0 +1,6 @@
+{
+  "fixture": "../../../../timeline/testdata/claude-2.1.278-transcript.jsonl",
+  "version": "claude-code 2.1.278",
+  "turns": 11,
+  "usage": {"input": 292, "cache_read": 632984, "cache_write": 38665, "output": 3874, "reasoning": 889}
+}

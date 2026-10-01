@@ -279,6 +279,7 @@ func cmdReindex(args []string, stdout, stderr io.Writer) error {
 	// A Herdr that is not running just leaves the fallback in charge.
 	if err := timeline.New(w, handle, timeline.Deps{
 		SessionRef: consoleSessionRef(w, spawn.LiveDeps(harnesses)),
+		Harnesses:  harnesses,
 	}).Reindex(ctx); err != nil {
 		return err
 	}

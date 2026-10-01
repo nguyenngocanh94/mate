@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/process"
 )
 
@@ -22,7 +23,7 @@ func TestParseARealSchema5Snapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rs, err := Parse(raw)
+	rs, err := Parse(raw, catalog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestSchema6BindsTheHarnessAccount(t *testing.T) {
 		row("claude", "other", scope("all", "1", "-9", RunwayExhausted, "0")),
 		row("claude", "default", scope("all", "60", "0.4", RunwayThroughReset, `"unknown"`)),
 	)
-	rs, err := Parse(raw)
+	rs, err := Parse(raw, catalog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestTheMostBindingScopeWins(t *testing.T) {
 		scope("all", "40", "0.2", RunwayProjected, "5400"),
 		scope("model:gpt-5.5", "0", "-5", RunwayExhausted, "0"),
 	))
-	rs, err := Parse(raw)
+	rs, err := Parse(raw, catalog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +153,7 @@ func TestFavouredRanksOnlyEligibleKnownHarnesses(t *testing.T) {
 
 func TestParseRefusesAnUnknownSchema(t *testing.T) {
 	for _, raw := range []string{`{"schemaVersion":4,"providers":[]}`, `not json`} {
-		if _, err := Parse([]byte(raw)); err == nil {
+		if _, err := Parse([]byte(raw), catalog.Default()); err == nil {
 			t.Errorf("Parse(%q) accepted it", raw)
 		}
 	}
@@ -179,7 +180,7 @@ func TestReadIsReadOnlyAndNamesBothHarnesses(t *testing.T) {
 		return process.Result{ExitCode: 1, Stdout: raw}, nil
 	}}
 	now := time.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC)
-	snap, err := Read(context.Background(), fr, now)
+	snap, err := Read(context.Background(), fr, catalog.Default(), now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,11 +197,66 @@ func TestReadReportsMissingAndOldQuotaAxi(t *testing.T) {
 	missing := &process.FakeRunner{Handler: func(context.Context, process.Spec) (process.Result, error) {
 		return process.Result{}, fmt.Errorf("process quota-axi: %w", exec.ErrNotFound)
 	}}
-	if _, err := Read(context.Background(), missing, time.Now()); !errors.Is(err, ErrNotInstalled) {
+	if _, err := Read(context.Background(), missing, catalog.Default(), time.Now()); !errors.Is(err, ErrNotInstalled) {
 		t.Fatalf("missing: err = %v", err)
 	}
 	old := &process.FakeRunner{Default: process.Result{Stdout: []byte("0.1.20\n")}}
-	if _, err := Read(context.Background(), old, time.Now()); err == nil || !strings.Contains(err.Error(), "quota-axi update") {
+	if _, err := Read(context.Background(), old, catalog.Default(), time.Now()); err == nil || !strings.Contains(err.Error(), "quota-axi update") {
 		t.Fatalf("old: err = %v", err)
+	}
+}
+
+// unmeasured is a harness that names no quota-axi row: its provider follows
+// the model, not the harness.
+type unmeasured struct{ harness.Codex }
+
+func (unmeasured) Kind() harness.Kind { return "unmeasured" }
+
+func (u unmeasured) Capabilities() harness.Capabilities {
+	c := u.Codex.Capabilities()
+	c.Quota = harness.Cap[harness.QuotaProvider]{Status: harness.CapUnsupported, Reason: "the provider follows --model"}
+	return c
+}
+
+// A harness with no quota row is assumed to have its whole allowance left
+// (plan section 3.7): it passes the gate, is never favoured on a number it
+// does not have, and the line says the reading is an assumption and why.
+func TestAHarnessWithNoQuotaRowIsAssumedFull(t *testing.T) {
+	reg, err := harness.NewRegistry(map[harness.AgentRole]harness.Kind{harness.RoleCrew: harness.KindCodex},
+		harness.Claude{}, harness.Codex{}, unmeasured{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile("testdata/schema5-0.1.34.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs, err := Parse(raw, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs) != 3 || rs[0].Harness != harness.KindCodex || rs[1].Harness != harness.KindClaude {
+		t.Fatalf("readings = %+v, want codex, claude, then the unmeasured harness", rs)
+	}
+	r := rs[2]
+	if r.Harness != "unmeasured" || r.Assumed == "" || r.PercentLeft != 100 || !r.Eligible() || r.SpendPriority != nil {
+		t.Fatalf("unmeasured reading = %+v", r)
+	}
+	if line := r.Line(); !strings.Contains(line, "assumed 100% left") || !strings.Contains(line, "the provider follows --model") {
+		t.Fatalf("line = %q", line)
+	}
+
+	// With no harness quota-axi can measure, it is never asked for a snapshot.
+	only, err := harness.NewRegistry(nil, unmeasured{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fr := &process.FakeRunner{Default: process.Result{Stdout: []byte("0.1.34\n")}}
+	snap, err := Read(context.Background(), fr, only, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fr.Calls) != 1 || len(snap.Readings) != 1 || snap.Readings[0].Assumed == "" {
+		t.Fatalf("calls %v, snapshot %+v", fr.Calls, snap)
 	}
 }

@@ -545,7 +545,7 @@ internal/facts/          `project facts`: chỉ metadata git, không mở file n
 internal/host/           the Console's sibling columns: WezTerm/Ghostty Layout (M10, M13)
 internal/panerun/        the program each column runs; swaps what it shows (M13)
 internal/runtime/        copy v1
-internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec, ScreenProfile: nguồn đọc pane, dialog startup, composer); Claude và Codex hiện thực tại chỗ
+internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec, ScreenProfile: nguồn đọc pane, dialog startup, composer; TranscriptSource, QuotaProvider); Claude và Codex hiện thực tại chỗ
 internal/harness/catalog/ danh sách harness biên dịch sẵn và harness mặc định theo vai; chỉ binary import
 internal/process/        copy v1
 assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts

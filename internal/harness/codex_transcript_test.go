@@ -52,10 +52,10 @@ func TestCodexParseTranscriptNormalizesRolloutFactsAndCumulativeDeltas(t *testin
 		{Input: 10, CacheRead: 2, CacheWrite: 1, Output: 3, Reasoning: 1},
 		{Input: 5, Output: 2, Reasoning: 1},
 	}
-	if len(batch.CodexUsageSnapshots) != len(wantUsage) {
-		t.Fatalf("usage snapshots = %d, want %d", len(batch.CodexUsageSnapshots), len(wantUsage))
+	if len(codexSnapshots(batch)) != len(wantUsage) {
+		t.Fatalf("usage snapshots = %d, want %d", len(codexSnapshots(batch)), len(wantUsage))
 	}
-	for i, snapshot := range batch.CodexUsageSnapshots {
+	for i, snapshot := range codexSnapshots(batch) {
 		if snapshot.SourceRef != []string{"5", "7"}[i] {
 			t.Errorf("snapshot %d source ref = %q, want %q", i, snapshot.SourceRef, []string{"5", "7"}[i])
 		}
@@ -109,8 +109,8 @@ func TestCodexParseTranscriptCarriesTurnAndCumulativeStateAcrossRanges(t *testin
 	if len(second.Turns) != 0 {
 		t.Fatalf("resumed turns = %+v, want no fabricated assistant turn", second.Turns)
 	}
-	if len(second.CodexUsageSnapshots) != 1 || second.CodexUsageSnapshots[0].Delta.Input != 5 {
-		t.Fatalf("resumed usage snapshots = %+v, want the 5-token input delta", second.CodexUsageSnapshots)
+	if len(codexSnapshots(second)) != 1 || codexSnapshots(second)[0].Delta.Input != 5 {
+		t.Fatalf("resumed usage snapshots = %+v, want the 5-token input delta", codexSnapshots(second))
 	}
 }
 
@@ -152,8 +152,8 @@ func TestCodexParseTranscriptRefusesRegressingCumulativeUsage(t *testing.T) {
 	if len(batch.UsageFailures) != 1 || batch.UsageFailures[0].Reason != MalformedCumulativeUsage {
 		t.Fatalf("usage failures = %+v, want one cumulative regression", batch.UsageFailures)
 	}
-	if len(batch.CodexUsageSnapshots) != 1 || batch.CodexUsageSnapshots[0].Delta.Input != 10 {
-		t.Fatalf("usage snapshots before regression = %+v, want first delta only", batch.CodexUsageSnapshots)
+	if len(codexSnapshots(batch)) != 1 || codexSnapshots(batch)[0].Delta.Input != 10 {
+		t.Fatalf("usage snapshots before regression = %+v, want first delta only", codexSnapshots(batch))
 	}
 }
 
@@ -167,8 +167,8 @@ func TestCodexTokenCountInfoNullDoesNotBlockLaterUsage(t *testing.T) {
 	if batch.Malformed != nil || len(batch.UsageFailures) != 0 {
 		t.Fatalf("info:null batch = %+v, want no failure", batch)
 	}
-	if len(batch.CodexUsageSnapshots) != 1 || batch.CodexUsageSnapshots[0].Delta.Input != 10 {
-		t.Fatalf("snapshots = %+v, want later valid snapshot", batch.CodexUsageSnapshots)
+	if len(codexSnapshots(batch)) != 1 || codexSnapshots(batch)[0].Delta.Input != 10 {
+		t.Fatalf("snapshots = %+v, want later valid snapshot", codexSnapshots(batch))
 	}
 }
 
@@ -183,7 +183,7 @@ func TestCodexRegressionProgressesAcrossPersistedCursorRestart(t *testing.T) {
 		t.Fatalf("prefix = %+v, want progress-capable regression", first)
 	}
 	second := (Codex{}).ParseTranscript(first.NextState, []byte(tail))
-	if second.Malformed != nil || len(second.UsageFailures) != 0 || len(second.CodexUsageSnapshots) != 1 || second.CodexUsageSnapshots[0].Delta.Input != 5 {
+	if second.Malformed != nil || len(second.UsageFailures) != 0 || len(codexSnapshots(second)) != 1 || codexSnapshots(second)[0].Delta.Input != 5 {
 		t.Fatalf("restart tail = %+v, want later delta from last valid baseline", second)
 	}
 }
