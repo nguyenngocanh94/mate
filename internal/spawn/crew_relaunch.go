@@ -151,18 +151,14 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		repoCfg:  repoCfg,
 	}
 
-	// 1. The old agent, if Herdr still has one. A restart of a live crew
-	// stops it first so the recorded name is free and no second pane is
-	// left pointing at the same task; a crew whose agent is already gone
-	// pays only the inspect that establishes it.
-	stopped, err := stopCrewAgentForRelaunch(ctx, w, deps, project, crew, meta)
-	if err != nil {
-		return RelaunchResult{}, err
-	}
-
-	// 2. The harness files. Claude gets a fresh settings file and session
-	// id; Codex's discovery file is refreshed from the brief currently on
-	// disk, so a `brief append` made after the crash is picked up.
+	// 1. Everything that can be refused without touching the old agent:
+	// the harness files and the argv. Claude gets a fresh settings file and
+	// session id; Codex's discovery file is refreshed from the brief
+	// currently on disk, so a `brief append` made after the crash is picked
+	// up. The settings file is rewritten with the same content and Codex
+	// reads its discovery file when a session starts, so writing them while
+	// the old agent lives changes nothing for it, and a refusal here leaves
+	// a live crew running.
 	sessionID, settingsPath, err := prepareCrewHarnessFiles(ctx, w, deps, deps.git(), plan, brief)
 	if err != nil {
 		return RelaunchResult{}, err
@@ -171,13 +167,22 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 	if err != nil {
 		return RelaunchResult{}, err
 	}
-
-	// 3. Herdr: EnsureSession starts a server that a machine restart left
-	// gone, which is the whole point of this path.
 	sessionSpec, err := deps.sessionSpec(w)
 	if err != nil {
 		return RelaunchResult{}, err
 	}
+
+	// 2. The old agent, if Herdr still has one. A restart of a live crew
+	// stops it first so the recorded name is free and no second pane is
+	// left pointing at the same task; a crew whose agent is already gone
+	// pays only the inspect that establishes it.
+	stopped, err := stopCrewAgentForRelaunch(ctx, w, deps, project, crew, meta)
+	if err != nil {
+		return RelaunchResult{}, err
+	}
+
+	// 3. Herdr: EnsureSession starts a server that a machine restart left
+	// gone, which is the whole point of this path.
 	session, err := deps.Runtime.EnsureSession(ctx, sessionSpec)
 	if err != nil {
 		return RelaunchResult{}, err
@@ -206,6 +211,7 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 	}
 	result := saga.result
 	result.Project, result.Crew, result.Harness = project, crew, kind
+	result.Model, result.Effort = plan.model, plan.effort
 	result.Stopped, result.AlreadyGone = stopped, !stopped
 	result.Repo, result.Branch, result.Worktree, result.BriefPath = repoCfg.Name, meta[MetaBranch], worktree, briefPath
 
@@ -327,9 +333,10 @@ func (s *crewRelaunchSaga) compensate(ctx context.Context) {
 		_ = s.deps.Runtime.StopAgent(ctx, handle, runtime.StopForce)
 	}
 	if s.madeTab {
-		if err := s.deps.Runtime.RemoveTab(ctx, s.tab); err != nil && !runtime.IsTabGone(err) {
-			_ = err
-		}
+		// Best effort: the relaunch already failed and that error is the one
+		// the caller reports. A tab left behind is closed by the next
+		// relaunch, which removes the recorded tab before creating its own.
+		_ = s.deps.Runtime.RemoveTab(ctx, s.tab)
 	}
 	if s.agentName != "" && s.session.Name != "" {
 		s.deps.Names.Release(s.session.Name, s.agentName)

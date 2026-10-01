@@ -255,3 +255,60 @@ func TestRelaunchCrewStartsAFreshClaudeSession(t *testing.T) {
 		t.Fatalf("meta session_id = %q, want %q", meta[spawn.MetaSessionID], again.SessionID)
 	}
 }
+
+func TestRelaunchCrewReportsTheRecordedModelAndEffort(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow,
+		BriefText: brieftest.Ship("work"),
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	rt.ClosePane(res.Pane)
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "")
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	if again.Harness != harness.KindClaude || again.Model != "haiku" || again.Effort != harness.EffortLow {
+		t.Fatalf("relaunch reports harness %q model %q effort %q, want claude, haiku, low",
+			again.Harness, again.Model, again.Effort)
+	}
+}
+
+// A relaunch that cannot prepare its launch must leave a live crew running:
+// the old agent is stopped only once nothing but Herdr can still refuse.
+func TestRelaunchCrewThatCannotPrepareLeavesALiveAgentRunning(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", Harness: harness.KindCodex, BriefText: brieftest.Ship("work"),
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	// Codex's discovery file can no longer be written.
+	override := harness.CodexInstructionPath(res.Worktree)
+	if err := os.Remove(override); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(override, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", ""); err == nil {
+		t.Fatal("RelaunchCrew succeeded with an unwritable discovery file")
+	}
+	if rt.LiveAgentCount() != 1 {
+		t.Fatalf("live agents = %d, want the original one still running", rt.LiveAgentCount())
+	}
+	meta, err := w.ReadCrewMeta("shop", "k3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta[spawn.MetaPane] != res.Pane {
+		t.Fatalf("meta pane = %q, want the untouched %q", meta[spawn.MetaPane], res.Pane)
+	}
+}
