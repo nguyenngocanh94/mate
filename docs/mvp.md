@@ -20,7 +20,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 ## 2. Quyết định đã chốt
 
 1. Mate chỉ điều phối và ra quyết định. Không sửa code, không tự khảo sát repo. Ràng buộc bằng cấu trúc (cwd không chứa code), không bằng lời dặn.
-2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi. Mặc định Mate là Claude Code, Crew là Codex. Một harness chỉ làm Mate được khi capability `Hooks` của nó là `verified`, vì trí nhớ và inbox của Mate dựa vào hook; thiếu thì `mate mate start` từ chối và nêu tên capability, còn vai Crew không bị ảnh hưởng ([phương án registry harness](plans/harness-registry-2026-09-30.md) mục 3.7 và 9.3).
+2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi. Mặc định Mate là Claude Code, Crew là Codex. Một harness làm Crew được khi nó được đăng ký trong `internal/harness/catalog` và qua suite hợp đồng ở đó (mọi capability có khai báo, launch dựng được, capture màn hình phân loại đúng, transcript đọc khớp fixture). Một harness chỉ làm Mate được khi capability `Hooks` của nó là `verified`, vì trí nhớ và inbox của Mate dựa vào hook; thiếu thì `mate mate start` từ chối và nêu tên capability, còn vai Crew không bị ảnh hưởng ([phương án registry harness](plans/harness-registry-2026-09-30.md) mục 3.7 và 9.3).
 3. Runtime terminal là Herdr 0.8.2. Mapping: một Herdr session cho workspace, một Herdr workspace cho project, một tab cho Mate và một tab cho mỗi Crew.
 4. Giao tiếp học triệt để từ firstmate (`/Volumes/Work/Workspace/firstmate`), xem mục 4.
 5. Hai chế độ giao tiếp: giám sát (mặc định) và tự động, xem mục 5.
@@ -504,7 +504,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
 - Restart có stow đo được (2026-09-24, `TestLiveRestartMateStowsFirst`, Claude Code 2.1.281): Mate được dặn một sự thật chỉ trong hội thoại và "đừng ghi file nào", `restart_mate` từ console gõ dòng `stow:` qua outbox, lượt stow xong trong 29 giây, sự thật vào `PROJECT.md`, dòng kết quả `stowed; stopped mate-shop; Mate mate-shop is running on claude in pane …`, và `sent.log` có đúng hai bản dòng `stow:` (outbox và hook).
 - Live test không còn đụng `~/.codex` của người dùng (task 38, 2026-09-24).
   Đo trước khi sửa: 115 trên 138 mục `[projects."…"]` trong `~/.codex/config.toml` của người dùng trỏ vào thư mục tạm đã xoá của live test mate, vì mọi crew Codex của live test trust worktree của nó trong home duy nhất nó thấy; mục cũ để người dùng tự quyết, không sửa.
-  Sửa ba lớp: `codexlab.Home` (`internal/harness/codexlab`) là một `CODEX_HOME` tạm chỉ có bản chép `auth.json` (codex-cli 0.156.1 lưu login ở đó, `cli_auth_credentials_store` mặc định `file`) và `[features] hooks = true`, cài trong mọi hàm dựng lab (`consoleLiveLab`, `liveLabSession` của spawn, watch, send, runtime), và cleanup của nó làm test hỏng nếu `config.toml` của người dùng có thêm dòng nào nêu đường dẫn tạm; `harness.LaunchCodexHome` từ chối, khi `MATE_LIVE=1`, mọi home ngoài thư mục tạm cho launch Codex và cho pane Mate, trước khi launch gì; và `Herdr.StartAgent` `export` env của launch vào shell của pane trước mỗi lần start, nên relaunch trong `StartMate`/resume cũng mang `CODEX_HOME` lab.
+  Sửa ba lớp: `codexlab.Home` (`internal/harness/codex/codexlab`) là một `CODEX_HOME` tạm chỉ có bản chép `auth.json` (codex-cli 0.156.1 lưu login ở đó, `cli_auth_credentials_store` mặc định `file`) và `[features] hooks = true`, cài trong mọi hàm dựng lab (`consoleLiveLab`, `liveLabSession` của spawn, watch, send, runtime), và cleanup của nó làm test hỏng nếu `config.toml` của người dùng có thêm dòng nào nêu đường dẫn tạm; `codex.LaunchCodexHome` từ chối, khi `MATE_LIVE=1`, mọi home ngoài thư mục tạm cho launch Codex và cho pane Mate, trước khi launch gì; và `Herdr.StartAgent` `export` env của launch vào shell của pane trước mỗi lần start, nên relaunch trong `StartMate`/resume cũng mang `CODEX_HOME` lab.
   Hash `config.toml` của người dùng trước và sau mọi lần chạy live của task 38 giống nhau (`908cc00f…`, 571 dòng).
   `TestLiveSpawnMateResumeRemembersCodex` giờ chạy trong lab, nơi không có integration Herdr, nên lấy `session_id` từ hook `SessionStart` của chính Mate thay vì `agent_session`.
 - `tab create` của Herdr không thừa kế `--env` của `workspace create` (đo 2026-09-24, Herdr 0.8.2: workspace tạo với `--env FOO_T=ws`, tab tạo sau không có `--env` in `FOO_T` rỗng, tab có `--env FOO_T=tab` in `tab`).
@@ -512,7 +512,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   Sửa: env của Mate (identity và `CODEX_HOME`) đi cả trên workspace create lẫn trên launch, và runtime `export` nó ở mỗi lần start.
 - `restart_mate` từ console khởi động lại Mate bằng harness mặc định của workspace, nên Mate Codex quay lại thành Mate Claude mới (tìm thấy 2026-09-24 khi viết acceptance task 38); giờ restart giữ harness trong `mate.meta`.
 - Composer của Codex trống giữa hai tool call, nên "bận rồi trống hai lần" không phải là hết lượt (đo 2026-09-24, task 38, codex-cli 0.156.1): console báo `stowed` trong khi Mate Codex còn đang ghi, và restart cắt lượt đó ("Conversation interrupted").
-  Sửa: khi `mate.meta` có `transcript` của Mate Codex, stow chỉ kết thúc khi rollout có `task_complete` sau dòng `stow:` (`harness.CodexTurnCompletedAfter`); luật composer chỉ còn cho Mate Codex chưa có rollout.
+  Sửa: khi `mate.meta` có `transcript` của Mate Codex, stow chỉ kết thúc khi rollout có `task_complete` sau dòng `stow:` (`codex.CodexTurnCompletedAfter`); luật composer chỉ còn cho Mate Codex chưa có rollout.
 
 ## 8. Tái sử dụng từ v1
 
@@ -545,8 +545,11 @@ internal/facts/          `project facts`: chỉ metadata git, không mở file n
 internal/host/           the Console's sibling columns: WezTerm/Ghostty Layout (M10, M13)
 internal/panerun/        the program each column runs; swaps what it shows (M13)
 internal/runtime/        copy v1
-internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec, ScreenProfile: nguồn đọc pane, dialog startup, composer; TranscriptSource, QuotaProvider); Claude và Codex hiện thực tại chỗ
-internal/harness/catalog/ danh sách harness biên dịch sẵn và harness mặc định theo vai; chỉ binary import
+internal/harness/        hợp đồng harness (Profile, capability, Registry, launch Prepare/Build, NewLaunchSpec, ScreenProfile: nguồn đọc pane, dialog startup, composer; TranscriptSource, QuotaProvider); không import package con nào
+internal/harness/claude/ mọi thứ riêng Claude Code: profile, launch, màn hình, settings và hook, transcript, capture startup
+internal/harness/codex/  mọi thứ riêng Codex: profile, launch, chuỗi chỉ dẫn, màn hình, hook, transcript, telemetry; kèm codexlab
+internal/harness/catalog/ danh sách harness biên dịch sẵn, harness mặc định theo vai, và suite hợp đồng; chỉ binary import
+internal/harness/harnesstest/ fixture dùng chung cho test của các package harness
 internal/process/        copy v1
 assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 ```
@@ -960,6 +963,22 @@ Rollout: build binary mới, đóng console cũ (sender cũ chưa biết mainten
 lúc Mate rảnh, rồi mở lại console bằng binary mới để daemon dùng điều kiện M15.
 Chỉ sửa AGENTS.md trên đĩa hoặc resume phiên cũ không chứng minh context đã nhỏ đi.
 Evidence: `docs/evidence/m15-context-2026-09-28.md`.
+
+### M16. Registry harness
+
+Theo [phương án registry harness](plans/harness-registry-2026-09-30.md); captain chốt 2026-10-01 rằng chuỗi này không chạy test live, lỗi chỉ lộ ra khi dùng thật thì sửa sau.
+Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
+
+| Task | Việc | Kiểm chứng |
+| --- | --- | --- |
+| 63 | PR 0: test đặc tả argv và file sinh ra, ratchet tên harness | Golden `TestLaunchCharacterization*`; ratchet ghi con số ban đầu. |
+| 64 | PR 1: hợp đồng, `Registry`, `catalog`, tiêm qua `Deps` | Không call site nào gọi `AdapterFor` hay `ParseKind` toàn cục. |
+| 65 | PR 2: launch qua `Prepare` và `Build`, một builder kín cho `LaunchSpec` | Argv và file sinh ra giống từng byte. |
+| 66 | PR 3: bảng màn hình vào `ScreenProfile`, đọc pane qua nguồn của profile | Mọi capture phân loại như cũ. |
+| 67 | PR 4: stop, session, hook, turn-end thành capability | Test resume, stow, recall hook pass trên cả hai harness. |
+| 68 | PR 5: transcript và quota thành capability | `mate usage` và dashboard cho cùng số trên corpus fixture. |
+| 69 | PR 6: Claude và Codex vào `internal/harness/claude` và `internal/harness/codex`; mặc định và danh mục harness cho store, query, Console lấy từ registry; skill `harness-adapters` sinh từ registry; suite hợp đồng mục 1 đến 4 | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai. |
+| 70 | PR 7: pi, chỉ vai Crew | Diff chỉ gồm package mới, một dòng catalog, fixture và tài liệu. |
 
 ### Thử nghiệm: Jev notice advisor
 
