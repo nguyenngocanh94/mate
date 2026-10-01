@@ -23,38 +23,46 @@ type TranscriptParser interface {
 	// message group instead of withholding it; without it the last turn of a
 	// finished session would never be ingested.
 	//
-	// "Positively stopped" means observed stopped, not asked to stop, and
-	// **no caller in this repository establishes that today**. This method is
-	// deliberately unused: every shipped trigger uses ParseTranscript.
+	// "Positively stopped" means observed stopped, not asked to stop. The one
+	// caller is the timeline (internal/timeline/telemetry.go), and only for a
+	// Claude range whose Located.Finalized is set. That flag is earned by a
+	// chain, each link of which must hold:
 	//
-	// It is stated that plainly because two rounds of review narrowed the
-	// claim instead of retiring it, and each narrower version was still
-	// false. `crew done` cannot qualify - it makes no runtime call and the
-	// Crew agent itself is the caller, so the harness is running the very
-	// tool call that invoked it. Neither can today's stop paths: StopCrew
-	// reports a confirmed stop from a single successful ListAgents that omits
-	// the name, without ever calling InspectAgent; StopMate's
-	// inspectRecordedName swallows every InspectAgent error, so an empty list
-	// plus a transport failure reads as absence; and both release the binding
-	// inside their own success path, so a sync run after the call returns is
-	// already past "after confirmation, before release".
+	//   1. context refresh (cmd/mate/context_refresh.go) calls StopMate, and
+	//      while the Herdr session is running StopMate succeeds only through
+	//      confirmGone (internal/spawn/stop.go): InspectAgent must return
+	//      agent_not_found AND ListAgents must omit the name. Live or unknown
+	//      on either side fails the stop. The exception is below.
+	//   2. only after StopMate returns nil does refresh call
+	//      store.FreezeMateSession, which copies the transcript to an immutable
+	//      snapshot under the Mate's sessions/ directory and marks the archive
+	//      finalized=true. The snapshot, not the sync's timing, is what keeps
+	//      a writer out: no harness ever appends to the copy, so there is no
+	//      "after confirmation, before release" window to sequence the sync in.
+	//   3. the timeline sets Located.Finalized only for an archive marked
+	//      finalized whose located path is that snapshot (LocatorMeta).
 	//
-	// Acquiring a caller is G5-12's job and needs all three of:
+	// The two false-positive branches of link 1 - ListAgents empty while
+	// InspectAgent still finds the agent, and ListAgents empty while
+	// InspectAgent fails - are pinned for StopMate and StopCrew by
+	// internal/spawn/stop_confirm_test.go.
 	//
-	//   1. complementary absence - ListAgents omits the name AND InspectAgent
-	//      returns agent_not_found. Live or unknown on either side must
-	//      neither flush nor release.
-	//   2. the final sync sequenced inside the orchestration stop, after that
-	//      dual observation and before the binding is released.
-	//   3. regressions for both false-positive branches: an empty list while
-	//      InspectAgent still finds the agent, and an empty list while
-	//      InspectAgent fails.
+	// One branch of link 1 confirms less than that. When Herdr's session
+	// list does not report the Mate's session running, StopMate returns
+	// success after LookupSession alone, without calling confirmGone, and
+	// refresh then freezes the snapshot. That treats "the Herdr server is
+	// down" as "the harness has stopped writing", which nothing here
+	// verifies.
 	//
-	// Until then the last message group of a session is never flushed. It is
-	// visibly pending - OpenSourceRef names it and the cursor still points at
-	// it - not silently lost.
+	// Everything outside that chain still uses ParseTranscript: a live Mate,
+	// every Crew, and every Codex range. `crew done` cannot qualify - it makes
+	// no runtime call and the Crew agent itself is the caller, so the harness
+	// is running the very tool call that invoked it. For those sessions the
+	// last message group is never flushed. It is visibly pending -
+	// OpenSourceRef names it and the cursor still points at it - not silently
+	// lost.
 	//
-	// That is a precondition, and the parser cannot check it. A JSONL range
+	// At rest is a precondition, and the parser cannot check it. A JSONL range
 	// that ends on a complete newline-terminated record is indistinguishable,
 	// from its bytes alone, from one whose writer has stopped mid-message, so
 	// the parser does not claim to prove at rest. It withholds only what the
