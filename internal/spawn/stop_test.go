@@ -10,6 +10,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/mateassets"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -64,7 +66,7 @@ func TestStopMateConfirmsTheAgentIsGone(t *testing.T) {
 // claudeWithout is Claude's profile with one capability declared unknown,
 // so a test can show the core asks the capability, not the kind.
 type claudeWithout struct {
-	harness.Claude
+	claude.Claude
 	capability string
 }
 
@@ -93,7 +95,7 @@ func (c claudeWithout) Capabilities() harness.Capabilities {
 func onlyClaudeWithout(t *testing.T, capability string) harness.Registry {
 	t.Helper()
 	reg, err := harness.NewRegistry(map[harness.AgentRole]harness.Kind{
-		harness.RoleMate: harness.KindClaude, harness.RoleCrew: harness.KindClaude,
+		harness.RoleMate: claude.KindClaude, harness.RoleCrew: claude.KindClaude,
 	}, claudeWithout{capability: capability})
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +162,7 @@ func TestStopMateRecordsWhyACodexMateWasForced(t *testing.T) {
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps, _ := codexDeps(t, rt)
-	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex}); err != nil {
+	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex}); err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
 	res, err := spawn.StopMate(context.Background(), w, deps, "shop")
@@ -198,7 +200,7 @@ func TestSpawnCrewNeedsNoHooks(t *testing.T) {
 	deps := fakeDeps(t, rt)
 	deps.Harnesses = onlyClaudeWithout(t, "Hooks")
 	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "k3", Harness: harness.KindClaude,
+		Project: "shop", Crew: "k3", Harness: claude.KindClaude,
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
 	}); err != nil {
 		t.Fatalf("SpawnCrew on a harness without hooks: %v", err)

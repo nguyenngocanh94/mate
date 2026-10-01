@@ -2,6 +2,8 @@ package harness
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"time"
@@ -406,7 +408,10 @@ type TranscriptBatch struct {
 	HarnessState any
 }
 
-func codexMessageText(raw json.RawMessage) string {
+// MessageText is a message's text as a transcript record carries it: a JSON
+// string, or the text of a list of content blocks joined by newlines, or
+// else the compacted JSON itself.
+func MessageText(raw json.RawMessage) string {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return ""
@@ -429,10 +434,12 @@ func codexMessageText(raw json.RawMessage) string {
 		}
 		return strings.Join(parts, "\n")
 	}
-	return compactJSON(trimmed, string(trimmed))
+	return CompactJSON(trimmed, string(trimmed))
 }
 
-func compactJSON(raw json.RawMessage, fallback string) string {
+// CompactJSON is raw with insignificant whitespace removed, the trimmed raw
+// text when it is not valid JSON, or fallback when it is empty.
+func CompactJSON(raw json.RawMessage, fallback string) string {
 	t := bytes.TrimSpace(raw)
 	if len(t) == 0 {
 		return fallback
@@ -444,12 +451,18 @@ func compactJSON(raw json.RawMessage, fallback string) string {
 	return buf.String()
 }
 
-func outputFact(s string, n *int64) *telemetry.Output {
+// HashText is the hex SHA-256 of s, as telemetry records a text it does not
+// keep.
+func HashText(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// OutputFact is the telemetry fact for one tool output: its size, hash and a
+// bounded preview, and whether the harness said it truncated it.
+func OutputFact(s string, n *int64) *telemetry.Output {
 	preview := s
 	if len(preview) > 1200 {
 		preview = preview[:1200]
 	}
-	o := &telemetry.Output{Bytes: int64(len(s)), SHA256: hashText(s), NewBytes: n, Preview: preview}
+	o := &telemetry.Output{Bytes: int64(len(s)), SHA256: HashText(s), NewBytes: n, Preview: preview}
 	if strings.Contains(s, "Warning: truncated output") || strings.Contains(s, "tokens truncated") || strings.Contains(s, "Output truncated") {
 		yes := true
 		o.Truncated = &yes

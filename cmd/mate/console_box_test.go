@@ -6,7 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -26,8 +27,8 @@ import (
 // a ruled box, empty or holding somebody else's half-typed line.
 const (
 	claudeRule            = "─────────────────────────────────────────────"
-	claudeEmptyScreen     = claudeRule + "\n" + harness.ClaudeComposerMarker + "\n" + claudeRule + "\n"
-	claudePendingScreen   = claudeRule + "\n" + harness.ClaudeComposerMarker + " half typed\n" + claudeRule + "\n"
+	claudeEmptyScreen     = claudeRule + "\n" + claude.ClaudeComposerMarker + "\n" + claudeRule + "\n"
+	claudePendingScreen   = claudeRule + "\n" + claude.ClaudeComposerMarker + " half typed\n" + claudeRule + "\n"
 	codexBoxPendingScreen = "› rebase onto main\n\n  gpt-5.6-terra high · /tmp/x\n"
 )
 
@@ -67,7 +68,7 @@ func newBoxFixture(t *testing.T) boxFixture {
 	mate := runtime.AgentHandle{Session: session, Name: meta[spawn.MetaAgent]}
 
 	crewMeta := map[string]string{
-		spawn.MetaHarness:   string(harness.KindCodex),
+		spawn.MetaHarness:   string(codex.KindCodex),
 		spawn.MetaAgent:     "crew-shop-k3",
 		spawn.MetaPane:      "pane-k3",
 		spawn.MetaTab:       "tab-k3",
@@ -79,7 +80,7 @@ func newBoxFixture(t *testing.T) boxFixture {
 		t.Fatalf("WriteCrewMeta: %v", err)
 	}
 	crew := runtime.AgentHandle{
-		Session: session, Name: "crew-shop-k3", RawID: "k3", Kind: harness.KindCodex,
+		Session: session, Name: "crew-shop-k3", RawID: "k3", Kind: codex.KindCodex,
 		Tab: runtime.TabHandle{Session: session, TabID: "tab-k3", PaneID: "pane-k3", Label: "crew-k3"},
 	}
 	rt.PutAgent(crew, runtime.AgentIdle)

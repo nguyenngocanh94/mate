@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -98,7 +99,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 		Tab: runtime.TabHandle{
 			Session:     runtime.SessionHandle{Name: session, ConfigHome: configHome},
 			WorkspaceID: started.Workspace,
@@ -124,7 +125,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	}
 
 	// The captain types one line. No marker: this is a human talking.
-	report, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, claude.KindClaude, acceptanceRequest, send.Options{})
 	if err != nil {
 		t.Fatalf("send the captain's request: %v (report %+v)", err, report)
 	}

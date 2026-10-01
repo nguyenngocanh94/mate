@@ -10,6 +10,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -48,7 +49,7 @@ func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 		defer cancel()
 		_, _ = spawn.StopMate(c, w, deps, "shop")
 	})
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatal(err)
 	}

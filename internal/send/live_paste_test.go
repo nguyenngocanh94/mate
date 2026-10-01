@@ -17,6 +17,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -109,7 +110,7 @@ func TestLiveCodexDelayedPasteAndRecovery(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond) // wait for the newly created shell
 	}
-	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: session}, Name: name, Kind: harness.KindCodex, Tab: runtime.TabHandle{PaneID: pane}}
+	h := runtime.AgentHandle{Session: runtime.SessionHandle{Name: session}, Name: name, Kind: codex.KindCodex, Tab: runtime.TabHandle{PaneID: pane}}
 	rt := runtime.NewHerdr(process.ExecRunner{})
 	read := func() string {
 		t.Helper()
@@ -124,7 +125,7 @@ func TestLiveCodexDelayedPasteAndRecovery(t *testing.T) {
 		var s string
 		for deadline := time.Now().Add(budget); time.Now().Before(deadline); {
 			s = read()
-			c := send.ClassifyComposer((harness.Codex{}).Screen(), s)
+			c := send.ClassifyComposer((codex.Codex{}).Screen(), s)
 			if c.State == want && strings.Contains(send.StripSGR(s), " · ") {
 				return s
 			}
@@ -184,7 +185,7 @@ func TestLiveCodexDelayedPasteAndRecovery(t *testing.T) {
 	}
 	pending := waitState(send.StatePending, 10*time.Second)
 	t.Logf("owned unsubmitted draft:\n%s", send.StripSGR(pending))
-	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: rt}, h, harness.KindCodex, payload, send.Options{ResumePending: true})
+	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: rt}, h, codex.KindCodex, payload, send.Options{ResumePending: true})
 	if err != nil || !report.Delivered() || report.Typed || !report.Resumed {
 		t.Fatalf("recovery: %+v %v\nscreen after refusal: %q", report, err, send.StripSGR(read()))
 	}

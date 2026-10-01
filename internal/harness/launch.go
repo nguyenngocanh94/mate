@@ -40,7 +40,10 @@ type PrepareRequest struct {
 	NewSessionID func() string
 }
 
-func (r PrepareRequest) check(kind Kind) error {
+// Check refuses a request a harness cannot lay out: a path that is not
+// absolute, or a role that is neither a Mate nor a Crew. kind names the
+// harness in the refusal.
+func (r PrepareRequest) Check(kind Kind) error {
 	for _, p := range []struct{ name, path string }{
 		{"cwd", r.Cwd}, {"state directory", r.StateDir}, {"context path", r.ContextPath},
 	} {
@@ -56,7 +59,9 @@ func (r PrepareRequest) check(kind Kind) error {
 	return nil
 }
 
-func (r PrepareRequest) newSessionID() string {
+// MintSessionID is the id of a fresh session: NewSessionID's, or a random
+// UUID.
+func (r PrepareRequest) MintSessionID() string {
 	if r.NewSessionID != nil {
 		return r.NewSessionID()
 	}

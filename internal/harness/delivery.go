@@ -239,9 +239,11 @@ func (s LaunchSpec) deliveryLimit() (deliveryLimit, error) {
 		}
 		return deliveryLimit{max: max, inArgv: true}, nil
 	case DeliveryInstructionFile:
+		// The harness that reads an instruction file names its budget
+		// (LaunchPlan.MaxFileBytes); the core has no default to guess.
 		max := int64(s.maxFileBytes)
 		if max <= 0 {
-			max = CodexDefaultMaxBytes
+			return deliveryLimit{}, s.codedRequired(fmt.Sprintf("%s delivery names no size budget", s.delivery))
 		}
 		return deliveryLimit{
 			max:  max,

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -94,7 +94,7 @@ func TestLiveMarkerSurvivesToTheHook(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, spawnDeps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, spawnDeps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestLiveMarkerSurvivesToTheHook(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 	}
 	deps := send.Deps{Harnesses: catalog.Default(), Runtime: rt}
 
@@ -135,7 +135,7 @@ func TestLiveMarkerSurvivesToTheHook(t *testing.T) {
 		waitForComposer(ctx, t, rt, handle, send.StateEmpty)
 		tag := fmt.Sprintf("reply with just the word measured round %d", i)
 		text := c.prefix + tag
-		report, err := send.Send(ctx, deps, handle, harness.KindClaude, text, send.Options{})
+		report, err := send.Send(ctx, deps, handle, claude.KindClaude, text, send.Options{})
 		logReport(t, c.name, report)
 		if err != nil {
 			t.Fatalf("Send(%s): %v", c.name, err)

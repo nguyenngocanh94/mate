@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -71,7 +71,7 @@ func TestStopMateRecordsTheCodexSessionAndStartResumesIt(t *testing.T) {
 	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
-	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("first StartMate: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestStopMateRecordsTheCodexSessionAndStartResumesIt(t *testing.T) {
 		t.Fatalf("meta session_id after stop = %q, want %q", got, codexSessionA)
 	}
 
-	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("resuming StartMate: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestStopMateAdoptsTheCodexRolloutWhenHerdrHasNoSession(t *testing.T) {
 	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
-	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex}); err != nil {
+	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex}); err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
 	cwd, err := filepath.EvalSymlinks(w.MateDir("blog"))
@@ -159,7 +159,7 @@ func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
-	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
+	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestStartMateGoesFreshWhenTheCodexRolloutIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	// No rollout was ever written for codexSessionA.
-	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestStartMateFallsBackToFreshWhenTheResumedLaunchFails(t *testing.T) {
 	deps, sessions := codexDeps(t, rt)
 	ctx := context.Background()
 
-	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex})
+	first, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestStartMateFallsBackToFreshWhenTheResumedLaunchFails(t *testing.T) {
 	// The resumed pane shows a screen the settle cannot name (the fake
 	// shows NextStartupScreen once, then the composer again).
 	rt.NextStartupScreen = "ERROR: something codex has never printed before\n"
-	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: harness.KindCodex, Resume: true})
+	second, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "blog", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}

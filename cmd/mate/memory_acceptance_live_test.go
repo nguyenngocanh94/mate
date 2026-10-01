@@ -18,6 +18,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief"
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -73,10 +75,10 @@ func TestLiveMemorySurvivesRestart(t *testing.T) {
 		kind  harness.Kind
 		fresh bool
 	}{
-		{"claude", harness.KindClaude, false},
-		{"claude-fresh", harness.KindClaude, true},
-		{"codex", harness.KindCodex, false},
-		{"codex-fresh", harness.KindCodex, true},
+		{"claude", claude.KindClaude, false},
+		{"claude-fresh", claude.KindClaude, true},
+		{"codex", codex.KindCodex, false},
+		{"codex-fresh", codex.KindCodex, true},
 	} {
 		t.Run(v.name, func(t *testing.T) { memoryAcceptance(t, v.kind, v.fresh) })
 	}
@@ -158,7 +160,7 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 	defer pilot.Stop()
 
 	harnessChoice := query.HarnessKind("claude")
-	if kind == harness.KindCodex {
+	if kind == codex.KindCodex {
 		harnessChoice = query.HarnessKind("codex")
 	}
 	out, err := action(ctx, console.ActionRequest{Action: console.ActionStart, Target: memoryProject, TargetKind: "mate", Harness: harnessChoice})
@@ -257,7 +259,7 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 	}
 	meta, _ := w.ReadMateMeta(memoryProject)
 	t.Logf("EVIDENCE mate.meta after the restart: resumed=%q resumed_from=%q session_id=%q", meta[spawn.MetaResumed], meta[spawn.MetaResumedFrom], meta[spawn.MetaSessionID])
-	if !fresh && kind == harness.KindClaude && meta[spawn.MetaResumed] != "true" {
+	if !fresh && kind == claude.KindClaude && meta[spawn.MetaResumed] != "true" {
 		t.Fatalf("the console's restart of a Claude Mate did not resume its session: %v", meta)
 	}
 	mate, _ = mateHandleOrFatal(t, ctx, w, deps, memoryProject)
@@ -419,7 +421,7 @@ type mateReply struct {
 func (v mateVoice) since(at time.Time) []mateReply {
 	v.t.Helper()
 	var out []mateReply
-	if v.kind == harness.KindClaude {
+	if v.kind == claude.KindClaude {
 		for _, e := range sentEntries(v.t, v.w, v.project) {
 			if e.Source == store.SourceMate && e.Target == store.SourceUser && e.Time.After(at) {
 				out = append(out, mateReply{at: e.Time, text: e.Text})
@@ -773,12 +775,12 @@ func sentToCrew(_ *testing.T, entries []store.SentEntry, crew string) []store.Se
 // Mate's cwd and the lab CODEX_HOME's memories must hold nothing.
 func assertNoHarnessMemory(t *testing.T, w *store.Workspace, project, codexHome string) {
 	t.Helper()
-	projects, err := harness.ClaudeProjectsDir()
+	projects, err := claude.ClaudeProjectsDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, dir := range []string{
-		filepath.Join(projects, harness.ClaudeProjectSlug(w.MateDir(project)), "memory"),
+		filepath.Join(projects, claude.ClaudeProjectSlug(w.MateDir(project)), "memory"),
 		filepath.Join(codexHome, "memories"),
 	} {
 		entries, err := os.ReadDir(dir)

@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
@@ -131,15 +132,15 @@ func TestLiveHerdrClaudeStopHookFiresWithRealPayload(t *testing.T) {
 	// A Crew-shaped launch takes its --settings from <state>/settings.json,
 	// which is settingsPath; the file written above stands in for the one
 	// Prepare names, so prep.Files is not written.
-	prep, err := harness.Claude{}.Prepare(ctx, harness.PrepareRequest{
+	prep, err := claude.Claude{}.Prepare(ctx, harness.PrepareRequest{
 		Role: harness.RoleCrew, Cwd: cwd, StateDir: filepath.Dir(settingsPath), ContextPath: ctxPath,
 		NewSessionID: func() string { return sessionID },
 	})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
-		Kind:        harness.KindClaude,
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind:        claude.KindClaude,
 		Cwd:         cwd,
 		ContextPath: prep.ContextPath,
 		Launch:      prep.Launch,

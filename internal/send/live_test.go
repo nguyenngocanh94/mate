@@ -12,7 +12,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
-	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -47,7 +48,7 @@ func liveLabSession(t *testing.T) (session, configHome string) {
 		t.Fatal("HOME is required to resolve the Herdr socket")
 	}
 	// Every live test that reaches a lab session runs Codex in a lab
-	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codex/codexlab).
 	codexlab.Home(t)
 	return session, filepath.Join(home, ".config")
 }
@@ -114,7 +115,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, spawnDeps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, spawnDeps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -129,12 +130,12 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 	}
 	deps := send.Deps{Harnesses: catalog.Default(), Runtime: rt}
 
 	// (a) An empty composer takes the line.
-	report, err := send.Send(ctx, deps, handle, harness.KindClaude, "say PONG", send.Options{WaitForWorking: true})
+	report, err := send.Send(ctx, deps, handle, claude.KindClaude, "say PONG", send.Options{WaitForWorking: true})
 	logReport(t, "case a", report)
 	if err != nil {
 		t.Fatalf("Send into an empty composer: %v", err)
@@ -156,7 +157,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 		t.Fatalf("SendText: %v", err)
 	}
 	time.Sleep(time.Second)
-	refused, err := send.Send(ctx, deps, handle, harness.KindClaude, "say PONG AGAIN", send.Options{})
+	refused, err := send.Send(ctx, deps, handle, claude.KindClaude, "say PONG AGAIN", send.Options{})
 	logReport(t, "case b", refused)
 	if !errors.Is(err, send.ErrComposerPending) {
 		t.Fatalf("Send over a half-typed line: err = %v, want ErrComposerPending", err)
@@ -171,7 +172,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	still := send.ClassifyComposer(harness.Claude{}.Screen(), screen)
+	still := send.ClassifyComposer(claude.Claude{}.Screen(), screen)
 	if still.State != send.StatePending || still.Pending != halfTyped {
 		t.Fatalf("after the refusal the composer holds %q (%s), want exactly %q untouched", still.Pending, still.State, halfTyped)
 	}
@@ -186,7 +187,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 
 	// (c) A slash command: the completion popup swallows an enter sent too
 	// soon, which is what Options.Settle's 1200ms for a `/` line is for.
-	slash, err := send.Send(ctx, deps, handle, harness.KindClaude, "/help", send.Options{})
+	slash, err := send.Send(ctx, deps, handle, claude.KindClaude, "/help", send.Options{})
 	logReport(t, "case c", slash)
 	if err != nil {
 		t.Fatalf("Send of a slash command: %v", err)

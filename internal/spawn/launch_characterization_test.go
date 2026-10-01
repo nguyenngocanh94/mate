@@ -17,6 +17,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -61,8 +63,8 @@ func newLaunchFixture(t *testing.T, crew bool, env map[string]string) *launchFix
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv(harness.CodexHomeEnv, codexHome)
-	t.Setenv(harness.ClaudeConfigDirEnv, "")
+	t.Setenv(codex.CodexHomeEnv, codexHome)
+	t.Setenv(claude.ClaudeConfigDirEnv, "")
 	t.Setenv(config.EnvLive, "")
 	for k, v := range env {
 		t.Setenv(k, v)
@@ -412,17 +414,17 @@ func TestLaunchCharacterizationMate(t *testing.T) {
 	cases := []mateCase{
 		// The Mate profile defaults (opus, medium) are filled by the Claude
 		// adapter when the project says nothing.
-		{name: "mate-claude-fresh-default", kind: harness.KindClaude},
-		{name: "mate-claude-fresh-model-effort", kind: harness.KindClaude, mate: store.MateConfig{Model: "sonnet", Effort: "high"}},
-		{name: "mate-claude-fresh-effort-only", kind: harness.KindClaude, mate: store.MateConfig{Effort: "max"}},
+		{name: "mate-claude-fresh-default", kind: claude.KindClaude},
+		{name: "mate-claude-fresh-model-effort", kind: claude.KindClaude, mate: store.MateConfig{Model: "sonnet", Effort: "high"}},
+		{name: "mate-claude-fresh-effort-only", kind: claude.KindClaude, mate: store.MateConfig{Effort: "max"}},
 		// CLAUDE_CONFIG_DIR set: the launch assigns it instead of unsetting it.
-		{name: "mate-claude-fresh-config-dir", kind: harness.KindClaude, env: map[string]string{harness.ClaudeConfigDirEnv: "dir"}},
-		{name: "mate-claude-resume", kind: harness.KindClaude, resume: true},
-		{name: "mate-codex-fresh-default", kind: harness.KindCodex},
-		{name: "mate-codex-fresh-model-effort", kind: harness.KindCodex, mate: store.MateConfig{Model: "gpt-5.5", Effort: "high"}},
+		{name: "mate-claude-fresh-config-dir", kind: claude.KindClaude, env: map[string]string{claude.ClaudeConfigDirEnv: "dir"}},
+		{name: "mate-claude-resume", kind: claude.KindClaude, resume: true},
+		{name: "mate-codex-fresh-default", kind: codex.KindCodex},
+		{name: "mate-codex-fresh-model-effort", kind: codex.KindCodex, mate: store.MateConfig{Model: "gpt-5.5", Effort: "high"}},
 		// Codex does not take max: recorded, left out of the argv.
-		{name: "mate-codex-fresh-effort-omitted", kind: harness.KindCodex, mate: store.MateConfig{Effort: "max"}},
-		{name: "mate-codex-resume", kind: harness.KindCodex, resume: true},
+		{name: "mate-codex-fresh-effort-omitted", kind: codex.KindCodex, mate: store.MateConfig{Effort: "max"}},
+		{name: "mate-codex-resume", kind: codex.KindCodex, resume: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -452,7 +454,7 @@ func TestLaunchCharacterizationMate(t *testing.T) {
 				t.Fatalf("StartMate: %v", err)
 			}
 			if tc.resume {
-				if tc.kind == harness.KindCodex {
+				if tc.kind == codex.KindCodex {
 					setSessionRef(t, f.rt, f.w, res.Agent, codexSessionA)
 					writeCodexRollout(t, f.codexSessions, codexSessionA, f.w.MateDir("shop"), f.deps.Now())
 				}
@@ -486,14 +488,14 @@ type crewCase struct {
 
 func TestLaunchCharacterizationCrew(t *testing.T) {
 	cases := []crewCase{
-		{name: "crew-claude-default", kind: harness.KindClaude},
-		{name: "crew-claude-model-effort", kind: harness.KindClaude, model: "sonnet", effort: harness.EffortMax},
-		{name: "crew-claude-config-dir", kind: harness.KindClaude, env: map[string]string{harness.ClaudeConfigDirEnv: "dir"}},
-		{name: "crew-claude-relaunch", kind: harness.KindClaude, model: "sonnet", effort: harness.EffortHigh, relaunch: true},
-		{name: "crew-codex-default", kind: harness.KindCodex},
-		{name: "crew-codex-model-effort", kind: harness.KindCodex, model: "gpt-5.5", effort: harness.EffortHigh},
-		{name: "crew-codex-effort-omitted", kind: harness.KindCodex, effort: harness.EffortMax},
-		{name: "crew-codex-relaunch", kind: harness.KindCodex, model: "gpt-5.5", effort: harness.EffortLow, relaunch: true},
+		{name: "crew-claude-default", kind: claude.KindClaude},
+		{name: "crew-claude-model-effort", kind: claude.KindClaude, model: "sonnet", effort: harness.EffortMax},
+		{name: "crew-claude-config-dir", kind: claude.KindClaude, env: map[string]string{claude.ClaudeConfigDirEnv: "dir"}},
+		{name: "crew-claude-relaunch", kind: claude.KindClaude, model: "sonnet", effort: harness.EffortHigh, relaunch: true},
+		{name: "crew-codex-default", kind: codex.KindCodex},
+		{name: "crew-codex-model-effort", kind: codex.KindCodex, model: "gpt-5.5", effort: harness.EffortHigh},
+		{name: "crew-codex-effort-omitted", kind: codex.KindCodex, effort: harness.EffortMax},
+		{name: "crew-codex-relaunch", kind: codex.KindCodex, model: "gpt-5.5", effort: harness.EffortLow, relaunch: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -15,7 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
-	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -66,7 +67,7 @@ func liveLabSession(t *testing.T) (session, home string) {
 		t.Fatal("HOME is required to resolve the Herdr socket; do not use XDG_CONFIG_HOME for lab isolation")
 	}
 	// Every live test that reaches a lab session runs Codex in a lab
-	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codex/codexlab).
 	codexlab.Home(t)
 	home = filepath.Join(userHome, ".config")
 	return session, home
@@ -203,15 +204,15 @@ func TestLiveHerdrSessionWorkspaceTabStart(t *testing.T) {
 	// A Crew-shaped launch takes its --settings from <state>/settings.json,
 	// which is settingsPath; the file written above stands in for the one
 	// Prepare names, so prep.Files is not written.
-	prep, err := harness.Claude{}.Prepare(ctx, harness.PrepareRequest{
+	prep, err := claude.Claude{}.Prepare(ctx, harness.PrepareRequest{
 		Role: harness.RoleCrew, Cwd: cwd, StateDir: filepath.Dir(settingsPath), ContextPath: ctxPath,
 		NewSessionID: func() string { return sessionID },
 	})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
-		Kind:        harness.KindClaude,
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind:        claude.KindClaude,
 		Cwd:         cwd,
 		ContextPath: prep.ContextPath,
 		Launch:      prep.Launch,
@@ -612,8 +613,8 @@ func startLiveProbe(t *testing.T, ctx context.Context, rt *runtime.Herdr, sessio
 	if err := os.WriteFile(ctxPath, []byte("you are a gomate G4-05 live probe."), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{
-		Kind: harness.KindClaude, Cwd: tab.Cwd, ContextPath: ctxPath,
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{
+		Kind: claude.KindClaude, Cwd: tab.Cwd, ContextPath: ctxPath,
 	})
 	if err != nil {
 		t.Fatal(err)

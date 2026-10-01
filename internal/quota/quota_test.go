@@ -12,6 +12,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 )
 
@@ -27,24 +29,24 @@ func TestParseARealSchema5Snapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	codex, claude := rs[0], rs[1]
-	if codex.Harness != harness.KindCodex || !codex.Known || codex.PercentLeft != 93 || codex.SpendPriority != nil || codex.Runway != RunwayUnknown {
-		t.Fatalf("codex = %+v", codex)
+	codexReading, claudeReading := rs[0], rs[1]
+	if codexReading.Harness != codex.KindCodex || !codexReading.Known || codexReading.PercentLeft != 93 || codexReading.SpendPriority != nil || codexReading.Runway != RunwayUnknown {
+		t.Fatalf("codex = %+v", codexReading)
 	}
-	if claude.Harness != harness.KindClaude || claude.Known || claude.Status != "auth_required" || claude.Remedy != "quota-axi --allow-keychain-prompt" {
-		t.Fatalf("claude = %+v", claude)
+	if claudeReading.Harness != claude.KindClaude || claudeReading.Known || claudeReading.Status != "auth_required" || claudeReading.Remedy != "quota-axi --allow-keychain-prompt" {
+		t.Fatalf("claude = %+v", claudeReading)
 	}
-	if !strings.Contains(codex.Line(), "93% left · spendPriority unknown · runway unknown") {
-		t.Fatalf("codex line = %q", codex.Line())
+	if !strings.Contains(codexReading.Line(), "93% left · spendPriority unknown · runway unknown") {
+		t.Fatalf("codex line = %q", codexReading.Line())
 	}
 	if _, why, ok := (Snapshot{Readings: rs}).Favoured(); ok || !strings.Contains(why, "no harness") {
 		t.Fatalf("an unknown spendPriority was ranked: %q", why)
 	}
-	if !claude.Eligible() {
+	if !claudeReading.Eligible() {
 		t.Fatal("an unmeasured harness was gated out; unknown is disclosed, never blocking")
 	}
-	if !strings.Contains(claude.Line(), "unknown (auth_required)") || !strings.Contains(claude.Line(), "quota-axi --allow-keychain-prompt") {
-		t.Fatalf("claude line = %q", claude.Line())
+	if !strings.Contains(claudeReading.Line(), "unknown (auth_required)") || !strings.Contains(claudeReading.Line(), "quota-axi --allow-keychain-prompt") {
+		t.Fatalf("claude line = %q", claudeReading.Line())
 	}
 }
 
@@ -120,28 +122,28 @@ func TestFavouredRanksOnlyEligibleKnownHarnesses(t *testing.T) {
 		ok   bool
 	}{
 		{"higher wins", []Reading{
-			{Harness: harness.KindCodex, Known: true, PercentLeft: 50, SpendPriority: f(1.5), Runway: RunwayThroughReset},
-			{Harness: harness.KindClaude, Known: true, PercentLeft: 90, SpendPriority: f(0.3), Runway: RunwayThroughReset},
-		}, harness.KindCodex, true},
+			{Harness: codex.KindCodex, Known: true, PercentLeft: 50, SpendPriority: f(1.5), Runway: RunwayThroughReset},
+			{Harness: claude.KindClaude, Known: true, PercentLeft: 90, SpendPriority: f(0.3), Runway: RunwayThroughReset},
+		}, codex.KindCodex, true},
 		{"exhausted is gated", []Reading{
-			{Harness: harness.KindCodex, Known: true, PercentLeft: 50, SpendPriority: f(9), Runway: RunwayExhausted},
-			{Harness: harness.KindClaude, Known: true, PercentLeft: 90, SpendPriority: f(-1), Runway: RunwayThroughReset},
-		}, harness.KindClaude, true},
+			{Harness: codex.KindCodex, Known: true, PercentLeft: 50, SpendPriority: f(9), Runway: RunwayExhausted},
+			{Harness: claude.KindClaude, Known: true, PercentLeft: 90, SpendPriority: f(-1), Runway: RunwayThroughReset},
+		}, claude.KindClaude, true},
 		{"zero left is gated", []Reading{
-			{Harness: harness.KindCodex, Known: true, PercentLeft: 0, SpendPriority: f(9), Runway: RunwayUnknown},
-			{Harness: harness.KindClaude, Known: true, PercentLeft: 10, SpendPriority: f(-1), Runway: RunwayUnknown},
-		}, harness.KindClaude, true},
+			{Harness: codex.KindCodex, Known: true, PercentLeft: 0, SpendPriority: f(9), Runway: RunwayUnknown},
+			{Harness: claude.KindClaude, Known: true, PercentLeft: 10, SpendPriority: f(-1), Runway: RunwayUnknown},
+		}, claude.KindClaude, true},
 		{"known beats unknown", []Reading{
-			{Harness: harness.KindCodex, Known: true, PercentLeft: 20, SpendPriority: f(-0.5), Runway: RunwayProjected},
-			{Harness: harness.KindClaude, PercentLeft: -1, Runway: RunwayUnknown, Status: "auth_required"},
-		}, harness.KindCodex, true},
+			{Harness: codex.KindCodex, Known: true, PercentLeft: 20, SpendPriority: f(-0.5), Runway: RunwayProjected},
+			{Harness: claude.KindClaude, PercentLeft: -1, Runway: RunwayUnknown, Status: "auth_required"},
+		}, codex.KindCodex, true},
 		{"tie favours none", []Reading{
-			{Harness: harness.KindCodex, Known: true, PercentLeft: 20, SpendPriority: f(1), Runway: RunwayThroughReset},
-			{Harness: harness.KindClaude, Known: true, PercentLeft: 20, SpendPriority: f(1), Runway: RunwayThroughReset},
+			{Harness: codex.KindCodex, Known: true, PercentLeft: 20, SpendPriority: f(1), Runway: RunwayThroughReset},
+			{Harness: claude.KindClaude, Known: true, PercentLeft: 20, SpendPriority: f(1), Runway: RunwayThroughReset},
 		}, "", false},
 		{"nothing known", []Reading{
-			{Harness: harness.KindCodex, PercentLeft: -1, Runway: RunwayUnknown},
-			{Harness: harness.KindClaude, PercentLeft: -1, Runway: RunwayUnknown},
+			{Harness: codex.KindCodex, PercentLeft: -1, Runway: RunwayUnknown},
+			{Harness: claude.KindClaude, PercentLeft: -1, Runway: RunwayUnknown},
 		}, "", false},
 	} {
 		got, _, ok := Snapshot{Readings: tc.rs}.Favoured()
@@ -208,7 +210,7 @@ func TestReadReportsMissingAndOldQuotaAxi(t *testing.T) {
 
 // unmeasured is a harness that names no quota-axi row: its provider follows
 // the model, not the harness.
-type unmeasured struct{ harness.Codex }
+type unmeasured struct{ codex.Codex }
 
 func (unmeasured) Kind() harness.Kind { return "unmeasured" }
 
@@ -222,8 +224,8 @@ func (u unmeasured) Capabilities() harness.Capabilities {
 // (plan section 3.7): it passes the gate, is never favoured on a number it
 // does not have, and the line says the reading is an assumption and why.
 func TestAHarnessWithNoQuotaRowIsAssumedFull(t *testing.T) {
-	reg, err := harness.NewRegistry(map[harness.AgentRole]harness.Kind{harness.RoleCrew: harness.KindCodex},
-		harness.Claude{}, harness.Codex{}, unmeasured{})
+	reg, err := harness.NewRegistry(map[harness.AgentRole]harness.Kind{harness.RoleCrew: codex.KindCodex},
+		claude.Claude{}, codex.Codex{}, unmeasured{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +237,7 @@ func TestAHarnessWithNoQuotaRowIsAssumedFull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rs) != 3 || rs[0].Harness != harness.KindCodex || rs[1].Harness != harness.KindClaude {
+	if len(rs) != 3 || rs[0].Harness != codex.KindCodex || rs[1].Harness != claude.KindClaude {
 		t.Fatalf("readings = %+v, want codex, claude, then the unmeasured harness", rs)
 	}
 	r := rs[2]

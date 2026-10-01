@@ -10,6 +10,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
@@ -165,7 +167,7 @@ func TestMateClaudeIsLocatedFromItsSessionIDWhenTheHookHasNotWrittenThePath(t *t
 	f := newFixture(t)
 	const sessionID = "8414030c-5d90-4925-94cc-c94e12aae4a9"
 	projects := filepath.Join(f.root, "claude-projects")
-	slug := harness.ClaudeProjectSlug(f.ws.MateDir(fixtureProject))
+	slug := claude.ClaudeProjectSlug(f.ws.MateDir(fixtureProject))
 	dir := filepath.Join(projects, slug)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -219,7 +221,7 @@ func TestRelaunchedClaudeCrewIsLocatedInItsNewSession(t *testing.T) {
 
 	// The relaunch: a new session id, no transcript yet, a later launch.
 	cwd := filepath.Join(f.ws.Root(), ".worktrees", "shop-buybtn")
-	newPath := harness.ClaudeTranscriptPath(projects, cwd, newSession)
+	newPath := claude.ClaudeTranscriptPath(projects, cwd, newSession)
 	if err := os.MkdirAll(filepath.Dir(newPath), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -451,7 +453,7 @@ func TestHealthIsRecordedOnlyWhenTheComposerChanges(t *testing.T) {
 
 // unobserved is a registered harness that declares no transcript it can
 // read.
-type unobserved struct{ harness.Codex }
+type unobserved struct{ codex.Codex }
 
 func (unobserved) Kind() harness.Kind { return "unobserved" }
 
@@ -466,7 +468,7 @@ func (u unobserved) Capabilities() harness.Capabilities {
 // even though its meta names a file the Codex harness could read.
 func TestAHarnessWithNoTranscriptIsUnobservedNotGuessed(t *testing.T) {
 	f := newFixture(t)
-	reg, err := harness.NewRegistry(nil, harness.Claude{}, harness.Codex{}, unobserved{})
+	reg, err := harness.NewRegistry(nil, claude.Claude{}, codex.Codex{}, unobserved{})
 	if err != nil {
 		t.Fatal(err)
 	}

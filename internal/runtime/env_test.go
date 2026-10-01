@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
@@ -85,8 +86,8 @@ func TestPaneEnvCopiesLaunchSpecEnv(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
-		Kind:        harness.KindClaude,
+	launch, err := claude.Claude{}.Build(context.Background(), harness.AgentSpec{
+		Kind:        claude.KindClaude,
 		Cwd:         cwd,
 		ContextPath: path,
 		Env: []harness.EnvVar{
@@ -119,8 +120,8 @@ func TestPaneEnvRefusesUnknownLaunchEnv(t *testing.T) {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
-		Kind:        harness.KindClaude,
+	_, err := claude.Claude{}.Build(context.Background(), harness.AgentSpec{
+		Kind:        claude.KindClaude,
 		Cwd:         cwd,
 		ContextPath: path,
 		Env:         []harness.EnvVar{{Key: "SECRET", Value: "nope"}},

@@ -7,6 +7,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -38,7 +40,7 @@ func TestStartMateInjectsTheMateCallerIntoItsPane(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{
-		Project: "shop", Harness: harness.KindClaude,
+		Project: "shop", Harness: claude.KindClaude,
 	})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
@@ -80,10 +82,10 @@ func TestSpawnCrewInjectsTheCrewCallerIntoItsPane(t *testing.T) {
 // CODEX_HOME. Both harnesses: a Claude Mate's `crew spawn` launches Codex
 // Crews too.
 func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
-	for _, kind := range []harness.Kind{harness.KindClaude, harness.KindCodex} {
+	for _, kind := range []harness.Kind{claude.KindClaude, codex.KindCodex} {
 		t.Run(string(kind), func(t *testing.T) {
 			home := t.TempDir()
-			t.Setenv(harness.CodexHomeEnv, home)
+			t.Setenv(codex.CodexHomeEnv, home)
 			w := newWorkspace(t, "shop")
 			rt := runtime.NewFake()
 			deps := fakeDeps(t, rt)
@@ -96,16 +98,16 @@ func TestStartMateCarriesItsEnvironmentOnEveryLaunch(t *testing.T) {
 				env[v.Key] = v.Value
 			}
 			for key, want := range map[string]string{
-				config.EnvCaller:     spawn.CallerMate,
-				config.EnvAgentRole:  string(harness.RoleMate),
-				config.EnvProjectID:  "shop",
-				harness.CodexHomeEnv: home,
+				config.EnvCaller:    spawn.CallerMate,
+				config.EnvAgentRole: string(harness.RoleMate),
+				config.EnvProjectID: "shop",
+				codex.CodexHomeEnv:  home,
 			} {
 				if env[key] != want {
 					t.Fatalf("the %s Mate's launch exports %s=%q, want %q (all: %v)", kind, key, env[key], want, env)
 				}
 			}
-			if got := paneEnv(t, rt, res.Pane)[harness.CodexHomeEnv]; got != home {
+			if got := paneEnv(t, rt, res.Pane)[codex.CodexHomeEnv]; got != home {
 				t.Fatalf("the workspace create gave the Mate pane CODEX_HOME=%q, want %q", got, home)
 			}
 		})
@@ -125,11 +127,11 @@ func TestOutboxReadsTheTranscriptKeySpawnWrites(t *testing.T) {
 // Crew the Mate spawns.
 func TestStartMateRefusesTheOperatorsCodexHomeInALiveRun(t *testing.T) {
 	t.Setenv(config.EnvLive, "1")
-	t.Setenv(harness.CodexHomeEnv, "")
+	t.Setenv(codex.CodexHomeEnv, "")
 	w := newWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err == nil {
 		t.Fatal("a live run started a Mate whose pane carries the operator's CODEX_HOME")
 	}

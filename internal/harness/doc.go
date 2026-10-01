@@ -3,6 +3,11 @@
 // Launcher prepares a launch's files and builds its LaunchSpec (launch.go),
 // and never writes a file or forks the harness process.
 //
+// Each harness lives in a package of its own below this one
+// (internal/harness/claude, internal/harness/codex), and only
+// internal/harness/catalog names them all. This package imports none of
+// them; they import it.
+//
 // For callers outside this package, NewLaunchSpec is the only way to obtain
 // a startable LaunchSpec, and it refuses to return one whose required
 // context would be silently dropped. Inside the package a startable-shaped

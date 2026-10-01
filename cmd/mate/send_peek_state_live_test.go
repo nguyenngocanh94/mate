@@ -11,6 +11,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -81,7 +82,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 	res, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project: "shop",
 		Crew:    "k3",
-		Harness: harness.KindCodex,
+		Harness: codex.KindCodex,
 		BriefText: brieftest.Ship(`Append needs-decision: pick A or B to the status file and stop. ` +
 			`When the Mate answers, append wait-mate: chose <answer> and stop.`),
 	})
@@ -102,7 +103,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    res.Agent,
 		RawID:   "k3",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 	}
 	needsDecision := waitForStatusLine(t, ctx, w, "needs-decision:", 120*time.Second, func() string {
 		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)

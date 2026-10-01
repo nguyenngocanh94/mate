@@ -13,7 +13,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/dashboard"
 	"github.com/nguyenngocanh94/mate/internal/db"
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -89,7 +89,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 		Tab: runtime.TabHandle{
 			Session:     runtime.SessionHandle{Name: session, ConfigHome: configHome},
 			WorkspaceID: started.Workspace,
@@ -111,7 +111,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 			Label:       "mate",
 		},
 	}
-	if _, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{}); err != nil {
+	if _, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, claude.KindClaude, acceptanceRequest, send.Options{}); err != nil {
 		t.Fatalf("send the captain's request: %v", err)
 	}
 

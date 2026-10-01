@@ -21,9 +21,12 @@ import (
 // section 4). It may only go down: plan PRs 1-6 move that knowledge behind
 // the registry, and PR 6 brings it to zero outside the allowlist.
 //
-// Two kinds of reference are counted, in every non-test .go file of the
+// Three kinds of reference are counted, in every non-test .go file of the
 // module outside internal/harness/...:
 //
+//   - import: an import of a harness's own package (internal/harness/claude,
+//     internal/harness/codex/codexlab), which is named after its kind; each
+//     use of such a package is an identifier too.
 //   - identifier: a use of an exported identifier of package harness whose
 //     name carries a harness name as a camel-case word (harness.KindCodex,
 //     harness.Claude{}, harness.CodexRolloutPath, and fields or methods such
@@ -146,8 +149,8 @@ func TestHarnessNameRatchet(t *testing.T) {
 	}
 	sort.Strings(pkgs)
 	var breakdown strings.Builder
-	fmt.Fprintf(&breakdown, "harness ratchet: %d references outside internal/harness (%d identifier, %d literal; ceiling %d)\n",
-		len(hits), byKind["identifier"], byKind["literal"], harnessRatchetCeiling)
+	fmt.Fprintf(&breakdown, "harness ratchet: %d references outside internal/harness (%d import, %d identifier, %d literal; ceiling %d)\n",
+		len(hits), byKind["import"], byKind["identifier"], byKind["literal"], harnessRatchetCeiling)
 	for _, p := range pkgs {
 		fmt.Fprintf(&breakdown, "  %-28s %d\n", p, byPkg[p])
 	}
@@ -334,19 +337,38 @@ func scanRatchetFile(t *testing.T, root, path string, top, members map[string]bo
 	}
 	rel = filepath.ToSlash(rel)
 
+	var hits []ratchetHit
+	add := func(pos token.Pos, kind, what, decl string) {
+		hits = append(hits, ratchetHit{file: rel, line: fset.Position(pos).Line, kind: kind, what: what, decl: decl})
+	}
+
 	pkgName := ""
+	// kindPkgs are the names this file gives the harness packages it
+	// imports.
+	kindPkgs := map[string]bool{}
 	for _, imp := range f.Imports {
-		if p, _ := strconv.Unquote(imp.Path.Value); p == harnessImportPath {
+		p, _ := strconv.Unquote(imp.Path.Value)
+		if p == harnessImportPath {
 			pkgName = "harness"
 			if imp.Name != nil {
 				pkgName = imp.Name.Name
 			}
+			continue
 		}
-	}
-
-	var hits []ratchetHit
-	add := func(pos token.Pos, kind, what, decl string) {
-		hits = append(hits, ratchetHit{file: rel, line: fset.Position(pos).Line, kind: kind, what: what, decl: decl})
+		sub, ok := strings.CutPrefix(p, harnessImportPath+"/")
+		if !ok {
+			continue
+		}
+		kind, _, _ := strings.Cut(sub, "/")
+		if !namesAHarness(kind, ratchetKinds) {
+			continue
+		}
+		add(imp.Pos(), "import", strconv.Quote(p), "import")
+		name := filepath.Base(p)
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		kindPkgs[name] = true
 	}
 	for _, d := range f.Decls {
 		if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
@@ -367,6 +389,10 @@ func scanRatchetFile(t *testing.T, root, path string, top, members map[string]bo
 					add(n.Pos(), "literal", strconv.Quote(name), decl)
 				}
 			case *ast.SelectorExpr:
+				if x, ok := n.X.(*ast.Ident); ok && kindPkgs[x.Name] {
+					add(n.Pos(), "identifier", x.Name+"."+n.Sel.Name, decl)
+					return true
+				}
 				if pkgName == "" {
 					return true
 				}
@@ -486,6 +512,47 @@ func ratchetAllowed(h ratchetHit) int {
 
 // TestRatchetLiteralMatchingIsWholeToken pins the matching rule the ratchet
 // depends on: a name counts as a whole token, never as a substring.
+// A harness's own package is knowledge of that harness: importing it is
+// counted, and so is every use of it, under whatever name the file gives
+// it. The core, its test helpers and the catalog are not harness packages.
+func TestRatchetCountsAHarnessPackage(t *testing.T) {
+	root := t.TempDir()
+	src := `package x
+
+import (
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
+	cc "github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"
+)
+
+var (
+	_ harness.Kind = cc.KindClaude
+	_              = codexlab.Home
+	_              = catalog.Default
+	_              = harnesstest.ReadingVisible
+)
+`
+	path := filepath.Join(root, "x.go")
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, h := range scanRatchetFile(t, root, path, map[string]bool{}, map[string]bool{}) {
+		got = append(got, h.kind+" "+h.what)
+	}
+	want := []string{
+		`import "github.com/nguyenngocanh94/mate/internal/harness/claude"`,
+		`import "github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"`,
+		"identifier cc.KindClaude",
+		"identifier codexlab.Home",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("hits:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 func TestRatchetLiteralMatchingIsWholeToken(t *testing.T) {
 	for _, tc := range []struct {
 		in   string

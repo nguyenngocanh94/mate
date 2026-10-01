@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/watch"
@@ -67,13 +68,13 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: harness.Codex{}.Screen()}
+	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: codex.Codex{}.Screen()}
 	f.ws = newWorkspace(t)
 	f.handle = runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "mate-lab"},
 		Name:    "crew-k3",
 		RawID:   "k3",
-		Kind:    harness.KindCodex,
+		Kind:    codex.KindCodex,
 		Tab:     runtime.TabHandle{PaneID: "pane-k3"},
 	}
 	f.recordCrew("k3")

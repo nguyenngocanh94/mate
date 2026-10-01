@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -91,16 +93,16 @@ func TestSessionHookFitsWhatEachHarnessReads(t *testing.T) {
 	}
 	writeFixture(t, w.MemoryFile("shop"), big.String())
 
-	claude, _ := runMateSession(t, w, `{"source":"startup"}`)
-	if len(claude) > harness.ClaudeSessionHookMaxBytes {
-		t.Fatalf("the Claude digest is %d bytes, over %d", len(claude), harness.ClaudeSessionHookMaxBytes)
+	claudeDigest, _ := runMateSession(t, w, `{"source":"startup"}`)
+	if len(claudeDigest) > claude.ClaudeSessionHookMaxBytes {
+		t.Fatalf("the Claude digest is %d bytes, over %d", len(claudeDigest), claude.ClaudeSessionHookMaxBytes)
 	}
-	if !strings.Contains(claude, "== 1. Live state ==") || !strings.Contains(claude, "recall cut to fit 9500 bytes; not shown: ") {
-		t.Fatalf("the cut Claude digest lost part 1 or its notice:\n%s", claude)
+	if !strings.Contains(claudeDigest, "== 1. Live state ==") || !strings.Contains(claudeDigest, "recall cut to fit 9500 bytes; not shown: ") {
+		t.Fatalf("the cut Claude digest lost part 1 or its notice:\n%s", claudeDigest)
 	}
-	codex, _ := runMateSession(t, w, `{"source":"startup"}`, "--harness", "codex")
-	if strings.Contains(codex, "recall cut to fit") || len(partHeadings(codex)) != 7 {
-		t.Fatalf("the Codex digest (%d bytes) was cut", len(codex))
+	codexDigest, _ := runMateSession(t, w, `{"source":"startup"}`, "--harness", "codex")
+	if strings.Contains(codexDigest, "recall cut to fit") || len(partHeadings(codexDigest)) != 7 {
+		t.Fatalf("the Codex digest (%d bytes) was cut", len(codexDigest))
 	}
 }
 
@@ -113,7 +115,7 @@ func TestSessionHookRefusesAnUnknownHarness(t *testing.T) {
 }
 
 // codexWithoutHooks is Codex declaring no hooks.
-type codexWithoutHooks struct{ harness.Codex }
+type codexWithoutHooks struct{ codex.Codex }
 
 func (c codexWithoutHooks) Capabilities() harness.Capabilities {
 	caps := c.Codex.Capabilities()

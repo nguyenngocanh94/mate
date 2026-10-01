@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -33,7 +33,7 @@ func TestSendHappyPathAppendsToSentLog(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeSpawnDeps(t, rt)
 	res := spawnFakeCrew(t, w, deps, "shop", "k3")
-	if res.Harness != harness.KindCodex {
+	if res.Harness != codex.KindCodex {
 		t.Fatalf("harness = %q, want codex (the crew default)", res.Harness)
 	}
 	handle := runtime.AgentHandle{Session: runtime.SessionHandle{Name: res.Session}, Name: res.Agent}

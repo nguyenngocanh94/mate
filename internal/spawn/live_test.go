@@ -12,7 +12,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
-	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -50,7 +51,7 @@ func liveLabSession(t *testing.T) (session, configHome string) {
 		t.Fatal("HOME is required to resolve the Herdr socket")
 	}
 	// Every live test that reaches a lab session runs Codex in a lab
-	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codexlab).
+	// CODEX_HOME, never the operator's ~/.codex (internal/harness/codex/codexlab).
 	codexlab.Home(t)
 	return session, filepath.Join(home, ".config")
 }
@@ -115,7 +116,7 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -134,14 +135,14 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
 		Name:    started.Agent,
 		RawID:   "shop",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 	}
 	pane, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 	if err != nil {
 		t.Fatalf("ReadAgent: %v", err)
 	}
 	t.Logf("pane after start:\n%s", harness.StartupScreenTail(pane, 12))
-	class := harness.Claude{}.Screen().ClassifyStartup(pane)
+	class := claude.Claude{}.Screen().ClassifyStartup(pane)
 	if class != harness.StartupScreenReady {
 		t.Fatalf("pane classifies as %q, want the Claude composer", class)
 	}

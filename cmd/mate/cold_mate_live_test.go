@@ -10,6 +10,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -110,7 +112,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project: "shop",
 		Crew:    "k3",
-		Harness: harness.KindCodex,
+		Harness: codex.KindCodex,
 		BriefText: brieftest.Ship(`Append needs-decision: pick A or B to the status file and stop; ` +
 			`when answered, append wait-mate: chose <answer>`),
 	})
@@ -121,7 +123,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 
 	crewHandle := runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
-		Name:    crewRes.Agent, RawID: "k3", Kind: harness.KindCodex,
+		Name:    crewRes.Agent, RawID: "k3", Kind: codex.KindCodex,
 	}
 	crewTail := func() string {
 		screen, readErr := rt.ReadAgent(ctx, crewHandle, harness.ReadRecentUnwrapped, send.DefaultLines)
@@ -228,7 +230,7 @@ func waitForStreamComposer(t *testing.T, ctx context.Context, channel runtime.Se
 	t.Helper()
 	var seen strings.Builder
 	deadline := time.Now().Add(within)
-	for !strings.Contains(seen.String(), harness.ClaudeComposerMarker) {
+	for !strings.Contains(seen.String(), claude.ClaudeComposerMarker) {
 		if time.Now().After(deadline) {
 			t.Fatalf("Claude's composer glyph never arrived in the stream within %s; last bytes:\n%s",
 				within, harness.StartupScreenTail(seen.String(), 12))

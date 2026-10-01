@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -77,7 +78,7 @@ func TestLiveMateRecallOnCompact(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	lab := newLiveLab(t)
 	// liveLabSession gave this test a lab CODEX_HOME (codexlab.Home), and
 	// StartMate pins it into the Mate's pane on every launch.
-	home, err := harness.LaunchCodexHome("")
+	home, err := codex.LaunchCodexHome("")
 	if err != nil {
 		t.Fatalf("no lab CODEX_HOME: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	defer cancel()
 
 	seedCanary(t, lab.w.MemoryFile("shop"), "HERON-EAST")
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 		}
 	}
 	rollout := readMeta(t, lab.w, "shop")[spawn.MetaTranscript]
-	if p, ok := harness.CodexRolloutPath(sessions, id); !ok || p != rollout {
+	if p, ok := codex.CodexRolloutPath(sessions, id); !ok || p != rollout {
 		t.Fatalf("mate.meta transcript %q, rollout for %s %q (found %v)", rollout, id, p, ok)
 	}
 	answer := waitCodexAnswer(t, rollout, 0, 3*time.Minute)
@@ -169,8 +170,8 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(cfg), `[hooks.state."`+harness.CodexHooksPath(mateDir)+`:session_start:`) {
-		t.Fatalf("the lab config.toml records no trust for %s:\n%s", harness.CodexHooksPath(mateDir), cfg)
+	if !strings.Contains(string(cfg), `[hooks.state."`+codex.CodexHooksPath(mateDir)+`:session_start:`) {
+		t.Fatalf("the lab config.toml records no trust for %s:\n%s", codex.CodexHooksPath(mateDir), cfg)
 	}
 
 	// /compact: the hook runs again at the next prompt with the digest as

@@ -9,6 +9,8 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 )
 
 func writeTable(t *testing.T, body string) string {
@@ -41,10 +43,10 @@ func TestLoadReadsFirstmatesSchema(t *testing.T) {
 	if len(tbl.Rules) != 2 || tbl.Rules[0].Why != "cheap and fast" || len(tbl.Rules[1].Use) != 2 {
 		t.Fatalf("rules = %+v", tbl.Rules)
 	}
-	if got := tbl.Rules[0].Use[0]; got != (Profile{Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow}) {
+	if got := tbl.Rules[0].Use[0]; got != (Profile{Harness: claude.KindClaude, Model: "haiku", Effort: harness.EffortLow}) {
 		t.Fatalf("first profile = %+v", got)
 	}
-	if len(tbl.Default) != 1 || tbl.Default[0].Harness != harness.KindCodex || tbl.Default[0].Model != "" {
+	if len(tbl.Default) != 1 || tbl.Default[0].Harness != codex.KindCodex || tbl.Default[0].Model != "" {
 		t.Fatalf("default = %+v", tbl.Default)
 	}
 }
@@ -85,11 +87,11 @@ func TestLoadRefusesAMalformedTable(t *testing.T) {
 }
 
 func TestProfileFlags(t *testing.T) {
-	p := Profile{Harness: harness.KindClaude, Model: "haiku", Effort: harness.EffortLow}
+	p := Profile{Harness: claude.KindClaude, Model: "haiku", Effort: harness.EffortLow}
 	if got := p.Flags(); got != "--harness claude --model haiku --effort low" {
 		t.Fatalf("flags = %q", got)
 	}
-	if got := (Profile{Harness: harness.KindCodex}).Flags(); got != "--harness codex" {
+	if got := (Profile{Harness: codex.KindCodex}).Flags(); got != "--harness codex" {
 		t.Fatalf("flags = %q", got)
 	}
 }
@@ -134,7 +136,7 @@ func TestTheBuiltInTableIsTheCaptains(t *testing.T) {
 // A harness is known when it is registered: the same table is refused by a
 // registry that lacks one of its harnesses, the built-in one included.
 func TestTablesAreCheckedAgainstTheRegistry(t *testing.T) {
-	onlyCodex, err := harness.NewRegistry(nil, harness.Codex{})
+	onlyCodex, err := harness.NewRegistry(nil, codex.Codex{})
 	if err != nil {
 		t.Fatal(err)
 	}

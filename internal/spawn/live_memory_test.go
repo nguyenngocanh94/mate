@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -126,12 +126,12 @@ func (l liveLab) askClaudeMate(t *testing.T, ctx context.Context, h runtime.Agen
 // remembers goes to mate/memory.md.
 func TestLiveMateAutoMemoryOff(t *testing.T) {
 	lab := newLiveLab(t)
-	projects, err := harness.ClaudeProjectsDir()
+	projects, err := claude.ClaudeProjectsDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 	mateDir := lab.w.MateDir("shop")
-	slugDir := filepath.Join(projects, harness.ClaudeProjectSlug(mateDir))
+	slugDir := filepath.Join(projects, claude.ClaudeProjectSlug(mateDir))
 	memDir := filepath.Join(slugDir, "memory")
 	// The seed lives in the operator's ~/.claude/projects only for this
 	// test's own throwaway cwd, and goes with the test.
@@ -146,7 +146,7 @@ func TestLiveMateAutoMemoryOff(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 
 	// The Mate's own settings plus a lab SessionStart hook. StartMate keeps
 	// an existing settings file, so this is what the Mate launches with.
-	base, err := harness.ClaudeSettings(lab.deps.Binary)
+	base, err := claude.ClaudeSettings(lab.deps.Binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,10 +286,10 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Dir(harness.ClaudeSettingsPath(mateDir)), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(claude.ClaudeSettingsPath(mateDir)), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(harness.ClaudeSettingsPath(mateDir), data, 0o644); err != nil {
+	if err := os.WriteFile(claude.ClaudeSettingsPath(mateDir), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -297,7 +297,7 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 	defer cancel()
 	const question = "Without running any tool or reading any file: what is the most recent session canary word in your context? Answer with that word only, or NONE."
 
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestLiveMateSessionStartHookSources(t *testing.T) {
 	if _, err := spawn.StopMate(ctx, lab.w, lab.deps, "shop"); err != nil {
 		t.Fatalf("StopMate: %v", err)
 	}
-	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude, Resume: true})
+	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate resume: %v", err)
 	}
@@ -365,7 +365,7 @@ func requireCanary(t *testing.T, answer, want string) {
 
 func sendSlash(t *testing.T, ctx context.Context, lab liveLab, h runtime.AgentHandle, cmd string) {
 	t.Helper()
-	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, harness.KindClaude, cmd, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, claude.KindClaude, cmd, send.Options{})
 	if err != nil {
 		t.Fatalf("send %s: %v (report %+v)", cmd, err, report)
 	}
@@ -385,7 +385,7 @@ func TestLiveMateResumeReloadsManual(t *testing.T) {
 	defer cancel()
 	const question = "Without running any tool or reading any file: according to your operating manual as it stands now, what is this project's default branch? Answer with the branch name only."
 
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -406,7 +406,7 @@ func TestLiveMateResumeReloadsManual(t *testing.T) {
 	if err := lab.w.SaveProject("shop", cfg); err != nil {
 		t.Fatal(err)
 	}
-	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude, Resume: true})
+	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: claude.KindClaude, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate resume: %v", err)
 	}

@@ -1,9 +1,10 @@
-// Package harnesstest wraps registered harnesses for the core tests that
-// prove a pane is read through the source its harness's ScreenProfile
-// names (docs/plans/harness-registry-2026-09-30.md, section 3.2). Claude
-// and Codex both read recent-unwrapped, so a caller that ignored the
-// profile and spelled that source itself would pass every test built on
-// them; the same screens read through ReadVisible catch it.
+// Package harnesstest holds what the tests of the harness packages share:
+// the live gate, launch fixtures (fixture.go), and wrappers of registered
+// harnesses for the core tests that prove a pane is read through the source
+// its harness's ScreenProfile names (docs/plans/harness-registry-2026-09-30.md,
+// section 3.2). Claude and Codex both read recent-unwrapped, so a caller that
+// ignored the profile and spelled that source itself would pass every test
+// built on them; the same screens read through ReadVisible catch it.
 package harnesstest
 
 import (

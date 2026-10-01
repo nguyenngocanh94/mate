@@ -11,6 +11,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -139,7 +140,7 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 	crewRes, err := spawn.SpawnCrew(ctx, w, deps, spawn.SpawnCrewRequest{
 		Project: "shop",
 		Crew:    "k3",
-		Harness: harness.KindCodex,
+		Harness: codex.KindCodex,
 		BriefText: brieftest.Ship(`Append needs-decision: pick A or B to the status file and stop; ` +
 			`when answered, append wait-mate: chose <answer>`),
 	})
@@ -149,7 +150,7 @@ func TestLiveAssignQueuesWhileTheMateIsBusy(t *testing.T) {
 	t.Logf("spawned crew %s in pane %s", crewRes.Agent, crewRes.Pane)
 	crewHandle := runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: session, ConfigHome: configHome},
-		Name:    crewRes.Agent, RawID: "k3", Kind: harness.KindCodex,
+		Name:    crewRes.Agent, RawID: "k3", Kind: codex.KindCodex,
 	}
 	crewTail := func() string {
 		screen, readErr := rt.ReadAgent(ctx, crewHandle, harness.ReadRecentUnwrapped, send.DefaultLines)

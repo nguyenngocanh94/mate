@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
@@ -67,10 +69,10 @@ func TestStartMateAnswersTheClaudeTrustDialog(t *testing.T) {
 	if len(pressedOn) != 2 {
 		t.Fatalf("recorded %d presses, want 2", len(pressedOn))
 	}
-	if selected := (harness.Claude{}).Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[0]); selected {
+	if selected := (claude.Claude{}).Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[0]); selected {
 		t.Fatal("the fixture must start with the accept option NOT selected")
 	}
-	selected := harness.Claude{}.Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[1])
+	selected := claude.Claude{}.Screen().StartupTargetSelected(harness.StartupScreenTrustDialog, pressedOn[1])
 	if !selected {
 		t.Fatal("enter was sent while the highlight was not on the accept option")
 	}
@@ -89,7 +91,7 @@ func TestStartMateAnswersTheCodexTrustDialog(t *testing.T) {
 		}
 	}
 
-	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -246,8 +248,8 @@ func TestStartMateSettlesThroughTheProfilesReadSource(t *testing.T) {
 		w := newWorkspace(t, "shop")
 		rt := runtime.NewFake()
 		deps := readingVisible(t, rt)
-		source := harness.CodexHooksPath(w.MateDir("shop"))
-		command := harness.CodexSessionHookCommand(deps.Binary)
+		source := codex.CodexHooksPath(w.MateDir("shop"))
+		command := codex.CodexSessionHookCommand(deps.Binary)
 		own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
 		newScriptedPane(t, rt,
 			scriptStep{screen: screen(t, "codex-0.156.1-hooks-review.txt"), key: "enter"},
@@ -257,7 +259,7 @@ func TestStartMateSettlesThroughTheProfilesReadSource(t *testing.T) {
 			scriptStep{screen: screen(t, "codex-0.156.1-hooks-table-trusted.txt"), key: "esc"},
 			scriptStep{screen: screen(t, "codex-0.156.1-ready.txt")},
 		)
-		res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+		res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 		if err != nil {
 			t.Fatalf("StartMate: %v", err)
 		}
@@ -284,7 +286,7 @@ func TestStartMateSkipsTheCodexUpdateDialogThenReachesTheComposer(t *testing.T) 
 		scriptStep{screen: ready},
 	)
 
-	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -301,7 +303,7 @@ func TestStartMateSkipsTheCodexUpdateDialogThenReachesTheComposer(t *testing.T) 
 	if len(on) != 3 {
 		t.Fatalf("recorded %d presses, want 3", len(on))
 	}
-	selected := harness.Codex{}.Screen().StartupTargetSelected(harness.StartupScreenUpdateDialog, on[2])
+	selected := codex.Codex{}.Screen().StartupTargetSelected(harness.StartupScreenUpdateDialog, on[2])
 	if !selected {
 		t.Fatal("enter was sent while the highlight was not on \"3. Skip until next version\"")
 	}
@@ -325,7 +327,7 @@ func TestStartMateAnswersTheUpdateDialogThenTheTrustDialog(t *testing.T) {
 		scriptStep{screen: ready},
 	)
 
-	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	res, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
@@ -345,7 +347,7 @@ func TestStartMateRefusesToConfirmAnUnmovedUpdateHighlight(t *testing.T) {
 	// cursor, so Enter would run a package install under the agent.
 	rt.NextStartupScreen = screen(t, "codex_update_dialog.txt")
 
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil {
 		t.Fatal("the start must be refused when the highlight did not move")
 	}
@@ -372,7 +374,7 @@ func TestStartMateRefusesAnUnrecognisedScreenCarryingUpdateWords(t *testing.T) {
 	deps := fakeDeps(t, rt)
 	rt.NextStartupScreen = "✨ Update available! 0.154.0 -> 0.155.0\nsomething nobody measured\n  a) yes\n  b) no\n"
 
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil {
 		t.Fatal("an unrecognised startup screen must fail the start")
 	}
@@ -401,7 +403,7 @@ func TestStartMateRefusesAnUpdateDialogItAlreadyAnswered(t *testing.T) {
 		scriptStep{screen: update},
 	)
 
-	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex})
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex})
 	if err == nil {
 		t.Fatal("a dialog still on screen after mate confirmed it must fail the start")
 	}

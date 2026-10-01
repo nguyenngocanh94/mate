@@ -4,7 +4,7 @@ import "testing"
 
 // Codex meters the raw bytes of every project instruction file it loads and
 // silently truncates the tail past `project_doc_max_bytes` (harness/
-// codexplan.go, ADR 0004 re-probed on codex-cli 0.152.1). mate refuses
+// internal/harness/codex/plan.go, ADR 0004 re-probed on codex-cli 0.152.1). mate refuses
 // rather than letting that happen, so a Mate manual that has grown past the
 // cap does not render badly - it stops `mate start --harness codex`
 // outright, with an error about metered bytes that says nothing about which

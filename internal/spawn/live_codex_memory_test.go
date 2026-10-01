@@ -14,6 +14,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -85,7 +86,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex, Resume: true})
+	started, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate (first): %v", err)
 	}
@@ -110,13 +111,13 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	sessions, err := harness.CodexSessionsDir("")
+	sessions, err := codex.CodexSessionsDir("")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var rollout string
 	for rollout == "" {
-		if p, ok := harness.CodexRolloutPath(sessions, ref); ok {
+		if p, ok := codex.CodexRolloutPath(sessions, ref); ok {
 			rollout = p
 		} else if time.Now().After(deadline) {
 			t.Fatalf("no rollout for session %s under %s", ref, sessions)
@@ -135,7 +136,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 		t.Fatalf("stop recorded session %q (meta %q), want the hook's %q", stopped.SessionID, readMeta(t, lab.w, "shop")[spawn.MetaSessionID], ref)
 	}
 
-	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: harness.KindCodex, Resume: true})
+	resumed, err := spawn.StartMate(ctx, lab.w, lab.deps, spawn.StartRequest{Project: "shop", Harness: codex.KindCodex, Resume: true})
 	if err != nil {
 		t.Fatalf("StartMate (resume): %v", err)
 	}
@@ -149,7 +150,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadAgent after resume: %v", err)
 	}
-	if class := (harness.Codex{}).Screen().ClassifyStartup(pane); class != harness.StartupScreenReady {
+	if class := (codex.Codex{}).Screen().ClassifyStartup(pane); class != harness.StartupScreenReady {
 		t.Fatalf("resumed pane classifies as %q; pane:\n%s", class, pane)
 	}
 
@@ -179,7 +180,7 @@ func TestLiveSpawnMateResumeRemembersCodex(t *testing.T) {
 // Nothing is written to the operator's ~/.codex.
 func codexLabHome(t *testing.T) (home, globalLog string) {
 	t.Helper()
-	home, err := harness.LaunchCodexHome("")
+	home, err := codex.LaunchCodexHome("")
 	if err != nil {
 		t.Fatalf("no lab CODEX_HOME: %v", err)
 	}
@@ -221,8 +222,8 @@ func codexLabAgent(t *testing.T, ctx context.Context, lab liveLab, home, cwd, re
 	if err != nil {
 		t.Fatalf("CreateAgentTab: %v", err)
 	}
-	launch, err := harness.Codex{Home: home}.Build(ctx, harness.AgentSpec{
-		ID: "codexlab", Kind: harness.KindCodex, Cwd: cwd, ResumeSessionID: resumeID,
+	launch, err := codex.Codex{Home: home}.Build(ctx, harness.AgentSpec{
+		ID: "codexlab", Kind: codex.KindCodex, Cwd: cwd, ResumeSessionID: resumeID,
 	})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -239,7 +240,7 @@ func codexLabAgent(t *testing.T, ctx context.Context, lab liveLab, home, cwd, re
 	if err != nil {
 		t.Fatalf("StartAgent: %v", err)
 	}
-	h.Kind = harness.KindCodex
+	h.Kind = codex.KindCodex
 	t.Cleanup(func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -263,12 +264,12 @@ func settleCodexLab(t *testing.T, ctx context.Context, lab liveLab, h runtime.Ag
 		if err != nil {
 			t.Fatalf("ReadAgent: %v", err)
 		}
-		class := harness.Codex{}.Screen().ClassifyStartup(screen)
+		class := codex.Codex{}.Screen().ClassifyStartup(screen)
 		switch {
 		case class == harness.StartupScreenReady:
 			return
 		case class == harness.StartupScreenTrustDialog:
-			answer, err := harness.Codex{}.Screen().StartupAnswer(harness.StartupScreenTrustDialog)
+			answer, err := codex.Codex{}.Screen().StartupAnswer(harness.StartupScreenTrustDialog)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -338,7 +339,7 @@ func TestLiveCodexSessionStartHook(t *testing.T) {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(harness.CodexInstructionPath(cwd), []byte("# Lab\n\nYou are a lab agent. Keep every reply to one line.\n"), 0o644); err != nil {
+	if err := os.WriteFile(codex.CodexInstructionPath(cwd), []byte("# Lab\n\nYou are a lab agent. Keep every reply to one line.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	projectHookDir := t.TempDir()
@@ -397,7 +398,7 @@ func TestLiveCodexSessionStartHook(t *testing.T) {
 
 func sendCodexSlash(t *testing.T, ctx context.Context, lab liveLab, h runtime.AgentHandle, cmd string) {
 	t.Helper()
-	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, harness.KindCodex, cmd, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, codex.KindCodex, cmd, send.Options{})
 	if err != nil {
 		t.Fatalf("send %s: %v (report %+v)", cmd, err, report)
 	}

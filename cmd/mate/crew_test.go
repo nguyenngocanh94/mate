@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -265,7 +266,7 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 func TestCrewRelaunchReportNamesTheLaunchProfileAndEndsTheTurn(t *testing.T) {
 	var out bytes.Buffer
 	writeCrewRelaunchReport(&out, spawn.RelaunchResult{
-		Project: "shop", Crew: "k3", Agent: "crew-k3", Pane: "p9", Harness: harness.KindClaude,
+		Project: "shop", Crew: "k3", Agent: "crew-k3", Pane: "p9", Harness: claude.KindClaude,
 		Model: "haiku", Effort: harness.EffortLow, Repo: "shop", Branch: "mate/k3",
 		Worktree: "/w/.worktrees/shop-k3", BriefPath: "/w/brief.md", Stopped: true,
 	})

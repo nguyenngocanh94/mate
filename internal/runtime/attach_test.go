@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -38,7 +38,7 @@ func attachHandle(session, name, pane, terminal string) runtime.AgentHandle {
 		Session: runtime.SessionHandle{Name: session},
 		Name:    name,
 		RawID:   "mate_g407",
-		Kind:    harness.KindClaude,
+		Kind:    claude.KindClaude,
 		Tab: runtime.TabHandle{
 			Session:     runtime.SessionHandle{Name: session},
 			WorkspaceID: "w1",

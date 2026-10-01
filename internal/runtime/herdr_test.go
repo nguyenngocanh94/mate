@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -1000,12 +1002,12 @@ func TestHerdrStartExportsTheLaunchEnvIntoThePane(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	cwd := t.TempDir()
-	if err := os.WriteFile(harness.CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
+	if err := os.WriteFile(codex.CodexInstructionPath(cwd), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	home := filepath.Join(t.TempDir(), "it's a home")
-	launch, err := harness.Codex{Home: home}.Build(ctx, harness.AgentSpec{
-		Kind: harness.KindCodex, Cwd: cwd,
+	launch, err := codex.Codex{Home: home}.Build(ctx, harness.AgentSpec{
+		Kind: codex.KindCodex, Cwd: cwd,
 		Env: []harness.EnvVar{{Key: "MATE_AGENT_ROLE", Value: "mate"}},
 	})
 	if err != nil {
@@ -1511,7 +1513,7 @@ func TestHerdrStopDoesNotCallAgentStop(t *testing.T) {
 		t.Fatalf("unexpected argv %#v", spec.Args)
 		return process.Result{}, nil
 	})
-	h := runtime.AgentHandle{Session: session, Name: "mate-g4-01", Kind: harness.KindClaude, Tab: tab}
+	h := runtime.AgentHandle{Session: session, Name: "mate-g4-01", Kind: claude.KindClaude, Tab: tab}
 	if err := rt.StopAgent(context.Background(), h, runtime.StopForce); err != nil {
 		t.Fatal(err)
 	}
@@ -1542,7 +1544,7 @@ func TestHerdrGracefulStopTypesTheDeclaredExit(t *testing.T) {
 		t.Fatalf("unexpected argv %#v", spec.Args)
 		return process.Result{}, nil
 	})
-	h := runtime.AgentHandle{Session: session, Name: "crew-g4-01", Kind: harness.KindCodex, Tab: tab}
+	h := runtime.AgentHandle{Session: session, Name: "crew-g4-01", Kind: codex.KindCodex, Tab: tab}
 	if err := rt.StopAgent(context.Background(), h, runtime.StopGraceful(exitLine("/quit"))); err != nil {
 		t.Fatal(err)
 	}
@@ -1558,7 +1560,7 @@ func TestHerdrStopRefusesAStopWithoutAMode(t *testing.T) {
 		t.Fatalf("a refused stop ran %#v", spec.Args)
 		return process.Result{}, nil
 	})
-	h := runtime.AgentHandle{Session: session, Name: "mate-g4-01", Kind: harness.KindClaude, Tab: tab}
+	h := runtime.AgentHandle{Session: session, Name: "mate-g4-01", Kind: claude.KindClaude, Tab: tab}
 	for name, stop := range map[string]runtime.Stop{
 		"zero Stop":                  {},
 		"graceful without exit":      runtime.StopGraceful(nil),
@@ -1590,8 +1592,8 @@ func bootHerdrWithOptions(t *testing.T, observePaneEnvClear bool, handler func(c
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{
-		Kind: harness.KindClaude, Cwd: cwd, ContextPath: path,
+	launch, err := claude.Claude{}.Build(context.Background(), harness.AgentSpec{
+		Kind: claude.KindClaude, Cwd: cwd, ContextPath: path,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1869,7 +1871,7 @@ func TestHerdrCreateAgentTabRefusesMismatchedCwdFromCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{Kind: claude.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1918,7 +1920,7 @@ func TestHerdrCreateAgentTabRefusesEmptyCwdFromCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{Kind: claude.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1973,7 +1975,7 @@ func TestHerdrCreateAgentTabRefusesMismatchedCwdOnLabelReuse(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(requestedCwd, "context.md"), []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.Build(ctx, harness.AgentSpec{Kind: harness.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
+	launch, err := claude.Claude{}.Build(ctx, harness.AgentSpec{Kind: claude.KindClaude, Cwd: requestedCwd, ContextPath: filepath.Join(requestedCwd, "context.md")})
 	if err != nil {
 		t.Fatal(err)
 	}

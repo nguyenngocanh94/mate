@@ -12,6 +12,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/claude"
+	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
@@ -222,5 +224,5 @@ func initRepo(t *testing.T, dir string) {
 // transcriptRoots points the catalog's harnesses at fixture directories:
 // Claude's projects root and Codex's sessions root.
 func transcriptRoots(claudeProjects, codexSessions string) map[harness.Kind]string {
-	return map[harness.Kind]string{harness.KindClaude: claudeProjects, harness.KindCodex: codexSessions}
+	return map[harness.Kind]string{claude.KindClaude: claudeProjects, codex.KindCodex: codexSessions}
 }
