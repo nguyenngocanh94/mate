@@ -91,12 +91,16 @@ func CheckCodexProjectTrust(req CodexTrustRequest) (CodexTrustReport, error) {
 	report := CodexTrustReport{ConfigPath: filepath.Join(filepath.Clean(home), "config.toml")}
 
 	report.LookupKeys = []string{cwd}
-	root := ResolveCodexTrustRoot(cwd)
-	if root == "" && !pathExists(cwd) {
-		// The cwd does not exist yet (a worktree about to be added); the
-		// repository it will be added from is what codex will resolve to.
-		root = ResolveCodexTrustRoot(repo)
+	// A cwd that does not exist yet is a worktree about to be added: the
+	// repository it will be added from is what codex will resolve to. Walking
+	// up from the missing path instead would stop at whatever repository
+	// happens to enclose it - a workspace that is itself a checkout - and
+	// report that one's trust.
+	start := cwd
+	if !pathExists(cwd) {
+		start = repo
 	}
+	root := ResolveCodexTrustRoot(start)
 	report.TrustRoot = root
 	if root != "" && !samePath(root, cwd) {
 		report.LookupKeys = append(report.LookupKeys, root)
