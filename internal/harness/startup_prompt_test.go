@@ -8,6 +8,17 @@ import (
 	"testing"
 )
 
+// screenOf is the ScreenProfile of a kind's profile.
+func screenOf(kind Kind) ScreenProfile {
+	switch kind {
+	case KindClaude:
+		return Claude{}.Screen()
+	case KindCodex:
+		return Codex{}.Screen()
+	}
+	panic("no profile for " + string(kind))
+}
+
 func startupFixture(t *testing.T, name string) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "startup", name))
@@ -58,10 +69,7 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		{KindCodex, "claude-2.1.270-trust-dialog.txt", StartupScreenUnrecognized},
 	}
 	for _, tc := range cases {
-		got, err := ClassifyStartupScreen(tc.kind, startupFixture(t, tc.fixture))
-		if err != nil {
-			t.Fatalf("%s/%s: %v", tc.kind, tc.fixture, err)
-		}
+		got := screenOf(tc.kind).ClassifyStartup(startupFixture(t, tc.fixture))
 		if got != tc.want {
 			t.Fatalf("%s/%s = %s, want %s", tc.kind, tc.fixture, got, tc.want)
 		}
@@ -79,10 +87,7 @@ func TestClassifyStartupScreenIsUnrecognizedForAnythingElse(t *testing.T) {
 		"Press Enter to continue\n",
 	} {
 		for _, kind := range []Kind{KindClaude, KindCodex} {
-			got, err := ClassifyStartupScreen(kind, screen)
-			if err != nil {
-				t.Fatal(err)
-			}
+			got := screenOf(kind).ClassifyStartup(screen)
 			if got != StartupScreenUnrecognized {
 				t.Fatalf("%s classified %q as %s, want unrecognized", kind, screen, got)
 			}
@@ -97,31 +102,15 @@ func TestClassifyStartupScreenRefusesRewordedDialogs(t *testing.T) {
 	t.Parallel()
 	claude := startupFixture(t, "claude-2.1.270-trust-dialog.txt")
 	reworded := strings.Replace(claude, "Yes, I trust this folder", "Yes, trust it", 1)
-	got, err := ClassifyStartupScreen(KindClaude, reworded)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := screenOf(KindClaude).ClassifyStartup(reworded)
 	if got != StartupScreenUnrecognized {
 		t.Fatalf("reworded Claude dialog = %s, want unrecognized", got)
 	}
 	codex := startupFixture(t, "codex-0.154.0-trust-dialog.txt")
 	reworded = strings.Replace(codex, "Do you trust the contents of this directory?", "Trust this directory?", 1)
-	got, err = ClassifyStartupScreen(KindCodex, reworded)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got = screenOf(KindCodex).ClassifyStartup(reworded)
 	if got != StartupScreenUnrecognized {
 		t.Fatalf("reworded Codex dialog = %s, want unrecognized", got)
-	}
-}
-
-func TestClassifyStartupScreenRefusesUnknownHarness(t *testing.T) {
-	t.Parallel()
-	if _, err := ClassifyStartupScreen(Kind("gemini"), "anything"); err == nil {
-		t.Fatal("a harness with no measured profile must be refused, not classified")
-	}
-	if _, err := TrustDialogAnswerFor(Kind("gemini")); err == nil {
-		t.Fatal("no answer may exist for a harness with no measured dialog")
 	}
 }
 
@@ -129,14 +118,14 @@ func TestClassifyStartupScreenRefusesUnknownHarness(t *testing.T) {
 // The answer therefore differs per harness, and neither is a bare Enter.
 func TestTrustDialogAnswersSelectBeforeConfirming(t *testing.T) {
 	t.Parallel()
-	claude, err := TrustDialogAnswerFor(KindClaude)
+	claude, err := screenOf(KindClaude).StartupAnswer(StartupScreenTrustDialog)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(claude.SelectKeys) != 1 || claude.SelectKeys[0] != "down" || claude.ConfirmKey != "enter" || claude.TargetLabel != "Yes, I trust this folder" {
 		t.Fatalf("claude answer = %+v", claude)
 	}
-	codex, err := TrustDialogAnswerFor(KindCodex)
+	codex, err := screenOf(KindCodex).StartupAnswer(StartupScreenTrustDialog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,10 +153,7 @@ func TestTrustDialogAcceptSelectedReadsTheHighlightMarker(t *testing.T) {
 		{KindCodex, "codex-0.154.0-ready.txt", false},
 	}
 	for _, tc := range cases {
-		got, err := TrustDialogAcceptSelected(tc.kind, startupFixture(t, tc.fixture))
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := screenOf(tc.kind).StartupTargetSelected(StartupScreenTrustDialog, startupFixture(t, tc.fixture))
 		if got != tc.want {
 			t.Fatalf("%s/%s accept selected = %v, want %v", tc.kind, tc.fixture, got, tc.want)
 		}
@@ -183,18 +169,12 @@ func TestClaudeComposerIsALoneMarkerLine(t *testing.T) {
 	if strings.Count(dialog, "❯") < 2 {
 		t.Fatalf("fixture no longer carries both the shell prompt and the highlight marker")
 	}
-	got, err := ClassifyStartupScreen(KindClaude, dialog)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := screenOf(KindClaude).ClassifyStartup(dialog)
 	if got != StartupScreenTrustDialog {
 		t.Fatalf("dialog with two ❯ glyphs = %s, want trust_dialog", got)
 	}
 	shellOnly := "  /Users/x/proj   main ❯ \n"
-	got, err = ClassifyStartupScreen(KindClaude, shellOnly)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got = screenOf(KindClaude).ClassifyStartup(shellOnly)
 	if got != StartupScreenUnrecognized {
 		t.Fatalf("shell prompt alone = %s, want unrecognized", got)
 	}
@@ -254,17 +234,11 @@ func TestClassifyStartupScreenRefusesTheWordsWithoutTheShape(t *testing.T) {
 		{"codex options inside prose", KindCodex, "Do you trust the contents of this directory?\nthe options were › 1. Yes, continue and\n2. No, quit as before\nPress enter to continue\n"},
 	}
 	for _, tc := range cases {
-		got, err := ClassifyStartupScreen(tc.kind, tc.screen)
-		if err != nil {
-			t.Fatalf("%s: %v", tc.name, err)
-		}
+		got := screenOf(tc.kind).ClassifyStartup(tc.screen)
 		if got == StartupScreenTrustDialog {
 			t.Fatalf("%s: classified as trust_dialog; a key would have been pressed into it:\n%s", tc.name, tc.screen)
 		}
-		selected, err := TrustDialogAcceptSelected(tc.kind, tc.screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		selected := screenOf(tc.kind).StartupTargetSelected(StartupScreenTrustDialog, tc.screen)
 		if selected {
 			t.Fatalf("%s: accept reported selected on a screen that is not the dialog", tc.name)
 		}
@@ -277,14 +251,12 @@ func TestClassifyStartupScreenRefusesTheWordsWithoutTheShape(t *testing.T) {
 func TestClassifyStartupScreenQuotedDialogAboveTheComposerIsReady(t *testing.T) {
 	t.Parallel()
 	codex := startupFixture(t, "codex-0.154.0-trust-dialog.txt") + "\n› Ask Codex to do anything\n"
-	got, err := ClassifyStartupScreen(KindCodex, codex)
-	if err != nil || got != StartupScreenReady {
-		t.Fatalf("codex quoted dialog over composer = %s err=%v, want ready", got, err)
+	if got := screenOf(KindCodex).ClassifyStartup(codex); got != StartupScreenReady {
+		t.Fatalf("codex quoted dialog over composer = %s, want ready", got)
 	}
 	claude := startupFixture(t, "claude-2.1.270-trust-dialog.txt") + "\n──────\n❯ \n──────\n"
-	got, err = ClassifyStartupScreen(KindClaude, claude)
-	if err != nil || got != StartupScreenReady {
-		t.Fatalf("claude quoted dialog over composer = %s err=%v, want ready", got, err)
+	if got := screenOf(KindClaude).ClassifyStartup(claude); got != StartupScreenReady {
+		t.Fatalf("claude quoted dialog over composer = %s, want ready", got)
 	}
 }
 
@@ -313,10 +285,7 @@ func TestClassifyStartupScreenOnCapturedUpdateDialogScreens(t *testing.T) {
 		{KindClaude, "codex_update_dialog.txt", StartupScreenUnrecognized},
 	}
 	for _, tc := range cases {
-		got, err := ClassifyStartupScreen(tc.kind, startupFixture(t, tc.fixture))
-		if err != nil {
-			t.Fatalf("%s/%s: %v", tc.kind, tc.fixture, err)
-		}
+		got := screenOf(tc.kind).ClassifyStartup(startupFixture(t, tc.fixture))
 		if got != tc.want {
 			t.Fatalf("%s/%s = %s, want %s", tc.kind, tc.fixture, got, tc.want)
 		}
@@ -328,7 +297,7 @@ func TestClassifyStartupScreenOnCapturedUpdateDialogScreens(t *testing.T) {
 // version" and the presses are measured, not guessed.
 func TestUpdateDialogAnswerSkipsUntilTheNextVersion(t *testing.T) {
 	t.Parallel()
-	answer, err := UpdateDialogAnswerFor(KindCodex)
+	answer, err := screenOf(KindCodex).StartupAnswer(StartupScreenUpdateDialog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,11 +307,8 @@ func TestUpdateDialogAnswerSkipsUntilTheNextVersion(t *testing.T) {
 	if answer.ConfirmKey != "enter" || answer.TargetLabel != "3. Skip until next version" {
 		t.Fatalf("update answer = %+v", answer)
 	}
-	if _, err := UpdateDialogAnswerFor(KindClaude); err == nil {
+	if _, err := screenOf(KindClaude).StartupAnswer(StartupScreenUpdateDialog); err == nil {
 		t.Fatal("Claude has no measured update prompt; no answer may be invented for it")
-	}
-	if _, err := UpdateDialogAnswerFor(Kind("gemini")); err == nil {
-		t.Fatal("a harness with no profile must be refused")
 	}
 }
 
@@ -363,10 +329,7 @@ func TestUpdateDialogSkipSelectedReadsTheHighlightMarker(t *testing.T) {
 		{KindClaude, "codex_update_dialog.txt", false},
 	}
 	for _, tc := range cases {
-		got, err := UpdateDialogSkipSelected(tc.kind, startupFixture(t, tc.fixture))
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := screenOf(tc.kind).StartupTargetSelected(StartupScreenUpdateDialog, startupFixture(t, tc.fixture))
 		if got != tc.want {
 			t.Fatalf("%s/%s skip selected = %v, want %v", tc.kind, tc.fixture, got, tc.want)
 		}
@@ -399,17 +362,11 @@ func TestClassifyStartupScreenUpdateRefusesTheWordsWithoutTheShape(t *testing.T)
 		{"options inside prose", "✨ Update available! 0.154.0 -> 0.155.0\nit offered › 1. Update now and\n2. Skip, or 3. Skip until next version\nPress enter to continue\n"},
 	}
 	for _, tc := range cases {
-		got, err := ClassifyStartupScreen(KindCodex, tc.screen)
-		if err != nil {
-			t.Fatalf("%s: %v", tc.name, err)
-		}
+		got := screenOf(KindCodex).ClassifyStartup(tc.screen)
 		if got == StartupScreenUpdateDialog {
 			t.Fatalf("%s: classified as update_dialog; a key would have been pressed into it:\n%s", tc.name, tc.screen)
 		}
-		selected, err := UpdateDialogSkipSelected(KindCodex, tc.screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		selected := screenOf(KindCodex).StartupTargetSelected(StartupScreenUpdateDialog, tc.screen)
 		if selected {
 			t.Fatalf("%s: skip reported selected on a screen that is not the dialog", tc.name)
 		}
@@ -426,10 +383,7 @@ func TestClassifyStartupScreenUpdateDialogToleratesTheInstallCommand(t *testing.
 	if brew == dialog {
 		t.Fatal("fixture no longer carries the npm install command")
 	}
-	got, err := ClassifyStartupScreen(KindCodex, brew)
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := screenOf(KindCodex).ClassifyStartup(brew)
 	if got != StartupScreenUpdateDialog {
 		t.Fatalf("update dialog with another install command = %s, want update_dialog", got)
 	}
@@ -441,11 +395,8 @@ func TestClassifyStartupScreenUpdateDialogToleratesTheInstallCommand(t *testing.
 // the same option position.
 func TestStartupDialogLayoutsOfOneScreenShareTheirAnswer(t *testing.T) {
 	t.Parallel()
-	for _, kind := range []Kind{KindClaude, KindCodex} {
-		p, err := startupProfileFor(kind)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, p := range []startupProfile{claudeStartup(), codexStartup()} {
+		kind := p.kind
 		for _, d := range p.dialogs {
 			first := p.dialogsFor(d.screen)[0]
 			if !slices.Equal(d.selectKeys, first.selectKeys) || d.target != first.target {
@@ -478,9 +429,8 @@ func TestClaudeComposerSuggestionIsStillEmpty(t *testing.T) {
 		{"typed text that starts like a suggestion", strings.Replace(ready, suggestion, "❯\u00a0Try \"edit\" and then run the tests", 1), StartupScreenUnrecognized},
 		{"suggestion outside the composer rules", "  /tmp/x main ❯ Try \"edit <filepath> to...\"\n", StartupScreenUnrecognized},
 	} {
-		got, err := ClassifyStartupScreen(KindClaude, tc.screen)
-		if err != nil || got != tc.want {
-			t.Errorf("%s: got %s err=%v, want %s", tc.name, got, err, tc.want)
+		if got := screenOf(KindClaude).ClassifyStartup(tc.screen); got != tc.want {
+			t.Errorf("%s: got %s, want %s", tc.name, got, tc.want)
 		}
 	}
 }

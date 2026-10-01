@@ -449,7 +449,7 @@ func TestSpawnCrewWarnsWhenThePaneStaysIdle(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	fake := runtime.NewFake()
 	rt := &silentPrompt{Fake: fake}
-	deps := fakeDeps(t, fake)
+	deps := readingVisible(t, fake)
 	deps.Runtime = rt
 	deps.BriefDeliveryTimeout = 20 * time.Millisecond
 
@@ -468,6 +468,8 @@ func TestSpawnCrewWarnsWhenThePaneStaysIdle(t *testing.T) {
 	if res.PaneTail == "" {
 		t.Fatal("the warning must carry the pane tail")
 	}
+	// The settle and the tail both read through the profile's source.
+	assertReadVisible(t, fake)
 	// The crew itself is real: the meta is written and the worktree exists.
 	if _, statErr := os.Stat(w.CrewMeta("shop", "k3")); statErr != nil {
 		t.Fatalf("an undelivered brief must still leave a recorded crew: %v", statErr)

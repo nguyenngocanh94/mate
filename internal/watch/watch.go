@@ -43,20 +43,20 @@ type Runtime interface {
 	// composer state, and telling a harness's own faint suggestion from a
 	// person's unsubmitted line needs the attributes
 	// (internal/send/classify.go's faintPlaceholder).
-	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error)
+	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 }
 
 var _ Runtime = runtime.Adapter(nil)
 
-// HandleFunc resolves the Herdr handle and harness kind recorded for one
-// crew. It is a seam rather than a direct call to internal/spawn so the
-// observer imports no code that can start or stop an agent; cmd/mate wires
-// spawn.CrewHandle into it.
+// HandleFunc resolves the Herdr handle recorded for one crew, and the screen
+// profile of the harness it runs. It is a seam rather than a direct call to
+// internal/spawn so the observer imports no code that can start or stop an
+// agent; cmd/mate wires spawn.CrewHandle into it.
 //
 // An error means "mate could not resolve a handle to look at" - the crew has
 // no agent recorded, or the Herdr session is not running. That is not a
 // finding: the observer skips the crew for this round and concludes nothing.
-type HandleFunc func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error)
+type HandleFunc func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.ScreenProfile, error)
 
 // Clock is where the observer reads the time. Tests pass a fake one so every
 // threshold in this package can be crossed without waiting.
@@ -387,7 +387,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		obs.changedAt = now
 	}
 
-	handle, kind, err := w.deps.Handle(ctx, ref.Project, ref.Crew)
+	handle, screens, err := w.deps.Handle(ctx, ref.Project, ref.Crew)
 	if err != nil {
 		// No handle to look at: the crew records no agent yet, or the Herdr
 		// session is not running. Neither says the crew is in trouble.
@@ -417,7 +417,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		return err
 	}
 
-	screen, err := w.deps.Runtime.ReadAgentStyled(ctx, handle, send.DefaultLines)
+	screen, err := w.deps.Runtime.ReadAgentStyled(ctx, handle, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
 		// The agent is there and the pane is not readable: an unread screen
 		// is not a quiet one, so the round ends without a verdict.
@@ -430,10 +430,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		obs.changedAt = now
 	}
 
-	composer := send.StateUnknown
-	if class, err := send.ClassifyComposer(kind, screen); err == nil {
-		composer = class.State
-	}
+	composer := send.ClassifyComposer(screens, screen).State
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer
 		obs.composerSince = now

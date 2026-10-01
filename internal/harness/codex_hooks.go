@@ -78,13 +78,6 @@ func hooksReviewDialogs() []dialogProfile {
 	return []dialogProfile{v156, v154}
 }
 
-// HooksReviewSelected reports whether the dialog is on screen with its
-// highlight on "1. Review hooks", the one option the settle confirms.
-func HooksReviewSelected(screen string) bool {
-	ok, _ := targetSelected(KindCodex, StartupScreenHooksReview, screen)
-	return ok
-}
-
 // OwnHook is one hook the settle may trust: mate wrote it, in this file,
 // with this command, for this event.
 type OwnHook struct {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/db"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -765,13 +766,19 @@ func logComposerReading(t *testing.T, rt runtime.Adapter, handle runtime.AgentHa
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	screen, err := rt.ReadAgentStyled(ctx, handle, send.DefaultLines)
+	profile, err := catalog.Default().Lookup(kind)
+	if err != nil {
+		t.Logf("%s Mate composer: %v", project, err)
+		return
+	}
+	screens := profile.Screen()
+	screen, err := rt.ReadAgentStyled(ctx, handle, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
 		t.Logf("%s Mate composer: not readable: %v", project, err)
 		return
 	}
-	cls, err := send.ClassifyComposer(kind, screen)
-	t.Logf("%s Mate composer: state=%s evidence=%q err=%v\nstyled tail:\n%q", project, cls.State, cls.Evidence, err,
+	cls := send.ClassifyComposer(screens, screen)
+	t.Logf("%s Mate composer: state=%s evidence=%q\nstyled tail:\n%q", project, cls.State, cls.Evidence,
 		lastLines(screen, 8))
 }
 
@@ -829,7 +836,7 @@ func paneReader(rt runtime.Adapter, handle runtime.AgentHandle) func() string {
 	return func() string {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
-		screen, err := rt.ReadAgent(ctx, handle, 60)
+		screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 60)
 		if err != nil {
 			return "(pane not readable: " + err.Error() + ")"
 		}

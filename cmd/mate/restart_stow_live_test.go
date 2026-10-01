@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -84,7 +85,7 @@ func TestLiveRestartMateStowsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	evidence := func() string {
-		s, _ := rt.ReadAgent(context.Background(), handle, 40)
+		s, _ := rt.ReadAgent(context.Background(), handle, harness.ReadRecentUnwrapped, 40)
 		return s
 	}
 	// The fact exists only in this conversation: the Mate is told not to

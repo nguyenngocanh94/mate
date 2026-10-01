@@ -256,11 +256,16 @@ func Span(d time.Duration) string {
 
 // composer classifies the Mate's composer from one styled read.
 func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind) (send.Classification, error) {
-	screen, err := s.deps.Runtime.ReadAgentStyled(ctx, handle, send.DefaultLines)
+	profile, err := s.deps.Harnesses.Lookup(kind)
+	if err != nil {
+		return send.Classification{State: send.StateUnknown}, err
+	}
+	screens := profile.Screen()
+	screen, err := s.deps.Runtime.ReadAgentStyled(ctx, handle, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
 		return send.Classification{}, err
 	}
-	return send.ClassifyComposer(kind, screen)
+	return send.ClassifyComposer(screens, screen), nil
 }
 
 // answeredAfter reports whether sent.log has a line from the Mate after

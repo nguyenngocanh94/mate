@@ -71,7 +71,7 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 		t.Fatalf("presses = %s, want enter (Review hooks), enter (SessionStart), t, esc, esc", got)
 	}
 	// The first enter confirmed "1. Review hooks", never "2. Trust all".
-	if !harness.HooksReviewSelected(pane.screensPressedOn()[0]) {
+	if !(harness.Codex{}).Screen().StartupTargetSelected(harness.StartupScreenHooksReview, pane.screensPressedOn()[0]) {
 		t.Fatal("enter was pressed on the dialog while the highlight was not on 1. Review hooks")
 	}
 

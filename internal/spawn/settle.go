@@ -104,26 +104,13 @@ func (s *Settlement) markAnswered(screen harness.StartupScreen) bool {
 	return false
 }
 
-// startupDialog describes how one recognised dialog is answered: its keys and
-// the check that the highlight is on the option the confirm key will take.
-type startupDialog struct {
-	answer   func(harness.Kind) (harness.StartupDialogAnswer, error)
-	selected func(harness.Kind, string) (bool, error)
-	// what names the dialog in refusals.
-	what string
-}
-
-var startupDialogs = map[harness.StartupScreen]startupDialog{
-	harness.StartupScreenTrustDialog: {
-		answer:   harness.TrustDialogAnswerFor,
-		selected: harness.TrustDialogAcceptSelected,
-		what:     "trust dialog",
-	},
-	harness.StartupScreenUpdateDialog: {
-		answer:   harness.UpdateDialogAnswerFor,
-		selected: harness.UpdateDialogSkipSelected,
-		what:     "update dialog",
-	},
+// startupDialogs are the dialogs the settle answers with the harness's
+// measured keys (harness.ScreenProfile.StartupAnswer), each with the name it
+// carries in refusals. Codex's hook review is walked by reviewOwnHooks
+// instead.
+var startupDialogs = map[harness.StartupScreen]string{
+	harness.StartupScreenTrustDialog:  "trust dialog",
+	harness.StartupScreenUpdateDialog: "update dialog",
 }
 
 // settleStartupPrompt polls the agent's pane until it shows the harness's
@@ -142,23 +129,15 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		sleep = sleepCtx
 	}
 	kind, screens := profile.Kind(), profile.Screen()
-	if _, err := screens.ClassifyStartup(""); err != nil {
-		// No profile for this harness: nothing can be recognised, so
-		// nothing is pressed and the launch proceeds without this step.
-		return Settlement{}, nil
-	}
 	deadline := time.Now().Add(budget)
 	var settled Settlement
 	answered := 0
 	for {
-		screen, err := rt.ReadAgent(ctx, handle, startupScreenLines)
+		screen, err := rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
 		if err != nil {
 			return settled, err
 		}
-		class, err := screens.ClassifyStartup(screen)
-		if err != nil {
-			return settled, err
-		}
+		class := screens.ClassifyStartup(screen)
 		if class == harness.StartupScreenReady {
 			return settled, nil
 		}
@@ -176,22 +155,22 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 				return settled, startupRefusal(handle, kind, screen,
 					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; mate stops answering rather than press keys in a loop", kind, startupMaxDialogs))
 			}
-			presses, err := reviewOwnHooks(ctx, rt, handle, kind, screen, trusted, sleep)
+			presses, err := reviewOwnHooks(ctx, rt, handle, kind, screens, screen, trusted, sleep)
 			settled.Presses = append(settled.Presses, presses...)
 			if err != nil {
 				return settled, err
 			}
-		} else if dialog, ok := startupDialogs[class]; ok {
+		} else if what, ok := startupDialogs[class]; ok {
 			if settled.markAnswered(class) {
 				return settled, startupRefusal(handle, kind, screen,
-					fmt.Sprintf("%s %s is still on screen after mate confirmed its selection; not pressing anything further", kind, dialog.what))
+					fmt.Sprintf("%s %s is still on screen after mate confirmed its selection; not pressing anything further", kind, what))
 			}
 			answered++
 			if answered > startupMaxDialogs {
 				return settled, startupRefusal(handle, kind, screen,
 					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; mate stops answering rather than press keys in a loop", kind, startupMaxDialogs))
 			}
-			presses, err := answerStartupDialog(ctx, rt, handle, kind, dialog, sleep)
+			presses, err := answerStartupDialog(ctx, rt, handle, kind, screens, class, what, sleep)
 			settled.Presses = append(settled.Presses, presses...)
 			if err != nil {
 				return settled, err
@@ -215,8 +194,8 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 // and Codex's update highlight opens on "1. Update now", so this order is the
 // difference between settling the pane and killing the agent or starting a
 // package install under it.
-func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, dialog startupDialog, sleep sleeper) ([]string, error) {
-	answer, err := dialog.answer(kind)
+func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
+	answer, err := screens.StartupAnswer(dialog)
 	if err != nil {
 		return nil, err
 	}
@@ -233,24 +212,20 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err := sleep(ctx, startupKeySettle); err != nil {
 			return presses, err
 		}
-		screen, err = rt.ReadAgent(ctx, handle, startupScreenLines)
+		screen, err = rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
 		if err != nil {
 			return presses, err
 		}
 	}
 	if len(answer.SelectKeys) == 0 {
-		screen, err = rt.ReadAgent(ctx, handle, startupScreenLines)
+		screen, err = rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
 		if err != nil {
 			return presses, err
 		}
 	}
-	selected, err := dialog.selected(kind, screen)
-	if err != nil {
-		return presses, err
-	}
-	if !selected {
+	if !screens.StartupTargetSelected(dialog, screen) {
 		return presses, startupRefusal(handle, kind, screen,
-			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, dialog.what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
+			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
 	}
 	if err := rt.SendKeys(ctx, handle, []string{answer.ConfirmKey}); err != nil {
 		return presses, err
@@ -271,7 +246,7 @@ const reviewScreenPolls = 20
 // nothing else. Every hook the review lists as needing review is read, and
 // matched against own, before a single one is trusted: a review that also
 // lists a hook mate did not install is refused with nothing trusted.
-func reviewOwnHooks(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screen string, own []harness.OwnHook, sleep sleeper) ([]string, error) {
+func reviewOwnHooks(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, screen string, own []harness.OwnHook, sleep sleeper) ([]string, error) {
 	var presses []string
 	press := func(key string) error {
 		if err := rt.SendKeys(ctx, handle, []string{key}); err != nil {
@@ -287,7 +262,7 @@ func reviewOwnHooks(ctx context.Context, rt runtime.Adapter, handle runtime.Agen
 	readUntil := func(what string, parse func(string) bool) (string, error) {
 		var last string
 		for i := 0; i < reviewScreenPolls; i++ {
-			s, err := rt.ReadAgent(ctx, handle, startupScreenLines)
+			s, err := rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
 			if err != nil {
 				return s, err
 			}
@@ -303,7 +278,7 @@ func reviewOwnHooks(ctx context.Context, rt runtime.Adapter, handle runtime.Agen
 	}
 
 	// 1. The dialog: confirm "1. Review hooks", never "2. Trust all".
-	if !harness.HooksReviewSelected(screen) {
+	if !screens.StartupTargetSelected(harness.StartupScreenHooksReview, screen) {
 		return presses, refuse(screen, `the highlight is not on "1. Review hooks"; refusing to confirm a selection mate cannot see`)
 	}
 	if err := press("enter"); err != nil {

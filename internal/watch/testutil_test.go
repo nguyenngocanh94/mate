@@ -20,7 +20,7 @@ import (
 // read `incidents.log` back through store, which is the contract mvp.md
 // section 4b states.
 
-// The two Codex screens the classifier measures (internal/send/classify.go):
+// The two Codex screens the classifier measures (internal/harness/composer.go):
 // an idle composer, and a turn in flight. The observer only ever asks
 // "busy or not" and "did this change", so two are enough.
 const (
@@ -60,11 +60,14 @@ type fixture struct {
 	clock  *fakeClock
 	w      *watch.Watcher
 	handle runtime.AgentHandle
+	// screens is the ScreenProfile handleFunc answers with: Codex's, unless
+	// a test swaps it.
+	screens harness.ScreenProfile
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock()}
+	f := &fixture{t: t, rt: runtime.NewFake(), clock: newClock(), screens: harness.Codex{}.Screen()}
 	f.ws = newWorkspace(t)
 	f.handle = runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "mate-lab"},
@@ -93,18 +96,18 @@ func (f *fixture) deps() watch.Deps {
 // handleFunc is the seam cmd/mate fills with spawn.CrewHandle: it answers
 // for a crew whose meta records an agent, and refuses for one that does not.
 func (f *fixture) handleFunc() watch.HandleFunc {
-	return func(_ context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error) {
+	return func(_ context.Context, project, crew string) (runtime.AgentHandle, harness.ScreenProfile, error) {
 		meta, err := f.ws.ReadCrewMeta(project, crew)
 		if err != nil {
-			return runtime.AgentHandle{}, "", err
+			return runtime.AgentHandle{}, nil, err
 		}
 		if meta["agent"] == "" {
-			return runtime.AgentHandle{}, "", os.ErrNotExist
+			return runtime.AgentHandle{}, nil, os.ErrNotExist
 		}
 		handle := f.handle
 		handle.Name = meta["agent"]
 		handle.RawID = crew
-		return handle, harness.KindCodex, nil
+		return handle, f.screens, nil
 	}
 }
 

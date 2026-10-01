@@ -101,14 +101,15 @@ func contextRefresh(ctx context.Context, w *store.Workspace, deps spawn.Deps, pr
 		}
 		return false, err
 	}
-	screen, err := deps.Runtime.ReadAgentStyled(ctx, h, send.DefaultLines)
+	screens, err := screenOf(deps, kind)
 	if err != nil {
 		return false, err
 	}
-	composer, err := send.ClassifyComposer(kind, screen)
+	screen, err := deps.Runtime.ReadAgentStyled(ctx, h, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
 		return false, err
 	}
+	composer := send.ClassifyComposer(screens, screen)
 	if composer.State != send.StateEmpty {
 		if automatic {
 			return false, nil

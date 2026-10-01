@@ -105,7 +105,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		Kind:    harness.KindCodex,
 	}
 	needsDecision := waitForStatusLine(t, ctx, w, "needs-decision:", 120*time.Second, func() string {
-		screen, readErr := rt.ReadAgent(ctx, handle, 40)
+		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}
@@ -147,7 +147,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 	}
 
 	done := waitForStatusLine(t, ctx, w, "wait-mate: chose A", 120*time.Second, func() string {
-		screen, readErr := rt.ReadAgent(ctx, handle, 40)
+		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}

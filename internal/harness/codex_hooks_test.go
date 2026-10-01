@@ -15,19 +15,16 @@ const (
 func TestHooksReviewDialogIsRecognisedInBothLayouts(t *testing.T) {
 	for _, name := range []string{"codex-0.154.0-hooks-review.txt", "codex-0.156.1-hooks-review.txt", "codex-0.156.1-hooks-review-two.txt"} {
 		screen := startupFixture(t, name)
-		got, err := ClassifyStartupScreen(KindCodex, screen)
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := screenOf(KindCodex).ClassifyStartup(screen)
 		if got != StartupScreenHooksReview {
 			t.Errorf("%s = %s, want %s", name, got, StartupScreenHooksReview)
 		}
-		if !HooksReviewSelected(screen) {
-			t.Errorf("%s: the highlight opens on 1. Review hooks, but HooksReviewSelected is false", name)
+		if !screenOf(KindCodex).StartupTargetSelected(StartupScreenHooksReview, screen) {
+			t.Errorf("%s: the highlight opens on 1. Review hooks, but it does not read as selected", name)
 		}
 	}
 	// Claude never draws it.
-	if got, _ := ClassifyStartupScreen(KindClaude, startupFixture(t, "codex-0.156.1-hooks-review.txt")); got != StartupScreenUnrecognized {
+	if got := screenOf(KindClaude).ClassifyStartup(startupFixture(t, "codex-0.156.1-hooks-review.txt")); got != StartupScreenUnrecognized {
 		t.Errorf("claude classified Codex's hook review as %s", got)
 	}
 }

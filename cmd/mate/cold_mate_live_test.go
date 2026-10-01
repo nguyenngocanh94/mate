@@ -124,7 +124,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 		Name:    crewRes.Agent, RawID: "k3", Kind: harness.KindCodex,
 	}
 	crewTail := func() string {
-		screen, readErr := rt.ReadAgent(ctx, crewHandle, send.DefaultLines)
+		screen, readErr := rt.ReadAgent(ctx, crewHandle, harness.ReadRecentUnwrapped, send.DefaultLines)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}
@@ -165,15 +165,16 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MateHandle: %v", err)
 	}
-	screen, err := rt.ReadAgent(ctx, mateHandle, send.DefaultLines)
+	screens, err := screenOf(deps, kind)
+	if err != nil {
+		t.Fatal(err)
+	}
+	screen, err := rt.ReadAgent(ctx, mateHandle, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
 		t.Fatalf("ReadAgent on the Mate: %v", err)
 	}
 	t.Logf("the cold Mate's pane:\n%s", screen)
-	cold, err := send.ClassifyComposer(kind, screen)
-	if err != nil {
-		t.Fatalf("ClassifyComposer: %v", err)
-	}
+	cold := send.ClassifyComposer(screens, screen)
 	t.Logf("cold Mate composer: state=%s evidence=%q", cold.State, cold.Evidence)
 	if cold.State != send.StateEmpty {
 		t.Fatalf("the cold Mate's composer classifies %q (evidence %q); the splash under it is still an empty composer",
@@ -194,7 +195,7 @@ func TestLiveAssignWorksOnAColdMate(t *testing.T) {
 	// (the Mate's UserPromptSubmit hook's record): two copies, section 7.
 	assertSentLine(t, w, "shop", store.SourceApp, store.TargetMate, ask.Resolve)
 	mateTail := func() string {
-		s, readErr := rt.ReadAgent(ctx, mateHandle, send.DefaultLines)
+		s, readErr := rt.ReadAgent(ctx, mateHandle, harness.ReadRecentUnwrapped, send.DefaultLines)
 		if readErr != nil {
 			return "(mate pane not readable: " + readErr.Error() + ")"
 		}

@@ -113,7 +113,7 @@ func TestLiveCodexDelayedPasteAndRecovery(t *testing.T) {
 	rt := runtime.NewHerdr(process.ExecRunner{})
 	read := func() string {
 		t.Helper()
-		s, err := rt.ReadAgentStyled(ctx, h, 80)
+		s, err := rt.ReadAgentStyled(ctx, h, harness.ReadRecentUnwrapped, 80)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,8 +124,8 @@ func TestLiveCodexDelayedPasteAndRecovery(t *testing.T) {
 		var s string
 		for deadline := time.Now().Add(budget); time.Now().Before(deadline); {
 			s = read()
-			c, err := send.ClassifyComposer(harness.KindCodex, s)
-			if err == nil && c.State == want && strings.Contains(send.StripSGR(s), " · ") {
+			c := send.ClassifyComposer((harness.Codex{}).Screen(), s)
+			if c.State == want && strings.Contains(send.StripSGR(s), " · ") {
 				return s
 			}
 			time.Sleep(100 * time.Millisecond)

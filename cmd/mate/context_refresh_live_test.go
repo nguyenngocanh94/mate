@@ -83,7 +83,7 @@ func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 			case <-time.After(time.Second):
 			}
 		}
-		screen, _ := rt.ReadAgent(ctx, h, 60)
+		screen, _ := rt.ReadAgent(ctx, h, harness.ReadRecentUnwrapped, 60)
 		t.Fatalf("no Stop hook after prompt; pane: %v", screen)
 		return ""
 	}

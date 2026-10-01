@@ -6,7 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
 // TestPeekPrintsTheRawPane is the happy path: a live crew's pane comes back
@@ -58,6 +62,43 @@ func TestPeekFallsBackToStatusLogWhenTheAgentIsAbsent(t *testing.T) {
 	for _, want := range []string{"working: reading the ticket", "done: ready in branch"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("peek output = %q, want it to carry %q", got, want)
+		}
+	}
+}
+
+// TestCrewReadersReadThroughTheProfilesSource: peek, state and the console
+// box peek read a crew's pane through the source its harness's
+// ScreenProfile names. Codex reads recent-unwrapped, so its screens read
+// through ReadVisible catch a reader that spells the source itself.
+func TestCrewReadersReadThroughTheProfilesSource(t *testing.T) {
+	w := liveCrewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeSpawnDeps(t, rt)
+	deps.Harnesses = harnesstest.ReadingVisible(deps.Harnesses)
+	res := spawnFakeCrew(t, w, deps, "shop", "k3")
+	handle := runtime.AgentHandle{Session: runtime.SessionHandle{Name: res.Session}, Name: res.Agent}
+	rt.SetReadOutput(handle, codexBusyScreen)
+	rt.ReadSources = nil
+
+	if err := peekCrew(context.Background(), w, deps, "shop", "k3", 40, &bytes.Buffer{}); err != nil {
+		t.Fatalf("peekCrew: %v", err)
+	}
+	got, err := stateOfCrew(context.Background(), w, deps, "shop", "k3")
+	if err != nil {
+		t.Fatalf("stateOfCrew: %v", err)
+	}
+	if got.Health.Kind != crewstate.HealthBusy {
+		t.Fatalf("health = %+v, want busy read off the Codex screen", got.Health)
+	}
+	if _, err := boxPeekAction(context.Background(), w, deps, console.ActionRequest{Target: "shop", Crew: "k3"}); err != nil {
+		t.Fatalf("boxPeekAction: %v", err)
+	}
+	if len(rt.ReadSources) < 3 {
+		t.Fatalf("reads = %v, want one per reader", rt.ReadSources)
+	}
+	for i, src := range rt.ReadSources {
+		if src != harness.ReadVisible {
+			t.Fatalf("read %d went through %q, want the profile's %q", i, src, harness.ReadVisible)
 		}
 	}
 }

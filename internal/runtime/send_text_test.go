@@ -107,7 +107,7 @@ func TestFakeSendTextRecordsTypingAndRunsTheScreenHook(t *testing.T) {
 	if err := f.SendText(context.Background(), h, "hello"); err != nil {
 		t.Fatal(err)
 	}
-	screen, err := f.ReadAgent(context.Background(), h, 10)
+	screen, err := f.ReadAgent(context.Background(), h, harness.ReadRecentUnwrapped, 10)
 	if err != nil || screen != "typed: hello" {
 		t.Fatalf("screen after hook = %q err=%v", screen, err)
 	}

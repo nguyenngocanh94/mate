@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 )
 
@@ -19,7 +20,7 @@ func TestHerdrReadAgentUsesRecentUnwrappedTextAndNamedSession(t *testing.T) {
 	rt := runtime.NewHerdr(runner)
 	output, err := rt.ReadAgent(context.Background(), runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "lab-session"}, Name: "crew-agent",
-	}, 12)
+	}, harness.ReadRecentUnwrapped, 12)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +65,7 @@ func TestHerdrReadAgentFallsBackToTheVisibleScreenWhileCodexWorks(t *testing.T) 
 			if format == "ansi" {
 				read = rt.ReadAgentStyled
 			}
-			output, err := read(context.Background(), handle, 40)
+			output, err := read(context.Background(), handle, harness.ReadRecentUnwrapped, 40)
 			if err != nil {
 				t.Fatalf("read of a working agent: %v", err)
 			}
@@ -96,11 +97,58 @@ func TestHerdrReadAgentDoesNotRetryOtherFailures(t *testing.T) {
 	rt := runtime.NewHerdr(runner)
 	_, err := rt.ReadAgent(context.Background(), runtime.AgentHandle{
 		Session: runtime.SessionHandle{Name: "lab-session"}, Name: "crew-agent",
-	}, 40)
+	}, harness.ReadRecentUnwrapped, 40)
 	if !runtime.IsAgentNotFound(err) {
 		t.Fatalf("err = %v, want agent_not_found", err)
 	}
 	if calls != 1 {
 		t.Fatalf("herdr ran %d times, want 1", calls)
+	}
+}
+
+// A harness whose screens were measured through the visible screen is read
+// through it, once: the recent-unwrapped fallback belongs to that source
+// alone (plan 2026-09-30 section 3.2, the captain's decision on pi).
+func TestHerdrReadAgentReadsTheVisibleScreenWhenThatIsTheSource(t *testing.T) {
+	t.Parallel()
+	var calls [][]string
+	runner := &process.FakeRunner{Handler: func(_ context.Context, spec process.Spec) (process.Result, error) {
+		calls = append(calls, spec.Args)
+		return process.Result{Stdout: []byte("pane output\n")}, nil
+	}}
+	rt := runtime.NewHerdr(runner)
+	handle := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab-session"}, Name: "crew-agent"}
+	if _, err := rt.ReadAgentStyled(context.Background(), handle, harness.ReadVisible, 40); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("herdr ran %d times, want one read: %v", len(calls), calls)
+	}
+	joined := " " + strings.Join(calls[0], " ") + " "
+	for _, want := range []string{"agent read crew-agent", "--source visible", "--lines 40", "--format ansi"} {
+		if !strings.Contains(joined, " "+want+" ") {
+			t.Fatalf("argv %v missing %q", calls[0], want)
+		}
+	}
+}
+
+// A source mate has no reading for is refused before Herdr runs, so a
+// profile that names one fails loudly instead of being read some other way.
+func TestHerdrReadAgentRefusesAnUnknownSource(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	runner := &process.FakeRunner{Handler: func(_ context.Context, _ process.Spec) (process.Result, error) {
+		calls++
+		return process.Result{}, nil
+	}}
+	rt := runtime.NewHerdr(runner)
+	handle := runtime.AgentHandle{Session: runtime.SessionHandle{Name: "lab-session"}, Name: "crew-agent"}
+	for _, src := range []harness.ReadSource{"", "recent"} {
+		if _, err := rt.ReadAgent(context.Background(), handle, src, 40); err == nil {
+			t.Fatalf("source %q was read", src)
+		}
+	}
+	if calls != 0 {
+		t.Fatalf("herdr ran %d times, want none", calls)
 	}
 }

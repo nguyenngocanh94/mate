@@ -9,6 +9,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -33,16 +34,18 @@ type scripted struct {
 	// onEnter, if set, replaces the remaining screens on the nth enter.
 	onEnter func(press int) []string
 	lines   []int
+	sources []harness.ReadSource
 }
 
-func (s *scripted) ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, lines int) (string, error) {
+func (s *scripted) ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	// The scripted screens carry no attributes, which is what a screen with
 	// nothing drawn faint looks like; send.Send reads this one.
-	return s.ReadAgent(ctx, handle, lines)
+	return s.ReadAgent(ctx, handle, source, lines)
 }
 
-func (s *scripted) ReadAgent(_ context.Context, _ runtime.AgentHandle, lines int) (string, error) {
+func (s *scripted) ReadAgent(_ context.Context, _ runtime.AgentHandle, source harness.ReadSource, lines int) (string, error) {
 	s.lines = append(s.lines, lines)
+	s.sources = append(s.sources, source)
 	if s.reads >= len(s.screens) {
 		return s.screens[len(s.screens)-1], nil
 	}
@@ -120,6 +123,10 @@ func TestSendTypesOnceAndConfirmsTheComposerCleared(t *testing.T) {
 	t.Parallel()
 	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
 	deps, slept := testDeps(rt)
+	// Claude's own screens, read through the source Claude does not use, so
+	// a read that spells recent-unwrapped instead of asking the profile
+	// fails below.
+	deps.Harnesses = harnesstest.ReadingVisible(deps.Harnesses)
 
 	report, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "say PONG", send.Options{})
 	if err != nil {
@@ -146,6 +153,16 @@ func TestSendTypesOnceAndConfirmsTheComposerCleared(t *testing.T) {
 	for _, n := range rt.lines {
 		if n != send.DefaultLines {
 			t.Fatalf("pane read %d lines, want %d", n, send.DefaultLines)
+		}
+	}
+	// Every read goes through the source the harness's screens were measured
+	// through.
+	if len(rt.sources) == 0 {
+		t.Fatal("the send never read the pane")
+	}
+	for _, src := range rt.sources {
+		if src != harness.ReadVisible {
+			t.Fatalf("pane read through %q, want the profile's %q", src, harness.ReadVisible)
 		}
 	}
 	want := []string{"classify", "type", "settle", "enter"}

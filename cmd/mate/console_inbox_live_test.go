@@ -125,7 +125,7 @@ func TestLiveConsoleInboxResolve(t *testing.T) {
 		Name:    crewRes.Agent, RawID: "k3", Kind: harness.KindCodex,
 	}
 	paneTail := func() string {
-		screen, readErr := rt.ReadAgent(ctx, crewHandle, 40)
+		screen, readErr := rt.ReadAgent(ctx, crewHandle, harness.ReadRecentUnwrapped, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}

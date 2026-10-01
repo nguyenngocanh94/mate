@@ -170,11 +170,15 @@ func boxPeekAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, re
 	if req.Crew == "" {
 		return "", observability.NewError(observability.CodeUsage, "no crew was named for the peek")
 	}
-	handle, _, err := spawn.CrewHandle(ctx, ws, deps, req.Target, req.Crew)
+	handle, kind, err := spawn.CrewHandle(ctx, ws, deps, req.Target, req.Crew)
 	if err != nil {
 		return "", err
 	}
-	screen, err := deps.Runtime.ReadAgent(ctx, handle, peekLines)
+	screens, err := screenOf(deps, kind)
+	if err != nil {
+		return "", err
+	}
+	screen, err := deps.Runtime.ReadAgent(ctx, handle, screens.ReadSource(), peekLines)
 	if err != nil {
 		return "", err
 	}

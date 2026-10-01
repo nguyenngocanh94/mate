@@ -137,15 +137,12 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 		RawID:   "shop",
 		Kind:    harness.KindClaude,
 	}
-	pane, err := rt.ReadAgent(ctx, resumedHandle, 60)
+	pane, err := rt.ReadAgent(ctx, resumedHandle, harness.ReadRecentUnwrapped, 60)
 	if err != nil {
 		t.Fatalf("ReadAgent after resume: %v", err)
 	}
 	t.Logf("pane after resume:\n%s", pane)
-	class, err := harness.ClassifyStartupScreen(harness.KindClaude, pane)
-	if err != nil {
-		t.Fatalf("ClassifyStartupScreen after resume: %v (pane: %s)", err, pane)
-	}
+	class := harness.Claude{}.Screen().ClassifyStartup(pane)
 	if class != harness.StartupScreenReady {
 		t.Fatalf("resumed pane classifies as %q (not the composer); pane:\n%s", class, pane)
 	}
@@ -164,7 +161,7 @@ func TestLiveSpawnMateResumeRemembers(t *testing.T) {
 		return true
 	})
 	if !strings.Contains(strings.ToUpper(recallText), "ZEBRA") {
-		pane, readErr := rt.ReadAgent(ctx, resumedHandle, 60)
+		pane, readErr := rt.ReadAgent(ctx, resumedHandle, harness.ReadRecentUnwrapped, 60)
 		if readErr != nil {
 			pane = "(ReadAgent failed: " + readErr.Error() + ")"
 		}

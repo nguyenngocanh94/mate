@@ -381,7 +381,7 @@ func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *cre
 	if readiness := runtime.ClassifyObservation(observed); readiness.Kind == runtime.ReadinessFailed {
 		return RelaunchResult{}, readiness.Err
 	}
-	delivered, warning, tail, err := deliverPrompt(ctx, deps, handle, RelaunchPrompt(briefPath, note), plan.kind)
+	delivered, warning, tail, err := deliverPrompt(ctx, deps, handle, RelaunchPrompt(briefPath, note), plan.profile)
 	if err != nil {
 		return RelaunchResult{}, err
 	}

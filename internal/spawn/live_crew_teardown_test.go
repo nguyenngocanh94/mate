@@ -101,7 +101,7 @@ func TestLiveCrewTeardownRefusesThenDiscards(t *testing.T) {
 		Kind:    harness.KindCodex,
 	}
 	status := waitForStatus(t, ctx, w, "k9", "wait-mate:", 120*time.Second, func() string {
-		screen, readErr := rt.ReadAgent(ctx, handle, 40)
+		screen, readErr := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, 40)
 		if readErr != nil {
 			return "(pane not readable: " + readErr.Error() + ")"
 		}

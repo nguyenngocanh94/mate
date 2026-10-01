@@ -169,14 +169,11 @@ func waitForComposer(t *testing.T, ctx context.Context, rt runtime.Adapter,
 	deadline := time.Now().Add(budget)
 	var last send.Classification
 	for {
-		screen, err := rt.ReadAgent(ctx, handle, send.DefaultLines)
+		screen, err := rt.ReadAgent(ctx, handle, harness.ReadRecentUnwrapped, send.DefaultLines)
 		if err != nil {
 			t.Fatalf("ReadAgent: %v", err)
 		}
-		class, err := send.ClassifyComposer(harness.KindCodex, screen)
-		if err != nil {
-			t.Fatalf("ClassifyComposer: %v", err)
-		}
+		class := send.ClassifyComposer(harness.Codex{}.Screen(), screen)
 		last = class
 		if class.State == want {
 			t.Logf("pane reached composer %s (%q)", class.State, class.Evidence)
@@ -249,8 +246,16 @@ func incidentDump(t *testing.T, w *store.Workspace) string {
 }
 
 func liveHandleFunc(w *store.Workspace, deps spawn.Deps) watch.HandleFunc {
-	return func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.Kind, error) {
-		return spawn.CrewHandle(ctx, w, deps, project, crew)
+	return func(ctx context.Context, project, crew string) (runtime.AgentHandle, harness.ScreenProfile, error) {
+		handle, kind, err := spawn.CrewHandle(ctx, w, deps, project, crew)
+		if err != nil {
+			return runtime.AgentHandle{}, nil, err
+		}
+		profile, err := deps.Harnesses.Lookup(kind)
+		if err != nil {
+			return runtime.AgentHandle{}, nil, err
+		}
+		return handle, profile.Screen(), nil
 	}
 }
 

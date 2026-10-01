@@ -56,6 +56,8 @@ type fixture struct {
 	clock     *fakeClock
 	handle    runtime.AgentHandle
 	handleErr error
+	// harnesses is what deps registers: the catalog, unless a test swaps it.
+	harnesses harness.Registry
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -81,12 +83,12 @@ func newFixture(t *testing.T) *fixture {
 	}
 	rt.PutAgent(handle, runtime.AgentIdle)
 	rt.SetReadOutput(handle, claudeScreen(""))
-	return &fixture{t: t, ws: ws, rt: rt, clock: &fakeClock{now: start}, handle: handle}
+	return &fixture{t: t, ws: ws, rt: rt, clock: &fakeClock{now: start}, handle: handle, harnesses: catalog.Default()}
 }
 
 func (f *fixture) deps() outbox.Deps {
 	return outbox.Deps{
-		Harnesses: catalog.Default(),
+		Harnesses: f.harnesses,
 		Runtime:   f.rt,
 		Handle: func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
 			if f.handleErr != nil {

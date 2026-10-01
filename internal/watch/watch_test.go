@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -69,6 +70,29 @@ func TestWatchDoesNotOpenStaleWhileTheComposerIsBusy(t *testing.T) {
 
 	if h, _ := f.health("k3"); h.Composer != send.StateBusy {
 		t.Fatalf("health composer = %q, want busy", h.Composer)
+	}
+}
+
+// The pane is read through the source the crew's ScreenProfile names. Codex
+// reads recent-unwrapped, so its screens read through ReadVisible catch a
+// read that spells the source instead of asking the profile.
+func TestWatchReadsThePaneThroughTheProfilesSource(t *testing.T) {
+	f := newFixture(t)
+	f.screens = harnesstest.ScreenReadingVisible(f.screens)
+	f.appendStatus("k3", "working: running the suite")
+	f.setScreen(codexBusyScreen)
+
+	f.poll()
+	if h, _ := f.health("k3"); h.Composer != send.StateBusy {
+		t.Fatalf("health composer = %q, want busy", h.Composer)
+	}
+	if len(f.rt.ReadSources) == 0 {
+		t.Fatal("the round never read the pane")
+	}
+	for i, src := range f.rt.ReadSources {
+		if src != harness.ReadVisible {
+			t.Fatalf("read %d went through %q, want the profile's %q", i, src, harness.ReadVisible)
+		}
 	}
 }
 
@@ -296,9 +320,9 @@ func TestWatchChecksTheSessionWithNoCrews(t *testing.T) {
 	ws := newWorkspace(t)
 	w := watch.New(ws, watch.Deps{
 		Runtime: runtime.NewFake(),
-		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.Kind, error) {
+		Handle: func(context.Context, string, string) (runtime.AgentHandle, harness.ScreenProfile, error) {
 			t.Fatal("a workspace with no open crews asked for a crew handle")
-			return runtime.AgentHandle{}, "", nil
+			return runtime.AgentHandle{}, nil, nil
 		},
 		Session: func(context.Context) error {
 			return observability.NewError(observability.CodeRuntimeUnavailable, "no herdr server is running")

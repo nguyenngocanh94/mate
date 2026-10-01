@@ -151,7 +151,10 @@ func (d dialogProfile) answer() StartupDialogAnswer {
 
 // startupProfile is one harness's measured startup screens: the modals it can
 // draw, in the order they are checked, and what its empty composer looks like.
+// Each harness's ScreenProfile reads through one (screen.go).
 type startupProfile struct {
+	// kind names the harness in refusals.
+	kind     Kind
 	dialogs  []dialogProfile
 	composer func(lines []string) bool
 }
@@ -170,118 +173,118 @@ func (p startupProfile) dialogsFor(screen StartupScreen) []dialogProfile {
 	return out
 }
 
-func startupProfileFor(kind Kind) (startupProfile, error) {
-	switch kind {
-	case KindCodex:
-		return startupProfile{
-			// The hook review (codex_hooks.go) is recognised here but
-			// answered only by the settle's own walk through it, and only
-			// for hooks mate names as its own.
-			dialogs: append([]dialogProfile{
-				{
-					screen:   StartupScreenTrustDialog,
-					question: codexTrustQuestion,
-					options: []optionSpec{
-						{label: codexTrustAccept},
-						{label: codexTrustQuit},
-					},
-					target:         0,
-					footer:         codexDialogFooter,
-					marker:         codexHighlightMarker,
-					questionWindow: 3,
-					// The dialog opens with "1. Yes, continue" highlighted,
-					// but the digit is pressed rather than trusted: the
-					// re-read after it is what the accept check reads.
-					selectKeys:  []string{"1"},
-					targetLabel: codexTrustAccept,
+// codexStartup is codex-cli's measured startup screens.
+func codexStartup() startupProfile {
+	return startupProfile{
+		kind: KindCodex,
+		// The hook review (codex_hooks.go) is recognised here but
+		// answered only by the settle's own walk through it, and only
+		// for hooks mate names as its own.
+		dialogs: append([]dialogProfile{
+			{
+				screen:   StartupScreenTrustDialog,
+				question: codexTrustQuestion,
+				options: []optionSpec{
+					{label: codexTrustAccept},
+					{label: codexTrustQuit},
 				},
-				{
-					screen:   StartupScreenTrustDialog,
-					question: codexTrustQuestionV156,
-					options: []optionSpec{
-						{label: codexTrustAcceptV156},
-						{label: codexTrustQuitV156},
-					},
-					target: 0,
-					footer: codexDialogFooterV156,
-					marker: codexHighlightMarker,
-					// The question opens a paragraph that wraps to three
-					// lines at 93 columns; a narrower pane wraps it to more.
-					questionWindow: 6,
-					selectKeys:     []string{"1"},
-					targetLabel:    codexTrustAcceptV156,
+				target:         0,
+				footer:         codexDialogFooter,
+				marker:         codexHighlightMarker,
+				questionWindow: 3,
+				// The dialog opens with "1. Yes, continue" highlighted,
+				// but the digit is pressed rather than trusted: the
+				// re-read after it is what the accept check reads.
+				selectKeys:  []string{"1"},
+				targetLabel: codexTrustAccept,
+			},
+			{
+				screen:   StartupScreenTrustDialog,
+				question: codexTrustQuestionV156,
+				options: []optionSpec{
+					{label: codexTrustAcceptV156},
+					{label: codexTrustQuitV156},
 				},
-				{
-					screen:   StartupScreenUpdateDialog,
-					question: codexUpdateNotice,
-					options: []optionSpec{
-						{label: codexUpdateNow, prefix: true},
-						{label: codexUpdateSkip},
-						{label: codexUpdateSkipNext},
-					},
-					// "3. Skip until next version" is the only option that
-					// does not draw the prompt again on the next launch:
-					// "2. Skip" returns immediately, and "1. Update now"
-					// runs a package install under the agent.
-					target:         2,
-					footer:         codexDialogFooter,
-					marker:         codexHighlightMarker,
-					questionWindow: 3,
-					// Measured 2026-09-18: the highlight opens on option 1
-					// and `down` moves it one option at a time.
-					selectKeys:  []string{"down", "down"},
-					targetLabel: codexUpdateSkipNext,
+				target: 0,
+				footer: codexDialogFooterV156,
+				marker: codexHighlightMarker,
+				// The question opens a paragraph that wraps to three
+				// lines at 93 columns; a narrower pane wraps it to more.
+				questionWindow: 6,
+				selectKeys:     []string{"1"},
+				targetLabel:    codexTrustAcceptV156,
+			},
+			{
+				screen:   StartupScreenUpdateDialog,
+				question: codexUpdateNotice,
+				options: []optionSpec{
+					{label: codexUpdateNow, prefix: true},
+					{label: codexUpdateSkip},
+					{label: codexUpdateSkipNext},
 				},
-			}, hooksReviewDialogs()...),
-			composer: func(lines []string) bool {
-				for _, l := range lines {
-					if strings.Contains(l, CodexComposerPlaceholder) {
-						return true
-					}
+				// "3. Skip until next version" is the only option that
+				// does not draw the prompt again on the next launch:
+				// "2. Skip" returns immediately, and "1. Update now"
+				// runs a package install under the agent.
+				target:         2,
+				footer:         codexDialogFooter,
+				marker:         codexHighlightMarker,
+				questionWindow: 3,
+				// Measured 2026-09-18: the highlight opens on option 1
+				// and `down` moves it one option at a time.
+				selectKeys:  []string{"down", "down"},
+				targetLabel: codexUpdateSkipNext,
+			},
+		}, hooksReviewDialogs()...),
+		composer: func(lines []string) bool {
+			for _, l := range lines {
+				if strings.Contains(l, CodexComposerPlaceholder) {
+					return true
 				}
-				return false
-			},
-		}, nil
-	case KindClaude:
-		return startupProfile{
-			dialogs: []dialogProfile{
-				{
-					screen:   StartupScreenTrustDialog,
-					question: claudeTrustQuestion,
-					options: []optionSpec{
-						{label: claudeTrustQuit},
-						{label: claudeTrustAccept},
-					},
-					target:         1,
-					footer:         claudeTrustFooter,
-					marker:         ClaudeComposerMarker,
-					questionWindow: 6,
-					selectKeys:     []string{"down"},
-					targetLabel:    claudeTrustAccept,
+			}
+			return false
+		},
+	}
+}
+
+// claudeStartup is Claude Code's measured startup screens.
+func claudeStartup() startupProfile {
+	return startupProfile{
+		kind: KindClaude,
+		dialogs: []dialogProfile{
+			{
+				screen:   StartupScreenTrustDialog,
+				question: claudeTrustQuestion,
+				options: []optionSpec{
+					{label: claudeTrustQuit},
+					{label: claudeTrustAccept},
 				},
+				target:         1,
+				footer:         claudeTrustFooter,
+				marker:         ClaudeComposerMarker,
+				questionWindow: 6,
+				selectKeys:     []string{"down"},
+				targetLabel:    claudeTrustAccept,
 			},
-			// The empty composer is the marker alone on its line. A shell
-			// prompt ending in the same glyph ("… main ❯ claude") and a
-			// highlighted option ("❯ No, exit") both carry text beside it.
-			// From 2.1.282 the empty composer also shows a dim suggestion
-			// after the marker; that shape counts only between the
-			// composer's two rules (claudeComposerSuggestion).
-			composer: func(lines []string) bool {
-				for i, l := range lines {
-					if strings.TrimSpace(l) == ClaudeComposerMarker {
-						return true
-					}
-					if i > 0 && i+1 < len(lines) && isRuleLine(lines[i-1]) && isRuleLine(lines[i+1]) &&
-						claudeComposerSuggestion.MatchString(strings.TrimSpace(l)) {
-						return true
-					}
+		},
+		// The empty composer is the marker alone on its line. A shell
+		// prompt ending in the same glyph ("… main ❯ claude") and a
+		// highlighted option ("❯ No, exit") both carry text beside it.
+		// From 2.1.282 the empty composer also shows a dim suggestion
+		// after the marker; that shape counts only between the
+		// composer's two rules (claudeComposerSuggestion).
+		composer: func(lines []string) bool {
+			for i, l := range lines {
+				if strings.TrimSpace(l) == ClaudeComposerMarker {
+					return true
 				}
-				return false
-			},
-		}, nil
-	default:
-		return startupProfile{}, observability.NewError(observability.CodeUsage,
-			fmt.Sprintf("no measured startup-screen profile for harness %q; mate refuses to drive a pane it cannot read", kind))
+				if i > 0 && i+1 < len(lines) && isRuleLine(lines[i-1]) && isRuleLine(lines[i+1]) &&
+					claudeComposerSuggestion.MatchString(strings.TrimSpace(l)) {
+					return true
+				}
+			}
+			return false
+		},
 	}
 }
 
@@ -388,83 +391,48 @@ func (d dialogProfile) parse(screen string) (highlighted int, ok bool) {
 	return 0, false
 }
 
-// ClassifyStartupScreen names what a harness pane is showing right after
-// launch. Dialogs are checked before the composer, because Claude's dialog
-// and Claude's composer share the highlight glyph, and because Codex keeps
-// an "update available" banner in its scrollback above the live composer.
-func ClassifyStartupScreen(kind Kind, screen string) (StartupScreen, error) {
-	p, err := startupProfileFor(kind)
-	if err != nil {
-		return StartupScreenUnrecognized, err
-	}
+// classify names what a harness pane is showing right after launch. Dialogs
+// are checked before the composer, because Claude's dialog and Claude's
+// composer share the highlight glyph, and because Codex keeps an "update
+// available" banner in its scrollback above the live composer.
+func (p startupProfile) classify(screen string) StartupScreen {
 	for _, d := range p.dialogs {
 		if _, ok := d.parse(screen); ok {
-			return d.screen, nil
+			return d.screen
 		}
 	}
 	if p.composer(strings.Split(screen, "\n")) {
-		return StartupScreenReady, nil
+		return StartupScreenReady
 	}
-	return StartupScreenUnrecognized, nil
+	return StartupScreenUnrecognized
 }
 
-// dialogAnswerFor is the shared lookup behind the per-dialog accessors.
-func dialogAnswerFor(kind Kind, screen StartupScreen) (StartupDialogAnswer, error) {
-	p, err := startupProfileFor(kind)
-	if err != nil {
-		return StartupDialogAnswer{}, err
-	}
+// answer is the measured key sequence for one dialog: the trust dialog's
+// accept, or the update prompt's "3. Skip until next version" - the only
+// option that both leaves the installed harness alone and stops the prompt
+// returning before the next release.
+func (p startupProfile) answer(screen StartupScreen) (StartupDialogAnswer, error) {
 	layouts := p.dialogsFor(screen)
 	if len(layouts) == 0 {
 		return StartupDialogAnswer{}, observability.NewError(observability.CodeUsage,
-			fmt.Sprintf("harness %q has no measured %s; mate refuses to invent one", kind, screen))
+			fmt.Sprintf("harness %q has no measured %s; mate refuses to invent one", p.kind, screen))
 	}
 	return layouts[0].answer(), nil
 }
 
 // targetSelected reports whether the structurally confirmed dialog is on
-// screen with its highlight marker on the option the answer confirms.
-func targetSelected(kind Kind, screen StartupScreen, snapshot string) (bool, error) {
-	p, err := startupProfileFor(kind)
-	if err != nil {
-		return false, err
-	}
+// screen with its highlight marker on the option the answer confirms - the
+// one state in which the confirm key accepts rather than quits, or skips
+// rather than runs a package install under the agent. It is false on a
+// screen with no such dialog, so a caller cannot confirm into a composer by
+// mistake.
+func (p startupProfile) targetSelected(screen StartupScreen, snapshot string) bool {
 	for _, d := range p.dialogsFor(screen) {
 		if highlighted, parsed := d.parse(snapshot); parsed {
-			return highlighted == d.target, nil
+			return highlighted == d.target
 		}
 	}
-	return false, nil
-}
-
-// TrustDialogAnswerFor returns the measured accept sequence for one harness.
-func TrustDialogAnswerFor(kind Kind) (StartupDialogAnswer, error) {
-	return dialogAnswerFor(kind, StartupScreenTrustDialog)
-}
-
-// TrustDialogAcceptSelected reports whether the structurally confirmed trust
-// dialog is on screen with its highlight marker on the accept option - the
-// one state in which the confirm key accepts rather than quits. It is false
-// on a screen with no dialog, so a caller cannot confirm into a composer by
-// mistake.
-func TrustDialogAcceptSelected(kind Kind, screen string) (bool, error) {
-	return targetSelected(kind, StartupScreenTrustDialog, screen)
-}
-
-// UpdateDialogAnswerFor returns the measured sequence that moves the update
-// prompt's highlight onto "3. Skip until next version" - the only option that
-// both leaves the installed harness alone and stops the prompt returning
-// before the next release.
-func UpdateDialogAnswerFor(kind Kind) (StartupDialogAnswer, error) {
-	return dialogAnswerFor(kind, StartupScreenUpdateDialog)
-}
-
-// UpdateDialogSkipSelected reports whether the structurally confirmed update
-// dialog is on screen with its highlight marker on "3. Skip until next
-// version". It is false on any other screen, so the confirm key can never
-// land on "1. Update now" and run a package install under the agent.
-func UpdateDialogSkipSelected(kind Kind, screen string) (bool, error) {
-	return targetSelected(kind, StartupScreenUpdateDialog, screen)
+	return false
 }
 
 // StartupScreenTail returns the last n lines of a screen, for error details.
@@ -478,14 +446,4 @@ func StartupScreenTail(screen string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, "\n")
-}
-
-// kindScreen is the ScreenProfile of a harness whose startup profile is
-// keyed by kind in this file. Plan PR 3 moves the profiles themselves behind
-// ScreenProfile.
-type kindScreen Kind
-
-// ClassifyStartup implements ScreenProfile.
-func (k kindScreen) ClassifyStartup(screen string) (StartupScreen, error) {
-	return ClassifyStartupScreen(Kind(k), screen)
 }
