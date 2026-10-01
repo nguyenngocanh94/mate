@@ -21,7 +21,7 @@ func claudeLaunch(t *testing.T) harness.LaunchSpec {
 	if err := os.WriteFile(path, []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	launch, err := harness.Claude{}.BuildLaunchSpec(context.Background(), harness.AgentSpec{Kind: harness.KindClaude, Cwd: cwd, ContextPath: path})
+	launch, err := harness.Claude{}.Build(context.Background(), harness.AgentSpec{Kind: harness.KindClaude, Cwd: cwd, ContextPath: path})
 	if err != nil {
 		t.Fatal(err)
 	}

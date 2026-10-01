@@ -131,8 +131,7 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 			fmt.Sprintf("the worktree of crew %s is gone (%s); there is nothing to relaunch into - spawn a new crew", crew, worktree))
 	}
 	briefPath := w.CrewBrief(project, crew)
-	brief, err := os.ReadFile(briefPath)
-	if err != nil {
+	if _, err := os.ReadFile(briefPath); err != nil {
 		return RelaunchResult{}, observability.NewError(observability.CodeNeedsRepair,
 			fmt.Sprintf("crew %s has no readable brief at %s; a relaunch would start an agent with nothing to do", crew, briefPath))
 	}
@@ -164,11 +163,11 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 	// reads its discovery file when a session starts, so writing them while
 	// the old agent lives changes nothing for it, and a refusal here leaves
 	// a live crew running.
-	sessionID, settingsPath, err := prepareCrewHarnessFiles(ctx, w, deps, deps.git(), plan, brief)
+	prep, err := prepareCrewLaunch(ctx, w, deps, deps.git(), plan)
 	if err != nil {
 		return RelaunchResult{}, err
 	}
-	launch, err := buildCrewLaunchSpec(ctx, plan, briefPath, sessionID, settingsPath)
+	launch, err := buildCrewLaunchSpec(ctx, plan, prep)
 	if err != nil {
 		return RelaunchResult{}, err
 	}
@@ -210,7 +209,7 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		return RelaunchResult{}, err
 	}
 	saga := &crewRelaunchSaga{deps: deps, session: session, tab: tab, madeTab: true}
-	if _, err := relaunchInTab(ctx, w, deps, saga, plan, briefPath, sessionID, settingsPath, launch, note); err != nil {
+	if _, err := relaunchInTab(ctx, w, deps, saga, plan, briefPath, prep.SessionID, launch, note); err != nil {
 		saga.compensate(ctx)
 		return RelaunchResult{}, err
 	}
@@ -352,7 +351,7 @@ func (s *crewRelaunchSaga) compensate(ctx context.Context) {
 // compensate: the agent, its startup screen, readiness, the prompt and the
 // result. The meta is deliberately not written here; the caller writes it
 // in one place after this returns.
-func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *crewRelaunchSaga, plan crewPlan, briefPath, sessionID, settingsPath string, launch harness.LaunchSpec, note string) (RelaunchResult, error) {
+func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *crewRelaunchSaga, plan crewPlan, briefPath, sessionID string, launch harness.LaunchSpec, note string) (RelaunchResult, error) {
 	reservation, err := runtime.AllocateAgentName(deps.Names, saga.session.Name, CrewAgentNamePrefix, plan.crew, runtime.FailOnCollision)
 	if err != nil {
 		return RelaunchResult{}, err

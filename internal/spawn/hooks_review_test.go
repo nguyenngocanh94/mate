@@ -48,8 +48,8 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	mateDir := w.MateDir("shop")
-	source := spawn.CodexHooksPath(mateDir)
-	command := spawn.SessionHookCommand(deps.Binary, harness.KindCodex)
+	source := harness.CodexHooksPath(mateDir)
+	command := harness.SessionHookCommand(deps.Binary, harness.KindCodex)
 
 	own := ownScreen(t, screen(t, "codex-0.156.1-hooks-sessionstart-own.txt"), captureOneBlock, source, command)
 	pane := newScriptedPane(t, rt,
@@ -93,8 +93,8 @@ func TestStartMateCodexTrustsItsOwnHookAndNothingElse(t *testing.T) {
 		t.Fatalf("hooks.json = %s, want one SessionStart hook and nothing else", data)
 	}
 	h := entries[0].Hooks[0]
-	if h["command"] != command || h["additionalContextLimit"] != float64(spawn.CodexHookContextLimit) {
-		t.Fatalf("hook = %+v, want %q with additionalContextLimit %d", h, command, spawn.CodexHookContextLimit)
+	if h["command"] != command || h["additionalContextLimit"] != float64(harness.CodexHookContextLimit) {
+		t.Fatalf("hook = %+v, want %q with additionalContextLimit %d", h, command, harness.CodexHookContextLimit)
 	}
 }
 
@@ -156,7 +156,7 @@ func TestStartMateClaudeWritesNoCodexHooks(t *testing.T) {
 	if _, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop", Harness: harness.KindClaude}); err != nil {
 		t.Fatalf("StartMate: %v", err)
 	}
-	if _, err := os.Stat(spawn.CodexHooksPath(w.MateDir("shop"))); !os.IsNotExist(err) {
+	if _, err := os.Stat(harness.CodexHooksPath(w.MateDir("shop"))); !os.IsNotExist(err) {
 		t.Fatalf("a Claude Mate got a Codex hooks file: %v", err)
 	}
 }

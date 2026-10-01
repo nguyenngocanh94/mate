@@ -50,7 +50,7 @@ func TestStartMateWritesManualAndMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("settings.json: %v", err)
 	}
-	wantSettings, err := spawn.ClaudeSettings(deps.Binary)
+	wantSettings, err := harness.ClaudeSettings(deps.Binary)
 	if err != nil {
 		t.Fatal(err)
 	}

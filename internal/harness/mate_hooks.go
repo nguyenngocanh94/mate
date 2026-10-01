@@ -1,12 +1,39 @@
-package spawn
+package harness
 
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
-
-	"github.com/nguyenngocanh94/mate/internal/harness"
 )
+
+// The settings and hook files a launch writes, which Prepare names. They came
+// here from internal/spawn with plan PR 2 (docs/plans/harness-registry-
+// 2026-09-30.md, section 6), because Prepare computes their bytes; which of
+// a Mate's hooks the startup settle may trust is still spawn's question
+// until the hook capability exists (plan PR 4).
+
+const (
+	// ClaudeSettingsFile is the name of the settings file a Claude launch
+	// passes with --settings: `<mate>/.claude/settings.json` for a Mate,
+	// `crews/<id>/settings.json` for a Crew.
+	ClaudeSettingsFile = "settings.json"
+	// CodexHooksFile is the Codex Mate's hook file, in the `.codex/` of its
+	// cwd, which Codex loads once the directory is trusted (task 35, A3).
+	// The operator's own `$CODEX_HOME/hooks.json` is never read or written.
+	CodexHooksFile = "hooks.json"
+)
+
+// ClaudeSettingsPath is the settings file a Claude Mate in mateDir launches
+// with.
+func ClaudeSettingsPath(mateDir string) string {
+	return filepath.Join(mateDir, Claude{}.Info().ConfigDir, ClaudeSettingsFile)
+}
+
+// CodexHooksPath is the hook file of a Codex Mate in mateDir.
+func CodexHooksPath(mateDir string) string {
+	return filepath.Join(mateDir, Codex{}.Info().ConfigDir, CodexHooksFile)
+}
 
 // AutoMemoryKey is the Claude Code setting that turns its auto-memory off
 // for one session when false. Measured 2026-09-24 on Claude Code 2.1.281 in a
@@ -25,8 +52,8 @@ const AutoMemoryKey = "autoMemoryEnabled"
 // user is back (docs/mvp.md task 08), and auto-memory off, because the
 // Mate's memory is `mate/memory.md` and nothing else (docs/mvp.md M8, B6).
 // It is a pure function of the mate binary path, so it can be
-// golden-tested without touching Herdr or the filesystem, and both
-// `StartMate` and its tests build the same file this way.
+// golden-tested without touching Herdr or the filesystem, and both a Mate
+// launch and its tests build the same file this way.
 //
 // UserPromptSubmit invokes `mate hook mate-prompt`; Stop invokes `mate
 // hook mate-stop`. Both read the hook's JSON payload from their own stdin,
@@ -57,24 +84,12 @@ func ClaudeSettings(binary string) ([]byte, error) {
 // hook runs.
 const SessionHookName = "mate-session"
 
-// The SessionStart digest's size, per harness. Both are measured limits on
-// what a hook's output puts in context (docs/mvp.md section 7, task 37).
 const (
-	// ClaudeSessionHookMaxBytes: Claude Code 2.1.281 replaces any hook
-	// output over 10,000 characters, plain stdout and JSON
-	// additionalContext alike, with a file path and a 2 KB preview, so the
-	// model never reads the rest. A byte bound is a character bound from
-	// above (UTF-8 never spends fewer bytes than UTF-16 code units), and
-	// the margin keeps the cut notice inside it.
-	ClaudeSessionHookMaxBytes = 9500
-	// CodexSessionHookMaxBytes: codex-cli 0.156.1 keeps the head and the
-	// tail of a SessionStart hook's output and drops the middle past about
-	// 2.5K tokens unless the hook raises additionalContextLimit; with the
-	// limit at 20000, 28K characters arrived whole. The digest is bounded
-	// well inside CodexHookContextLimit.
-	CodexSessionHookMaxBytes = 48000
 	// CodexHookContextLimit is the additionalContextLimit, in tokens, the
-	// Codex Mate's hook is installed with.
+	// Codex Mate's hook is installed with: codex-cli 0.156.1 keeps the head
+	// and the tail of a SessionStart hook's output and drops the middle past
+	// about 2.5K tokens unless the hook raises it (docs/mvp.md section 7,
+	// task 37).
 	CodexHookContextLimit = 32000
 	// CodexHookTimeoutSeconds bounds the hook, which reads files and git
 	// metadata only.
@@ -85,9 +100,9 @@ const (
 // The Codex form names its harness so the digest is sized for it. The
 // startup settle compares a hook Codex asks to trust against this string,
 // so it is the one place it is spelled.
-func SessionHookCommand(binary string, kind harness.Kind) string {
+func SessionHookCommand(binary string, kind Kind) string {
 	command := shellQuote(binary) + " hook " + SessionHookName
-	if kind == harness.KindCodex {
+	if kind == KindCodex {
 		command += " --harness codex"
 	}
 	return command
@@ -171,7 +186,7 @@ func EnsureSessionHook(data []byte, binary string) (out []byte, changed bool, er
 
 // CodexHooks is `mate/.codex/hooks.json` for a Codex Mate: the same
 // SessionStart hook, with its output limit raised so the digest arrives
-// whole (see CodexSessionHookMaxBytes). Codex runs it at the first prompt
+// whole (see CodexHookContextLimit). Codex runs it at the first prompt
 // after a launch, resume, /compact or /clear (task 35, A3). It is the app's
 // file, rewritten on every start; the same bytes keep the same trust.
 func CodexHooks(binary string) []byte {
@@ -180,7 +195,7 @@ func CodexHooks(binary string) []byte {
 			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
 					"type":                   "command",
-					"command":                SessionHookCommand(binary, harness.KindCodex),
+					"command":                SessionHookCommand(binary, KindCodex),
 					"timeout":                CodexHookTimeoutSeconds,
 					"additionalContextLimit": CodexHookContextLimit,
 				}},

@@ -1,9 +1,10 @@
 // Package harness is the harness contract (contract.go) and the Registry
 // that holds the harnesses a binary launches. A harness is a Profile: its
-// Launcher builds LaunchSpec values and never forks the harness process.
+// Launcher prepares a launch's files and builds its LaunchSpec (launch.go),
+// and never writes a file or forks the harness process.
 //
-// For callers outside this package, constructors are the only way to obtain
-// a startable LaunchSpec, and they refuse to return one whose required
+// For callers outside this package, NewLaunchSpec is the only way to obtain
+// a startable LaunchSpec, and it refuses to return one whose required
 // context would be silently dropped. Inside the package a startable-shaped
 // spec can still be hand-assembled (Startable is only a shape check), so
 // consuming boundaries - the runtime start path included - run

@@ -126,36 +126,64 @@ func TestContractRequiredParts(t *testing.T) {
 	})
 }
 
-// Item 2: the launcher builds a Crew spec on a fixture directory, and a
-// Mate spec or a refusal that names the capability it lacks.
-//
-// Until plan PR 2 gives Launcher a Prepare that names its own files, the
-// fixture writes the manual at the cwd's Info().InstructionFile and passes
-// that path; every env key a profile declares points at an empty directory
-// so no file of the operator's reaches the launch.
+// Item 2: Prepare lays out each role on fixture directories and Build turns
+// that into a Crew spec, and a Mate spec or a refusal that names the
+// capability it lacks. Every file Prepare names lands inside the agent's cwd
+// or its state directory, and one to keep out of git sits at the cwd's top,
+// where spawn's local exclude rule can name it. Every env key a profile
+// declares points at an empty directory so no file of the operator's
+// reaches the launch.
 func TestContractLauncherBuildsEachRole(t *testing.T) {
 	eachProfile(t, func(t *testing.T, p harness.Profile) {
 		info := p.Info()
 		for _, key := range info.EnvKeys {
 			t.Setenv(key, t.TempDir())
 		}
-		cwd := t.TempDir()
-		manual := filepath.Join(cwd, info.InstructionFile)
-		if info.InstructionFile == "" {
-			manual = filepath.Join(cwd, "manual.md")
-		}
-		if err := os.WriteFile(manual, []byte("you are a contract fixture\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
 		ctx := context.Background()
-		spec := func(role harness.AgentRole) harness.AgentSpec {
-			return harness.AgentSpec{
-				ID: "contract-" + string(role), Role: role, Kind: p.Kind(),
-				Cwd: cwd, ContextPath: manual, Config: harness.Config{Kind: p.Kind()},
+		launch := func(role harness.AgentRole) (harness.LaunchSpec, string, error) {
+			t.Helper()
+			cwd, state := t.TempDir(), t.TempDir()
+			// A Mate's manual is in its cwd; a Crew's brief is in its state
+			// directory, outside the worktree.
+			instructions := filepath.Join(state, "brief.md")
+			if role == harness.RoleMate {
+				instructions = filepath.Join(cwd, "AGENTS.md")
 			}
+			if err := os.WriteFile(instructions, []byte("you are a contract fixture\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			prep, err := p.Launcher().Prepare(ctx, harness.PrepareRequest{
+				Role: role, Cwd: cwd, StateDir: state, ContextPath: instructions, Binary: "/usr/local/bin/mate",
+			})
+			if err != nil {
+				return harness.LaunchSpec{}, cwd, err
+			}
+			for _, f := range prep.Files {
+				inside := func(dir string) bool {
+					rel, err := filepath.Rel(dir, f.Path)
+					return err == nil && filepath.IsAbs(f.Path) && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+				}
+				if !inside(cwd) && !inside(state) {
+					t.Errorf("%s: Prepare names %s, outside the cwd %s and the state directory %s", role, f.Path, cwd, state)
+				}
+				if f.Exclude && filepath.Dir(f.Path) != cwd {
+					t.Errorf("%s: %s is to be kept out of git but is not at the top of the cwd %s", role, f.Path, cwd)
+				}
+				if err := os.MkdirAll(filepath.Dir(f.Path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(f.Path, f.Data, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			spec, err := p.Launcher().Build(ctx, harness.AgentSpec{
+				ID: "contract-" + string(role), Role: role, Kind: p.Kind(), Cwd: cwd,
+				ContextPath: prep.ContextPath, Launch: prep.Launch,
+			})
+			return spec, cwd, err
 		}
 
-		crew, err := p.Launcher().BuildLaunchSpec(ctx, spec(harness.RoleCrew))
+		crew, cwd, err := launch(harness.RoleCrew)
 		if err != nil {
 			t.Fatalf("Crew launch: %v", err)
 		}
@@ -167,7 +195,7 @@ func TestContractLauncherBuildsEachRole(t *testing.T) {
 			t.Errorf("Crew launch fails the runtime's own context check: %v", err)
 		}
 
-		mate, err := p.Launcher().BuildLaunchSpec(ctx, spec(harness.RoleMate))
+		mate, _, err := launch(harness.RoleMate)
 		if err != nil {
 			var missing []string
 			for _, d := range declarations(t, p.Capabilities()) {
@@ -182,6 +210,9 @@ func TestContractLauncherBuildsEachRole(t *testing.T) {
 		}
 		if !mate.Startable() || mate.Kind() != info.RuntimeKind {
 			t.Errorf("Mate launch: startable %v, kind %q (want %q)", mate.Startable(), mate.Kind(), info.RuntimeKind)
+		}
+		if err := mate.ValidateRequiredContext(); err != nil {
+			t.Errorf("Mate launch fails the runtime's own context check: %v", err)
 		}
 	})
 }

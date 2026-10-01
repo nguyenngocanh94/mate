@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/nguyenngocanh94/mate/internal/config"
@@ -17,6 +18,14 @@ import (
 // @path tokens) and exposes the entire context in the process table.
 type Claude struct {
 	MaxInlineBytes int
+	// InlineFallback takes the bounded --append-system-prompt path for a
+	// launch that delivers a context file. Build still fails closed if the
+	// file is missing, empty, relative, or over budget.
+	InlineFallback bool
+	// ConfigDir is the configured CLAUDE_CONFIG_DIR. Empty means use the
+	// provider default for transcript discovery and leave the launch
+	// variable unset so Claude inherits its normal account identity.
+	ConfigDir string
 }
 
 // Kind implements Profile.
@@ -29,6 +38,9 @@ func (Claude) Info() Info {
 		ConfigDir:       ".claude",
 		InstructionFile: "CLAUDE.md",
 		EnvKeys:         []string{config.EnvClaudeConfigDir},
+		// Claude Code discovers skills under its cwd's
+		// `.claude/skills/<name>/SKILL.md`.
+		SkillsDir: ".claude/skills",
 	}
 }
 
@@ -53,11 +65,110 @@ func (Claude) Capabilities() Capabilities {
 	}
 }
 
-// BuildLaunchSpec constructs a startable Claude spec or returns an error.
-// A spec whose required context cannot be delivered is refused, not returned.
-func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
+// claudeLaunch is what Claude's Prepare hands its Build.
+type claudeLaunch struct {
+	// sessionID names a fresh session (--session-id). A resumed one comes
+	// from AgentSpec.ResumeSessionID.
+	sessionID string
+	// settingsPath is the --settings file. Claude takes it together with
+	// the session identity, fresh or resumed.
+	settingsPath string
+	// manualInCwd says the cwd already loads the operating manual on its
+	// own, so the launch carries no context flag. Claude Code reads
+	// `CLAUDE.md` from the directory it starts in, and a Mate's cwd holds
+	// one that is exactly `@AGENTS.md`; passing that same manual as
+	// --append-system-prompt-file delivered it twice (docs/mvp.md, "No ky
+	// thuat").
+	manualInCwd bool
+}
+
+// Prepare implements Launcher. Every Claude launch names its session and
+// carries a settings file with it, fresh or resumed. A Mate also gets the
+// `CLAUDE.md` that loads its manual from the cwd and the hook settings of
+// its cwd's `.claude/`; a Crew gets hook-less settings beside its brief, so
+// nothing lands in its worktree.
+func (c Claude) Prepare(_ context.Context, req PrepareRequest) (Prepared, error) {
+	if err := req.check(KindClaude); err != nil {
+		return Prepared{}, err
+	}
+	var launch claudeLaunch
+	sessionID := req.ResumeSessionID
+	if sessionID == "" {
+		sessionID = req.newSessionID()
+		launch.sessionID = sessionID
+	}
+	if req.Role == RoleMate {
+		files, err := claudeMateFiles(req)
+		if err != nil {
+			return Prepared{}, err
+		}
+		launch.settingsPath = ClaudeSettingsPath(req.Cwd)
+		launch.manualInCwd = true
+		return Prepared{Files: files, SessionID: sessionID, Launch: launch}, nil
+	}
+	// A Claude launch can only carry a session id together with a settings
+	// file, and decision 9 wants session_id= recorded from the first day,
+	// so the crew gets a settings file of its own. It wires no hooks (the
+	// Mate's hooks are the Mate's) and turns auto-memory off.
+	launch.settingsPath = filepath.Join(req.StateDir, ClaudeSettingsFile)
+	return Prepared{
+		Files:       []LaunchFile{{Path: launch.settingsPath, Data: CrewClaudeSettings()}},
+		SessionID:   sessionID,
+		ContextPath: req.ContextPath,
+		Launch:      launch,
+	}, nil
+}
+
+// claudeMateFiles are the two files of a Claude Mate's cwd: `CLAUDE.md`,
+// which loads the manual by reference, and `.claude/settings.json`, wired
+// to the mate binary's `hook mate-prompt`/`hook mate-stop`/`hook
+// mate-session` (ClaudeSettings). An existing settings file - the user's
+// own, or one a previous start wrote - keeps every key it has; the two
+// things added to it are `autoMemoryEnabled: false` when the file does not
+// say (EnsureAutoMemoryOff), and the SessionStart hook when no SessionStart
+// entry runs it (EnsureSessionHook), so a Mate directory made before task 35
+// or 37 starts with auto-memory off and its digest wired too.
+func claudeMateFiles(req PrepareRequest) ([]LaunchFile, error) {
+	manual, err := filepath.Rel(req.Cwd, req.ContextPath)
+	if err != nil || manual == ".." || strings.HasPrefix(manual, ".."+string(filepath.Separator)) {
+		return nil, observability.WrapError(observability.CodeUsage,
+			fmt.Sprintf("the Mate manual %s is not inside its cwd %s, so %s cannot load it", req.ContextPath, req.Cwd, Claude{}.Info().InstructionFile), ErrContextRequired)
+	}
+	path := ClaudeSettingsPath(req.Cwd)
+	var settings []byte
+	existing, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		settings, _, err = EnsureAutoMemoryOff(existing)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		settings, _, err = EnsureSessionHook(settings, req.Binary)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+	case os.IsNotExist(err):
+		if settings, err = ClaudeSettings(req.Binary); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, err
+	}
+	return []LaunchFile{
+		{Path: filepath.Join(req.Cwd, Claude{}.Info().InstructionFile), Data: []byte("@" + filepath.ToSlash(manual) + "\n")},
+		{Path: path, Data: settings},
+	}, nil
+}
+
+// Build implements Launcher: a startable Claude spec, or an error. A spec
+// whose required context cannot be delivered is refused, not returned.
+func (c Claude) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	if spec.Kind != "" && spec.Kind != KindClaude {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("claude adapter got kind %q", spec.Kind))
+	}
+	launch, ok := spec.Launch.(claudeLaunch)
+	if spec.Launch != nil && !ok {
+		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("claude adapter got launch data %T that its Prepare did not make", spec.Launch))
 	}
 	max := c.MaxInlineBytes
 	if max <= 0 {
@@ -65,20 +176,20 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	}
 	cwd := spec.Cwd
 	path := spec.ContextPath
-	// ManualInCwd is the caller asserting that the cwd already loads the
+	// manualInCwd is Prepare recording that the cwd already loads the
 	// manual (Claude reads CLAUDE.md from the directory it starts in), so
 	// this launch carries no context flag at all. The two are mutually
 	// exclusive rather than merely redundant: a spec that names a path AND
 	// claims the cwd loads it is the double delivery this flag exists to
 	// remove, so it is refused instead of silently preferring one.
 	switch {
-	case spec.ManualInCwd && path != "":
+	case launch.manualInCwd && path != "":
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 			"claude launch cannot both carry a context path and declare the manual already loaded from cwd", ErrContextRequired)
-	case spec.ManualInCwd && spec.InlineFallback:
+	case launch.manualInCwd && c.InlineFallback:
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 			"claude inline fallback needs a context file to inline; it cannot be combined with a cwd-loaded manual", ErrContextRequired)
-	case !spec.ManualInCwd && path == "":
+	case !launch.manualInCwd && path == "":
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "claude context path is required", ErrContextRequired)
 	case path != "" && !filepath.IsAbs(path):
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, fmt.Sprintf("context path %s is relative", path), ErrContextRequired)
@@ -86,15 +197,15 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	if cwd == "" || !filepath.IsAbs(cwd) {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "claude launch requires the absolute cwd the agent will run in", ErrContextRequired)
 	}
-	if spec.ClaudeSessionID != "" && spec.ResumeSessionID != "" {
+	if launch.sessionID != "" && spec.ResumeSessionID != "" {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 			"claude session id and resume session id are mutually exclusive", ErrContextRequired)
 	}
-	effectiveID := spec.ClaudeSessionID
+	effectiveID := launch.sessionID
 	if spec.ResumeSessionID != "" {
 		effectiveID = spec.ResumeSessionID
 	}
-	if (effectiveID == "") != (spec.ClaudeSettingsPath == "") {
+	if (effectiveID == "") != (launch.settingsPath == "") {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 			"claude transcript locator requires both session id and settings path", ErrContextRequired)
 	}
@@ -103,11 +214,11 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 			return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 				"claude session id must be a UUID", ErrContextRequired)
 		}
-		if !filepath.IsAbs(spec.ClaudeSettingsPath) {
+		if !filepath.IsAbs(launch.settingsPath) {
 			return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 				"claude settings path must be absolute", ErrContextRequired)
 		}
-		info, err := os.Stat(spec.ClaudeSettingsPath)
+		info, err := os.Stat(launch.settingsPath)
 		if err != nil {
 			return LaunchSpec{}, observability.WrapError(observability.CodeUsage,
 				"claude settings file is not readable", fmt.Errorf("%w: %w", ErrContextRequired, err))
@@ -117,7 +228,7 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 				"claude settings path is not a regular file", ErrContextRequired)
 		}
 	}
-	configDir, setConfigDir, err := ClaudeConfigDirForLaunch(spec.Config.ClaudeConfigDir)
+	configDir, setConfigDir, err := ClaudeConfigDirForLaunch(c.ConfigDir)
 	if err != nil {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "claude config directory", err)
 	}
@@ -128,10 +239,6 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	} else {
 		unsetEnv = []string{config.EnvClaudeConfigDir}
 	}
-	env, err := filterLaunchEnv(envInput)
-	if err != nil {
-		return LaunchSpec{}, err
-	}
 
 	extra := make([]string, 0, 6)
 	extra = append(extra, "--dangerously-skip-permissions")
@@ -139,9 +246,9 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 	case spec.ResumeSessionID != "":
 		// --resume and --session-id are mutually exclusive on the Claude
 		// CLI; resuming never carries --session-id (2.1.274 --help).
-		extra = append(extra, "--resume", spec.ResumeSessionID, "--settings", spec.ClaudeSettingsPath)
-	case spec.ClaudeSessionID != "":
-		extra = append(extra, "--session-id", spec.ClaudeSessionID, "--settings", spec.ClaudeSettingsPath)
+		extra = append(extra, "--resume", spec.ResumeSessionID, "--settings", launch.settingsPath)
+	case launch.sessionID != "":
+		extra = append(extra, "--session-id", launch.sessionID, "--settings", launch.settingsPath)
 	}
 	if spec.Role == RoleMate {
 		// A coordinator must not inherit the captain's unrelated development
@@ -169,32 +276,32 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 		"whether mate should auto-accept that second screen for the operator is a separate open captain call (gomate-claude-bypass-mode-screen), not implemented here",
 		"the bypass is unconditional: there is no config key or CLI flag to opt out, a deliberate choice consistent with unattended Crew/Mate operation",
 	}
-	out := LaunchSpec{
-		kind:            c.Info().RuntimeKind,
-		cwd:             cwd,
-		env:             env,
-		contextFiles:    []GeneratedFile{{Path: path, Role: "canonical_context"}},
-		contextPath:     path,
-		contextRequired: true,
-		maxInlineBytes:  max,
-		taskPrompt:      spec.TaskPrompt,
-		model:           spec.Model,
-		effort:          spec.Effort,
-		effortOmitted:   effortOmitted,
-		claudeConfigDir: configDir,
-		unsetEnv:        unsetEnv,
+	out := LaunchPlan{
+		RuntimeKind:     c.Info().RuntimeKind,
+		Cwd:             cwd,
+		Env:             envInput,
+		ContextFiles:    []GeneratedFile{{Path: path, Role: "canonical_context"}},
+		ContextPath:     path,
+		ContextRequired: true,
+		MaxInlineBytes:  max,
+		TaskPrompt:      spec.TaskPrompt,
+		Model:           spec.Model,
+		Effort:          spec.Effort,
+		EffortOmitted:   effortOmitted,
+		ClaudeConfigDir: configDir,
+		UnsetEnv:        unsetEnv,
 	}
-	if spec.ManualInCwd {
-		out.contextFiles = nil
-		out.contextRequired = false
-		out.delivery = DeliveryCwdManual
-		out.args = extra
-		out.notes = append(append([]string(nil), dangerousPermissionNotes...),
+	if launch.manualInCwd {
+		out.ContextFiles = nil
+		out.ContextRequired = false
+		out.Delivery = DeliveryCwdManual
+		out.Args = extra
+		out.Notes = append(append([]string(nil), dangerousPermissionNotes...),
 			"no context flag is passed: Claude Code loads CLAUDE.md from the directory it starts in, and the caller declared that file already loads the manual",
 		)
-		return finalize(out)
+		return NewLaunchSpec(out)
 	}
-	if spec.InlineFallback {
+	if c.InlineFallback {
 		info, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -213,18 +320,18 @@ func (c Claude) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, 
 		if err != nil {
 			return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "read "+path, fmt.Errorf("%w: %w", ErrContextRequired, err))
 		}
-		out.delivery = DeliveryAppendSystemPrompt
-		out.args = append(extra, "--append-system-prompt", string(data))
-		out.notes = append(append([]string(nil), dangerousPermissionNotes...),
+		out.Delivery = DeliveryAppendSystemPrompt
+		out.Args = append(extra, "--append-system-prompt", string(data))
+		out.Notes = append(append([]string(nil), dangerousPermissionNotes...),
 			"inline --append-system-prompt is a bounded fallback; the entire context is visible in the process table",
 		)
 	} else {
-		out.delivery = DeliveryAppendSystemPromptFile
-		out.args = append(extra, "--append-system-prompt-file", path)
-		out.notes = append(append([]string(nil), dangerousPermissionNotes...),
+		out.Delivery = DeliveryAppendSystemPromptFile
+		out.Args = append(extra, "--append-system-prompt-file", path)
+		out.Notes = append(append([]string(nil), dangerousPermissionNotes...),
 			"default Claude delivery is --append-system-prompt-file; Claude exits 1 on a missing file, and mate still fails in BuildLaunchSpec first",
 			"G5-12 live evidence proves Claude receives the locator flags through Herdr and fires the configured Stop hook",
 		)
 	}
-	return finalize(out)
+	return NewLaunchSpec(out)
 }

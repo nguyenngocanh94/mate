@@ -22,6 +22,7 @@ func fixedParams() Params {
 		Mode:             "local-only",
 		Yolo:             false,
 		Harness:          "claude-code",
+		SkillsDir:        ".claude/skills",
 		WorkspaceDoc:     "/ws/.mate/WORKSPACE.md",
 		ProjectDoc:       "/ws/.mate/projects/shop/PROJECT.md",
 		WorkspaceCrewDoc: "/ws/.mate/CREW.md",
@@ -281,17 +282,27 @@ func TestWriteCreatesFiles(t *testing.T) {
 	if err := Write(dir, fixedParams()); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"AGENTS.md", "CLAUDE.md", "memory.md", "backlog.md"} {
+	for _, name := range []string{"AGENTS.md", "memory.md", "backlog.md", ".claude/skills/stow/SKILL.md"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Errorf("expected %s to exist: %v", name, err)
 		}
 	}
-	claude, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
-	if err != nil {
-		t.Fatal(err)
+	// The name a harness reads the manual under is the harness's launch to
+	// write (harness.Launcher.Prepare), not the manual's.
+	if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Errorf("Write laid down CLAUDE.md (%v); only the harness's launch names it", err)
 	}
-	if string(claude) != "@AGENTS.md\n" {
-		t.Errorf("CLAUDE.md = %q, want \"@AGENTS.md\\n\"", claude)
+}
+
+// TestWriteRefusesASkillsDirOutsideTheMateDir: the skills go where the
+// harness discovers them, which is always inside the Mate's directory.
+func TestWriteRefusesASkillsDirOutsideTheMateDir(t *testing.T) {
+	for _, dir := range []string{"", "/abs/skills", "../skills"} {
+		p := fixedParams()
+		p.SkillsDir = dir
+		if err := Write(t.TempDir(), p); err == nil {
+			t.Errorf("SkillsDir %q: Write succeeded, want a refusal", dir)
+		}
 	}
 }
 
@@ -324,13 +335,10 @@ func TestWritePreservesExistingMemory(t *testing.T) {
 	}
 }
 
-func TestWriteOverwritesAgentsAndClaude(t *testing.T) {
+func TestWriteOverwritesAgents(t *testing.T) {
 	dir := t.TempDir()
 	const marker = "PRE-EXISTING-STUB-CONTENT"
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(marker), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(marker), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := Write(dir, fixedParams()); err != nil {

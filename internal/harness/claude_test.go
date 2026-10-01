@@ -16,7 +16,7 @@ func TestClaudeDefaultUsesFileFlag(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", "you are mate")
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	spec, err := Claude{}.Build(context.Background(), AgentSpec{
 		Kind:        KindClaude,
 		Cwd:         cwd,
 		ContextPath: path,
@@ -64,12 +64,11 @@ func TestClaudeLaunchArgsCarryTranscriptLocator(t *testing.T) {
 	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
 	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
 	sessionID := "11111111-1111-4111-8111-111111111111"
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:               KindClaude,
-		Cwd:                cwd,
-		ContextPath:        contextPath,
-		ClaudeSessionID:    sessionID,
-		ClaudeSettingsPath: settingsPath,
+	spec, err := Claude{}.Build(context.Background(), AgentSpec{
+		Kind:        KindClaude,
+		Cwd:         cwd,
+		ContextPath: contextPath,
+		Launch:      claudeLaunch{sessionID: sessionID, settingsPath: settingsPath},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -86,12 +85,12 @@ func TestClaudeResumeUsesResumeFlagNotSessionID(t *testing.T) {
 	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
 	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
 	resumeID := "22222222-2222-4222-8222-222222222222"
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:               KindClaude,
-		Cwd:                cwd,
-		ContextPath:        contextPath,
-		ResumeSessionID:    resumeID,
-		ClaudeSettingsPath: settingsPath,
+	spec, err := Claude{}.Build(context.Background(), AgentSpec{
+		Kind:            KindClaude,
+		Cwd:             cwd,
+		ContextPath:     contextPath,
+		ResumeSessionID: resumeID,
+		Launch:          claudeLaunch{settingsPath: settingsPath},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -111,13 +110,12 @@ func TestClaudeResumeAndSessionIDAreMutuallyExclusive(t *testing.T) {
 	cwd := t.TempDir()
 	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
 	settingsPath := writeAbs(t, cwd, "settings.json", "{}\n")
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:               KindClaude,
-		Cwd:                cwd,
-		ContextPath:        contextPath,
-		ClaudeSessionID:    "11111111-1111-4111-8111-111111111111",
-		ResumeSessionID:    "22222222-2222-4222-8222-222222222222",
-		ClaudeSettingsPath: settingsPath,
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
+		Kind:            KindClaude,
+		Cwd:             cwd,
+		ContextPath:     contextPath,
+		ResumeSessionID: "22222222-2222-4222-8222-222222222222",
+		Launch:          claudeLaunch{sessionID: "11111111-1111-4111-8111-111111111111", settingsPath: settingsPath},
 	})
 	if !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("err = %v, want ErrContextRequired", err)
@@ -128,7 +126,7 @@ func TestClaudeResumeRequiresSettingsPath(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
 		Kind:            KindClaude,
 		Cwd:             cwd,
 		ContextPath:     contextPath,
@@ -143,11 +141,11 @@ func TestClaudeLaunchArgsRequireCompleteTranscriptLocator(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	contextPath := writeAbs(t, cwd, "context.md", "you are mate")
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:            KindClaude,
-		Cwd:             cwd,
-		ContextPath:     contextPath,
-		ClaudeSessionID: "11111111-1111-4111-8111-111111111111",
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
+		Kind:        KindClaude,
+		Cwd:         cwd,
+		ContextPath: contextPath,
+		Launch:      claudeLaunch{sessionID: "11111111-1111-4111-8111-111111111111"},
 	})
 	if !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("incomplete locator err = %v, want ErrContextRequired", err)
@@ -157,7 +155,7 @@ func TestClaudeLaunchArgsRequireCompleteTranscriptLocator(t *testing.T) {
 func TestClaudeConstructorFailsOnMissingFile(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
 		Kind:        KindClaude,
 		Cwd:         cwd,
 		ContextPath: filepath.Join(cwd, "nope.md"),
@@ -172,11 +170,10 @@ func TestClaudeInlineCarriesContentsNotPathToken(t *testing.T) {
 	cwd := t.TempDir()
 	body := "you are mate\nnever drop this line\n"
 	path := writeAbs(t, cwd, "context.md", body)
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:           KindClaude,
-		Cwd:            cwd,
-		ContextPath:    path,
-		InlineFallback: true,
+	spec, err := Claude{InlineFallback: true}.Build(context.Background(), AgentSpec{
+		Kind:        KindClaude,
+		Cwd:         cwd,
+		ContextPath: path,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -198,11 +195,10 @@ func TestClaudeInlineRejectsOversizedBeforeReadingIntoArgv(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", strings.Repeat("x", DefaultMaxInlineBytes+1))
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
-		Kind:           KindClaude,
-		Cwd:            cwd,
-		ContextPath:    path,
-		InlineFallback: true,
+	_, err := Claude{InlineFallback: true}.Build(context.Background(), AgentSpec{
+		Kind:        KindClaude,
+		Cwd:         cwd,
+		ContextPath: path,
 	})
 	if !errors.Is(err, ErrContextTooLarge) {
 		t.Fatalf("err = %v, want ErrContextTooLarge", err)
@@ -222,7 +218,7 @@ func TestClaudeRejectsRelativeContextAndCwd(t *testing.T) {
 	if err := os.WriteFile("ctx.md", []byte("you are mate"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err = Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err = Claude{}.Build(context.Background(), AgentSpec{
 		Cwd:         mateCwd,
 		ContextPath: "ctx.md",
 	})
@@ -230,7 +226,7 @@ func TestClaudeRejectsRelativeContextAndCwd(t *testing.T) {
 		t.Fatalf("relative context: err = %v", err)
 	}
 	abs := filepath.Join(mateCwd, "ctx.md")
-	_, err = Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err = Claude{}.Build(context.Background(), AgentSpec{
 		Cwd:         ".",
 		ContextPath: abs,
 	})
@@ -243,7 +239,7 @@ func TestClaudeRejectsEmptyFile(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "empty.md", "")
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
 		Cwd: cwd, ContextPath: path,
 	})
 	if !errors.Is(err, ErrContextRequired) {
@@ -255,7 +251,7 @@ func TestHandAssembledSpecRejectsDuplicateAndTerminator(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", "you are mate")
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{Cwd: cwd, ContextPath: path})
+	spec, err := Claude{}.Build(context.Background(), AgentSpec{Cwd: cwd, ContextPath: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,9 +274,8 @@ func TestClaudeLaunchEnvIsAllowlisted(t *testing.T) {
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", "you are mate")
 	configDir := filepath.Join(t.TempDir(), "claude-config")
-	spec, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	spec, err := Claude{ConfigDir: configDir}.Build(context.Background(), AgentSpec{
 		Cwd: cwd, ContextPath: path,
-		Config: Config{ClaudeConfigDir: configDir},
 		Env: []EnvVar{
 			{Key: "MATE_AGENT_ID", Value: "mate_001"},
 		},
@@ -300,7 +295,7 @@ func TestClaudeLaunchSpecRefusesUnknownEnv(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	path := writeAbs(t, cwd, "context.md", "you are mate")
-	_, err := Claude{}.BuildLaunchSpec(context.Background(), AgentSpec{
+	_, err := Claude{}.Build(context.Background(), AgentSpec{
 		Cwd: cwd, ContextPath: path,
 		Env: []EnvVar{
 			{Key: "MATE_AGENT_ID", Value: "mate_001"},

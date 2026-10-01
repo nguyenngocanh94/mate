@@ -221,12 +221,11 @@ func codexLabAgent(t *testing.T, ctx context.Context, lab liveLab, home, cwd, re
 	if err != nil {
 		t.Fatalf("CreateAgentTab: %v", err)
 	}
-	launch, err := harness.Codex{}.BuildLaunchSpec(ctx, harness.AgentSpec{
+	launch, err := harness.Codex{Home: home}.Build(ctx, harness.AgentSpec{
 		ID: "codexlab", Kind: harness.KindCodex, Cwd: cwd, ResumeSessionID: resumeID,
-		Config: harness.Config{Kind: harness.KindCodex, CodexHome: home},
 	})
 	if err != nil {
-		t.Fatalf("BuildLaunchSpec: %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 	reservation, err := runtime.AllocateAgentName(lab.deps.Names, session.Name, "codexlab", fmt.Sprint(n), runtime.FailOnCollision)
 	if err != nil {

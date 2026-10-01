@@ -1,17 +1,15 @@
-package harness_test
+package harness
 
 import (
 	"context"
 	"slices"
 	"testing"
-
-	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 func TestClaudeMateHasAnIsolatedProfile(t *testing.T) {
 	spec := manualInCwdSpec(t)
-	spec.Role = harness.RoleMate
-	launch, err := (harness.Claude{}).BuildLaunchSpec(context.Background(), spec)
+	spec.Role = RoleMate
+	launch, err := (Claude{}).Build(context.Background(), spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,8 +33,8 @@ func TestClaudeMateHasAnIsolatedProfile(t *testing.T) {
 
 func TestClaudeMateKeepsAnExplicitModelAndEffort(t *testing.T) {
 	spec := manualInCwdSpec(t)
-	spec.Role, spec.Model, spec.Effort = harness.RoleMate, "sonnet", harness.EffortHigh
-	launch, err := (harness.Claude{}).BuildLaunchSpec(context.Background(), spec)
+	spec.Role, spec.Model, spec.Effort = RoleMate, "sonnet", EffortHigh
+	launch, err := (Claude{}).Build(context.Background(), spec)
 	if err != nil {
 		t.Fatal(err)
 	}

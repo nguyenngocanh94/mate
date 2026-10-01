@@ -284,7 +284,7 @@ func (s agentStartSpec) Validate() error {
 	}
 	// Startable is only a shape check. Re-validate required-context delivery
 	// here, so a launch spec whose context stopped being deliverable after
-	// BuildLaunchSpec - or one hand-assembled inside the harness package -
+	// harness.NewLaunchSpec - or one hand-assembled inside the harness package -
 	// cannot reach StartAgent however it was made.
 	if err := s.launch.ValidateRequiredContext(); err != nil {
 		return err

@@ -27,7 +27,7 @@ import (
 //   - identifier: a use of an exported identifier of package harness whose
 //     name carries a harness name as a camel-case word (harness.KindCodex,
 //     harness.Claude{}, harness.CodexRolloutPath, and fields or methods such
-//     as AgentSpec.ClaudeSessionID or LaunchSpec.CodexHome()). The set is
+//     as LaunchSpec.CodexHome() or LaunchPlan.ClaudeConfigDir). The set is
 //     derived from package harness's source, not listed by hand.
 //   - literal: a string literal equal to a harness name, or carrying one as a
 //     whole token: a path segment (".claude/settings.json"), a word
@@ -39,7 +39,7 @@ import (
 // The test fails if the count rises above it. When the count falls, lower
 // this constant to the new count in the same change, so the ground gained is
 // kept.
-const harnessRatchetCeiling = 136
+const harnessRatchetCeiling = 107
 
 // ratchetHarnessNames is every spelling of a harness name a literal can
 // carry: the kinds of catalog.Default(), and the names each profile

@@ -1,4 +1,4 @@
-package harness_test
+package harness
 
 import (
 	"context"
@@ -7,14 +7,11 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-
-	"github.com/nguyenngocanh94/mate/internal/harness"
 )
 
 // manualInCwdSpec is a Mate-shaped Claude launch: a cwd that already holds
-// CLAUDE.md, no context path, and the session-id/settings pair a real start
-// carries.
-func manualInCwdSpec(t *testing.T) harness.AgentSpec {
+// CLAUDE.md and no context path.
+func manualInCwdSpec(t *testing.T) AgentSpec {
 	t.Helper()
 	cwd := t.TempDir()
 	if err := os.WriteFile(filepath.Join(cwd, "CLAUDE.md"), []byte("@AGENTS.md\n"), 0o644); err != nil {
@@ -23,10 +20,10 @@ func manualInCwdSpec(t *testing.T) harness.AgentSpec {
 	if err := os.WriteFile(filepath.Join(cwd, "AGENTS.md"), []byte("# Mate\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return harness.AgentSpec{
-		Kind:        harness.KindClaude,
-		Cwd:         cwd,
-		ManualInCwd: true,
+	return AgentSpec{
+		Kind:   KindClaude,
+		Cwd:    cwd,
+		Launch: claudeLaunch{manualInCwd: true},
 	}
 }
 
@@ -34,9 +31,9 @@ func manualInCwdSpec(t *testing.T) harness.AgentSpec {
 // manual reaches Claude once, through the CLAUDE.md in its cwd, so the argv
 // must carry no --append-system-prompt-file at all.
 func TestClaudeManualInCwdPassesNoContextFlag(t *testing.T) {
-	spec, err := harness.Claude{}.BuildLaunchSpec(context.Background(), manualInCwdSpec(t))
+	spec, err := Claude{}.Build(context.Background(), manualInCwdSpec(t))
 	if err != nil {
-		t.Fatalf("BuildLaunchSpec: %v", err)
+		t.Fatalf("Build: %v", err)
 	}
 	args := spec.Args()
 	if slices.Contains(args, "--append-system-prompt-file") || slices.Contains(args, "--append-system-prompt") {
@@ -45,8 +42,8 @@ func TestClaudeManualInCwdPassesNoContextFlag(t *testing.T) {
 	if want := []string{"--dangerously-skip-permissions"}; !slices.Equal(args, want) {
 		t.Fatalf("args = %v, want %v", args, want)
 	}
-	if spec.Delivery() != harness.DeliveryCwdManual {
-		t.Fatalf("delivery = %q, want %q", spec.Delivery(), harness.DeliveryCwdManual)
+	if spec.Delivery() != DeliveryCwdManual {
+		t.Fatalf("delivery = %q, want %q", spec.Delivery(), DeliveryCwdManual)
 	}
 	if spec.ContextPath() != "" {
 		t.Fatalf("context path = %q, want empty", spec.ContextPath())
@@ -68,26 +65,25 @@ func TestClaudeManualInCwdPassesNoContextFlag(t *testing.T) {
 func TestClaudeManualInCwdRefusesAContextPath(t *testing.T) {
 	spec := manualInCwdSpec(t)
 	spec.ContextPath = filepath.Join(spec.Cwd, "AGENTS.md")
-	if _, err := (harness.Claude{}).BuildLaunchSpec(context.Background(), spec); !errors.Is(err, harness.ErrContextRequired) {
+	if _, err := (Claude{}).Build(context.Background(), spec); !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("err = %v, want ErrContextRequired", err)
 	}
 }
 
 func TestClaudeManualInCwdRefusesInlineFallback(t *testing.T) {
 	spec := manualInCwdSpec(t)
-	spec.InlineFallback = true
-	if _, err := (harness.Claude{}).BuildLaunchSpec(context.Background(), spec); !errors.Is(err, harness.ErrContextRequired) {
+	if _, err := (Claude{InlineFallback: true}).Build(context.Background(), spec); !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("err = %v, want ErrContextRequired", err)
 	}
 }
 
 // TestClaudeWithoutManualInCwdStillRequiresAContextPath proves the relaxation
-// is opt-in: a crew launch, which has no CLAUDE.md in its worktree, is still
+// is Prepare's to grant: a crew launch, which has no CLAUDE.md in its worktree, is still
 // refused without one.
 func TestClaudeWithoutManualInCwdStillRequiresAContextPath(t *testing.T) {
 	spec := manualInCwdSpec(t)
-	spec.ManualInCwd = false
-	if _, err := (harness.Claude{}).BuildLaunchSpec(context.Background(), spec); !errors.Is(err, harness.ErrContextRequired) {
+	spec.Launch = nil
+	if _, err := (Claude{}).Build(context.Background(), spec); !errors.Is(err, ErrContextRequired) {
 		t.Fatalf("err = %v, want ErrContextRequired", err)
 	}
 }

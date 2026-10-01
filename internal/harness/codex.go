@@ -15,14 +15,23 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
-// Codex is the Profile of Codex CLI 0.151.0. Generated context is
-// written by later gates to <cwd>/AGENTS.override.md (not tracked AGENTS.md).
-// BuildLaunchSpec binds that cwd and refuses to start when the effective
+// Codex is the Profile of Codex CLI 0.151.0. Prepare names the generated
+// context <cwd>/AGENTS.override.md (not tracked AGENTS.md), and Build binds
+// that cwd and refuses to start when the effective
 // instruction chain is missing the required file, empty, or would be
 // silently truncated at project_doc_max_bytes.
 type Codex struct {
+	// MaxChainBytes is the instruction-file cap the launch meters against
+	// and hands Codex. Zero means CodexDefaultMaxBytes.
 	MaxChainBytes int
 	LookPath      func(name string) (string, error) // unused in G2; reserved for G4 executable probe
+	// Home is $CODEX_HOME for global instruction discovery. Empty means the
+	// one the process environment resolves (LaunchCodexHome).
+	Home string
+	// FallbackFilenames are Codex project_doc_fallback_filenames. Empty
+	// means only AGENTS.override.md / AGENTS.md, never an assumed
+	// TEAM_GUIDE.md.
+	FallbackFilenames []string
 }
 
 // Kind implements Profile.
@@ -35,6 +44,11 @@ func (Codex) Info() Info {
 		ConfigDir:       ".codex",
 		InstructionFile: CodexOverrideName,
 		EnvKeys:         []string{config.EnvCodexHome},
+		// Codex discovers no skills from a Mate's cwd; its manual sends it
+		// to each skill's file by path, in the directory a Claude Mate's
+		// layout puts them, so a project's skills live in one place
+		// whichever harness its Mate runs on.
+		SkillsDir: ".claude/skills",
 	}
 }
 
@@ -54,20 +68,54 @@ func (Codex) Capabilities() Capabilities {
 	}
 }
 
-func (c Codex) maxBytes(cfg Config) int {
-	if cfg.ProjectDocMaxBytes > 0 {
-		return cfg.ProjectDocMaxBytes
-	}
+func (c Codex) maxBytes() int {
 	if c.MaxChainBytes > 0 {
 		return c.MaxChainBytes
 	}
 	return CodexDefaultMaxBytes
 }
 
-// BuildLaunchSpec constructs a startable Codex spec or returns an error.
-func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
+// Prepare implements Launcher. Codex reads its instructions from
+// AGENTS.override.md at its cwd and nothing else, so the agent's
+// instructions are copied there: for a Crew that is a file in its
+// worktree, excluded so it is never committed, which is why the crew is
+// told to read the brief by absolute path rather than to trust whatever it
+// found in its cwd. A Codex Mate also gets its SessionStart hook in its
+// cwd's `.codex/hooks.json`.
+//
+// A Codex Mate's directory also carries a Claude Mate's `CLAUDE.md` and
+// `.claude/settings.json`, as it always has: nothing in Codex reads them,
+// and leaving them out is a change to what a start writes, for a change of
+// its own. Codex has no launch-time session id; it exists only once the
+// first prompt opens the rollout, so a fresh launch names none.
+func (c Codex) Prepare(_ context.Context, req PrepareRequest) (Prepared, error) {
+	if err := req.check(KindCodex); err != nil {
+		return Prepared{}, err
+	}
+	manual, err := os.ReadFile(req.ContextPath)
+	if err != nil {
+		return Prepared{}, err
+	}
+	override := CodexInstructionPath(req.Cwd)
+	files := []LaunchFile{{Path: override, Data: manual, Exclude: true}}
+	if req.Role == RoleMate {
+		claude, err := claudeMateFiles(req)
+		if err != nil {
+			return Prepared{}, err
+		}
+		files = append(files, LaunchFile{Path: CodexHooksPath(req.Cwd), Data: CodexHooks(req.Binary)})
+		files = append(files, claude...)
+	}
+	return Prepared{Files: files, SessionID: req.ResumeSessionID, ContextPath: override}, nil
+}
+
+// Build implements Launcher: a startable Codex spec, or an error.
+func (c Codex) Build(_ context.Context, spec AgentSpec) (LaunchSpec, error) {
 	if spec.Kind != "" && spec.Kind != KindCodex {
 		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("codex adapter got kind %q", spec.Kind))
+	}
+	if spec.Launch != nil {
+		return LaunchSpec{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("codex adapter got launch data %T that its Prepare did not make", spec.Launch))
 	}
 	resumeID := strings.TrimSpace(spec.ResumeSessionID)
 	if spec.ResumeSessionID != "" {
@@ -99,15 +147,15 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 			ErrContextRequired,
 		)
 	}
-	max := c.maxBytes(spec.Config)
-	codexHome, err := LaunchCodexHome(spec.Config.CodexHome)
+	max := c.maxBytes()
+	codexHome, err := LaunchCodexHome(c.Home)
 	if err != nil {
 		return LaunchSpec{}, observability.WrapError(observability.CodeUsage, "codex home", err)
 	}
 	chain, err := DiscoverCodexChain(DiscoverRequest{
 		Cwd:               cwd,
 		CodexHome:         codexHome,
-		FallbackFilenames: spec.Config.FallbackFilenames,
+		FallbackFilenames: c.FallbackFilenames,
 	})
 	if err != nil {
 		return LaunchSpec{}, err
@@ -117,10 +165,6 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 	}
 	envInput := append([]EnvVar(nil), spec.Env...)
 	envInput = append(envInput, EnvVar{Key: config.EnvCodexHome, Value: codexHome})
-	env, err := filterLaunchEnv(envInput)
-	if err != nil {
-		return LaunchSpec{}, err
-	}
 	args := []string{"--dangerously-bypass-approvals-and-sandbox", "-c", CodexDisableUpdateCheck, "-c", CodexProjectDocMaxBytesOverride}
 	profile, effortOmitted := profileArgs(KindCodex, spec.Model, spec.Effort)
 	args = append(args, profile...)
@@ -133,21 +177,22 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		// composer with the old conversation replayed above it.
 		args = append(append([]string{"resume"}, args...), resumeID)
 	}
-	out := LaunchSpec{
-		kind:            c.Info().RuntimeKind,
-		args:            args,
-		cwd:             cwd,
-		env:             env,
-		contextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
-		delivery:        DeliveryInstructionFile,
-		contextPath:     want,
-		contextRequired: true,
-		maxFileBytes:    max,
-		taskPrompt:      spec.TaskPrompt,
-		model:           spec.Model,
-		effort:          spec.Effort,
-		effortOmitted:   effortOmitted,
-		notes: []string{
+	fallback := append([]string(nil), c.FallbackFilenames...)
+	return NewLaunchSpec(LaunchPlan{
+		RuntimeKind:     c.Info().RuntimeKind,
+		Args:            args,
+		Cwd:             cwd,
+		Env:             envInput,
+		ContextFiles:    []GeneratedFile{{Path: want, Role: "codex_override"}},
+		Delivery:        DeliveryInstructionFile,
+		ContextPath:     want,
+		ContextRequired: true,
+		MaxFileBytes:    max,
+		TaskPrompt:      spec.TaskPrompt,
+		Model:           spec.Model,
+		Effort:          spec.Effort,
+		EffortOmitted:   effortOmitted,
+		Notes: []string{
 			"the captain ruled on 2026-09-14 that Mate and Crew launches carry the harness permission bypass; there is no external sandbox of any kind, because a Crew runs on the operator's own machine on real project code",
 			"the captain first chose the narrower --ask-for-approval never --sandbox workspace-write pair, then reversed that ruling the same day: a linked Crew worktree's .git is a pointer file into the primary repo's git dir, outside workspace-write's writable root, so a Codex Crew under the narrow pair could do work but could never git commit it (measured both directions) - and mate never commits on a Crew's behalf, it only fast-forwards the Crew branch, so uncommitted work can never be delivered",
 			"this is not merely a prompt bypass: under the combined flag a Codex Crew can write outside its own worktree - the workspace database (.mate/mate.db), other Crews' worktrees, and the operator's home directory are all reachable; the captain accepted that cost knowingly to keep Crews able to commit",
@@ -158,10 +203,26 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 			"Codex 0.151.0 loads AGENTS.override.md in preference to AGENTS.md and silently truncates the project chain's content bytes at project_doc_max_bytes (global doc, marker and joiners are rendered unmetered); the launch raises that cap to CodexDefaultMaxBytes with -c project_doc_max_bytes= and mate meters against the same number",
 			"missing or empty project files do not fail Codex; mate refuses to start instead",
 		},
-		codexHome:     codexHome,
-		codexFallback: append([]string(nil), spec.Config.FallbackFilenames...),
-	}
-	return finalize(out)
+		CodexHome: codexHome,
+		// The chain is discovered again every time the spec is validated, so
+		// the runtime boundary refuses a launch whose override went missing
+		// or grew past the cap after Build.
+		CheckContext: func(s LaunchSpec) error {
+			want := CodexInstructionPath(s.Cwd())
+			if filepath.Clean(s.ContextPath()) != filepath.Clean(want) {
+				return s.codedRequired(fmt.Sprintf("context path %s is not the Codex discovery file for cwd %s (%s)", s.ContextPath(), s.Cwd(), want))
+			}
+			chain, err := DiscoverCodexChain(DiscoverRequest{Cwd: s.Cwd(), CodexHome: codexHome, FallbackFilenames: fallback})
+			if err != nil {
+				return err
+			}
+			max := s.MaxFileBytes()
+			if max <= 0 {
+				max = CodexDefaultMaxBytes
+			}
+			return chain.RefuseIfRequiredMissingOrTruncated(want, max)
+		},
+	})
 }
 
 // CodexDisableUpdateCheck is the `-c key=value` override that turns off

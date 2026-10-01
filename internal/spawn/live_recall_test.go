@@ -168,8 +168,8 @@ func TestLiveCodexMateRecallHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(cfg), `[hooks.state."`+spawn.CodexHooksPath(mateDir)+`:session_start:`) {
-		t.Fatalf("the lab config.toml records no trust for %s:\n%s", spawn.CodexHooksPath(mateDir), cfg)
+	if !strings.Contains(string(cfg), `[hooks.state."`+harness.CodexHooksPath(mateDir)+`:session_start:`) {
+		t.Fatalf("the lab config.toml records no trust for %s:\n%s", harness.CodexHooksPath(mateDir), cfg)
 	}
 
 	// /compact: the hook runs again at the next prompt with the digest as
