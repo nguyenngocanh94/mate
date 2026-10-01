@@ -29,33 +29,35 @@ type TranscriptParser interface {
 	// chain, each link of which must hold:
 	//
 	//   1. context refresh (cmd/mate/context_refresh.go) calls StopMate, and
-	//      while the Herdr session is running StopMate succeeds only through
-	//      confirmGone (internal/spawn/stop.go): InspectAgent must return
-	//      agent_not_found AND ListAgents must omit the name. Live or unknown
-	//      on either side fails the stop. The exception is below.
-	//   2. only after StopMate returns nil does refresh call
+	//      StopMate reports Confirmed only through confirmGone
+	//      (internal/spawn/stop.go): InspectAgent must return agent_not_found
+	//      AND ListAgents must omit the name. Live or unknown on either side
+	//      fails the stop. When Herdr's session list does not report the
+	//      Mate's session running - missing from the list, or listed but not
+	//      running - there is no agent to ask: StopMate clears the stale
+	//      record and returns AlreadyGone with Confirmed false. When the list
+	//      cannot be read at all, StopMate fails.
+	//   2. only when StopMate returns nil with Confirmed set does refresh call
 	//      store.FreezeMateSession, which copies the transcript to an immutable
 	//      snapshot under the Mate's sessions/ directory and marks the archive
-	//      finalized=true. The snapshot, not the sync's timing, is what keeps
-	//      a writer out: no harness ever appends to the copy, so there is no
-	//      "after confirmation, before release" window to sequence the sync in.
+	//      finalized=true. An unconfirmed stop leaves the archive refresh wrote
+	//      before stopping: on the live transcript and not finalized. The
+	//      snapshot, not the sync's timing, is what keeps a writer out: no
+	//      harness ever appends to the copy, so there is no "after
+	//      confirmation, before release" window to sequence the sync in.
 	//   3. the timeline sets Located.Finalized only for an archive marked
 	//      finalized whose located path is that snapshot (LocatorMeta).
 	//
-	// The two false-positive branches of link 1 - ListAgents empty while
+	// The two false-positive branches of confirmGone - ListAgents empty while
 	// InspectAgent still finds the agent, and ListAgents empty while
 	// InspectAgent fails - are pinned for StopMate and StopCrew by
-	// internal/spawn/stop_confirm_test.go.
-	//
-	// One branch of link 1 confirms less than that. When Herdr's session
-	// list does not report the Mate's session running, StopMate returns
-	// success after LookupSession alone, without calling confirmGone, and
-	// refresh then freezes the snapshot. That treats "the Herdr server is
-	// down" as "the harness has stopped writing", which nothing here
-	// verifies.
+	// internal/spawn/stop_confirm_test.go. That an inferred absence never
+	// reads as Confirmed is pinned by internal/spawn/stop_unconfirmed_test.go,
+	// and that refresh then does not finalize by
+	// cmd/mate/context_refresh_finalize_test.go.
 	//
 	// Everything outside that chain still uses ParseTranscript: a live Mate,
-	// every Crew, and every Codex range. `crew done` cannot qualify - it makes
+	// a Mate whose stop was not confirmed, every Crew, and every Codex range. `crew done` cannot qualify - it makes
 	// no runtime call and the Crew agent itself is the caller, so the harness
 	// is running the very tool call that invoked it. For those sessions the
 	// last message group is never flushed. It is visibly pending -

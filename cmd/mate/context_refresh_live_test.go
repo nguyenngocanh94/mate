@@ -103,6 +103,21 @@ func TestLiveMateContextRefreshPreservesHeldQuestion(t *testing.T) {
 	if meta[spawn.MetaSessionID] == started.SessionID || meta[spawn.MetaResumed] == "true" {
 		t.Fatal("old transcript resumed")
 	}
+	// A real Herdr stop of a live Mate is a confirmed one, so the old
+	// session is frozen and finalized.
+	archives, err := w.MateSessionArchives("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalized := false
+	for _, a := range archives {
+		if a[spawn.MetaSessionID] == started.SessionID {
+			finalized = a["finalized"] == "true"
+		}
+	}
+	if !finalized {
+		t.Fatalf("old session %s not finalized after a confirmed stop: %v", started.SessionID, archives)
+	}
 	after := ask("What exact question are you waiting for me to answer?")
 	t.Logf("after refresh: %s", after)
 	if !strings.Contains(after, "Ship blue or green?") {

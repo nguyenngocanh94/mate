@@ -163,6 +163,9 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 	if stopped.Agent != started.Agent {
 		t.Fatalf("stopped %q, want %q", stopped.Agent, started.Agent)
 	}
+	if !stopped.Confirmed || stopped.AlreadyGone {
+		t.Fatalf("confirmed=%v alreadyGone=%v, want a confirmed stop of a live agent", stopped.Confirmed, stopped.AlreadyGone)
+	}
 
 	// The proof of the stop is Herdr's own inventory, not the stop's answer.
 	listed, err := rt.ListAgents(ctx, runtime.SessionHandle{Name: session, ConfigHome: configHome})

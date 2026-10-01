@@ -39,6 +39,10 @@ type Fake struct {
 	// SessionNotRunning makes LookupSession report the named session as
 	// not running, so status/stop can be tested without EnsureSession.
 	SessionNotRunning bool
+	// SessionLookupErr makes LookupSession fail, modelling a `herdr session
+	// list` that could not be run or read: Herdr unreachable, as distinct
+	// from Herdr answering that the session is not running.
+	SessionLookupErr error
 	// StopLeavesAgent makes StopAgent return success without removing the
 	// agent. That is the unconfirmed-stop case: the call looked fine, the
 	// inventory still has the name.
@@ -173,6 +177,9 @@ func (f *Fake) LookupSession(_ context.Context, spec SessionSpec) (SessionHandle
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("LookupSession")
+	if f.SessionLookupErr != nil {
+		return SessionHandle{}, false, f.SessionLookupErr
+	}
 	h, err := sessionAddress(spec)
 	if err != nil {
 		return SessionHandle{}, false, err

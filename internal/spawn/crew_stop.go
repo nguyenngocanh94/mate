@@ -224,6 +224,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 			if err := confirmGone(ctx, deps, handle); err != nil {
 				return StopResult{}, err
 			}
+			out.Confirmed = true
 			deps.Names.Release(session.Name, handle.Name)
 			if tab.PaneID != "" || tab.TabID != "" {
 				if err := deps.Runtime.RemoveTab(ctx, tab); err != nil && !runtime.IsTabGone(err) {

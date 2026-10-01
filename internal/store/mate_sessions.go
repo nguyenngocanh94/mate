@@ -59,8 +59,10 @@ func (w *Workspace) MateSessionArchives(project string) ([]map[string]string, er
 }
 
 // FreezeMateSession must be called only after the runtime confirmed the agent
-// gone. Its immutable transcript snapshot lets the ledger count the final
-// message group without guessing whether a live writer has finished it.
+// gone (spawn.StopResult.Confirmed), never on an absence inferred from Herdr
+// not reporting the session running. Its immutable transcript snapshot lets
+// the ledger count the final message group without guessing whether a live
+// writer has finished it.
 func (w *Workspace) FreezeMateSession(project string, meta map[string]string) error {
 	copyMeta := make(map[string]string, len(meta)+2)
 	for key, value := range meta {

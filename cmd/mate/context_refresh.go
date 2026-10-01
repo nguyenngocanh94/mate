@@ -172,11 +172,19 @@ func contextRefresh(ctx context.Context, w *store.Workspace, deps spawn.Deps, pr
 	if err := w.ArchiveMateSession(project, current); err != nil {
 		return false, err
 	}
-	if _, err := spawn.StopMate(ctx, w, deps, project); err != nil {
+	stopped, err := spawn.StopMate(ctx, w, deps, project)
+	if err != nil {
 		return false, err
 	}
-	if err := w.FreezeMateSession(project, current); err != nil {
-		return false, fmt.Errorf("Mate stopped with checkpoint saved; archive failed: %w", err)
+	// Only a confirmed stop freezes the transcript. A Mate whose Herdr
+	// session was not reported running was cleared on inference alone, so
+	// its archive stays as written above, on the live transcript and not
+	// finalized: the timeline keeps its last message group pending rather
+	// than flushing a turn a writer may still extend.
+	if stopped.Confirmed {
+		if err := w.FreezeMateSession(project, current); err != nil {
+			return false, fmt.Errorf("Mate stopped with checkpoint saved; archive failed: %w", err)
+		}
 	}
 	_, err = spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: project, Harness: harness.Kind(meta[spawn.MetaHarness]), Fresh: true})
 	if err != nil {
