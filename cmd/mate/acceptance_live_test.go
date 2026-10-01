@@ -82,6 +82,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,
@@ -123,7 +124,7 @@ func TestLiveAcceptanceMateRunsATask(t *testing.T) {
 	}
 
 	// The captain types one line. No marker: this is a human talking.
-	report, err := send.Send(ctx, send.Deps{Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{})
 	if err != nil {
 		t.Fatalf("send the captain's request: %v (report %+v)", err, report)
 	}

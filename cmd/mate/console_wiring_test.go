@@ -46,6 +46,7 @@ func consoleFixture(t *testing.T, project string) (*store.Workspace, spawn.Deps)
 	}
 	rt := runtime.NewFake()
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                rt.Names,
 		ConfigHome:           t.TempDir(),

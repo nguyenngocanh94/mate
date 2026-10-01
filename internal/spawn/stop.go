@@ -144,7 +144,7 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 		return out, clearRunMeta(w, project, meta, deps.now())
 	}
 
-	kind, _ := harness.ParseKind(meta[MetaHarness])
+	kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 	handle := runtime.AgentHandle{Session: session, Name: out.Agent, RawID: project, Kind: kind, Tab: tab}
 	observed, live, err := inspectLive(ctx, deps, handle)
 	if err != nil {
@@ -182,7 +182,7 @@ func StopMate(ctx context.Context, w *store.Workspace, deps Deps, project string
 // stopLiveAgent asks for a graceful stop where the harness has one, then
 // forces. A name Herdr already does not know is success, not a failure.
 func stopLiveAgent(ctx context.Context, deps Deps, handle runtime.AgentHandle) error {
-	if handle.Kind == harness.KindClaude {
+	if gracefulStop(deps, handle.Kind) {
 		if err := deps.Runtime.StopAgent(ctx, handle, runtime.StopGraceful); err == nil || runtime.IsAgentNotFound(err) {
 			if confirmGone(ctx, deps, handle) == nil {
 				return nil
@@ -196,6 +196,14 @@ func stopLiveAgent(ctx context.Context, deps Deps, handle runtime.AgentHandle) e
 		return err
 	}
 	return confirmGone(ctx, deps, handle)
+}
+
+// gracefulStop reports whether the harness declares a verified graceful
+// stop. Anything else - unsupported, unknown, or a kind no profile is
+// registered for - goes straight to the force stop (plan section 3.7).
+func gracefulStop(deps Deps, kind harness.Kind) bool {
+	profile, err := deps.Harnesses.Lookup(kind)
+	return err == nil && profile.Capabilities().GracefulStop.Verified()
 }
 
 // confirmGone is the only way a stop is confirmed: `agent get` must not find

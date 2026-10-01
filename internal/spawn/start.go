@@ -122,10 +122,13 @@ func StartMate(ctx context.Context, w *store.Workspace, deps Deps, req StartRequ
 	}
 	kind := req.Harness
 	if kind == "" {
-		kind, err = harness.ParseKind(w.Defaults().MateHarness)
+		kind, err = deps.defaultHarness(w.Defaults().MateHarness, harness.RoleMate)
 		if err != nil {
 			return StartResult{}, err
 		}
+	}
+	if _, err := deps.Harnesses.Lookup(kind); err != nil {
+		return StartResult{}, err
 	}
 
 	// 1. The recorded Mate, re-checked against Herdr. The meta alone is
@@ -319,7 +322,7 @@ func startInTab(ctx context.Context, w *store.Workspace, deps Deps, project stri
 	if err != nil {
 		return StartResult{}, err
 	}
-	launch, err := buildLaunchSpec(ctx, project, kind, mateDir, sessionID, resume, env, cfg.Mate)
+	launch, err := buildLaunchSpec(ctx, deps.Harnesses, project, kind, mateDir, sessionID, resume, env, cfg.Mate)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -348,7 +351,11 @@ func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project
 	if err != nil {
 		return StartResult{}, err
 	}
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, kind, deps.startupPromptTimeout(), deps.sleep(), trusted...)
+	profile, err := deps.Harnesses.Lookup(kind)
+	if err != nil {
+		return StartResult{}, err
+	}
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, profile, deps.startupPromptTimeout(), deps.sleep(), trusted...)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -590,12 +597,12 @@ func writeCodexOverride(mateDir string) error {
 	return os.WriteFile(harness.CodexInstructionPath(mateDir), manual, 0o644)
 }
 
-// buildLaunchSpec asks the harness adapter for the argv. The cwd is the Mate
-// directory, which is also where the manual is: the adapters require a
-// context path, so the path they are given is that same manual, never a
+// buildLaunchSpec asks the harness's launcher for the argv. The cwd is the
+// Mate directory, which is also where the manual is: the launchers require
+// a context path, so the path they are given is that same manual, never a
 // separate generated file.
-func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
-	adapter, err := harness.AdapterFor(kind)
+func buildLaunchSpec(ctx context.Context, harnesses harness.Registry, project string, kind harness.Kind, mateDir, sessionID string, resume bool, env []runtime.EnvVar, profiles ...store.MateConfig) (harness.LaunchSpec, error) {
+	profile, err := harnesses.Lookup(kind)
 	if err != nil {
 		return harness.LaunchSpec{}, err
 	}
@@ -644,7 +651,7 @@ func buildLaunchSpec(ctx context.Context, project string, kind harness.Kind, mat
 			spec.ResumeSessionID = sessionID
 		}
 	}
-	return adapter.BuildLaunchSpec(ctx, spec)
+	return profile.Launcher().BuildLaunchSpec(ctx, spec)
 }
 
 // ensureProjectWorkspace creates the Herdr workspace for a project, injecting

@@ -42,7 +42,7 @@ func cmdPeek(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return peekCrew(context.Background(), w, spawn.LiveDeps(), fs.Arg(0), fs.Arg(1), lines, stdout)
+	return peekCrew(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), fs.Arg(1), lines, stdout)
 }
 
 // clampPeekLines applies the 1..200 bound on --lines: zero or negative

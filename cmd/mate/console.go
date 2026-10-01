@@ -67,7 +67,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// adapter and the agent-name registry it shares, so a Mate started from
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
-	deps := spawn.LiveDeps()
+	deps := spawn.LiveDeps(harnesses)
 	// Point the runtime at the `herdr` findTool resolves - the one the stage
 	// column runs by absolute path, which can be in ~/.local/bin when the
 	// Console's PATH cannot reach it. Without this, a session check would

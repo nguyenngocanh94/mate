@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -48,6 +49,7 @@ func gitInit(t *testing.T, dir string) {
 func fakeDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 	t.Helper()
 	return spawn.Deps{
+		Harnesses:            catalog.Default(),
 		Runtime:              rt,
 		Names:                rt.Names,
 		ConfigHome:           t.TempDir(),

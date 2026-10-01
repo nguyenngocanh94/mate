@@ -132,6 +132,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,
@@ -710,7 +711,7 @@ func typeCaptainLine(t *testing.T, ctx context.Context, deps spawn.Deps, action 
 	deadline := time.Now().Add(within)
 	var last error
 	for time.Now().Before(deadline) {
-		_, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime}, handle, kind, text, send.Options{})
+		_, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: deps.Runtime}, handle, kind, text, send.Options{})
 		if err == nil {
 			t.Logf("captain → %s Mate: %s", project, text)
 			return

@@ -71,7 +71,7 @@ func cmdReview(args []string, stdout, stderr io.Writer) error {
 	}
 	var h harness.Kind
 	if *kind != "" {
-		h, err = harness.ParseKind(*kind)
+		h, err = harnesses.Parse(*kind)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func cmdReview(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	req := spawn.SpawnCrewRequest{Project: project, Crew: *id, Repo: fp["repo"], Harness: h, Model: m, Effort: e, Scout: true, Task: "Review " + crew + " at " + fp["head"], BriefText: reviewBrief(w, project, crew, fp)}
-	result, err := spawn.SpawnCrew(ctx, w, spawn.LiveDeps(), req)
+	result, err := spawn.SpawnCrew(ctx, w, spawn.LiveDeps(harnesses), req)
 	if err != nil {
 		return err
 	}

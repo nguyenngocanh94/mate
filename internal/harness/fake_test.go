@@ -50,10 +50,10 @@ func TestFakeBuildErrInjection(t *testing.T) {
 func TestFakeDoesNotFork(t *testing.T) {
 	t.Parallel()
 	f := &Fake{}
-	if _, err := f.Validate(context.Background(), Config{Kind: KindClaude}); err != nil {
-		t.Fatal(err)
+	if _, err := f.BuildLaunchSpec(context.Background(), AgentSpec{Kind: KindClaude}); err == nil {
+		t.Fatal("a spec with no cwd and no context built")
 	}
 	if len(f.Calls) == 0 {
-		t.Fatal("expected Validate call record")
+		t.Fatal("expected BuildLaunchSpec call record")
 	}
 }

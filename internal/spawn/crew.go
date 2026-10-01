@@ -214,9 +214,13 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	}
 	harnessKind := req.Harness
 	if harnessKind == "" {
-		if harnessKind, err = harness.ParseKind(w.Defaults().CrewHarness); err != nil {
+		if harnessKind, err = deps.defaultHarness(w.Defaults().CrewHarness, harness.RoleCrew); err != nil {
 			return CrewResult{}, err
 		}
+	}
+	profile, err := deps.Harnesses.Lookup(harnessKind)
+	if err != nil {
+		return CrewResult{}, err
 	}
 
 	// 1. The recorded crew, re-checked against Herdr, and the brief. Both
@@ -265,6 +269,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		project:          project,
 		crew:             crew,
 		kind:             harnessKind,
+		profile:          profile,
 		model:            req.Model,
 		effort:           req.Effort,
 		task:             task,
@@ -335,6 +340,7 @@ type crewPlan struct {
 	project string
 	crew    string
 	kind    harness.Kind
+	profile harness.Profile
 	model   string
 	effort  harness.Effort
 	// task is the one line recorded as `task=`; brief is the Mate's
@@ -426,7 +432,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		return CrewResult{}, err
 	}
 	saga.startedAgent = true
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.kind, deps.startupPromptTimeout(), deps.sleep())
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.startupPromptTimeout(), deps.sleep())
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -814,14 +820,10 @@ func excludeGeneratedFile(ctx context.Context, git gitx.Git, worktree, name stri
 	return closeErr
 }
 
-// buildCrewLaunchSpec asks the harness adapter for the argv. The cwd is the
-// worktree; the context file is the brief (Claude) or the copy of it Codex
-// discovers in that cwd.
+// buildCrewLaunchSpec asks the harness's launcher for the argv. The cwd is
+// the worktree; the context file is the brief (Claude) or the copy of it
+// Codex discovers in that cwd.
 func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionID, settingsPath string) (harness.LaunchSpec, error) {
-	adapter, err := harness.AdapterFor(plan.kind)
-	if err != nil {
-		return harness.LaunchSpec{}, err
-	}
 	spec := harness.AgentSpec{
 		ID:   CrewAgentNamePrefix + "-" + plan.crew,
 		Role: harness.RoleCrew,
@@ -842,7 +844,7 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, briefPath, sessionI
 	case harness.KindCodex:
 		spec.ContextPath = harness.CodexInstructionPath(plan.worktree)
 	}
-	return adapter.BuildLaunchSpec(ctx, spec)
+	return plan.profile.Launcher().BuildLaunchSpec(ctx, spec)
 }
 
 // crewPaneEnv is the crew's identity, injected when its pane is created.

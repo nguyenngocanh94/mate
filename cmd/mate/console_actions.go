@@ -215,7 +215,7 @@ func consoleHarness(kind query.HarnessKind) (harness.Kind, error) {
 	if kind == "" {
 		return "", nil
 	}
-	parsed, err := harness.ParseKind(string(kind))
+	parsed, err := harnesses.Parse(string(kind))
 	if err != nil {
 		return "", observability.WrapError(observability.CodeUsage, "harness", err)
 	}

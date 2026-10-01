@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 )
 
 func writeTable(t *testing.T, body string) string {
@@ -33,7 +34,7 @@ func TestLoadReadsFirstmatesSchema(t *testing.T) {
   ],
   "default": {"harness": "codex", "effort": "medium"}
 }`)
-	tbl, ok, err := Load(p)
+	tbl, ok, err := Load(p, catalog.Default())
 	if err != nil || !ok {
 		t.Fatalf("Load: ok=%v err=%v", ok, err)
 	}
@@ -50,7 +51,7 @@ func TestLoadReadsFirstmatesSchema(t *testing.T) {
 
 // No file is no table: spawns go on as before. It is not an error.
 func TestAMissingTableIsNotAnError(t *testing.T) {
-	_, ok, err := Load(filepath.Join(t.TempDir(), "crew-dispatch.json"))
+	_, ok, err := Load(filepath.Join(t.TempDir(), "crew-dispatch.json"), catalog.Default())
 	if ok || err != nil {
 		t.Fatalf("Load of a missing file: ok=%v err=%v", ok, err)
 	}
@@ -72,7 +73,7 @@ func TestLoadRefusesAMalformedTable(t *testing.T) {
 		"empty table":        `{}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := Load(writeTable(t, body))
+			_, _, err := Load(writeTable(t, body), catalog.Default())
 			if !errors.Is(err, ErrInvalid) {
 				t.Fatalf("Load accepted a malformed table (err=%v)", err)
 			}
@@ -96,7 +97,7 @@ func TestProfileFlags(t *testing.T) {
 // The built-in table is the captain's five rules, in their order, each with
 // a Claude and a Codex profile of the same weight.
 func TestTheBuiltInTableIsTheCaptains(t *testing.T) {
-	tbl, err := Resolve(t.TempDir())
+	tbl, err := Resolve(t.TempDir(), catalog.Default())
 	if err != nil || !tbl.BuiltIn || tbl.Path != "" {
 		t.Fatalf("Resolve without a file: %+v %v", tbl, err)
 	}
@@ -130,6 +131,25 @@ func TestTheBuiltInTableIsTheCaptains(t *testing.T) {
 	}
 }
 
+// A harness is known when it is registered: the same table is refused by a
+// registry that lacks one of its harnesses, the built-in one included.
+func TestTablesAreCheckedAgainstTheRegistry(t *testing.T) {
+	onlyCodex, err := harness.NewRegistry(nil, harness.Codex{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve(t.TempDir(), onlyCodex); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("built-in table naming claude under a registry without it: err = %v, want ErrInvalid", err)
+	}
+	p := writeTable(t, `{"default": {"harness": "claude"}}`)
+	if _, _, err := Load(p, onlyCodex); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("table naming claude under a registry without it: err = %v, want ErrInvalid", err)
+	}
+	if _, _, err := Load(p, catalog.Default()); err != nil {
+		t.Fatalf("the same table under the catalog: %v", err)
+	}
+}
+
 // A workspace file replaces the built-in table whole; a malformed one is
 // an error, not a fall back.
 func TestAWorkspaceTableReplacesTheBuiltIn(t *testing.T) {
@@ -137,20 +157,20 @@ func TestAWorkspaceTableReplacesTheBuiltIn(t *testing.T) {
 	if err := os.WriteFile(Path(dir), []byte(`{"default": {"harness": "claude"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	tbl, err := Resolve(dir)
+	tbl, err := Resolve(dir, catalog.Default())
 	if err != nil || tbl.BuiltIn || len(tbl.Rules) != 0 || tbl.Path != Path(dir) {
 		t.Fatalf("Resolve = %+v, %v", tbl, err)
 	}
 	if err := os.WriteFile(Path(dir), []byte(`{"rules": []}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Resolve(dir); !errors.Is(err, ErrInvalid) {
+	if _, err := Resolve(dir, catalog.Default()); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("malformed table: err = %v, want ErrInvalid", err)
 	}
 }
 
 func TestDefaultForPrefersTheWorkspaceHarness(t *testing.T) {
-	tbl, _ := Resolve(t.TempDir())
+	tbl, _ := Resolve(t.TempDir(), catalog.Default())
 	for kind, want := range map[string]string{
 		"codex":  "--harness codex --model gpt-6-luna --effort high",
 		"claude": "--harness claude --model sonnet --effort high",

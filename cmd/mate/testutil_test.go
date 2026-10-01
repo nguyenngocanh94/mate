@@ -45,6 +45,7 @@ func runGitOrFatal(t *testing.T, dir string, args ...string) {
 func fakeSpawnDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 	t.Helper()
 	return spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                rt.Names,
 		ConfigHome:           t.TempDir(),

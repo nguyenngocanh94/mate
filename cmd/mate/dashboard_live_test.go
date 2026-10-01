@@ -73,6 +73,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,
@@ -110,7 +111,7 @@ func TestLiveDashboardMatchesUsage(t *testing.T) {
 			Label:       "mate",
 		},
 	}
-	if _, err := send.Send(ctx, send.Deps{Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{}); err != nil {
+	if _, err := send.Send(ctx, send.Deps{Harnesses: harnesses, Runtime: rt}, mate, harness.KindClaude, acceptanceRequest, send.Options{}); err != nil {
 		t.Fatalf("send the captain's request: %v", err)
 	}
 

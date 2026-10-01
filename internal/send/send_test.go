@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -97,7 +98,8 @@ func claudeBusyScreen() string {
 func testDeps(rt send.Runtime) (send.Deps, *[]time.Duration) {
 	var slept []time.Duration
 	return send.Deps{
-		Runtime: rt,
+		Harnesses: catalog.Default(),
+		Runtime:   rt,
 		Sleep: func(_ context.Context, d time.Duration) error {
 			slept = append(slept, d)
 			return nil
@@ -409,5 +411,23 @@ func TestSendSurfacesRuntimeFailures(t *testing.T) {
 	}
 	if _, err := send.Send(context.Background(), send.Deps{}, target(), harness.KindClaude, "x", send.Options{}); err == nil {
 		t.Fatal("a send with no runtime must be refused")
+	}
+}
+
+// A kind no harness is registered for is refused before the pane is read:
+// there is nothing to classify its composer with.
+func TestSendRefusesAnUnregisteredKind(t *testing.T) {
+	rt := &scripted{screens: []string{claudeBusyScreen()}}
+	deps, _ := testDeps(rt)
+	reg, err := harness.NewRegistry(nil, harness.Codex{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.Harnesses = reg
+	if _, err := send.Send(context.Background(), deps, target(), harness.KindClaude, "x", send.Options{}); err == nil {
+		t.Fatal("a send to a kind the registry does not hold was not refused")
+	}
+	if rt.reads != 0 || len(rt.typed) != 0 {
+		t.Fatalf("reads %d, typed %v: the refusal must come before the pane is touched", rt.reads, rt.typed)
 	}
 }

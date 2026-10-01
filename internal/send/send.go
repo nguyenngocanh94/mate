@@ -95,7 +95,10 @@ var _ Runtime = runtime.Adapter(nil)
 // at memory speed; a nil Sleep waits for real.
 type Deps struct {
 	Runtime Runtime
-	Sleep   func(ctx context.Context, d time.Duration) error
+	// Harnesses are the harnesses a target may run. A send to a kind that
+	// is not registered is refused before the pane is read.
+	Harnesses harness.Registry
+	Sleep     func(ctx context.Context, d time.Duration) error
 	// BeforeType persists an attempt after readiness checks and before any
 	// bytes are sent. A failure prevents typing. Recovery never calls it.
 	BeforeType func() error
@@ -207,6 +210,9 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	report := Report{Agent: target.Name}
 	if deps.Runtime == nil {
 		return report, observability.NewError(observability.CodeUsage, "send requires a runtime")
+	}
+	if _, err := deps.Harnesses.Lookup(kind); err != nil {
+		return report, err
 	}
 	if strings.ContainsAny(text, "\r\n") {
 		return report, observability.NewError(observability.CodeUsage,

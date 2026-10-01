@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -68,6 +69,7 @@ func newLiveLab(t *testing.T) liveLab {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            catalog.Default(),
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,
@@ -363,7 +365,7 @@ func requireCanary(t *testing.T, answer, want string) {
 
 func sendSlash(t *testing.T, ctx context.Context, lab liveLab, h runtime.AgentHandle, cmd string) {
 	t.Helper()
-	report, err := send.Send(ctx, send.Deps{Runtime: lab.rt}, h, harness.KindClaude, cmd, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, harness.KindClaude, cmd, send.Options{})
 	if err != nil {
 		t.Fatalf("send %s: %v (report %+v)", cmd, err, report)
 	}

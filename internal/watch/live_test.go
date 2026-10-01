@@ -13,6 +13,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/harness/codexlab"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -138,7 +139,7 @@ func TestLiveWatchOpensAndResolvesIncidentsOnARealCrew(t *testing.T) {
 
 	// 2. A line into the pane is movement: the composer holds it, then the
 	// turn starts. Either way the screen changed, and the incident closes.
-	if _, err := send.Send(ctx, send.Deps{Runtime: rt}, handle, harness.KindCodex,
+	if _, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: rt}, handle, harness.KindCodex,
 		"reply with the single word ack", send.Options{}); err != nil {
 		t.Fatalf("send into the crew pane: %v", err)
 	}
@@ -297,6 +298,7 @@ func liveDeps(t *testing.T, configHome string) (*runtime.Herdr, spawn.Deps) {
 		return nil
 	}
 	return rt, spawn.Deps{
+		Harnesses:            catalog.Default(),
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,

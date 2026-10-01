@@ -10,7 +10,6 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/box"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
-	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -209,7 +208,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		if !running {
 			out.AlreadyGone, out.TabClosed = true, true
 		} else {
-			kind, _ := harness.ParseKind(meta[MetaHarness])
+			kind, _ := deps.Harnesses.Parse(meta[MetaHarness])
 			handle := runtime.AgentHandle{Session: session, Name: out.Agent, RawID: crew, Kind: kind, Tab: tab}
 			live, err := agentLive(ctx, deps, handle)
 			if err != nil {

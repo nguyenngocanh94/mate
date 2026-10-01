@@ -62,6 +62,7 @@ func TestLiveSendPeekStateCrew(t *testing.T) {
 		return nil
 	}
 	deps := spawn.Deps{
+		Harnesses:            harnesses,
 		Runtime:              rt,
 		Names:                names,
 		ConfigHome:           configHome,

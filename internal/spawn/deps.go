@@ -85,10 +85,14 @@ const (
 )
 
 // Deps are the collaborators a start or stop needs. The zero value is not
-// usable: Runtime is required. Everything else has a default.
+// usable: Runtime and Harnesses are required. Everything else has a default.
 type Deps struct {
 	// Runtime is the Herdr adapter. Tests pass runtime.NewFake().
 	Runtime runtime.Adapter
+	// Harnesses are the harnesses a start may launch and a stop may meet.
+	// The zero Registry holds none, so every start is refused; cmd/mate
+	// passes catalog.Default().
+	Harnesses harness.Registry
 	// Names is the live agent-name registry. Nil means a fresh in-process
 	// one, which is what a one-shot CLI invocation wants.
 	Names runtime.LiveNameRegistry
@@ -135,14 +139,24 @@ func (d Deps) codexSessionsDir() (string, error) {
 	return harness.CodexSessionsDir("")
 }
 
-// LiveDeps is what the CLI uses: the real Herdr adapter over os/exec. The
-// name registry is shared with the adapter, which re-reserves the name at
-// start; without one StartAgent refuses outright.
-func LiveDeps() Deps {
+// LiveDeps is what the CLI uses: the real Herdr adapter over os/exec, and
+// the harnesses the binary was built with. The name registry is shared with
+// the adapter, which re-reserves the name at start; without one StartAgent
+// refuses outright.
+func LiveDeps(harnesses harness.Registry) Deps {
 	names := runtime.NewMemoryNameRegistry()
 	rt := runtime.NewHerdr(process.ExecRunner{})
 	rt.Names = names
-	return Deps{Runtime: rt, Names: names}
+	return Deps{Runtime: rt, Harnesses: harnesses, Names: names}
+}
+
+// defaultHarness is the harness a role gets when the request named none:
+// the one the workspace recorded, else the registry's default for the role.
+func (d Deps) defaultHarness(recorded string, role harness.AgentRole) (harness.Kind, error) {
+	if strings.TrimSpace(recorded) == "" {
+		return d.Harnesses.Default(role)
+	}
+	return d.Harnesses.Parse(recorded)
 }
 
 func (d Deps) names() runtime.LiveNameRegistry {

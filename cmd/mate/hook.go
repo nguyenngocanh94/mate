@@ -37,7 +37,7 @@ func cmdHook(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := fs.Parse(args[1:]); err != nil {
 			return &usageError{err}
 		}
-		kind, err := harness.ParseKind(*harnessFlag)
+		kind, err := harnesses.Parse(*harnessFlag)
 		if err != nil {
 			return &usageError{err}
 		}

@@ -78,8 +78,9 @@ func consolePilot(dir string, deps spawn.Deps) (*consoleDelivery, error) {
 // runs at memory speed under the fake adapter; the live deps set neither.
 func consoleOutbox(ws *store.Workspace, deps spawn.Deps) *outbox.Sender {
 	od := outbox.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleMateHandle(ws, deps),
+		Runtime:   deps.Runtime,
+		Handle:    consoleMateHandle(ws, deps),
+		Harnesses: deps.Harnesses,
 	}
 	if deps.Now != nil {
 		od.Clock = clockFunc(deps.Now)

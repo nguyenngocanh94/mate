@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -400,7 +401,7 @@ func TestLiveCodexSessionStartHook(t *testing.T) {
 
 func sendCodexSlash(t *testing.T, ctx context.Context, lab liveLab, h runtime.AgentHandle, cmd string) {
 	t.Helper()
-	report, err := send.Send(ctx, send.Deps{Runtime: lab.rt}, h, harness.KindCodex, cmd, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Harnesses: catalog.Default(), Runtime: lab.rt}, h, harness.KindCodex, cmd, send.Options{})
 	if err != nil {
 		t.Fatalf("send %s: %v (report %+v)", cmd, err, report)
 	}

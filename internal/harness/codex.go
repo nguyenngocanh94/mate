@@ -15,7 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 )
 
-// Codex is the HarnessAdapter for Codex CLI 0.151.0. Generated context is
+// Codex is the Profile of Codex CLI 0.151.0. Generated context is
 // written by later gates to <cwd>/AGENTS.override.md (not tracked AGENTS.md).
 // BuildLaunchSpec binds that cwd and refuses to start when the effective
 // instruction chain is missing the required file, empty, or would be
@@ -25,37 +25,33 @@ type Codex struct {
 	LookPath      func(name string) (string, error) // unused in G2; reserved for G4 executable probe
 }
 
-// Validate reports Codex capabilities. Config.toml fallback filenames are
-// not read here (unproven as a G2 file-parse); they are an explicit Config
-// field so callers cannot silently assume TEAM_GUIDE.md.
-func (c Codex) Validate(_ context.Context, cfg Config) (CapabilitySet, error) {
-	if cfg.Kind != "" && cfg.Kind != KindCodex {
-		return CapabilitySet{}, observability.NewError(observability.CodeUsage, fmt.Sprintf("codex adapter got kind %q", cfg.Kind))
+// Kind implements Profile.
+func (Codex) Kind() Kind { return KindCodex }
+
+// Info implements Profile.
+func (Codex) Info() Info {
+	return Info{
+		RuntimeKind:     string(KindCodex),
+		ConfigDir:       ".codex",
+		InstructionFile: CodexOverrideName,
+		EnvKeys:         []string{config.EnvCodexHome},
 	}
-	max := c.maxBytes(cfg)
-	return CapabilitySet{
-		Kind:               KindCodex,
-		Deliveries:         []Delivery{DeliveryInstructionFile},
-		DefaultDelivery:    DeliveryInstructionFile,
-		ProjectDocMaxBytes: max,
-		GracefulStop: GracefulStop{
-			Available: false,
-			Method:    "",
-			ProvenOn:  "",
+}
+
+// Launcher implements Profile.
+func (c Codex) Launcher() Launcher { return c }
+
+// Screen implements Profile.
+func (Codex) Screen() ScreenProfile { return kindScreen(KindCodex) }
+
+// Capabilities implements Profile.
+func (Codex) Capabilities() Capabilities {
+	return Capabilities{
+		GracefulStop: Cap[GracefulStopper]{
+			Status: CapUnknown,
+			Reason: "never measured: v1 G1 proved only Claude's /exit, so a Codex stop closes the pane",
 		},
-		Assumptions: []Assumption{
-			{
-				ID:      AssumptionCodexConfigFallbacks,
-				Status:  "unproven",
-				Summary: "G2 does not parse ~/.codex/config.toml. Fallback filenames must be passed on Config; TEAM_GUIDE.md is not assumed.",
-			},
-			{
-				ID:      "codex_graceful_stop",
-				Status:  "unproven",
-				Summary: "G1 proved Claude /exit; Codex graceful stop was not measured. StopAgent must not hardcode send-keys.",
-			},
-		},
-	}, nil
+	}
 }
 
 func (c Codex) maxBytes(cfg Config) int {
@@ -138,7 +134,7 @@ func (c Codex) BuildLaunchSpec(_ context.Context, spec AgentSpec) (LaunchSpec, e
 		args = append(append([]string{"resume"}, args...), resumeID)
 	}
 	out := LaunchSpec{
-		kind:            string(KindCodex),
+		kind:            c.Info().RuntimeKind,
 		args:            args,
 		cwd:             cwd,
 		env:             env,

@@ -43,7 +43,7 @@ func TestLiveIndependentReviewRejectsFalseHandback(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
-	deps := spawn.LiveDeps()
+	deps := spawn.LiveDeps(harnesses)
 	deps.Binary = consoleBinaryPath(t)
 	t.Cleanup(func() {
 		c, cancel := context.WithTimeout(context.Background(), time.Minute)

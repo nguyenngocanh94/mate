@@ -1,5 +1,6 @@
-// Package harness is the HarnessAdapter port. Adapters validate executables
-// and build LaunchSpec values; they do not fork harness processes.
+// Package harness is the harness contract (contract.go) and the Registry
+// that holds the harnesses a binary launches. A harness is a Profile: its
+// Launcher builds LaunchSpec values and never forks the harness process.
 //
 // For callers outside this package, constructors are the only way to obtain
 // a startable LaunchSpec, and they refuse to return one whose required

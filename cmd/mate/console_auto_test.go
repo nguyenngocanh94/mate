@@ -42,9 +42,10 @@ func TestConsolePilotDigestsToAStartedMate(t *testing.T) {
 
 	pilot := autopilot.New(w, autopilot.Deps{
 		Outbox: outbox.New(w, outbox.Deps{
-			Runtime: deps.Runtime,
-			Handle:  consoleMateHandle(w, deps),
-			Sleeper: noSleep{},
+			Harnesses: harnesses,
+			Runtime:   deps.Runtime,
+			Handle:    consoleMateHandle(w, deps),
+			Sleeper:   noSleep{},
 		}),
 		Sleeper: noSleep{},
 	})
