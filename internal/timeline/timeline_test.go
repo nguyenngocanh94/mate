@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -498,12 +499,7 @@ func TestAFailedReindexLeavesThePreviousTimelineInPlace(t *testing.T) {
 func TestNarrateGolden(t *testing.T) {
 	f := newFixture(t)
 	f.ingest(t)
-
-	var lines []string
-	for _, e := range f.story(t) {
-		lines = append(lines, timeline.NarrateIn(e, time.UTC))
-	}
-	got := strings.Join(lines, "\n") + "\n"
+	got := f.narrate(t)
 
 	golden := "testdata/narrate.golden"
 	if os.Getenv("MATE_UPDATE_GOLDEN") == "1" {
@@ -517,6 +513,58 @@ func TestNarrateGolden(t *testing.T) {
 	}
 	if got != string(want) {
 		t.Fatalf("the narrated story changed.\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// A crew's status line has no time of its own: it borrows the time of the
+// transcript command that echoed it, so the two tie to the nanosecond. The
+// tie used to be broken by comparing the two files' absolute paths, which put
+// "reports" before or after the "runs: echo" that wrote it depending on
+// where the workspace and the transcript lived (found 2026-10-01: the golden
+// failed with TMPDIR inside the checkout). The line now sorts at the
+// command's byte, so the story is the same wherever its files are.
+func TestNarrateOrderDoesNotDependOnWhereTheFilesLive(t *testing.T) {
+	want, err := os.ReadFile("testdata/narrate.golden")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// '!' sorts before the workspace's ".mate" and '~' after it. The root is
+	// resolved because the workspace's own paths are (macOS /var is
+	// /private/var), so the two spellings share a prefix.
+	for _, dir := range []string{"!transcripts", "~transcripts"} {
+		t.Run(dir, func(t *testing.T) {
+			f := newFixture(t)
+			root, err := filepath.EvalSymlinks(f.root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			moved := filepath.Join(root, dir)
+			if err := os.MkdirAll(moved, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			mate, err := f.ws.ReadMateMeta(fixtureProject)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mate[timeline.MetaTranscript] = filepath.Join(moved, filepath.Base(claudeFixture))
+			copyFile(t, abs(t, claudeFixture), mate[timeline.MetaTranscript])
+			if err := f.ws.WriteMateMeta(fixtureProject, mate); err != nil {
+				t.Fatal(err)
+			}
+			crew, err := f.ws.ReadCrewMeta(fixtureProject, fixtureCrew)
+			if err != nil {
+				t.Fatal(err)
+			}
+			crew[timeline.MetaTranscript] = filepath.Join(moved, filepath.Base(codexFixture))
+			copyFile(t, abs(t, codexFixture), crew[timeline.MetaTranscript])
+			if err := f.ws.WriteCrewMeta(fixtureProject, fixtureCrew, crew); err != nil {
+				t.Fatal(err)
+			}
+			f.ingest(t)
+			if got := f.narrate(t); got != string(want) {
+				t.Fatalf("the story changed with its transcripts under %s.\n--- got ---\n%s\n--- want ---\n%s", dir, got, want)
+			}
+		})
 	}
 }
 

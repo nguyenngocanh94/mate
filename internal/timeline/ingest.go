@@ -270,6 +270,10 @@ type pass struct {
 type datedCommand struct {
 	command string
 	at      time.Time
+	// path and offset are the transcript byte the command was read from, so
+	// a status line it dates can sort right after it.
+	path   string
+	offset int64
 }
 
 // commitSighting is a commit an agent's transcript shows it making: the sha

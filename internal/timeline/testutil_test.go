@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,6 +158,16 @@ func (f *fixture) story(t *testing.T) []timeline.StoryEvent {
 		t.Fatalf("Story: %v", err)
 	}
 	return events
+}
+
+// narrate is the whole story as the golden spells it.
+func (f *fixture) narrate(t *testing.T) string {
+	t.Helper()
+	var lines []string
+	for _, e := range f.story(t) {
+		lines = append(lines, timeline.NarrateIn(e, time.UTC))
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func (f *fixture) crewActor() string { return timeline.CrewActorID(fixtureProject, fixtureCrew) }

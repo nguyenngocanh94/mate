@@ -496,7 +496,7 @@ func (p *pass) rememberToolCommand(loc Located, call harness.TranscriptToolCall,
 	// so ingestStatus can date the line it echoed.
 	if class == harness.CommandShell && summary != "" {
 		p.statusClock[loc.ActorID] = append(p.statusClock[loc.ActorID],
-			datedCommand{command: summary, at: call.StartedAt})
+			datedCommand{command: summary, at: call.StartedAt, path: loc.Path, offset: call.Offset})
 		if res, ok := results[call.SourceRef]; ok && !res.IsError {
 			if sha, found := commitSha(summary, res.OutputText); found {
 				p.commitSightings[loc.ActorID] = append(p.commitSightings[loc.ActorID],

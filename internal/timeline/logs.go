@@ -87,7 +87,7 @@ func (p *pass) ingestStatus(ctx context.Context) error {
 		}
 		for _, line := range lines {
 			status := box.ParseStatus(line.Line)
-			at, dated := p.dateStatusLine(crew.ActorID, line.Line, mtime, previous)
+			at, dated, clock := p.dateStatusLine(crew.ActorID, line.Line, mtime, previous)
 			previous = at
 			statusDedup := dedup(KindStatusAppend, crew.ActorID, fmt.Sprint(line.Offset))
 			p.b.event(pendingEvent{
@@ -99,6 +99,7 @@ func (p *pass) ingestStatus(ctx context.Context) error {
 					"line": line.Line, "dated_by": dated,
 				},
 				RefPath: path, RefOffset: line.Offset,
+				ClockPath: clock.path, ClockOffset: clock.offset,
 			})
 			if status.State != box.StateNeedsDecision {
 				continue
@@ -110,6 +111,7 @@ func (p *pass) ingestStatus(ctx context.Context) error {
 				Kind: KindQuestionAsked, TaskActor: crew.ActorID,
 				Payload: map[string]any{"text": status.Text, "crew": crew.ID},
 				RefPath: path, RefOffset: line.Offset,
+				ClockPath: clock.path, ClockOffset: clock.offset,
 			})
 			p.b.question(&pendingQuestion{
 				ID:          questionRowID(crew.ActorID, line.Offset),
@@ -125,20 +127,22 @@ func (p *pass) ingestStatus(ctx context.Context) error {
 
 // dateStatusLine applies the two rules above and says which one fired, so a
 // reader of a payload can tell an exact timestamp from an approximate one.
-func (p *pass) dateStatusLine(actorID, line string, mtime, previous time.Time) (time.Time, string) {
+// Dated by a command, it also returns that command, whose transcript byte the
+// line sorts at.
+func (p *pass) dateStatusLine(actorID, line string, mtime, previous time.Time) (time.Time, string, datedCommand) {
 	text := strings.TrimSpace(line)
 	if text != "" {
-		best := time.Time{}
+		var best datedCommand
 		for _, cmd := range p.statusClock[actorID] {
 			if !strings.Contains(cmd.command, text) {
 				continue
 			}
-			if best.IsZero() || cmd.at.Before(best) {
-				best = cmd.at
+			if best.at.IsZero() || cmd.at.Before(best.at) {
+				best = cmd
 			}
 		}
-		if !best.IsZero() {
-			return best, "transcript.shell"
+		if !best.at.IsZero() {
+			return best.at, "transcript.shell", best
 		}
 	}
 	// The fallback, clamped so a file's lines never go backwards: mtime is
@@ -147,7 +151,7 @@ func (p *pass) dateStatusLine(actorID, line string, mtime, previous time.Time) (
 	if !previous.IsZero() && at.Before(previous) {
 		at = previous
 	}
-	return at, "status.mtime"
+	return at, "status.mtime", datedCommand{}
 }
 
 // lastAppLineToMate is the newest line mate typed into the Mate's pane that
