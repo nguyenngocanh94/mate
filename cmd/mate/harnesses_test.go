@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -41,5 +42,26 @@ func TestNewWorkspaceRecordsTheRegistryDefaults(t *testing.T) {
 	}
 	if !strings.HasPrefix(harnessChoices(harness.RoleCrew, "|"), string(crew)+"|") {
 		t.Fatalf("crew choices %q do not start with %s", harnessChoices(harness.RoleCrew, "|"), crew)
+	}
+}
+
+// A harness offered for a Mate - in the Console's catalog and on `mate mate
+// start`'s usage line - is exactly one whose Hooks are verified, the rule
+// StartMate refuses by. Every harness is still in the catalog, because a
+// Crew runs on it either way.
+func TestOnlyAHarnessWithHooksIsOfferedForAMate(t *testing.T) {
+	mates := strings.Split(harnessChoices(harness.RoleMate, "|"), "|")
+	for _, h := range consoleHarnesses().List {
+		p, err := harnesses.Lookup(harness.Kind(h.Kind))
+		if err != nil {
+			t.Fatal(err)
+		}
+		hooks := p.Capabilities().Hooks.Verified()
+		if h.Mate != hooks {
+			t.Errorf("%s: offered for a Mate = %v, Hooks verified = %v", h.Kind, h.Mate, hooks)
+		}
+		if got := slices.Contains(mates, string(h.Kind)); got != hooks {
+			t.Errorf("%s: in the Mate usage choices %q = %v, Hooks verified = %v", h.Kind, mates, got, hooks)
+		}
 	}
 }

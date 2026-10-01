@@ -16,18 +16,29 @@ var harnesses = catalog.Default()
 
 // harnessChoices spells the harnesses a role may launch for a usage line:
 // the role's default first, then the others in registration order, joined
-// with sep.
+// with sep. A Mate's choices are only the harnesses that can run one.
 func harnessChoices(role harness.AgentRole, sep string) string {
 	var names []string
 	if k, err := harnesses.Default(role); err == nil {
 		names = append(names, string(k))
 	}
 	for _, k := range harnesses.Kinds() {
+		if role == harness.RoleMate && !runsMate(k) {
+			continue
+		}
 		if len(names) == 0 || string(k) != names[0] {
 			names = append(names, string(k))
 		}
 	}
 	return strings.Join(names, sep)
+}
+
+// runsMate reports whether a registered harness can run a Mate: the rule
+// `mate mate start` refuses by (spawn.StartMate), a verified Hooks
+// capability, because a Mate's memory and inbox rest on its hooks.
+func runsMate(k harness.Kind) bool {
+	p, err := harnesses.Lookup(k)
+	return err == nil && p.Capabilities().Hooks.Verified()
 }
 
 // workspaceDefaults are the harnesses a new workspace.yaml records: the
@@ -58,6 +69,7 @@ func consoleHarnesses() query.Harnesses {
 		out.List = append(out.List, query.Harness{
 			Kind: query.HarnessKind(k),
 			Icon: query.HarnessIcon{Nerd: icon.Nerd, Unicode: icon.Unicode, ASCII: icon.ASCII},
+			Mate: runsMate(k),
 		})
 	}
 	if k, err := harnesses.Default(harness.RoleMate); err == nil {

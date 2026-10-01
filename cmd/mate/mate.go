@@ -54,6 +54,12 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return &usageError{err}
 		}
+		if !runsMate(kind) {
+			// spawn.StartMate refuses it too, through the harness's own
+			// launcher; this says so before a workspace is looked for.
+			return newUsageErrorf("mate mate start: the %s harness cannot run a Mate: it has no verified Hooks capability (choose %s)",
+				kind, harnessChoices(harness.RoleMate, " or "))
+		}
 		req.Harness = kind
 	}
 	w, err := resolveWorkspace(*workspaceFlag)

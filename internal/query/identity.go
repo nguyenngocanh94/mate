@@ -38,6 +38,9 @@ func (k HarnessKind) String() string { return string(k) }
 type Harness struct {
 	Kind HarnessKind
 	Icon HarnessIcon
+	// Mate reports whether the harness can run a Mate. One that cannot
+	// still runs Crews, so it is drawn, and never offered for a Mate.
+	Mate bool
 }
 
 // HarnessIcon is a harness's one-cell mark in each glyph alphabet a UI may

@@ -135,8 +135,9 @@ func bxAllGlyphs(g glyphSet) map[string]string {
 // testHarnesses is the harness catalog the fixtures' snapshots carry, as
 // cmd/mate builds it from the registry (TestConsoleHarnessesAreTheCatalogs).
 var testHarnesses = []query.Harness{
-	{Kind: "claude", Icon: query.HarnessIcon{Nerd: "\uec82", Unicode: "✻", ASCII: "*"}},
-	{Kind: "codex", Icon: query.HarnessIcon{Nerd: "\uec81", Unicode: "⌬", ASCII: "#"}},
+	{Kind: "claude", Icon: query.HarnessIcon{Nerd: "\uec82", Unicode: "✻", ASCII: "*"}, Mate: true},
+	{Kind: "codex", Icon: query.HarnessIcon{Nerd: "\uec81", Unicode: "⌬", ASCII: "#"}, Mate: true},
+	{Kind: "pi", Icon: query.HarnessIcon{Nerd: "π", Unicode: "π", ASCII: "p"}},
 }
 
 // TestAsciiSetIsActuallyASCII: a stray box-drawing glyph in the fallback
