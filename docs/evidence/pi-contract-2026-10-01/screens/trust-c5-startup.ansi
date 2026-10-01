@@ -1,0 +1,19 @@
+erics@Ericss-Mac-mini c5 % pi --model deepseek/deepseek-flash --no-session --no-extensions --no-skills -e /Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/ext/probe.ts
+[0m[38;2;95;168;204m─────────────────────────────────────────────────────────────────────────────────────────────[0m
+
+ [0m[1m[38;2;167;152;215mTrust project folder?[0m[38;2;167;152;215m                                                                       [0m
+ [0m[1m[38;2;167;152;215m/Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/tmp/lab/ctx/c5[0m[38;2;167;152;215m    [0m
+ [0m[38;2;167;152;215m                                                                                            [0m
+ [0m[1m[38;2;167;152;215mThis allows pi to load .pi settings and resources, install missing project packages, and    [0m
+ [0m[1m[38;2;167;152;215mexecute project extensions.[0m                                                                 
+
+ [0m[38;2;167;152;215m→ Trust[0m                                                                                     
+   [0m[38;2;222;224;225mTrust parent folder                                                                       [0m
+ [0m[38;2;222;224;225m(/Volumes/Work/Workspace/mate/.claude/worktrees/wf_81f3a9a6-12a-5/.scratch/tmp/lab/ctx)[0m     
+   [0m[38;2;222;224;225mTrust (this session only)[0m                                                                 
+   [0m[38;2;222;224;225mDo not trust[0m                                                                              
+   [0m[38;2;222;224;225mDo not trust (this session only)[0m                                                          
+
+ [0m[38;2;126;136;142m↑↓[0m[38;2;157;165;169m navigate[0m  [0m[38;2;126;136;142menter[0m[38;2;157;165;169m select[0m  [0m[38;2;126;136;142mescape/ctrl+c[0m[38;2;157;165;169m cancel[0m                                             
+
+[0m[38;2;95;168;204m─────────────────────────────────────────────────────────────────────────────────────────────[0m

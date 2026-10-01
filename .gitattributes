@@ -4,3 +4,4 @@
 # these files as the terminal handed them over.
 internal/send/testdata/screens/** -text
 internal/harness/testdata/** -text
+docs/evidence/pi-contract-2026-10-01/screens/** -text
