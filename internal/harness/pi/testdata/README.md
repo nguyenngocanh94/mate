@@ -8,7 +8,7 @@ The lab paths inside them are the lab's, not a real project's.
 
 Read with `herdr agent read <name> --source <source> --format text`.
 A name with `.visible` was read through `visible`, the source pi's profile uses; one without was read through `recent-unwrapped`.
-The `.ansi` files are the same reads with `--format ansi`, kept for the colours (pi's cursor is a reverse-video space).
+The `--format ansi` reads, with their colours and CRLF line endings (pi's cursor is a reverse-video space), stay only in the evidence: no test reads them.
 
 - `run1-empty-composer.visible.txt` - the empty composer after startup, under the "Update Available" banner.
 - `run6-idle-after-turn.visible.txt` - the empty composer after a finished turn.
