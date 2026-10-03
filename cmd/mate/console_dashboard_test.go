@@ -3,15 +3,20 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"testing"
 )
+
+// freeAddr lets the kernel pick the port: the default one belongs to
+// whatever console is open on this machine.
+const freeAddr = "127.0.0.1:0"
 
 // The console serves the dashboard while it is open and stops with it.
 func TestStartConsoleDashboardServesUntilStopped(t *testing.T) {
 	w := usageWorkspace(t)
-	url, stop, err := startConsoleDashboard(context.Background(), w)
+	url, stop, err := startConsoleDashboard(context.Background(), w, freeAddr)
 	if err != nil {
-		t.Skipf("default dashboard port unavailable: %v", err)
+		t.Fatalf("start: %v", err)
 	}
 	resp, err := http.Get(url + "api/workspace")
 	if err != nil {
@@ -33,12 +38,16 @@ func TestStartConsoleDashboardServesUntilStopped(t *testing.T) {
 // A busy port is reported, not fatal.
 func TestStartConsoleDashboardBusyPort(t *testing.T) {
 	w := usageWorkspace(t)
-	_, stop, err := startConsoleDashboard(context.Background(), w)
+	served, stop, err := startConsoleDashboard(context.Background(), w, freeAddr)
 	if err != nil {
-		t.Skipf("default dashboard port unavailable: %v", err)
+		t.Fatalf("start: %v", err)
 	}
 	defer stop()
-	if _, _, err := startConsoleDashboard(context.Background(), w); err == nil {
+	u, err := url.Parse(served)
+	if err != nil {
+		t.Fatalf("parse %q: %v", served, err)
+	}
+	if _, _, err := startConsoleDashboard(context.Background(), w, u.Host); err == nil {
 		t.Fatal("second start on the same port should fail")
 	}
 }
