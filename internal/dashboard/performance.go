@@ -55,7 +55,7 @@ func (s *Server) actorPerformance(ctx context.Context, actorID string, closed bo
 	for _, t := range turns {
 		in.Calls = append(in.Calls, diagnostics.Call{ID: t.ID, SessionID: t.SessionID, HarnessTurnRef: t.HarnessTurnRef,
 			StartedAt: t.StartedAt, EndedAt: t.EndedAt, Model: t.Model, Ordinal: t.Ordinal, Tokens: performanceTokens(t.Tokens),
-			ContextAfter: t.ContextAfter, Ref: diagnostics.Ref{Path: t.Ref.Path, Offset: t.Ref.Offset}})
+			ContextAfter: t.ContextAfter, Ref: diagnostics.Ref{Path: t.Ref.Path, Offset: t.Ref.Offset}, Outcome: t.Outcome})
 	}
 	for _, q := range questions {
 		in.Decisions = append(in.Decisions, diagnostics.Decision{ID: q.ID, Text: q.Text, AskedAt: q.AskedAt, AnsweredAt: q.AnsweredAt, EventID: q.AskedEventID})

@@ -37,6 +37,8 @@ type Call struct {
 	Tokens                                                   Tokens
 	ContextAfter                                             int64
 	Ref                                                      Ref
+	// Outcome is why the call stopped, as the ledger recorded it.
+	Outcome string
 }
 
 // Action is the ledger fallback. It supplies attribution even when the
@@ -120,6 +122,9 @@ type Performance struct {
 	TopOutputSegmentIDs []string    `json:"top_output_segment_ids"`
 	TopOutputCallIDs    []string    `json:"top_output_call_ids"`
 	Loops               LoopSummary `json:"loops"`
+	// Skills are the skills the recording shows being loaded, by name, in
+	// the order each was first loaded.
+	Skills []SkillUse `json:"skills"`
 }
 
 type RuntimeProfile struct {
@@ -164,6 +169,57 @@ type Overview struct {
 	Sequence   []WorkStep     `json:"sequence"`
 	Rule       string         `json:"rule"`
 	Coverage   string         `json:"coverage"`
+	// Steps are the prompt's model calls in order, consecutive calls of one
+	// type folded into one step. They partition the prompt's calls, so their
+	// tokens add up to the prompt's. The Crew overview has none, for the
+	// reason it has no Sequence.
+	Steps []Step `json:"steps"`
+}
+
+// Step is a run of consecutive model calls that did one type of work. Its
+// kind is the kind its calls are charged to in Categories, so the two can
+// never disagree. Executions counts the operations those calls ran: native
+// commands and direct tools, and a wrapper only when it is the sole record
+// of what ran inside it.
+type Step struct {
+	Kind       string   `json:"kind"`
+	Label      string   `json:"label"`
+	StartedAt  string   `json:"started_at,omitempty"`
+	EndedAt    string   `json:"ended_at,omitempty"`
+	ElapsedMs  *int64   `json:"elapsed_ms"`
+	ModelCalls int      `json:"model_calls"`
+	Executions int      `json:"executions"`
+	Tokens     Tokens   `json:"tokens"`
+	CallIDs    []string `json:"call_ids"`
+	SegmentIDs []string `json:"segment_ids"`
+	// Skills names the skills loaded during the step, once each.
+	Skills []string `json:"skills"`
+	// Parts are the types of work recorded inside the step's calls, sorted.
+	// A mixed step has several; they say what was mixed and split no token.
+	Parts []string `json:"parts"`
+	// Open marks the last step of a prompt that is still running: its
+	// numbers can still grow.
+	Open bool `json:"open"`
+}
+
+// SkillUse is one skill and every recorded load of it. A load is the
+// harness's skill tool being called, or a SKILL.md being read; neither says
+// the agent then followed the skill.
+type SkillUse struct {
+	Name  string      `json:"name"`
+	Count int         `json:"count"`
+	Loads []SkillLoad `json:"loads"`
+}
+
+type SkillLoad struct {
+	At          string `json:"at,omitempty"`
+	PromptID    string `json:"prompt_id,omitempty"`
+	CallID      string `json:"call_id,omitempty"`
+	ExecutionID string `json:"execution_id"`
+	// Via is "tool" for the harness's skill tool and "read" for a SKILL.md
+	// read by a file tool or a shell command.
+	Via  string `json:"via"`
+	Path string `json:"path,omitempty"`
 }
 
 type WorkCategory struct {
@@ -233,6 +289,9 @@ type Execution struct {
 	ErrorSignature  string `json:"error_signature,omitempty"`
 	SourceRef       Ref    `json:"source_ref"`
 	MeasurementKind string `json:"measurement_kind"`
+	// ParentLink is set when WrapperID and CallID were inferred rather than
+	// named by the harness; see linkNativeParents.
+	ParentLink string `json:"parent_link,omitempty"`
 }
 
 type Process struct {

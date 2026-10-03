@@ -374,6 +374,11 @@ func toolTarget(kind harness.Kind, call harness.TranscriptToolCall) (target, sum
 	if command := firstField(fields, "command", "cmd", "description", "prompt"); command != "" {
 		return truncateRunes(oneLine(command), targetRunes), truncateRunes(command, summaryRunes), class
 	}
+	// Claude's Skill tool is given the name of the skill it loads. The name
+	// is what the call was about; the summary keeps the whole input.
+	if skill := firstField(fields, "skill"); skill != "" {
+		return truncateRunes(oneLine(skill), targetRunes), truncateRunes(oneLine(body), summaryRunes), class
+	}
 	return "", truncateRunes(oneLine(body), summaryRunes), class
 }
 
