@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -493,5 +495,47 @@ func TestLoadCarriesTheWorkspaceDefaultMateHarness(t *testing.T) {
 				t.Fatalf("workspace field = %+v, want mate harness %q", snap.Workspace, tc.want)
 			}
 		})
+
+	}
+}
+
+// What the Mate holds for the captain is the questions in the `## Held for
+// the captain` section of its backlog: Absent before there is a backlog,
+// Known and empty when nothing is asked, and one item per `asked "…"` entry
+// otherwise - a promise or a note in the same section is not a question.
+func TestLoadReadsWhatTheMateHoldsForTheCaptain(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	held := func() Field[[]HeldItem] {
+		t.Helper()
+		snap, err := Load(context.Background(), ws, testHarnesses)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		return snap.Projects[0].Mate.Held
+	}
+	if got := held(); got.State != Absent {
+		t.Fatalf("Held without a backlog = %+v, want Absent", got)
+	}
+	write := func(text string) {
+		t.Helper()
+		if err := os.MkdirAll(ws.MateDir("shop"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(ws.BacklogFile("shop"), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(memory.BacklogHeader())
+	if got := held(); !got.IsKnown() || len(got.Value) != 0 {
+		t.Fatalf("Held on a fresh backlog = %+v, want Known and empty", got)
+	}
+	write("# Backlog\n\n## Held for the captain\n" +
+		"- checkout-button, 2026-09-24: asked \"Classic or express?\" Waits on: the captain's choice.\n" +
+		"- per-screen, 2026-09-23: promised \"a screenshot per screen\" Waits on: each hand-back.\n" +
+		"\n## Queued\n- other: not held\n")
+	got := held()
+	want := []HeldItem{{Task: "checkout-button", Date: "2026-09-24", Question: "Classic or express?"}}
+	if !got.IsKnown() || !reflect.DeepEqual(got.Value, want) {
+		t.Fatalf("Held = %+v, want %+v", got, want)
 	}
 }

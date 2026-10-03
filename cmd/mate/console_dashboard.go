@@ -21,12 +21,15 @@ import (
 // A busy port is not an error worth stopping the console for: another
 // console (or `mate dashboard`) is most likely already serving the same
 // workspace there. The caller says so on the status line and carries on.
-func startConsoleDashboard(ctx context.Context, ws *store.Workspace) (string, func(), error) {
+//
+// addr is the bind address, the dashboard's default when empty; a test
+// passes its own so it never depends on what this machine already serves.
+func startConsoleDashboard(ctx context.Context, ws *store.Workspace, addr string) (string, func(), error) {
 	handle, err := db.OpenRead(ws)
 	if err != nil {
 		return "", nil, err
 	}
-	opts := dashboard.Options{Workspace: ws, DB: handle, Deps: dashboardDeps(ws)}
+	opts := dashboard.Options{Workspace: ws, DB: handle, Deps: dashboardDeps(ws), Addr: addr}
 	server, err := dashboard.New(opts)
 	if err != nil {
 		_ = handle.Close()

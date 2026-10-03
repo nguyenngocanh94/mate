@@ -134,7 +134,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// The dashboard comes up with the console, after the observer has made
 	// sure the database exists. It is a convenience: a failure is said on the
 	// status line and never stops the console.
-	if url, stopDashboard, err := startConsoleDashboard(ctx, ws); err != nil {
+	if url, stopDashboard, err := startConsoleDashboard(ctx, ws, ""); err != nil {
 		notice = err.Error()
 	} else {
 		defer stopDashboard()

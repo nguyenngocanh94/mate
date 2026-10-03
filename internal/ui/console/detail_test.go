@@ -3,6 +3,7 @@ package console
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
 )
@@ -259,4 +260,68 @@ func TestCrewDetailShowsTheLaunchProfile(t *testing.T) {
 	if frame := renderFrame(t, m); strings.Contains(frame, "model ") || strings.Contains(frame, "effort ") {
 		t.Fatalf("a crew with no profile shows model/effort fields:\n%s", frame)
 	}
+}
+
+// bxHeld puts held items on payments-api's Mate and opens that Project.
+func bxHeld(t *testing.T, held query.Field[[]query.HeldItem]) Model {
+	t.Helper()
+	tree := designTree()
+	tree.Projects[7].Mate.Held = held
+	m := newFixture(t, tree, 40, 36, unicodeGlyphs)
+	for i := 0; i < 7; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	m, _ = send(t, m, key("enter"))
+	return m
+}
+
+// News: under the Mate's own fields, every question the Mate asked the
+// captain and still waits on - the task, its age, and the question in the
+// Mate's words, with none of its bookkeeping - so a captain who was away
+// reads it without asking the Mate again.
+func TestMateDetailShowsTheQuestionsTheMateAskedTheCaptain(t *testing.T) {
+	asOf := goldenAsOf.In(time.Local)
+	m := bxHeld(t, query.KnownField([]query.HeldItem{
+		{Task: "checkout-button", Date: asOf.AddDate(0, 0, -3).Format("2006-01-02"), Question: "Classic checkout or the express one?"},
+		{Task: "go-live", Date: asOf.Format("2006-01-02"), Question: "Ship on Friday?"},
+		{Question: "Which database do you want to use?"},
+	}))
+	d := bxDetail(t, m)
+	bxWants(t, "Mate detail", d,
+		"  news     checkout-button · 3d\n    Classic checkout or the express\n    one?\n",
+		"           go-live · today\n    Ship on Friday?\n",
+		"           Which database do you want\n           to use?\n")
+	bxDenies(t, "Mate detail", d, "waits on:", "asked")
+
+	// One field per question: y on the first copies that question.
+	for i, f := range m.detailFields(m.w) {
+		if f.label == "news" {
+			m.detailSel = i
+		}
+	}
+	if got, ok := m.detailCopy(); !ok || got != "Classic checkout or the express one?" {
+		t.Errorf("copy = %q, %v; want the question", got, ok)
+	}
+}
+
+// Nothing held says so; no backlog at all says nothing; an unreadable
+// backlog is not shown as "none".
+func TestMateDetailNewsStates(t *testing.T) {
+	d := bxDetail(t, bxHeld(t, query.KnownField([]query.HeldItem{})))
+	bxWants(t, "empty news", d, "news     none")
+	d = bxDetail(t, bxHeld(t, query.AbsentField[[]query.HeldItem]("no backlog")))
+	bxDenies(t, "absent news", d, "news")
+	d = bxDetail(t, bxHeld(t, query.UnknownField[[]query.HeldItem]("permission denied")))
+	bxWants(t, "unreadable news", d, "news     unknown", "permission denied")
+}
+
+// On the workspace level a Project says how much news waits in it.
+func TestProjectPeekCountsNews(t *testing.T) {
+	tree := designTree()
+	tree.Projects[7].Mate.Held = query.KnownField([]query.HeldItem{{Question: "a?"}, {Question: "b?"}})
+	m := newFixture(t, tree, 40, 36, unicodeGlyphs)
+	for i := 0; i < 7; i++ {
+		m, _ = send(t, m, key("down"))
+	}
+	bxWants(t, "project peek", bxDetail(t, m), "news      2 waiting on you")
 }

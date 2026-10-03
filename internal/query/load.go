@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/box"
+	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -118,6 +119,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 	}
 
 	p.Mate = loadMate(ws, ref.Name, w)
+	p.Mate.Held = note(w, loadHeld(ws, ref.Name), "held", RowRef{Kind: RowMate, ID: ref.Name, Label: ref.Name})
 	// The box is read before the Crews because a Crew's state depends on
 	// it: `blocked` is an open incident in the merged view and nothing
 	// else (mvp.md section 4b).
@@ -203,6 +205,27 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 		Pane:      pane,
 	}, "recorded in mate.meta; this does not prove the agent is alive")
 	return out
+}
+
+// loadHeld reads the questions the Mate asked the captain from `mate/backlog.md`.
+// It is a plain read of a file the Mate already keeps, so showing it costs
+// the Mate no turn.
+func loadHeld(ws *store.Workspace, project string) Field[[]HeldItem] {
+	data, err := os.ReadFile(ws.BacklogFile(project))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return AbsentField[[]HeldItem]("this project has no backlog yet")
+		}
+		return UnknownField[[]HeldItem](readFailureReason(err))
+	}
+	entries := memory.HeldEntries(string(data))
+	items := make([]HeldItem, 0, len(entries))
+	for _, e := range entries {
+		if e.Question != "" {
+			items = append(items, HeldItem{Task: e.ID, Date: e.Date, Question: e.Question})
+		}
+	}
+	return KnownField(items)
 }
 
 // absentMate and unknownMate carry the designation's own state forward onto
