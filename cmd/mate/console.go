@@ -131,23 +131,40 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		return cols
 	}})
 	notice := ""
+	// The dashboard comes up with the console, after the observer has made
+	// sure the database exists. It is a convenience: a failure is said on the
+	// status line and never stops the console.
+	if url, stopDashboard, err := startConsoleDashboard(ctx, ws); err != nil {
+		notice = err.Error()
+	} else {
+		defer stopDashboard()
+		notice = "dashboard " + url
+	}
+	addNotice := func(text string) {
+		if notice != "" {
+			notice += "; "
+		}
+		notice += text
+	}
 	var columns *consoleColumns
 	if h != nil {
 		if columns, err = newConsoleColumns(h, os.Getenv); err != nil {
-			notice = "no next pane: " + err.Error()
+			addNotice("no next pane: " + err.Error())
 		} else {
 			defer columns.close()
 			// `mate console` lays the columns out now; `mate <dir>` at the
 			// first Enter, which finds them gone and makes them.
+			layoutFailed := false
 			if split {
 				if err := columns.layout(ctx); err != nil {
+					layoutFailed = true
 					// Said on the status line: stderr is under the alt
 					// screen by the time anyone could read it.
-					notice = "no next pane: " + err.Error()
+					addNotice("no next pane: " + err.Error())
 				}
 			}
-			if notice == "" && columns.review == "" {
-				notice = "a crew's file changes need the Fresh editor: brew install fresh-editor"
+			if !layoutFailed && columns.review == "" {
+				addNotice("a crew's file changes need the Fresh editor: brew install fresh-editor")
 			}
 		}
 	}
@@ -155,10 +172,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// any pane message; the console stays usable either way.
 	noticeClient, noticeErr := consoleNoticeClient(ws)
 	if noticeErr != nil {
-		if notice != "" {
-			notice += "; "
-		}
-		notice += noticeErr.Error()
+		addNotice(noticeErr.Error())
 	}
 	action := consoleAction(ws, deps)
 	if noticeClient != nil {
