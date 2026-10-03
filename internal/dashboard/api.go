@@ -142,24 +142,11 @@ func (s *Server) handleTask(ctx context.Context, r *http.Request, env envelope) 
 		return nil, err
 	}
 	crew := r.PathValue("crew")
-	ledger, err := s.task(ctx, project, crew, s.deps.now())
+	ledger, turns, questions, performance, err := s.taskPerformance(ctx, project, crew)
 	if err != nil {
 		return nil, err
 	}
-	actorID := timeline.CrewActorID(project, crew)
-	turns, err := s.turns(ctx, actorID)
-	if err != nil {
-		return nil, err
-	}
-	lines, err := s.statusLines(ctx, actorID)
-	if err != nil {
-		return nil, err
-	}
-	questions, err := s.questions(ctx, actorID)
-	if err != nil {
-		return nil, err
-	}
-	performance, err := s.crewPerformance(ctx, actorID, ledger, turns, questions, s.deps.now())
+	lines, err := s.statusLines(ctx, timeline.CrewActorID(project, crew))
 	if err != nil {
 		return nil, err
 	}

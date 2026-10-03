@@ -10,7 +10,39 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/diagnostics"
 	"github.com/nguyenngocanh94/mate/internal/telemetry"
+	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
+
+// CrewPerformance is the Task page's ledger row, model calls and diagnostics
+// for one crew, for a reader that is not the HTTP API (`mate usage --why`):
+// the terminal and the page read through the same projection, so they cannot
+// disagree about what a Crew spent its tokens on.
+func (s *Server) CrewPerformance(ctx context.Context, project, crew string) (Task, []Turn, diagnostics.Performance, error) {
+	ledger, turns, _, performance, err := s.taskPerformance(ctx, project, crew)
+	return ledger, turns, performance, err
+}
+
+func (s *Server) taskPerformance(ctx context.Context, project, crew string) (Task, []Turn, []Question, diagnostics.Performance, error) {
+	now := s.deps.now()
+	ledger, err := s.task(ctx, project, crew, now)
+	if err != nil {
+		return Task{}, nil, nil, diagnostics.Performance{}, err
+	}
+	actorID := timeline.CrewActorID(project, crew)
+	turns, err := s.turns(ctx, actorID)
+	if err != nil {
+		return Task{}, nil, nil, diagnostics.Performance{}, err
+	}
+	questions, err := s.questions(ctx, actorID)
+	if err != nil {
+		return Task{}, nil, nil, diagnostics.Performance{}, err
+	}
+	performance, err := s.crewPerformance(ctx, actorID, ledger, turns, questions, now)
+	if err != nil {
+		return Task{}, nil, nil, diagnostics.Performance{}, err
+	}
+	return ledger, turns, questions, performance, nil
+}
 
 func (s *Server) crewPerformance(ctx context.Context, actorID string, ledger Task, turns []Turn, questions []Question, now time.Time) (diagnostics.Performance, error) {
 	return s.actorPerformance(ctx, actorID, ledger.Closed, turns, questions, now)

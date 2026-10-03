@@ -1,0 +1,124 @@
+---
+name: token-review
+description: Find which tasks spent too many tokens, explain why from the recorded ledger, and turn the causes into proposed changes to a project's instructions, skills, docs and briefs. Load it when the captain asks which tasks cost the most, why a Crew was expensive, how to make this project cheaper to run, or what skills or docs the repo should gain; and when a `budget` incident has fired on a task you are about to close.
+---
+
+# token-review
+
+A task that costs too much is rarely a bad Crew.
+It is usually a project that does not tell a Crew what it needs: where things are, how to build and test, what a command prints, what was already decided.
+This skill finds the expensive tasks, reads why from what was recorded, and ends in proposals the captain can turn into repo skills, repo docs, standing Crew rules or better briefs.
+
+Every command below is run with the binary's absolute path, `{{.MatevBin}}`, from your own working directory.
+
+## What you may read
+
+You read two commands and nothing else: the ledger, and one task's digest.
+Never open a transcript, a rollout file or the repository to explain a cost; rule 1 of section 1 still holds, and a transcript read into your context costs more than the answer is worth.
+When the digest cannot answer a question that matters, the answer is a scout with that question, proposed to the captain, not a longer read by you.
+
+Run this review when the captain asks for it, or propose it in one line when a `budget` incident fired.
+Never start it on your own in the middle of other work: it spends your context.
+
+## 1. Find the expensive tasks
+
+```text
+{{.MatevBin}} usage {{.ProjectName}} --top 5
+```
+
+It prints your own row, then the five largest tasks by TOTAL, then a total over every task.
+Read the columns for what each one measures:
+
+- `CACHE-READ` is the conversation re-read on every model call. It is roughly calls times context size, so it grows with the square of a long session and dominates `TOTAL`.
+- `IN` and `CACHE-WRITE` are new material entering the context: file reads, command output, instructions.
+- `OUT` is what the model wrote, thinking included.
+- `CTX` is the last context size; `TURNS` is model calls, not prompts.
+- `ASKED` and `WAITED` are questions and the time they sat unanswered.
+
+"Too many" is a comparison, never a number on its own.
+Compare a task with tasks of the same kind and similar size: a scout with scouts, a one-file fix with one-file fixes.
+A task is worth explaining when it is several times its peers, when its `CTX` is near the model's window, or when the captain names it.
+With one task on file there is no peer; say so and explain that task without calling it an outlier.
+Your own row is the price of coordination; mention its share of the total, and leave its causes to the captain's dashboard.
+
+Explain at most three tasks in one pass.
+
+## 2. Read why
+
+```text
+{{.MatevBin}} usage {{.ProjectName}} <crew> --why
+```
+
+It prints one bounded page: the token buckets, the session's shape, work by kind, loops, findings, the instruction files the harness loaded, and the costliest prompts.
+Hold to its own limits when you read it:
+
+- Findings overlap, and a finding's tokens are the whole model calls it touched; never add findings together and never call that number the cost of one command.
+- A `?` is unknown, not zero.
+- Every line under `not measured` is something you may not conclude from.
+- `Unclassified activity` and `Mixed activity` are not causes; they say the record cannot name the work.
+
+## 3. Name the cause and where its fix lives
+
+Match what the digest shows to one row; quote the line that shows it.
+
+| The digest shows | Likely cause | Where the fix lives |
+| --- | --- | --- |
+| `Research / inspect` holds a large share; `repeated_read` findings | The Crew had to discover the layout, or re-read what it had already read | A repo map and "where things are" notes in the repo's `AGENTS.md` or docs; the brief's `## What we already know` |
+| `Read instructions` holds a large share; large entries under `instructions loaded` | Too much is loaded on every call | Trim the repo's `AGENTS.md`; move procedures into repo skills that load on demand |
+| `execution_failure`, `repeated_error`, repair/retest loops | Build, test or setup steps are undocumented, wrong or flaky | A build-and-test section in the repo's `AGENTS.md`, or a repo skill for that workflow; a flaky test is its own task |
+| `large_output` findings | Commands dump whole logs into the context | Documented quiet or targeted commands, or a wrapper script, in the repo |
+| `long_execution`, `process_polling`, a large `Wait / poll` share | Slow jobs, polled by the model | Narrower test targets and the fast path documented in the repo |
+| High peak context, many calls, `context_reset` | The task was too large for one session | How you split work: smaller tasks, a tighter `Out of scope:` |
+| A costliest prompt is a correction you sent after `wait-mate`; `ASKED` above zero; `decision_wait` | The brief left the Crew to guess, or acceptance was not checkable | The brief (`brief-writing`), `{{.ProjectDoc}}` `## Captain's decisions`, or a standing rule in `{{.ProjectCrewDoc}}` |
+| Large `OUT` on a simple task; the `run:` line shows a heavy model or effort | The launch profile was heavier than the work | The dispatch table's rules (`crew-dispatch`) |
+
+When nothing matches, say the record does not explain the cost and name what is `not measured`.
+Do not invent a cause to fill the row.
+
+## 4. Separate a pattern from an accident
+
+A standing change is earned by a pattern: the same cause in two or more tasks, or once with a mechanical reason that will recur for every Crew, such as a test command nobody wrote down.
+One task with one bad afternoon is a note, not a rule.
+A rule added for an accident costs every later Crew the tokens to read it.
+
+## 5. Report
+
+Write the review to `{{.MateDir}}/token-reviews/<YYYY-MM-DD>.md`, one sentence per line, in this shape:
+
+```markdown
+# Token review <YYYY-MM-DD>
+
+## Tasks
+### <crew> - <total>, <calls> calls, peak context <n>
+- Compared with: <peers and their totals, or "no peer on file">
+- Cause: <one row of the table>
+- Evidence: `<the line of --why that shows it, verbatim>`
+- Confidence: pattern | single case | not explained
+
+## Proposals
+### <n>. <what changes>
+- Destination: <repo>:`AGENTS.md` | <repo>:`.claude/skills/<name>/SKILL.md` | <repo>:`docs/<file>` | `{{.ProjectCrewDoc}}` | `{{.ProjectDoc}}` | the dispatch table | how I brief or split
+- Text: <the exact lines to add, or the skill's name, trigger and outline>
+- From: <the tasks and evidence it rests on>
+- Check: <which number on the next comparable task should move, and which way>
+```
+
+A repo skill proposal names the skill, the moment it should load, and the steps it carries; a doc proposal gives the lines themselves.
+What you cannot write without knowing the code - the real test command, the real directory map - is not guessed: the proposal says a scout or the ship Crew fills it in, and names the question.
+
+Then tell the captain in a few lines: which tasks, the causes in outcome language, the proposals by number, and the file's path.
+
+## 6. Apply only on the captain's word
+
+Each proposal has one owner, and you are not the owner of most of them.
+
+- A change inside a repo - `AGENTS.md`, a skill, docs, a script - is a ship Crew's commit. When the captain accepts it, brief it like any task, with the captain's acceptance as `## Captain's words` and the proposal's text under `## Build`.
+- A line for `{{.ProjectCrewDoc}}` and a rule in the dispatch table are the captain's to add; give them the exact line.
+- A fact for `{{.ProjectDoc}}` or a lesson about how you brief, split or dispatch is yours: load `project-memory`, and record a lesson with `{{.MatevBin}} remember {{.ProjectName}} --lesson`, sourced to the review file.
+
+## 7. Check that it worked
+
+A proposal is a prediction.
+When the next comparable task closes, run `--why` on it, compare the number its `Check:` named, and add one line under that proposal: moved, did not move, or not comparable.
+Never report a saving you did not measure, and never extrapolate one task into a daily figure.
+A proposal that did not move its number is withdrawn or rewritten, and the captain is told.

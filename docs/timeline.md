@@ -654,6 +654,10 @@ The fix is in `codexTurns` itself: it subtracts the cache-read delta from the in
 
 `mate usage <project>` prints `v_task_ledger` as a table, the Mate's own row first (computed the same way but read straight off `turn` rather than `task`, since a Mate's turns belong to the project and not to any one task), then one row per task, oldest spawn first, then a totals footer.
 `mate usage <project> <crew>` instead prints that crew's own `turn` rows, one per model call, in the shape `mate events --narrate` calls "ends a turn".
+`mate usage <project> --top <n>` keeps the Mate's row and the n largest tasks by TOTAL, largest first; the totals footer still sums every task, and a last line says how many were left out.
+`mate usage <project> <crew> --why` prints the dashboard Task page's `performance` projection (docs/dashboard.md) as one bounded page of text: token buckets, calls, prompts and peak context, work by kind, the loop summary, the first six findings with one evidence line and their `review` hint, the instruction files the harness loaded, and the three costliest prompts, then every `freshness.missing` line under `not measured`.
+It reads through `dashboard.Server.CrewPerformance`, the same code path as `/api/projects/<p>/tasks/<crew>`, and measures nothing itself.
+Both flags exist for the Mate's `token-review` skill, whose reader pays for every line it reads.
 Every number is humanised (`query.HumanizeTokens`, `query.HumanizeCost`: `96.3k`, `$0.12`), and a `NULL` cost or context percentage prints as `?`, never as `0` or `0%` - the same rule the console's TOKENS column and `mate state`'s `tokens:`/`ctx:` suffix follow, all three built on the same two functions so a number reads the same everywhere it appears.
 
 ### The console's TOKENS column and `mate state`
