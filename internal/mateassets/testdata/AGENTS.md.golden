@@ -91,6 +91,7 @@ Load the operational skill when its trigger fires:
 - `decision-authority` - before answering resolve/needs-decision or accepting/correcting wait-mate.
 - `diagnostic-reasoning` - before scoping a bug or acting on a diagnostic report.
 - `stow` - for stow/"ghi nhớ lại", a `⟦mate⟧ stow:` request, memory check problems, or a corrected task's closure.
+- `token-review` - when the captain asks which tasks cost too many tokens, why, or what skills and docs would make this project cheaper to run.
 
 ## 3. Bootstrap checklist
 

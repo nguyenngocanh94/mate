@@ -21,7 +21,7 @@ var (
 // SkillNames are the skills installed beside the manual, in the order Write
 // lays them down. Each one is `assets/mate/skills/<name>/SKILL.md.tmpl` in
 // the embedded FS and `<mate>/<SkillsDir>/<name>/SKILL.md` on disk.
-var SkillNames = []string{"harness-adapters", "crew-dispatch", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow", "mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory"}
+var SkillNames = []string{"harness-adapters", "crew-dispatch", "stuck-crew-recovery", "decision-authority", "diagnostic-reasoning", "stow", "mate-commands", "task-intake", "brief-writing", "crew-spawn", "review-delivery", "event-handling", "project-memory", "token-review"}
 
 // skillTemplates holds one parsed template per SkillNames entry. Parsing at
 // init keeps a malformed skill a build-time failure rather than a Mate that

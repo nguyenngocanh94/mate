@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"sort"
 	"text/tabwriter"
 	"time"
 
@@ -16,20 +17,25 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 )
 
-// cmdUsage is `mate usage <project> [crew] [--workspace <dir>]` (mvp.md M5
-// task 27): the token/cost ledger `v_task_ledger` computes, read-only.
+// cmdUsage is `mate usage <project> [crew] [--top <n>] [--why] [--workspace
+// <dir>]` (mvp.md M5 task 27): the token/cost ledger `v_task_ledger`
+// computes, read-only.
 //
 // With no crew it prints one row per task plus the Mate, oldest spawn
-// first, and a totals footer. With a crew it prints that crew's own turns -
-// one row per model call, the unit `mate events --narrate` calls "ends a
-// turn" - rather than the whole-task summary.
+// first, and a totals footer; `--top <n>` keeps the Mate and the n largest
+// tasks by TOTAL instead. With a crew it prints that crew's own turns - one
+// row per model call, the unit `mate events --narrate` calls "ends a turn" -
+// rather than the whole-task summary; `--why` prints what those calls were
+// spent on instead (usage_why.go).
 func cmdUsage(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("usage", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate usage <project> [crew] [--workspace <dir>]")
+		fmt.Fprintln(stderr, "usage: mate usage <project> [--top <n>] | mate usage <project> <crew> [--why] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	top := fs.Int("top", 0, "print only the Mate and the n largest tasks by TOTAL")
+	why := fs.Bool("why", false, "print what a crew's tokens were spent on instead of its model calls")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -38,6 +44,15 @@ func cmdUsage(args []string, stdout, stderr io.Writer) error {
 		return newUsageError("mate usage: want 1 or 2 arguments: <project> [crew]")
 	}
 	project := fs.Arg(0)
+	if *top < 0 {
+		return newUsageError("mate usage: --top wants a positive number of tasks")
+	}
+	if *top > 0 && fs.NArg() == 2 {
+		return newUsageError("mate usage: --top ranks the project's tasks; drop the crew")
+	}
+	if *why && fs.NArg() == 1 {
+		return newUsageError("mate usage: --why explains one task; name the crew")
+	}
 
 	w, err := resolveWorkspace(*workspaceFlag)
 	if err != nil {
@@ -55,9 +70,12 @@ func cmdUsage(args []string, stdout, stderr io.Writer) error {
 
 	ctx := context.Background()
 	if fs.NArg() == 2 {
+		if *why {
+			return printCrewWhy(ctx, handle, w, stdout, project, fs.Arg(1))
+		}
 		return printCrewTurns(ctx, handle, stdout, project, fs.Arg(1))
 	}
-	return printLedger(ctx, handle, w, stdout, project)
+	return printLedger(ctx, handle, w, stdout, project, *top)
 }
 
 // ledgerRow is one line of the ledger table: the Mate's own row, built by
@@ -82,7 +100,10 @@ type ledgerRow struct {
 
 // printLedger is the no-crew form: the Mate's row first (mvp.md M5 task
 // 27), then every task the project has ever recorded, oldest spawn first.
-func printLedger(ctx context.Context, handle *db.DB, w *store.Workspace, stdout io.Writer, project string) error {
+// A positive top keeps the Mate's row and the top largest tasks by TOTAL,
+// largest first; the footer still counts every row, and a last line says
+// how many tasks were left out.
+func printLedger(ctx context.Context, handle *db.DB, w *store.Workspace, stdout io.Writer, project string, top int) error {
 	mate, err := mateLedgerRow(ctx, handle, project)
 	if err != nil {
 		return err
@@ -127,7 +148,16 @@ func printLedger(ctx context.Context, handle *db.DB, w *store.Workspace, stdout 
 		return err
 	}
 
-	printLedgerTable(stdout, rows)
+	shown := rows
+	if tasks := len(rows) - 1; top > 0 && tasks > top {
+		ranked := append([]ledgerRow(nil), rows[1:]...)
+		sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].Total > ranked[j].Total })
+		shown = append([]ledgerRow{mate}, ranked[:top]...)
+	}
+	printLedgerRows(stdout, shown, rows)
+	if len(shown) < len(rows) {
+		fmt.Fprintf(stdout, "showing the mate and the %d largest of %d task(s) by TOTAL; the total line counts all of them\n", top, len(rows)-1)
+	}
 	return nil
 }
 
@@ -194,17 +224,25 @@ func spanWord(spawnedAt, closedAt sql.NullString) string {
 // printLedgerTable renders the columns of docs/mvp.md M5 task 27, humanised
 // (query.HumanizeTokens, query.HumanizeCost), with a totals footer.
 func printLedgerTable(stdout io.Writer, rows []ledgerRow) {
+	printLedgerRows(stdout, rows, rows)
+}
+
+// printLedgerRows prints shown as the table and sums the footer over all,
+// so a cut table never understates what the project spent.
+func printLedgerRows(stdout io.Writer, shown, all []ledgerRow) {
 	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tSTATE\tTURNS\tIN\tCACHE-READ\tCACHE-WRITE\tOUT\tTOTAL\tCOST\tCTX\tCTX%\tASKED\tWAITED\tSPAWN→CLOSE")
 
 	var totalTurns, totalIn, totalCached, totalOut, totalTotal, totalAsked, totalWaited int64
 	var totalCost float64
 	haveCost := false
-	for _, r := range rows {
+	for _, r := range shown {
 		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 			r.ID, dashIfEmpty(r.State), r.Turns,
 			query.HumanizeTokens(r.In), query.HumanizeTokens(r.CacheRead), query.HumanizeTokens(r.CacheWrite), query.HumanizeTokens(r.Out), query.HumanizeTokens(r.Total),
 			costWord(r.Cost), contextWord(r.Context), ctxWord(r.CtxPct), r.Asked, waitedWord(r.WaitedMs), r.Span)
+	}
+	for _, r := range all {
 		totalTurns += r.Turns
 		totalIn += r.In
 		totalCached += r.Cached

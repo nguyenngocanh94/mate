@@ -1006,6 +1006,19 @@ Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
 | 69 | PR 6: Claude và Codex vào `internal/harness/claude` và `internal/harness/codex`; mặc định và danh mục harness cho store, query, Console lấy từ registry; skill `harness-adapters` sinh từ registry; suite hợp đồng mục 1 đến 4 | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai. |
 | 70 | PR 7: pi, chỉ vai Crew | Diff chỉ gồm package mới, một dòng catalog, một hàng dispatch, fixture và tài liệu, cộng ba chỗ sửa hợp đồng: `LaunchPlan.ContextFlag`, `GracefulStopper.ClearKeys`, `query.Harness.Mate`. Suite hợp đồng pass cho pi; Mate trên pi bị từ chối nêu `Hooks`. Đã xong 2026-10-01, không chạy test live (captain chốt). |
 
+### Token review: task nào tốn, vì sao, sửa harness của project ở đâu
+
+Captain yêu cầu 2026-10-03, sau khi M15 đã giới hạn context của chính Mate: Mate cần chỉ ra được task nào tiêu thụ quá nhiều token và đề xuất skill, docs cho repo của project.
+
+- Skill `token-review` (`assets/mate/skills/token-review/`): tìm task đắt, đọc nguyên nhân, đối chiếu vào bảng "dấu hiệu → nguyên nhân → nơi sửa", tách pattern khỏi tai nạn, ghi review vào `mate/token-reviews/<ngày>.md` với từng đề xuất có đích đến, nguyên văn, bằng chứng và con số sẽ kiểm lại.
+  Mate chỉ đề xuất: thay đổi trong repo (`AGENTS.md`, skill, docs, script) do một ship Crew commit sau khi captain đồng ý; `CREW.md` và bảng dispatch là của captain; lesson và `PROJECT.md` là của Mate.
+- Mate không đọc transcript hay repo để giải thích chi phí.
+  Hai lệnh có đầu ra chặn trên là nguồn duy nhất: `mate usage <project> --top <n>` (Mate và n task lớn nhất theo TOTAL, dòng total vẫn cộng mọi task) và `mate usage <project> <crew> --why` (projection `performance` của trang Task trong dashboard, in thành một trang chữ).
+  `--why` đi qua `dashboard.Server.CrewPerformance`, cùng đường với API, và không tự đo gì thêm.
+- Giới hạn giữ nguyên từ diagnostics: finding chồng lấn nên không cộng token của chúng; `?` là chưa biết, không phải 0; mọi dòng `not measured` là điều không được kết luận.
+- Chưa làm: digest cho chính hàng Mate (chi phí điều phối), so sánh tự động theo kind ship/scout, và live test cho một Mate thật chạy skill này.
+  Đã kiểm: unit cho hai cờ, golden cho skill và manual, chạy tay chỉ đọc trên workspace thật `~/work-matev2` (task `esp32research`, 1,5M token, 22 call).
+
 ### Thử nghiệm: Jev notice advisor
 
 Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
