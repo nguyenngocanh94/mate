@@ -145,6 +145,25 @@ type MateNode struct {
 	// (mvp.md M5 task 27) - see CrewNode.Tokens for why this package leaves
 	// it Absent and who fills it in.
 	Tokens Field[TokenValue]
+	// Held is the questions the Mate asked the captain that are still
+	// open: the `asked "…"` entries of the `## Held for the captain`
+	// section of `mate/backlog.md` (manual section 13). The section's
+	// promises and notes are the Mate's own bookkeeping and are left out.
+	// It is the Console's news. Loaded per Project rather than with
+	// mate.meta, because the backlog outlives a stopped Mate: Absent when
+	// the Project has no backlog yet, Known and empty when nothing is asked.
+	Held Field[[]HeldItem]
+}
+
+// HeldItem is one open question the Mate asked the captain.
+type HeldItem struct {
+	// Task and Date are the entry's head as the Mate wrote it: the task the
+	// question belongs to and the day it was recorded, YYYY-MM-DD. Either
+	// is empty when the entry does not carry it.
+	Task string
+	Date string
+	// Question is the sentence the Mate sent the captain, in its words.
+	Question string
 }
 
 // MateIdentity is the designated Mate row itself. Status is the durable

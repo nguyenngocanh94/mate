@@ -19,7 +19,14 @@ type detailField struct {
 	label string
 	lines []gline
 	copy  string
+	// flush puts the lines after the first under the label instead of under
+	// the value: prose (a news item) gets the pane's width, not the value
+	// column's.
+	flush bool
 }
+
+// detailFlushIndent is where a flush field's later lines start.
+const detailFlushIndent = 4
 
 // detailLabelWidth is the lead before a value: two blanks, then a label
 // column of nine cells, or the longest label and one blank when that is
@@ -43,6 +50,9 @@ func (m Model) detailLines(p framePlan) []gline {
 		on := focused && i == sel
 		for j, v := range f.lines {
 			lead := gl().pad(lw)
+			if f.flush {
+				lead = gl().pad(detailFlushIndent)
+			}
 			if j == 0 {
 				lead = gl().pad(2).add(padRight(f.label, lw-2), tDim)
 				if on {
@@ -160,6 +170,9 @@ func (m Model) projectPeekFields(proj query.ProjectNode, vw int) []detailField {
 	}
 	if n := boxWaiting(proj); n > 0 {
 		out = append(out, detailField{label: "box", lines: text(fmt.Sprintf("%d waiting on you", n), tAmber)})
+	}
+	if n := len(mate.Held.Value); mate.Held.IsKnown() && n > 0 {
+		out = append(out, detailField{label: "news", lines: text(fmt.Sprintf("%d waiting on you", n), tAmber)})
 	}
 	out = append(out, detailField{label: "mode", lines: one(m.modeLine(proj))})
 	out = append(out, m.repoFields(proj, vw)...)
@@ -290,7 +303,8 @@ func (m Model) mateDetailFields(vw int) []detailField {
 		// own facts, and the key that makes a Mate.
 		out = append(out, m.repoFields(proj, vw)...)
 		out = append(out, detailField{label: "mode", lines: one(m.modeLine(proj))})
-		return append(out, detailField{label: "start", lines: text("s creates one", tDim)})
+		out = append(out, detailField{label: "start", lines: text("s creates one", tDim)})
+		return append(out, m.newsFields(mate.Held, vw)...)
 	}
 	if f, ok := m.bindingField(mate.Binding, vw); ok {
 		out = append(out, f)
@@ -328,6 +342,53 @@ func (m Model) mateDetailFields(vw int) []detailField {
 	}
 	if mate.Error.IsKnown() && mate.Error.Value != "" {
 		out = append(out, detailField{label: "error", lines: wrapped(string(mate.Error.Value), tRed, vw)})
+	}
+	return append(out, m.newsFields(mate.Held, vw)...)
+}
+
+// newsFields are the questions the Mate asked the captain and still waits
+// on (mvp.md section 5, "News"): the task, its age, and the question in
+// the words the Mate sent. They are read from the Mate's backlog, so a
+// captain who was away reads them here instead of spending a Mate turn
+// asking again. One field per question, so y copies one question.
+func (m Model) newsFields(held query.Field[[]query.HeldItem], vw int) []detailField {
+	switch {
+	case held.State == query.Unknown:
+		return []detailField{{label: "news", lines: fieldState(held, vw)}}
+	case !held.IsKnown():
+		// No backlog yet: there is nothing the Mate could have asked.
+		return nil
+	case len(held.Value) == 0:
+		return []detailField{{label: "news", lines: text("none", tDim)}}
+	}
+	// The value column is vw wide behind an 11-cell lead; flush lines get
+	// the same right edge from their own indent.
+	fw := vw + detailLabelWidth(nil) - detailFlushIndent
+	var out []detailField
+	for i, it := range held.Value {
+		label := ""
+		if i == 0 {
+			label = "news"
+		}
+		head := gl()
+		if it.Task != "" {
+			head = head.add(truncateEnd(it.Task, max0(vw-8), m.g), tAmber)
+		}
+		if day := m.daysSince(it.Date); day != "" {
+			if len(head.segs) > 0 {
+				head = head.add(" "+m.g.Dot+" ", tDim)
+			}
+			head = head.add(day, tDim)
+		}
+		f := detailField{label: label, copy: it.Question}
+		if len(head.segs) > 0 {
+			f.lines = append(one(head), wrapped(it.Question, tFg, fw)...)
+			f.flush = true
+		} else {
+			// No head to put beside the label: the question starts there.
+			f.lines = wrapped(it.Question, tFg, vw)
+		}
+		out = append(out, f)
 	}
 	return out
 }

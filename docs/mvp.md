@@ -228,6 +228,20 @@ Chế độ tự động (daemon `internal/autopilot`, chốt 2026-09-18 ở tas
   Digest bỏ qua chính incident `(mate, wedged)` của mình: báo cáo một lỗi giao hàng qua chính đường giao hàng vừa hỏng là vô nghĩa, và người dùng đã thấy nó trong inbox.
 - Lý do từ chối của lượt gần nhất hiện trên dòng thông báo của console, một lần mỗi lượt chứ không phải mỗi mục, và tự biến mất ở lượt gửi được. Ô `MODE` thêm `auto · sent 14:32:10` khi daemon đã gửi ít nhất một lần.
 
+### News: việc Mate giữ cho captain
+
+Chốt 2026-10-03.
+Captain có thể bỏ qua câu hỏi của Mate hoặc đi vắng; hỏi lại Mate "còn gì chờ tôi" tốn thêm một lượt.
+Detail của hàng Mate (dưới các field của nó) có mục `news`: các câu hỏi Mate đã gửi captain mà chưa được trả lời, tức các mục `asked "…"` trong `## Held for the captain` của `mate/backlog.md` (manual mục 13).
+Chỉ câu hỏi của Mate: lời hứa và ghi chú trong cùng section là sổ sách của Mate, không hiện; câu hỏi của Crew đi tới Mate, và Mate tự quyết có đưa lên captain hay không (skill `decision-authority`), nên chỉ thứ Mate đã đưa lên mới thành news.
+Console chỉ đọc file đó ở mỗi lần nạp snapshot (`query.MateNode.Held`), không gửi gì cho Mate và không tốn lượt nào.
+Mỗi mục là một field: dòng đầu là tên task và tuổi theo ngày (`today`, `3d`), rồi đúng câu Mate đã gửi captain, không kèm `asked` hay `Waits on: …` (đó là ghi chú vận hành của Mate; câu hỏi gửi captain đã phải nói bằng kết quả theo manual mục 13); `y` copy câu hỏi.
+Không có backlog thì không vẽ field; backlog có mà không giữ gì thì `news none`; đọc lỗi thì `unknown` kèm lý do.
+Ở tầng workspace, detail của Project ghi `news N waiting on you`.
+Mục rời news khi Mate xoá dòng đó khỏi backlog, tức sau khi captain trả lời trong pane của Mate; console không có nút trả lời hay đóng mục.
+News khác box: box là câu hỏi của Crew chờ ai đó trả lời, news là thứ chính Mate chờ captain.
+Giới hạn: news đúng bằng những gì Mate ghi vào backlog; câu hỏi Mate hỏi mà quên ghi, hoặc ghi không theo mẫu `asked "…"`, thì không hiện.
+
 ## 6. Trí nhớ của Mate
 
 | Lớp | File | Ai viết |

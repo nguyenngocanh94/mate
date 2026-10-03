@@ -142,6 +142,23 @@ func (m Model) since(t time.Time) string {
 	return age(m.tree.AsOf.Sub(t))
 }
 
+// daysSince is the age of a YYYY-MM-DD date in whole days at the snapshot's
+// read time: "today", "3d". A date carries no hour, so it is never given
+// one.
+func (m Model) daysSince(date string) string {
+	day, err := time.ParseInLocation("2006-01-02", date, time.Local)
+	if err != nil || m.tree.AsOf.IsZero() {
+		return ""
+	}
+	now := m.tree.AsOf.In(time.Local)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	n := int(today.Sub(day).Hours()/24 + 0.5)
+	if n <= 0 {
+		return "today"
+	}
+	return fmt.Sprintf("%dd", n)
+}
+
 // tokensWord is a token total: 182k, 1.2M.
 func tokensWord(total int64) string {
 	switch {
