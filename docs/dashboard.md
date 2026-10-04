@@ -449,6 +449,23 @@ This endpoint is not cached: it answers "what happened after the id you hold", w
 }
 ```
 
+### `GET /api/now?project=<p>`
+
+The whole scene in one call: every `v_now` row, in the shape of `/api/events`' `now`, sorted by `actor_id`.
+`/api/events` only carries the rows of actors that moved since a cursor, so a page that draws everyone at once - Mate Office, section 11 - would otherwise have to poll from 0 and replay the story.
+`project` is optional; an unknown project is a 404 that names it.
+An actor with no scene row yet is simply absent, and a page reads its tokens today as unknown rather than 0.
+
+```json
+{
+  "generated_at": "2026-09-19T10:47:02.114Z",
+  "last_event_id": 1840,
+  "now": [
+    {"actor_id": "crew:shop:buybtn", "actor": "buybtn", "actor_kind": "crew", "project": "shop", "state": "waiting_review", "since": "2026-09-19T10:46:24.375000000Z", "target": "mate", "detail": "handback", "tokens_today": 0, "context_pct": null, "context_tokens": null}
+  ]
+}
+```
+
 ## 8. `GET /` - the UI
 
 `/` serves an embedded `embed.FS` rooted at `internal/dashboard/ui/`: plain HTML and JS, no build step and no CDN, so the dashboard is a single binary that works with no network at all.
@@ -517,3 +534,23 @@ Colour is defined once as tokens on `:root` and redefined under `prefers-color-s
 The four token buckets are a stacked meter in a fixed slot order - input, cache read, cache write, output - assigned to the bucket and not to its size, with a 2px surface gap between segments and a legend that always shows the numbers.
 Context % is a single-hue meter, because it is one magnitude against one window.
 Below 720px the tables collapse to one card per row and the page does not scroll sideways.
+
+## 11. Mate Office
+
+A second, read-only face on the same API, served at `/office/` from `internal/dashboard/ui/office/`: `index.html`, `office.css`, `office.js`, plus `../humanize.js` shared with the admin UI.
+It draws the workspace as an office from the owner's "Mate Office" design: a hallway with the captain's desk and the crews standing in it, and one room per project with the Mate at the big desk, a desk per open crew and a filing cabinet of closed tasks.
+It holds to every rule of section 10 - same origin only, GET only, text set with `textContent`, no build step, `null` shown as `?`.
+
+| Hash | Opens |
+| --- | --- |
+| `#mate/<project>` | the Mate drawer: current activity, facing, last turn, mode, usage, the crews in the room |
+| `#crew/<project>/<crew>` | the crew drawer: state and why, current activity, step, target, usage, the task, a link to the admin timeline |
+| `#cabinet/<project>` | the filing cabinet: closed tasks by age, each with its final state |
+
+Reads: `/api/workspace`, `/api/now`, `/api/projects/{p}` per project, and for an open drawer `/api/projects/{p}/mate` or `/api/projects/{p}/tasks/{crew}`.
+It long-polls `/api/events` from the lowest `last_event_id` it holds (`wait=5` with a drawer open, 20 otherwise) and re-reads the floor when anyone moved.
+
+The typefaces are the design's - Geist, Geist Mono and Bricolage Grotesque - as latin WOFF2 subsets under `ui/office/fonts/`.
+All three are under the SIL Open Font License 1.1; the licences are embedded from `internal/dashboard/fontlicenses/` and served at `/office/fonts/licenses/<Family>-OFL.txt`, kept outside `ui/` because they name web addresses.
+
+`internal/dashboard/ui_office_test.go` proves the page, its assets, the fonts and their licences are served from the binary and tests `/api/now`; it runs `ui_office_test.cjs`, which drives `office.js` in node against `testdata/office/busy.json` (built by `gen.cjs` beside it) for the drawers, the stuck crew, unknowns and the phone sheet.

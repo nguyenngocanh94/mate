@@ -26,7 +26,38 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/turns/{turn}", s.cached(s.handleTurn))
 	s.mux.HandleFunc("GET /api/projects/{project}/tasks/{crew}/diff", s.cached(s.handleDiff))
 	s.mux.HandleFunc("GET /api/events", s.handleEvents)
+	s.mux.HandleFunc("GET /api/now", s.cached(s.handleNow))
+	s.mux.Handle("GET /office/fonts/licenses/", http.StripPrefix("/office/fonts/licenses/", etagFileServer(fontLicensesFS())))
 	s.mux.Handle("GET /", etagFileServer(uiFS()))
+}
+
+// handleNow is GET /api/now[?project=<p>]: the whole scene, one `v_now` row
+// per actor, sorted by actor id. Rows with an empty state are kept - the
+// captain and the observer are in no scene, and that is an answer rather
+// than a gap (docs/timeline.md section 9.5).
+func (s *Server) handleNow(ctx context.Context, r *http.Request, env envelope) (any, error) {
+	project := strings.TrimSpace(r.URL.Query().Get("project"))
+	names := []string{project}
+	if project == "" {
+		names = nil
+		for _, ref := range s.ws.Projects() {
+			names = append(names, ref.Name)
+		}
+	} else if _, ok := s.ws.Project(project); !ok {
+		return nil, errNotFound{reason: unknownProject(s.ws, project)}
+	}
+	out := NowResponse{envelope: env, Project: project, Now: []SceneRow{}}
+	for _, name := range names {
+		scenes, err := s.sceneRows(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range scenes {
+			out.Now = append(out.Now, row)
+		}
+	}
+	sort.Slice(out.Now, func(i, j int) bool { return out.Now[i].ActorID < out.Now[j].ActorID })
+	return out, nil
 }
 
 // builder computes one response's body at a known generation.

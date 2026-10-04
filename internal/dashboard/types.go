@@ -340,6 +340,17 @@ type EventsResponse struct {
 	Now []SceneRow `json:"now"`
 }
 
+// NowResponse is GET /api/now: every `v_now` row of the workspace, or of
+// one project with `?project=`. It is the snapshot /api/events only ever
+// sends a slice of - the rows of the actors that moved - so a page that
+// draws the whole scene (Mate Office, docs/dashboard.md section 11) can
+// start from the full picture and then follow the deltas.
+type NowResponse struct {
+	envelope
+	Project string     `json:"project,omitempty"`
+	Now     []SceneRow `json:"now"`
+}
+
 // ErrorResponse is every 4xx and 5xx body. Reason is a sentence, not a
 // code: the reader of this API is a page, and the page shows the sentence.
 type ErrorResponse struct {
