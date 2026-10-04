@@ -1,0 +1,39 @@
+
+  /p/tmp/grok-harness-probe.o9lc                                  2.4K / 256K │ [Dashboard]
+
+
+     ◆ user_prompt_submit hook (global/settings) failed, ignored: hook not executed:        █
+     required env var(s) not set: ${SYSTEMROOT}                                             █
+                                                                                            █
+                                                                                            █
+     ❯ Reply with exactly: pong                                                  10:50 AM   █
+                                                                                            █
+                                                                                            █
+     ◆ Thought for 2.3s                                                                     █
+                                                                                            █
+     ◆ stop hook (global/settings) failed, ignored: hook not executed: required env var(s   █
+     not set: ${SYSTEMROOT}                                                                 █
+                                                                                            █
+     pong                                                                        10:50 AM   █
+                                                                                            █
+     Worked for 4.0s                                                                        █
+                                                                                            █
+     ◆ stop hook (global/settings) failed, ignored: hook not executed: required env var(s   █
+     not set: ${SYSTEMROOT}                                                                 █
+                                                                                            █
+     ◆ session_start hook (global/settings) failed, ignored: hook not executed: required    █
+     env var(s) not set: ${SYSTEMROOT}                                                      █
+                                                                                            █
+
+  Help improve Grok                                                      [Opt out] [Opt in]
+  Off by default. Opt-in to allow SpaceXAI to retain coding data, e.g.,
+  prompts, traces, & metrics, for training and debugging purposes.
+  Change anytime via settings.
+  Read Terms and Privacy Policy.
+
+  ╭───────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                                     │
+  ╰──────────────────────────────────────────────────── Grok 4.7 (high) · always-approve ─╯
+
+  Shift+Tab:mode  │  Ctrl+.:shortcuts
+

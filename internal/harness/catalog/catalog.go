@@ -10,6 +10,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
+	"github.com/nguyenngocanh94/mate/internal/harness/grok"
 	"github.com/nguyenngocanh94/mate/internal/harness/pi"
 )
 
@@ -24,6 +25,7 @@ func Default() harness.Registry {
 		claude.Claude{},
 		codex.Codex{},
 		pi.Pi{},
+		grok.Grok{},
 	)
 	if err != nil {
 		// The list above is fixed at compile time; a refusal is a bug in

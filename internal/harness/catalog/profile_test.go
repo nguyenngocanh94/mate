@@ -6,6 +6,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
+	"github.com/nguyenngocanh94/mate/internal/harness/grok"
 )
 
 // Claude accepts all five (claude 2.1.282 --help: "low, medium, high,
@@ -26,5 +27,13 @@ func TestEffortSupportPerHarness(t *testing.T) {
 	}
 	if (codex.Codex{}).Info().SupportsEffort(harness.EffortMax) {
 		t.Error("codex takes max; its catalogue does not advertise it for every model")
+	}
+	for _, e := range []harness.Effort{harness.EffortLow, harness.EffortMedium, harness.EffortHigh, harness.EffortXHigh} {
+		if !(grok.Grok{}).Info().SupportsEffort(e) {
+			t.Errorf("grok does not take %s", e)
+		}
+	}
+	if (grok.Grok{}).Info().SupportsEffort(harness.EffortMax) {
+		t.Error("grok takes max; grok-4.7's menu does not list it")
 	}
 }

@@ -1,0 +1,14 @@
+{
+  "captures": [
+    {"file": "../../../grok/testdata/screens/empty.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "empty"},
+    {"file": "../../../grok/testdata/screens/idle-after-turn.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "empty"},
+    {"file": "../../../grok/testdata/screens/resume.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "empty"},
+    {"file": "../../../grok/testdata/screens/busy-waiting.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "busy"},
+    {"file": "../../../grok/testdata/screens/busy-thinking.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "busy"},
+    {"file": "../../../grok/testdata/screens/busy-responding.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "busy"},
+    {"file": "../../../grok/testdata/screens/draft-pong.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "draft"},
+    {"file": "../../../grok/testdata/screens/empty.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "ready"},
+    {"file": "../../../grok/testdata/screens/idle-after-turn.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "ready"},
+    {"file": "../../../grok/testdata/screens/resume.txt", "version": "grok 1.0.46", "pane": "93x39", "source": "visible", "want": "ready"}
+  ]
+}
