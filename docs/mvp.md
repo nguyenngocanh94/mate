@@ -13,14 +13,14 @@ Mỗi task là một PR review được trong một buổi và có tiêu chí xo
 | Mate | Agent điều phối của một project. Phân tích yêu cầu, viết brief, spawn Crew, giám sát, review, báo cáo. Không sửa code, không tự tìm hiểu repo. | Dài, có trí nhớ |
 | Crew | Agent thực thi do Mate spawn cho một task. Chạy harness interactive trong pane Herdr, cwd là worktree riêng trên đúng một repo của project. | Ngắn, dùng một lần |
 
-Mate là một harness interactive (Claude Code, Codex, pi) chạy trong một pane Herdr, cwd là `.mate/projects/<p>/mate/`.
+Mate là một harness interactive (Claude Code, Codex, pi, Grok) chạy trong một pane Herdr, cwd là `.mate/projects/<p>/mate/`.
 Người dùng nói chuyện với Mate bằng cách gõ vào pane đó, xem qua stream mode của console.
 Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` hoặc spawn Crew.
 
 ## 2. Quyết định đã chốt
 
 1. Mate chỉ điều phối và ra quyết định. Không sửa code, không tự khảo sát repo. Ràng buộc bằng cấu trúc (cwd không chứa code), không bằng lời dặn.
-2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi. Mặc định Mate là Claude Code, Crew là Codex. Một harness làm Crew được khi nó được đăng ký trong `internal/harness/catalog` và qua suite hợp đồng ở đó (mọi capability có khai báo, launch dựng được, capture màn hình phân loại đúng, transcript đọc khớp fixture). Một harness chỉ làm Mate được khi capability `Hooks` của nó là `verified`, vì trí nhớ và inbox của Mate dựa vào hook; thiếu thì `mate mate start` từ chối và nêu tên capability, còn vai Crew không bị ảnh hưởng ([phương án registry harness](plans/harness-registry-2026-09-30.md) mục 3.7 và 9.3). pi chưa có `Hooks` nên hôm nay chỉ làm Crew: `mate mate start --harness pi` bị từ chối, picker tạo Mate của Console không đưa pi ra (task 70).
+2. Crew chạy bằng harness có sẵn: Claude Code, Codex, pi, Grok. Mặc định Mate là Claude Code, Crew là Codex. Một harness làm Crew được khi nó được đăng ký trong `internal/harness/catalog` và qua suite hợp đồng ở đó (mọi capability có khai báo, launch dựng được, capture màn hình phân loại đúng, transcript đọc khớp fixture). Một harness chỉ làm Mate được khi capability `Hooks` của nó là `verified`, vì trí nhớ và inbox của Mate dựa vào hook; thiếu thì `mate mate start` từ chối và nêu tên capability, còn vai Crew không bị ảnh hưởng ([phương án registry harness](plans/harness-registry-2026-09-30.md) mục 3.7 và 9.3). pi và Grok chưa có `Hooks` verified nên hôm nay chỉ làm Crew: `mate mate start --harness pi` và `mate mate start --harness grok` bị từ chối, picker tạo Mate của Console không đưa hai harness đó ra (task 70).
 3. Runtime terminal là Herdr 0.8.2. Mapping: một Herdr session cho workspace, một Herdr workspace cho project, một tab cho Mate và một tab cho mỗi Crew.
 4. Giao tiếp học triệt để từ firstmate (`/Volumes/Work/Workspace/firstmate`), xem mục 4.
 5. Hai chế độ giao tiếp: giám sát (mặc định) và tự động, xem mục 5.

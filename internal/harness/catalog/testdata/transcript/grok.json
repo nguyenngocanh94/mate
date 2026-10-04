@@ -1,0 +1,6 @@
+{
+  "fixture": "../../../grok/testdata/session/updates.jsonl",
+  "version": "grok 1.0.46",
+  "turns": 1,
+  "usage": {"input": 20231, "cache_read": 1664, "cache_write": 0, "output": 137, "reasoning": 136}
+}
