@@ -1019,6 +1019,25 @@ Captain yêu cầu 2026-10-03, sau khi M15 đã giới hạn context của chín
 - Chưa làm: digest cho chính hàng Mate (chi phí điều phối), so sánh tự động theo kind ship/scout, và live test cho một Mate thật chạy skill này.
   Đã kiểm: unit cho hai cờ, golden cho skill và manual, chạy tay chỉ đọc trên workspace thật `~/work-matev2` (task `esp32research`, 1,5M token, 22 call).
 
+### Card Steps: agent đã làm gì để xong task, và dùng skill nào
+
+Captain yêu cầu 2026-10-03: trang Task cần một card cho thấy các bước agent đã làm, tool call và model call được phân loại (không cần tới mức file nào, prompt nào), cùng các skill đã dùng.
+
+- Card `Steps` trên trang Task, ngay dưới bốn câu trả lời: mỗi prompt một dải ribbon theo token và một danh sách bước theo thứ tự.
+  Một bước là một chuỗi model call liên tiếp cùng loại việc, kèm số call, số tool call, token, phần trăm của prompt và thời gian.
+  Bước `Mixed activity` ghi rõ nó trộn những loại nào; bước cuối của prompt đang chạy mang nhãn `running`.
+  Prompt dài hiện 12 bước đầu, phần còn lại mở bằng một cú bấm; ribbon luôn vẽ cả prompt.
+- Dữ liệu là `overview.steps` của từng prompt và `performance.skills` (`internal/diagnostics`), cùng một phép gán loại với `categories`, nên token của các bước cộng lại đúng bằng prompt.
+- Skill: Claude Code qua tool `Skill` (tên lấy từ input, và giờ là `target` của action), Codex và pi qua việc đọc `SKILL.md` bằng shell hoặc tool đọc file (tên là thư mục chứa file).
+  Card ghi số lần nạp, cách nạp và bước nào nạp.
+  Nạp không có nghĩa là đã làm theo; card nói rõ điều đó.
+- Captain cho phép một suy luận theo thời gian, vì Codex không ghi tool call cha của lệnh native: lệnh được gắn vào tool call duy nhất đang mở lúc nó bắt đầu (`docs/timeline.md`, mục Crew diagnostic evidence).
+  Hai call cùng mở thì không gắn; mỗi lệnh được gắn mang `parent_link`, và dòng coverage ghi số lệnh.
+- Phân loại chỉnh theo dữ liệu thật: tool trong wrapper được phân loại theo tên (`tools.web__run` là research); dòng status ghi kèm việc khác không còn làm call thành mixed; `if`/`then`/`for`, guard `[ … ]` và comment không phải loại việc; tìm hay liệt kê `AGENTS.md`/`SKILL.md` là research, đọc mới là instructions; call kết thúc lượt (`end_turn`, `stop`) mà không chạy tool là `Respond`.
+- Đã kiểm: unit cho luật gắn lệnh, bước, skill của cả ba harness và các luật phân loại; test node cho card; golden số liệu dashboard cập nhật (tổng token không đổi); mở card thật ở 1280px và 480px, sáng và tối, trên bản sao workspace `~/work-matev2`.
+  Trên task `esp32research` (Codex, 1,5M token) phần Unclassified + Mixed giảm từ 78% xuống 44% token.
+- Chưa làm: card cho các exchange của Mate (dữ liệu `steps` đã có trong overview của exchange); dòng skill trong `mate usage --why`; kiểm trên recording thật của Claude và pi (workspace thật chỉ có Crew Codex, hai harness kia mới có unit test); token theo từng skill không đo được, chỉ có token của call nạp nó.
+
 ### Thử nghiệm: Jev notice advisor
 
 Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).

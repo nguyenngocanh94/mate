@@ -34,6 +34,14 @@ type projection struct {
 	missing       map[string]bool
 	progress      []telemetry.Fact
 	latestPrompt  map[string]string
+	// parents are the wrappers a native execution names, or was linked to,
+	// as its parent: what ran inside them is recorded by their children.
+	parents         map[string]bool
+	inferredParents int
+	// callExecutions and callSkills are what each model call ran and loaded,
+	// as the work observations saw it.
+	callExecutions map[string]int
+	callSkills     map[string][]string
 }
 
 // Project is a deterministic, read-only projection. Native usage records are
@@ -45,10 +53,11 @@ func Project(in Input, opts Options) Performance {
 		responseCalls: map[string]string{}, actionCalls: map[string]string{},
 		capabilities: map[string]bool{}, missing: map[string]bool{}}
 	p.latestPrompt = map[string]string{}
+	p.parents, p.callExecutions, p.callSkills = map[string]bool{}, map[string]int{}, map[string][]string{}
 	p.out = Performance{Version: Version, GeneratedAt: stamp(opts.Now),
 		PromptTurns: []Prompt{}, Segments: []Segment{}, Findings: []Finding{},
 		Executions: []Execution{}, Processes: []Process{}, TopSegmentIDs: []string{}, TopFindingIDs: []string{},
-		ObservedInputs: []ContextInput{}, Progress: []Evidence{},
+		ObservedInputs: []ContextInput{}, Progress: []Evidence{}, Skills: []SkillUse{},
 		TopOutputSegmentIDs: []string{}, TopOutputCallIDs: []string{},
 		RecentWindowMs: 300_000, Profile: in.Profile}
 	if in.LastIngestedAt != "" {
@@ -74,6 +83,7 @@ func Project(in Input, opts Options) Performance {
 	p.readFacts()
 	p.makePrompts()
 	p.makeExecutions()
+	p.makeSkills()
 	p.makeSegments()
 	p.makeOverviews()
 	p.detect()
@@ -287,7 +297,7 @@ func (p *projection) makeSegments() {
 			continue
 		}
 		seen[c.ID] = true
-		kind, target, label := classifyCall(byCall[c.ID], p.opts.Worktree)
+		kind, target, label := classifyCallWith(byCall[c.ID], p.opts.Worktree, p.parents)
 		pid := p.callPrompt[c.ID]
 		idx := len(p.out.Segments) - 1
 		if idx < 0 || p.out.Segments[idx].PromptID != pid || p.out.Segments[idx].Kind != kind || p.out.Segments[idx].Target != target {

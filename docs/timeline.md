@@ -66,11 +66,27 @@ Native command observations preserve execution/process IDs, command/cwd,
 known start/end/duration, status and nullable exit code. Wrapper success never
 overrides a failed native command. Polls are linked only when a literal process
 ID is recoverable; nested structured command output supplies exact new-output
-bytes. Unknown output progress, truncation, timestamps, wrapper ancestry and
-child usage remain unknown. Output hashes and bounded excerpts provide evidence
+bytes. Unknown output progress, truncation, timestamps and child usage remain
+unknown. Wrapper ancestry the harness does not record is not stored either;
+the diagnostics projection infers it at read time under one rule (below). Output hashes and bounded excerpts provide evidence
 without copying a second full transcript. Claude uses existing normalized
 response/tool facts and explicitly reports unavailable native process/timing
 coverage.
+
+The one inference from time (captain's decision, 2026-10-03).
+Codex records a native command without the tool call that ran it.
+`internal/diagnostics` links such a command to a tool call when exactly one call of its session and prompt was open at the moment the command started.
+Only the start is compared, because a backgrounded command outlives its call.
+Two open calls, a poll, or a call of another prompt leave it unlinked.
+The link is never stored: the execution carries `parent_link: "started_within_tool_call"`, and every overview's `coverage` says how many commands were attributed this way.
+A parent the harness names is never replaced.
+
+Steps and skills.
+A prompt's `overview.steps` are its model calls in order, consecutive calls of one work type folded into one step with their tokens, tool calls and elapsed time.
+A step's kind is the kind its calls are charged to in `categories`, so steps add up to the prompt and the two readings cannot disagree; a mixed step lists what it mixed in `parts`.
+`performance.skills` lists every recorded skill load by name: Claude Code's `Skill` tool call, or a `SKILL.md` read by a file tool or a shell command (Codex, pi), named by the directory that holds it.
+A load is not evidence that the skill was followed.
+A search over a skills directory, an edit of a `SKILL.md` and a file written to one are not loads.
 
 Read-only-source measurement on 2026-09-28: a real workspace with 35 located
 transcripts (about 191 MB when first measured) ingested into an isolated database

@@ -11,7 +11,7 @@ const overviewRule = "prompt-work-v1/observed-operations"
 // EmptyOverview is also used by message-only prompts whose harness activity
 // has not reached the ledger yet.
 func EmptyOverview() Overview {
-	return Overview{Summary: "No activity recorded yet", Categories: []WorkCategory{}, Sequence: []WorkStep{}, Rule: overviewRule,
+	return Overview{Summary: "No activity recorded yet", Categories: []WorkCategory{}, Sequence: []WorkStep{}, Steps: []Step{}, Rule: overviewRule,
 		Coverage: "No linked activity has been recorded for this prompt."}
 }
 
@@ -46,6 +46,9 @@ func (p *projection) makeOverviews() {
 	byCall := map[string]map[string]bool{}
 	for _, o := range observations {
 		byPrompt[o.promptID] = append(byPrompt[o.promptID], o)
+		if o.callID != "" && o.executionID != "" {
+			p.callExecutions[o.callID]++
+		}
 		if o.callID != "" {
 			if byCall[o.callID] == nil {
 				byCall[o.callID] = map[string]bool{}
@@ -75,6 +78,10 @@ func (p *projection) makeOverviews() {
 		evidence := Evidence{ID: c.ID, Kind: "model_call", Label: "Model call; operation details unavailable", At: c.StartedAt, SourceRef: c.Ref}
 		if response, ok := responseEvidence[c.ID]; ok {
 			kind, evidence = "response", response
+		} else if endedTurn(c.Outcome) {
+			// The ledger says the call ended its turn, and it ran nothing:
+			// what it produced is the reply.
+			kind, evidence.Label = "response", "Model call that ended the turn without running a tool"
 		}
 		byCall[c.ID] = map[string]bool{kind: true}
 		pid := p.callPrompt[c.ID]
@@ -94,8 +101,27 @@ func (p *projection) makeOverviews() {
 	p.out.Overview = p.crewOverview(all, byCall)
 }
 
+// endedTurn reports a stop reason that hands the turn back: Claude's and
+// Codex's end_turn, pi's stop. A call cut short (length, error, aborted) or
+// one that asked for a tool did not.
+func endedTurn(outcome string) bool { return outcome == "end_turn" || outcome == "stop" }
+
 func (p *projection) promptOverview(promptID string, observations []workObservation, callKinds map[string]map[string]bool) Overview {
-	return p.buildOverview(observations, callKinds, func(id string) bool { return p.callPrompt[id] == promptID })
+	out := p.buildOverview(observations, callKinds, func(id string) bool { return p.callPrompt[id] == promptID })
+	if n := len(out.Steps); n > 0 && p.promptLive(promptID) {
+		out.Steps[n-1].Open = true
+	}
+	out.Coverage += p.inferredCoverage()
+	return out
+}
+
+// inferredCoverage says how many commands of the recording linkNativeParents
+// attributed, on every overview that may rest on them.
+func (p *projection) inferredCoverage() string {
+	if p.inferredParents == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" %d command(s) in this recording are attributed to the one tool call that was open when they started; the harness does not name their parent.", p.inferredParents)
 }
 
 func (p *projection) crewOverview(observations []workObservation, callKinds map[string]map[string]bool) Overview {
@@ -108,29 +134,27 @@ func (p *projection) crewOverview(observations []workObservation, callKinds map[
 	out := p.buildOverview(observations, callKinds, func(string) bool { return true })
 	// The per-prompt sequences already carry order. Splicing every prompt into
 	// one Crew sequence would invent an order between unrelated prompts.
-	out.Sequence = []WorkStep{}
-	out.Coverage = strings.TrimSuffix(out.Coverage, ".") + prompts
+	out.Sequence, out.Steps = []WorkStep{}, []Step{}
+	out.Coverage = strings.TrimSuffix(out.Coverage, ".") + prompts + p.inferredCoverage()
 	return out
 }
 
 func (p *projection) workObservations() []workObservation {
 	out := []workObservation{}
-	// Suppress a wrapper as a duplicate operation only when the child names
-	// its parent explicitly. Equal commands or close timestamps do not link it.
-	parents := map[string]bool{}
-	for _, e := range p.out.Executions {
-		if !e.IsWrapper && e.WrapperID != "" && e.WrapperID != e.ID {
-			parents[e.WrapperID] = true
-		}
-	}
+	// A wrapper whose commands its native children record keeps only what it
+	// did besides them; one that did nothing else is a duplicate operation.
+	// A child names its parent, or linkNativeParents established it from the
+	// one tool call open when the child started. Equal commands do not link.
 	for _, e := range p.out.Executions {
 		if _, known := p.promptIndex[e.PromptID]; !known {
 			continue
 		}
-		if e.IsWrapper && parents[e.ID] {
-			continue
-		}
 		kinds := executionWork(e)
+		if e.IsWrapper && p.parents[e.ID] {
+			if kinds = wrapperOwnWork(e); len(kinds) == 0 {
+				continue
+			}
+		}
 		evidence := Evidence{ID: e.ID, Kind: "execution", Label: executionLabel(e), At: e.StartedAt, SourceRef: e.SourceRef,
 			Tool: e.Tool, Command: executionCommand(e), Status: e.Status, ExitCode: e.ExitCode, OutputExcerpt: short(e.OutputExcerpt, 500)}
 		if e.ExitCode != nil {
@@ -299,6 +323,26 @@ func (p *projection) buildOverview(observations []workObservation, callKinds map
 		if kind == "mixed" {
 			c.category.Evidence = append(c.category.Evidence, Evidence{ID: call.ID, Kind: "model_call", Label: "Model call with multiple recorded work types; its tokens are counted once here", At: call.StartedAt, SourceRef: call.Ref})
 		}
+		// The same kind that charges the call opens or extends a step, so
+		// steps and categories are two readings of one assignment.
+		if n := len(out.Steps); n == 0 || out.Steps[n-1].Kind != kind {
+			out.Steps = append(out.Steps, Step{Kind: kind, Label: workLabels[kind], CallIDs: []string{}, SegmentIDs: []string{}, Skills: []string{}, Parts: []string{}})
+		}
+		step := &out.Steps[len(out.Steps)-1]
+		step.ModelCalls++
+		step.Tokens.Add(call.Tokens)
+		step.CallIDs = append(step.CallIDs, call.ID)
+		step.Executions += p.callExecutions[call.ID]
+		step.Skills = appendUnique(step.Skills, p.callSkills[call.ID]...)
+		step.Parts = appendUnique(step.Parts, sortedKeys(kinds)...)
+		step.StartedAt, step.EndedAt = earlier(step.StartedAt, call.StartedAt), later(step.EndedAt, call.EndedAt)
+		if idx, ok := p.callSegment[call.ID]; ok {
+			step.SegmentIDs = appendUnique(step.SegmentIDs, p.out.Segments[idx].ID)
+		}
+	}
+	for i := range out.Steps {
+		out.Steps[i].ElapsedMs = duration(out.Steps[i].StartedAt, out.Steps[i].EndedAt)
+		sort.Strings(out.Steps[i].Parts)
 	}
 	for _, kind := range order {
 		c := categories[kind]
@@ -327,6 +371,7 @@ func (p *projection) buildOverview(observations []workObservation, callKinds map
 	if unlinked > 0 {
 		out.Coverage += fmt.Sprintf(" %d operation observation(s) lack call attribution.", unlinked)
 	}
+
 	return out
 }
 

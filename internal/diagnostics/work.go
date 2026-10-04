@@ -16,37 +16,67 @@ import (
 // Unknown scripts stay unknown; native FileChange evidence can still establish
 // edits without guessing what a Python program or shell variable would do.
 func executionWork(e Execution) []string {
+	if kinds := operationWork(e, true); len(kinds) > 0 {
+		return kinds
+	}
+	return []string{"unknown"}
+}
+
+// wrapperOwnWork is what a wrapper did besides running commands: its
+// patches, polls, image views and other tools. It is all that is left to
+// say about a wrapper whose commands its native children record, and it is
+// empty when the wrapper only ran commands.
+func wrapperOwnWork(e Execution) []string { return operationWork(e, false) }
+
+// toolWork is the kind a tool's own name establishes, or "" when the name
+// says nothing and the input has to be read.
+func toolWork(tool string) string {
+	for _, name := range []string{"spawn_agent", "send_message", "followup_task", "list_agents", "interrupt_agent"} {
+		if strings.Contains(tool, name) {
+			return "coordination"
+		}
+	}
+	if strings.Contains(tool, "review") {
+		return "review"
+	}
+	if tool == "write" || strings.HasSuffix(tool, ".write") || strings.Contains(tool, "write_file") || strings.Contains(tool, "create_file") {
+		return "write_code"
+	}
+	if strings.Contains(tool, "edit") || strings.Contains(tool, "patch") {
+		return "edit_code"
+	}
+	if skillTool(tool) {
+		return "instructions"
+	}
+	for _, name := range []string{"read", "grep", "glob", "search", "web", "browser", "fetch", "screenshot", "list_directory"} {
+		if strings.Contains(tool, name) {
+			return "research"
+		}
+	}
+	return ""
+}
+
+// wrapperCommandTools are the tools a wrapper script invokes that
+// operationWork reads by their input instead of by their name.
+var wrapperCommandTools = map[string]bool{"exec_command": true, "apply_patch": true, "write_stdin": true, "view_image": true}
+
+func operationWork(e Execution, withCommands bool) []string {
 	tool := strings.ToLower(e.Tool)
 	if (e.Poll && !e.IsWrapper) || waitTool(tool) {
 		return []string{"wait"}
 	}
-	for _, name := range []string{"spawn_agent", "send_message", "followup_task", "list_agents", "interrupt_agent"} {
-		if strings.Contains(tool, name) {
-			return []string{"coordination"}
-		}
-	}
-	if strings.Contains(tool, "review") {
-		return []string{"review"}
-	}
 	if strings.Contains(tool, "apply_patch") {
 		return patchWork(e.Command)
 	}
-	if tool == "write" || strings.HasSuffix(tool, ".write") || strings.Contains(tool, "write_file") || strings.Contains(tool, "create_file") {
-		return []string{"write_code"}
-	}
-	if strings.Contains(tool, "edit") || strings.Contains(tool, "patch") {
-		return []string{"edit_code"}
-	}
-	if tool == "skill" || strings.HasSuffix(tool, ".skill") {
-		return []string{"instructions"}
-	}
-	for _, name := range []string{"read", "grep", "glob", "search", "web", "browser", "fetch", "screenshot", "list_directory"} {
-		if strings.Contains(tool, name) {
-			if instructionPath(e.Target) || instructionPath(e.Command) {
-				return []string{"instructions"}
-			}
-			return []string{"research"}
+	switch kind := toolWork(tool); kind {
+	case "":
+	case "research":
+		if instructionPath(e.Target) || instructionPath(e.Command) {
+			return []string{"instructions"}
 		}
+		return []string{kind}
+	default:
+		return []string{kind}
 	}
 	kinds := []string{}
 	commands := []string{e.Command}
@@ -68,6 +98,17 @@ func executionWork(e Execution) []string {
 		if wrapperInvokes(e.Command, "view_image") {
 			kinds = appendKind(kinds, "research")
 		}
+		// Any other tool a wrapper invokes is classified by its name, as it
+		// would be had the harness called it directly: tools.web__run is a
+		// web tool whether or not a script stands around it.
+		for _, name := range invokedTools(e.Command) {
+			if wrapperCommandTools[name] {
+				continue
+			}
+			if kind := toolWork(strings.ToLower(name)); kind != "" {
+				kinds = appendKind(kinds, kind)
+			}
+		}
 	} else {
 		// Direct shell text may contain examples such as rg 'cmd:"go test"'.
 		// Only a complete structured input object establishes a command field.
@@ -76,15 +117,36 @@ func executionWork(e Execution) []string {
 			commands = literalCommands(e.Command)
 		}
 	}
+	if !withCommands {
+		return kinds
+	}
 	for _, command := range commands {
 		for _, kind := range shellWork(command, 0) {
 			kinds = appendKind(kinds, kind)
 		}
 	}
-	if len(kinds) == 0 {
-		return []string{"unknown"}
+	return settleStatus(kinds)
+}
+
+// statusLine is shellWork's own word for a line appended to $MATE_STATUS. It
+// never leaves this file: settleStatus turns it into a work kind or drops it.
+const statusLine = "status_line"
+
+// settleStatus decides what a status line was. On its own it is the Crew
+// talking to the Mate. Beside other work in the same execution it is the
+// Crew saying what that work is, which the brief asks of every step, so it
+// adds no type of its own and cannot make the call mixed.
+func settleStatus(kinds []string) []string {
+	out := []string{}
+	for _, kind := range kinds {
+		if kind != statusLine {
+			out = appendKind(out, kind)
+		}
 	}
-	return kinds
+	if len(out) == 0 && len(kinds) > 0 {
+		return []string{"coordination"}
+	}
+	return out
 }
 
 // waitTool recognizes a harness tool whose whole purpose is waiting on a
@@ -499,6 +561,10 @@ func withoutHeredocBodies(raw string) string {
 	return strings.Join(lines, "\n")
 }
 
+// shellKeyword are the words that open a branch or a loop body: the command
+// after one is classified as it would be on a line of its own.
+var shellKeyword = map[string]bool{"if": true, "then": true, "else": true, "elif": true, "do": true, "while": true, "until": true, "!": true, "{": true}
+
 func shellWork(command string, depth int) []string {
 	if depth > 2 {
 		return []string{"unknown"}
@@ -508,13 +574,26 @@ func shellWork(command string, depth int) []string {
 	previous := ""
 	for _, part := range shellParts(command) {
 		words := part.words
-		for len(words) > 0 && (strings.Contains(words[0], "=") || words[0] == "env" || words[0] == "command" || words[0] == "exec" || words[0] == "sudo") {
+		// A comment runs nothing.
+		if len(words) > 0 && strings.HasPrefix(words[0], "#") {
+			continue
+		}
+		for len(words) > 0 && (strings.Contains(words[0], "=") || words[0] == "env" || words[0] == "command" || words[0] == "exec" || words[0] == "sudo" || shellKeyword[words[0]]) {
+			// `command -v name` asks where a program is; it runs nothing.
+			if words[0] == "command" && len(words) > 1 && (words[1] == "-v" || words[1] == "-V") {
+				words = []string{"which"}
+				break
+			}
 			words = words[1:]
 		}
 		if len(words) == 0 {
 			continue
 		}
 		bin := strings.ToLower(filepath.Base(words[0]))
+		// The shell's own `test` is `[`; a program at a path keeps its name.
+		if words[0] == "test" {
+			bin = "["
+		}
 		args := words[1:]
 		if bin == "apply_patch" {
 			for _, kind := range patchWork(command) {
@@ -529,9 +608,12 @@ func shellWork(command string, depth int) []string {
 			continue
 		}
 		kind := commandWork(bin, args)
+		// The work before this command; a status line in between is not it.
 		last := ""
-		if len(kinds) > 0 {
-			last = kinds[len(kinds)-1]
+		for i := len(kinds) - 1; i >= 0 && last == ""; i-- {
+			if kinds[i] != statusLine {
+				last = kinds[i]
+			}
 		}
 		switch {
 		case kind == "":
@@ -551,7 +633,11 @@ func shellWork(command string, depth int) []string {
 		if file := redirectFile(args); file != "" {
 			written[file] = true
 		}
-		previous = bin
+		// A status line between a git write and the query that reports it
+		// does not separate them.
+		if kind != statusLine {
+			previous = bin
+		}
 	}
 	return kinds
 }
@@ -624,7 +710,8 @@ func commandWork(bin string, args []string) string {
 				}
 			}
 		}
-	case "open":
+	case "open", "which":
+		// Asking where a program is inspects, like ls.
 		return "research"
 	case "plutil":
 		for _, arg := range args {
@@ -658,6 +745,10 @@ func commandWork(bin string, args []string) string {
 		if bin == "find" && containsAny(args, map[string]bool{"-delete": true}) {
 			return ""
 		}
+		// Locating or measuring an instruction file is not reading it.
+		if bin == "find" || bin == "ls" || bin == "wc" || bin == "file" || bin == "stat" {
+			return "research"
+		}
 		if instructionPath(strings.Join(args, " ")) {
 			return "instructions"
 		}
@@ -674,7 +765,7 @@ func commandWork(bin string, args []string) string {
 		// A status line appended to $MATE_STATUS is the Crew talking to the
 		// Mate, not a file being written.
 		if strings.Contains(file, "MATE_STATUS") {
-			return "coordination"
+			return statusLine
 		}
 		if file != "" {
 			return "write_code"
@@ -682,6 +773,10 @@ func commandWork(bin string, args []string) string {
 		return ""
 	case "cd", "pwd", "mkdir", "rmdir", "cp", "mv", "touch", "rm", "true", "false", "set", "export":
 		// Housekeeping is not a work type: it neither inspects nor writes code.
+		return ""
+	case "[", "[[", "for", "case", "fi", "done", "esac", "}":
+		// A guard and the words that shape a branch or a loop are control
+		// flow; what they guard is classified on its own.
 		return ""
 	}
 	return "unknown"

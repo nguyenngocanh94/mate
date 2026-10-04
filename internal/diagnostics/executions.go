@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/telemetry"
 )
@@ -155,7 +156,11 @@ func (p *projection) makeExecutions() {
 		}
 		byID[id] = e
 	}
+	p.linkNativeParents(byID)
 	for _, e := range byID {
+		if !e.IsWrapper && e.WrapperID != "" && e.WrapperID != e.ID {
+			p.parents[e.WrapperID] = true
+		}
 		if e.Poll && e.ProcessID == "" {
 			p.missing["A process poll could not be linked to its originating job."] = true
 		}
@@ -171,6 +176,61 @@ func (p *projection) makeExecutions() {
 		}
 		return a.ID < b.ID
 	})
+}
+
+// ParentLinkStart marks a native execution whose wrapper and model call were
+// inferred by linkNativeParents.
+const ParentLinkStart = "started_within_tool_call"
+
+// linkNativeParents gives a native execution the tool call that launched it
+// when the harness names none: Codex's CommandExecution items carry no call
+// id. This is the one inference from time this package makes, and the
+// captain allowed it on 2026-10-03: a command starts while a tool call is
+// open, so when exactly one call of its session and prompt was open at that
+// moment, that call launched it. Only the start is compared, because a
+// backgrounded command outlives the call that started it. Two open calls
+// leave the command unlinked, and a poll starts nothing, so it is never a
+// candidate. Every link made here is marked on the execution and counted in
+// the overview's coverage.
+func (p *projection) linkNativeParents(byID map[string]Execution) {
+	type span struct {
+		id         string
+		start, end time.Time
+	}
+	open := map[string][]span{}
+	for _, w := range byID {
+		start := parse(w.StartedAt)
+		if !w.IsWrapper || w.Poll || start.IsZero() {
+			continue
+		}
+		open[w.SessionID] = append(open[w.SessionID], span{w.ID, start, parse(w.EndedAt)})
+	}
+	for id, e := range byID {
+		at := parse(e.StartedAt)
+		if e.IsWrapper || e.WrapperID != "" || e.CallID != "" || at.IsZero() {
+			continue
+		}
+		parent, found := "", 0
+		for _, w := range open[e.SessionID] {
+			if w.start.After(at) || (!w.end.IsZero() && at.After(w.end)) {
+				continue
+			}
+			if prompt := byID[w.id].PromptID; prompt != "" && e.PromptID != "" && prompt != e.PromptID {
+				continue
+			}
+			parent = w.id
+			found++
+		}
+		if found != 1 {
+			continue
+		}
+		e.WrapperID, e.ParentLink = parent, ParentLinkStart
+		if e.CallID = byID[parent].CallID; e.CallID != "" {
+			e.PromptID = p.callPrompt[e.CallID]
+		}
+		byID[id] = e
+		p.inferredParents++
+	}
 }
 
 // normalizeTarget shows a path inside the worktree relative to it. An
@@ -245,9 +305,22 @@ func isWrapper(tool string) bool {
 // vocabulary; targets are the concrete things operated on. Several kinds
 // make the call mixed and several targets are counted, never guessed.
 func classifyCall(executions []Execution, worktree string) (string, string, string) {
+	return classifyCallWith(executions, worktree, nil)
+}
+
+// classifyCallWith is classifyCall for a call whose wrappers may have native
+// children: such a wrapper contributes only what it did besides running the
+// commands its children record, so a command is never classified twice.
+func classifyCallWith(executions []Execution, worktree string, parents map[string]bool) (string, string, string) {
 	kinds, targets := map[string]bool{}, map[string]bool{}
 	for _, e := range executions {
-		for _, kind := range executionWork(e) {
+		work := executionWork(e)
+		if e.IsWrapper && parents[e.ID] {
+			if work = wrapperOwnWork(e); len(work) == 0 {
+				continue
+			}
+		}
+		for _, kind := range work {
 			kinds[kind] = true
 		}
 		for _, target := range classifyTargets(e, worktree) {

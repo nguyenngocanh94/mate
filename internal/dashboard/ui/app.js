@@ -928,6 +928,7 @@
     var out = el("div", { class: "crew-performance" });
     out.appendChild(currentWork(body, p));
     out.appendChild(answersStrip(body, p));
+    out.appendChild(stepsCard(body, p));
     out.appendChild(findingsPanel(body, p));
     out.appendChild(el("section", { class: "section", "aria-label": "Prompt turn timelines" }, [
       el("h2", { text: "Work over time" }),
@@ -1044,6 +1045,300 @@
         onclick: function () { revealPrompt(prompt.id); } });
     })));
     return answerCard("tokens", "Tokens", children);
+  }
+
+  // The steps card answers "what did the agent do to finish this task", in
+  // five bands: the task and its totals; the sequence of stages, drawn as a
+  // strip sized by tokens and listed as a table; the same stages summed by
+  // work type; the skills loaded and the stage each load happened in; and a
+  // legend. A stage is a run of consecutive model calls doing one type of
+  // work (the projector's `steps`). Stages partition the calls, so their
+  // numbers add up, and the work-type table is summed from them rather than
+  // read from another field, so the two tables agree by construction.
+  //
+  // Unknown is `?` and a true zero is `–`, everywhere in the card. A
+  // projection older than `steps` or `skills` says so in words.
+  var STAGE_ROWS = 12;
+
+  // The work-type table's fixed order: real types first, then the two the
+  // classifier could not name.
+  var EFFORT_ORDER = ["research", "write_code", "edit_code", "test", "review", "coordination",
+    "wait", "instructions", "response", "mixed", "unknown"];
+
+  function stepTokens(s) { return Number(s.tokens && s.tokens.total) || 0; }
+
+  // A count the recording always has: zero is a dash, never "0".
+  function dashed(n) { return n ? String(n) : "–"; }
+
+  function dashedTokens(n) { return n ? fmtTokens(n) : "–"; }
+
+  // An unknown value is a `?` in the warning colour; the legend says so.
+  function unknownable(text) {
+    return text === "?" ? el("span", { class: "sc-unknown", title: "not recorded", text: "?" }) : txt(text);
+  }
+
+  function stageTime(ms) { return ms == null ? "?" : ms === 0 ? "–" : fmtMs(ms); }
+
+  // A skill pin is the skill's 1-based place in the Skills band, so the same
+  // skill loaded in two stages shows the same number twice.
+  function skillPin(index, name) {
+    return el("span", { class: "sc-pin", "data-pin": String(index), title: "skill " + index + ": " + name + " loaded here",
+      "aria-label": "skill " + index + " " + name, text: String(index) });
+  }
+
+  function kindSwatch(kind) {
+    return el("i", { class: "sc-swatch", "data-kind": kind || "unknown", "aria-hidden": "true" });
+  }
+
+  function stepsCard(body, p) {
+    var prompts = p.prompt_turns || [];
+    var recorded = prompts.filter(function (prompt) { return prompt.overview && Array.isArray(prompt.overview.steps); });
+    var skills = Array.isArray(p.skills) ? p.skills : null;
+    // Stages are numbered across the whole task, in prompt order.
+    var stages = [];
+    recorded.forEach(function (prompt) {
+      prompt.overview.steps.forEach(function (s, i) {
+        stages.push({ step: s, n: stages.length + 1, prompt: prompt, promptStart: i === 0 && stages.length > 0, pins: [] });
+      });
+    });
+    var stageOfCall = {};
+    stages.forEach(function (st) { (st.step.call_ids || []).forEach(function (id) { stageOfCall[id] = st; }); });
+    (skills || []).forEach(function (skill, i) {
+      (skill.loads || []).forEach(function (load) {
+        var st = load.call_id ? stageOfCall[load.call_id] : null;
+        if (st && !st.pins.some(function (pin) { return pin.index === i + 1; })) st.pins.push({ index: i + 1, name: skill.name });
+      });
+    });
+
+    var card = el("section", { class: "card steps-card", "aria-label": "Stages of this task" });
+    card.appendChild(stepsHeadBand(body, p, stages, recorded.length > 0));
+    if (!recorded.length) {
+      card.appendChild(el("div", { class: "sc-band", "data-band": "sequence" }, [
+        el("p", { class: "coverage-note", text: prompts.length ? "Steps not recorded yet" : "No prompt has been recorded yet." })
+      ]));
+    } else {
+      card.appendChild(sequenceBand(body, p, stages));
+      card.appendChild(effortBand(p, stages));
+    }
+    card.appendChild(skillsBand(skills, stageOfCall, recorded.length > 0));
+    card.appendChild(el("div", { class: "sc-band sc-legend", "aria-label": "How to read this card" }, [
+      el("div", {}, [el("span", { class: "sc-unknown", text: "?" }), txt(" unknown"), el("span", { class: "sc-legend-gap", "aria-hidden": "true" }),
+        txt("– zero"), el("span", { class: "sc-legend-gap", "aria-hidden": "true" }), txt("Mdl = model (API) calls · Tool = tool calls")]),
+      el("div", { text: "strip width = tokens · numbered pins = skill loads" })
+    ]));
+    return card;
+  }
+
+  // The pill is the page's own state wording with its glyph and tone; a
+  // closed task reads done or failed, never a colour alone.
+  function taskPill(ledger) {
+    var info;
+    if (ledger.closed) {
+      var close = ledger.close_state || "";
+      info = close === "finished" ? { word: "done", glyph: "✓", tone: "good" }
+        : close === "failed" ? { word: "failed", glyph: "×", tone: "critical" }
+        : { word: close ? close.replace(/[_-]/g, " ") : "closed", glyph: "■", tone: "muted" };
+    } else info = stateInfo(ledger.state);
+    return el("span", { class: "state sc-pill", "data-tone": info.tone, "data-state": ledger.closed ? "closed:" + (ledger.close_state || "") : ledger.state || "" }, [
+      el("span", { class: "glyph", "aria-hidden": "true", text: info.glyph }), el("span", { text: info.word })
+    ]);
+  }
+
+  function scStat(label, value) {
+    return el("div", { class: "sc-stat" }, [el("span", { class: "sc-label", text: label }), el("strong", { class: "sc-big" }, [unknownable(value)])]);
+  }
+
+  function stepsHeadBand(body, p, stages, recorded) {
+    var ledger = body.ledger || {};
+    var calls = p.model_calls;
+    return el("div", { class: "sc-band sc-head", "data-band": "head" }, [
+      el("div", { class: "sc-title" }, [taskPill(ledger), el("h2", { class: "sc-task", text: ledger.text || body.crew || "Task" })]),
+      el("div", { class: "sc-sub" }, [
+        el("span", { class: "sc-label", text: "Agent" }), txt(" " + (body.crew || "?")), el("span", { class: "sc-bar-sep", "aria-hidden": "true", text: "|" }),
+        txt(recorded ? count(stages.length, "stage") : "stages not recorded")
+      ]),
+      el("div", { class: "sc-stats" }, [
+        scStat("Tokens", calls === 0 ? "–" : calls == null ? "?" : fmtTokens(p.tokens && p.tokens.total)),
+        scStat("Model calls", calls == null ? "?" : dashed(calls)),
+        scStat("Elapsed", stageTime(p.time && p.time.prompt_elapsed_ms))
+      ])
+    ]);
+  }
+
+  function bandHead(label, aside) {
+    return el("div", { class: "sc-band-head" }, [el("h3", { class: "sc-label", text: label }), aside ? el("span", { class: "sc-aside", text: aside }) : null]);
+  }
+
+  function sequenceBand(body, p, stages) {
+    var open = stages.filter(function (st) { return st.step.open; });
+    var band = el("div", { class: "sc-band", "data-band": "sequence" }, [
+      bandHead("Sequence", count(stages.length, "stage") + (open.length ? " · #" + open[open.length - 1].n + " in progress" : ""))
+    ]);
+    if (!stages.length) {
+      band.appendChild(el("p", { class: "coverage-note", text: "No model call recorded for this task yet." }));
+      return band;
+    }
+    var total = 0, max = 0;
+    stages.forEach(function (st) { var t = stepTokens(st.step); total += t; if (t > max) max = t; });
+    // The strip is the whole task at a glance and is never cut: one piece
+    // per stage, as wide as its tokens, with a wider gap between prompts.
+    var pinned = stages.some(function (st) { return st.pins.length; });
+    band.appendChild(el("div", { class: "sc-strip", role: "img", "data-pins": pinned ? null : "none", "aria-label": count(stages.length, "stage") + " in order, sized by tokens: " +
+      stages.map(function (st) { return st.n + " " + kindLabel(st.step.kind) + (st.step.open ? " (in progress)" : ""); }).join(", ") },
+      stages.map(function (st) {
+        var s = st.step, t = stepTokens(s);
+        return el("div", { class: "sc-piece", "data-kind": s.kind || "unknown", "data-stage": String(st.n),
+          "data-prompt-start": st.promptStart ? "true" : null, "data-open": s.open ? "true" : null,
+          style: "flex-grow:" + (total > 0 ? t : 1),
+          title: "#" + st.n + " " + kindLabel(s.kind) + " · " + dashedTokens(t) + " tokens" + (s.open ? " · in progress" : "") },
+        [el("div", { class: "sc-pins" }, st.pins.map(function (pin) { return skillPin(pin.index, pin.name); })), el("div", { class: "sc-fill" })]);
+      })));
+    var rows = [];
+    stages.forEach(function (st) {
+      if (st.promptStart) rows.push(promptSeparator(p, st.prompt));
+      rows.push(stageRow(st, max));
+    });
+    // Rows up to the twelfth stage are shown; a separator stays with the
+    // stage it introduces.
+    var cut = rows.findIndex(function (row) { return Number(row.getAttribute("data-stage")) > STAGE_ROWS; });
+    if (cut > 0 && rows[cut - 1].getAttribute("data-prompt")) cut--;
+    var table = el("div", { class: "sc-table sc-stages", role: "table", "aria-label": "Stages in order" }, [
+      el("div", { class: "sc-row sc-th", role: "row" }, ["#", "Stage", "Mdl", "Tool", "Tokens", "Time"].map(function (h, i) {
+        return el("span", { role: "columnheader", class: i > 1 ? "sc-num" : null, title: h === "Mdl" ? "model (API) calls" : h === "Tool" ? "tool calls" : null, text: h });
+      }))
+    ].concat(cut < 0 ? rows : rows.slice(0, cut)));
+    if (cut >= 0) table.appendChild(savedDetails("steps-later:" + (body.crew || ""),
+      "Continue through " + count(stages.length - STAGE_ROWS, "later stage"), rows.slice(cut), "sc-later"));
+    band.appendChild(table);
+    return band;
+  }
+
+  function promptSeparator(p, prompt) {
+    return el("div", { class: "sc-row sc-prompt", role: "row", "data-prompt": prompt.id }, [
+      el("span", { role: "cell", title: prompt.prompt || "",
+        text: promptTag(p, prompt.id, prompt.prompt_at || prompt.started_at) + " · " + excerpt(prompt.prompt || "Prompt text unavailable", 80) })
+    ]);
+  }
+
+  function stageRow(st, max) {
+    var s = st.step, t = stepTokens(s), kind = s.kind || "unknown";
+    var ids = s.segment_ids || [];
+    var name = ids.length
+      ? el("button", { class: "text-button sc-stage-name", type: "button", "data-focus": "step:" + ids[0],
+        title: "Open the work segments of this stage", onclick: function () { revealSegments(ids); }, text: kindLabel(kind) })
+      : el("span", { class: "sc-stage-name", text: kindLabel(kind) });
+    // What a mixed stage mixed, by name; no token is split among the parts.
+    var parts = (s.parts || []).filter(function (k) { return k !== kind; });
+    return el("div", { class: "sc-row sc-stage", role: "row", "data-kind": kind, "data-stage": String(st.n), "data-open": s.open ? "true" : null }, [
+      el("span", { class: "sc-n", role: "cell", text: String(st.n) }),
+      el("span", { class: "sc-what", role: "cell" }, [kindSwatch(kind), name]
+        .concat(st.pins.map(function (pin) { return skillPin(pin.index, pin.name); }))
+        .concat([parts.length ? el("span", { class: "sc-parts", text: parts.map(kindLabel).join(" + ") }) : null,
+          s.open ? el("span", { class: "sc-open", text: "in progress" }) : null])),
+      el("span", { class: "sc-num", role: "cell", text: dashed(s.model_calls) }),
+      el("span", { class: "sc-num", role: "cell", text: dashed(s.executions) }),
+      el("span", { class: "sc-num sc-tok", role: "cell" }, [txt(dashedTokens(t)),
+        t > 0 && max > 0 ? el("i", { class: "sc-underline", "data-kind": kind, "aria-hidden": "true", style: "width:" + (100 * t / max).toFixed(1) + "%" }) : null]),
+      el("span", { class: "sc-num", role: "cell", title: s.started_at ? "Started " + day(s.started_at) : "Time not recorded" }, [unknownable(stageTime(s.elapsed_ms))])
+    ]);
+  }
+
+  function effortBand(p, stages) {
+    var sums = {}, extra = [];
+    var total = { calls: 0, tools: 0, tokens: 0 };
+    stages.forEach(function (st) {
+      var kind = st.step.kind || "unknown";
+      if (!sums[kind]) {
+        sums[kind] = { calls: 0, tools: 0, tokens: 0 };
+        if (EFFORT_ORDER.indexOf(kind) === -1) extra.push(kind);
+      }
+      var t = stepTokens(st.step);
+      sums[kind].calls += st.step.model_calls || 0; sums[kind].tools += st.step.executions || 0; sums[kind].tokens += t;
+      total.calls += st.step.model_calls || 0; total.tools += st.step.executions || 0; total.tokens += t;
+    });
+    function share(tokens) { return total.tokens > 0 && tokens > 0 ? fmtPct(100 * tokens / total.tokens) : "–"; }
+    function bar(tokens, kind) {
+      return el("span", { class: "sc-track", role: "cell", "aria-hidden": "true" },
+        [total.tokens > 0 && tokens > 0 ? el("i", { "data-kind": kind, style: "width:" + (100 * tokens / total.tokens).toFixed(1) + "%" }) : null]);
+    }
+    // Kinds the vocabulary does not know go just before the two the
+    // classifier could not name.
+    var order = EFFORT_ORDER.slice(0, -2).concat(extra, EFFORT_ORDER.slice(-2));
+    var rows = order.map(function (kind) {
+      var row = sums[kind];
+      var empty = !row;
+      row = row || { calls: 0, tools: 0, tokens: 0 };
+      return el("div", { class: "sc-row sc-effort", role: "row", "data-effort": kind, "data-empty": empty ? "true" : null }, [
+        el("span", { class: "sc-what", role: "cell" }, [kindSwatch(kind), el("span", { text: kindLabel(kind) })]),
+        el("span", { class: "sc-num", role: "cell", text: dashed(row.calls) }),
+        el("span", { class: "sc-num", role: "cell", text: dashed(row.tools) }),
+        el("span", { class: "sc-num", role: "cell", text: dashedTokens(row.tokens) }),
+        bar(row.tokens, kind),
+        el("span", { class: "sc-num", role: "cell", text: share(row.tokens) })
+      ]);
+    });
+    rows.push(el("div", { class: "sc-row sc-effort sc-total", role: "row", "data-effort": "total" }, [
+      el("span", { role: "cell", text: "Total" }),
+      el("span", { class: "sc-num", role: "cell", text: dashed(total.calls) }),
+      el("span", { class: "sc-num", role: "cell", text: dashed(total.tools) }),
+      el("span", { class: "sc-num", role: "cell", text: dashedTokens(total.tokens) }),
+      el("span", { role: "cell", "aria-hidden": "true" }),
+      el("span", { class: "sc-num", role: "cell", text: total.tokens > 0 ? "100%" : "–" })
+    ]));
+    var band = el("div", { class: "sc-band", "data-band": "effort" }, [
+      bandHead("Where the effort went", "by work type"),
+      el("div", { class: "sc-table sc-efforts", role: "table", "aria-label": "Effort by work type" }, [
+        el("div", { class: "sc-row sc-th", role: "row" }, ["Type", "Mdl", "Tool", "Tokens", "", "Share"].map(function (h, i) {
+          return el("span", { role: "columnheader", class: i > 0 && i !== 4 ? "sc-num" : null, text: h });
+        }))
+      ].concat(rows))
+    ]);
+    // A prompt recorded before steps existed leaves calls outside any stage;
+    // say how many rather than let the totals disagree silently.
+    var missingCalls = (p.model_calls || 0) - total.calls;
+    var missingTokens = (Number(p.tokens && p.tokens.total) || 0) - total.tokens;
+    if (missingCalls > 0 || missingTokens > 0) band.appendChild(el("p", { class: "coverage-note",
+      text: count(Math.max(missingCalls, 0), "model call") + " and " + fmtTokens(Math.max(missingTokens, 0)) + " tokens are not in a recorded stage." }));
+    return band;
+  }
+
+  // skillsBand lists every skill the recording shows being loaded, how, and
+  // the stage each load happened in. A load is all a transcript can show.
+  function skillsBand(skills, stageOfCall, recorded) {
+    var loads = 0;
+    (skills || []).forEach(function (skill) { loads += (skill.loads || []).length; });
+    var band = el("div", { class: "sc-band", "data-band": "skills", "data-skills": "true" }, [
+      bandHead("Skills", skills && skills.length ? count(skills.length, "skill") + " · " + count(loads, "load") : null)
+    ]);
+    if (!skills) {
+      band.appendChild(el("p", { class: "coverage-note", text: "Skills not recorded yet" }));
+      return band;
+    }
+    if (!skills.length) {
+      band.appendChild(el("p", { class: "coverage-note", text: "No skill was loaded in this recording." }));
+      return band;
+    }
+    band.appendChild(el("ul", { class: "sc-skills" }, skills.map(function (skill, i) {
+      var via = [];
+      var chips = (skill.loads || []).map(function (load) {
+        var how = load.via === "tool" ? "skill tool" : "read SKILL.md";
+        if (via.indexOf(how) === -1) via.push(how);
+        var st = load.call_id ? stageOfCall[load.call_id] : null;
+        if (!st) return el("span", { class: "sc-load", "data-linked": "false", title: load.at ? "Loaded " + day(load.at) : null,
+          text: recorded ? "stage not linked" : "stage not recorded" });
+        var kind = st.step.kind || "unknown";
+        return el("span", { class: "sc-load", "data-stage": String(st.n), title: load.at ? "Loaded " + day(load.at) : null }, [
+          el("span", { class: "sc-load-n", text: "#" + st.n }), kindSwatch(kind), txt(kindLabel(kind))
+        ]);
+      });
+      return el("li", { "data-skill": skill.name }, [
+        el("div", { class: "sc-skill-head" }, [skillPin(i + 1, skill.name), el("strong", { class: "sc-skill-name", text: skill.name }),
+          el("span", { class: "sc-skill-count", text: "×" + (skill.count || (skill.loads || []).length) })]),
+        el("div", { class: "sc-skill-where" }, [el("span", { text: (via.join(" and ") || "load not recorded") + " · loaded in" })].concat(chips))
+      ]);
+    })));
+    band.appendChild(el("p", { class: "sc-note", text: "A load is the harness's skill tool being called or a SKILL.md being read. It does not show that the skill was followed." }));
+    return band;
   }
 
   function revealPrompt(id) {

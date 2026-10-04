@@ -193,39 +193,8 @@
       "prompt_ref": {},
       "response_ref": {},
       "overview": {
-        "summary": "Unclassified activity (1 executions) · Research / inspect (3 executions) · Coordinate (1 calls) · Write code / files (2 executions) · Wait / poll (1 executions) · +3 other work types",
+        "summary": "Research / inspect (3 executions) · Coordinate (1 calls) · Write code / files (2 executions) · Wait / poll (1 executions) · Edit code / files (1 executions) · +2 other work types",
         "categories": [
-          {
-            "kind": "unknown",
-            "label": "Unclassified activity",
-            "model_calls": 0,
-            "execution_count": 1,
-            "tokens": null,
-            "elapsed_ms": null,
-            "call_ids": [],
-            "segment_ids": [
-              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfFTf6emc7uKFwnpNDG"
-            ],
-            "execution_ids": [
-              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#tool#toolu_0111j7Lm3JgCWLANUmrkAhsU"
-            ],
-            "evidence": [
-              {
-                "id": "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#tool#toolu_0111j7Lm3JgCWLANUmrkAhsU",
-                "kind": "execution",
-                "label": "for f in /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/WORKSPACE.md /pr…",
-                "at": "2026-09-19T10:43:43.098Z",
-                "source_ref": {
-                  "path": "{{TESTDATA}}/claude-2.1.278-transcript.jsonl",
-                  "offset": 26629
-                },
-                "tool": "Bash",
-                "command": "for f in /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/WORKSPACE.md /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/PROJECT.md memory.md backlog.md; do echo \"=== $f\"; cat \"$f\" 2\u003e\u00261; done; echo \"=== backlog cmd\"; /private/tmp/TestLiveAcceptanceTwoProjects1918684859/002/mate backlog shop 2\u003e\u00261",
-                "status": "completed",
-                "output_excerpt": "=== /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/WORKSPACE.md cat: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/WORKSPACE.md: No such file or directory === /pri…(trimmed for the fixture)"
-              }
-            ]
-          },
           {
             "kind": "research",
             "label": "Research / inspect",
@@ -700,7 +669,133 @@
           }
         ],
         "rule": "prompt-work-v1/observed-operations",
-        "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap."
+        "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap.",
+        "steps": [
+          {
+            "kind": "mixed",
+            "label": "Mixed activity",
+            "started_at": "2026-09-19T10:43:38.918000000Z",
+            "ended_at": "2026-09-19T10:44:54.850000000Z",
+            "elapsed_ms": 75932,
+            "model_calls": 5,
+            "executions": 5,
+            "tokens": {
+              "input": 130,
+              "cache_read": 261416,
+              "cache_write": 35640,
+              "output": 1968,
+              "thinking": 132,
+              "total": 299154
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfFTf6emc7uKFwnpNDG",
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfGGomibgbLVzB4wKsf",
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfJNb5qJjChqNyZnRWM",
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfK56eYXZJzhW6owcCD",
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfM66jEbWSu3Aq2D854"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfFTf6emc7uKFwnpNDG",
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfGGomibgbLVzB4wKsf",
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfJNb5qJjChqNyZnRWM",
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfK56eYXZJzhW6owcCD",
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfM66jEbWSu3Aq2D854"
+            ],
+            "skills": [],
+            "parts": [
+              "coordination",
+              "research",
+              "wait",
+              "write_code"
+            ],
+            "open": false
+          },
+          {
+            "kind": "coordination",
+            "label": "Coordinate",
+            "started_at": "2026-09-19T10:44:59.316000000Z",
+            "ended_at": "2026-09-19T10:44:59.378000000Z",
+            "elapsed_ms": 62,
+            "model_calls": 1,
+            "executions": 1,
+            "tokens": {
+              "input": 32,
+              "cache_read": 60751,
+              "cache_write": 278,
+              "output": 129,
+              "thinking": 0,
+              "total": 61190
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfMXDLytqxLM2PfaRxP"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfMXDLytqxLM2PfaRxP"
+            ],
+            "skills": [],
+            "parts": [
+              "coordination"
+            ],
+            "open": false
+          },
+          {
+            "kind": "mixed",
+            "label": "Mixed activity",
+            "started_at": "2026-09-19T10:45:10.472000000Z",
+            "ended_at": "2026-09-19T10:45:13.034000000Z",
+            "elapsed_ms": 2562,
+            "model_calls": 1,
+            "executions": 1,
+            "tokens": {
+              "input": 32,
+              "cache_read": 61029,
+              "cache_write": 631,
+              "output": 343,
+              "thinking": 87,
+              "total": 62035
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfMrvWECeHHn9k15id4"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfMrvWECeHHn9k15id4"
+            ],
+            "skills": [],
+            "parts": [
+              "edit_code",
+              "research"
+            ],
+            "open": false
+          },
+          {
+            "kind": "response",
+            "label": "Respond",
+            "started_at": "2026-09-19T10:45:23.225000000Z",
+            "ended_at": "2026-09-19T10:45:23.225000000Z",
+            "elapsed_ms": 0,
+            "model_calls": 1,
+            "executions": 0,
+            "tokens": {
+              "input": 32,
+              "cache_read": 61660,
+              "cache_write": 520,
+              "output": 206,
+              "thinking": 0,
+              "total": 62418
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfNrrZPfyUJeUKTgWR9"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfNrrZPfyUJeUKTgWR9"
+            ],
+            "skills": [],
+            "parts": [
+              "response"
+            ],
+            "open": false
+          }
+        ]
       }
     },
     {
@@ -733,7 +828,8 @@
         "categories": [],
         "sequence": [],
         "rule": "prompt-work-v1/observed-operations",
-        "coverage": "No linked activity has been recorded for this prompt."
+        "coverage": "No linked activity has been recorded for this prompt.",
+        "steps": []
       }
     },
     {
@@ -994,7 +1090,95 @@
           }
         ],
         "rule": "prompt-work-v1/observed-operations",
-        "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap."
+        "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap.",
+        "steps": [
+          {
+            "kind": "mixed",
+            "label": "Mixed activity",
+            "started_at": "2026-09-19T10:45:45.503000000Z",
+            "ended_at": "2026-09-19T10:45:47.100000000Z",
+            "elapsed_ms": 1597,
+            "model_calls": 1,
+            "executions": 1,
+            "tokens": {
+              "input": 2,
+              "cache_read": 62180,
+              "cache_write": 350,
+              "output": 800,
+              "thinking": 618,
+              "total": 63332
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfPr9BKkRvPJ9nmkbUy"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfPr9BKkRvPJ9nmkbUy"
+            ],
+            "skills": [],
+            "parts": [
+              "coordination",
+              "research"
+            ],
+            "open": false
+          },
+          {
+            "kind": "coordination",
+            "label": "Coordinate",
+            "started_at": "2026-09-19T10:45:57.782000000Z",
+            "ended_at": "2026-09-19T10:46:00.581000000Z",
+            "elapsed_ms": 2799,
+            "model_calls": 1,
+            "executions": 1,
+            "tokens": {
+              "input": 32,
+              "cache_read": 62530,
+              "cache_write": 888,
+              "output": 303,
+              "thinking": 52,
+              "total": 63753
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfRNiUFDidY2bVNVERm"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfRNiUFDidY2bVNVERm"
+            ],
+            "skills": [],
+            "parts": [
+              "coordination"
+            ],
+            "open": false
+          },
+          {
+            "kind": "mixed",
+            "label": "Mixed activity",
+            "started_at": "2026-09-19T10:46:10.857000000Z",
+            "ended_at": "2026-09-19T10:46:30.963000000Z",
+            "elapsed_ms": 20106,
+            "model_calls": 1,
+            "executions": 1,
+            "tokens": {
+              "input": 32,
+              "cache_read": 63418,
+              "cache_write": 358,
+              "output": 125,
+              "thinking": 0,
+              "total": 63933
+            },
+            "call_ids": [
+              "mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfSNcnydrH6SYy7BApj"
+            ],
+            "segment_ids": [
+              "segment#mate:shop#8414030c-5d90-4925-94cc-c94e12aae4a9#turn#msg_011CfCfSNcnydrH6SYy7BApj"
+            ],
+            "skills": [],
+            "parts": [
+              "coordination",
+              "wait"
+            ],
+            "open": true
+          }
+        ]
       }
     }
   ]
@@ -1409,110 +1593,24 @@
         "coverage": "native prompt",
         "outcome": "task_complete",
         "overview": {
-          "summary": "Coordinate (1 calls) · Research / inspect (2 calls) · Unclassified activity (1 calls) · Respond · Mixed activity (1 calls)",
+          "summary": "Research / inspect (3 calls) · Coordinate (1 calls) · Respond (1 calls)",
           "categories": [
-            {
-              "kind": "coordination",
-              "label": "Coordinate",
-              "model_calls": 1,
-              "execution_count": 2,
-              "tokens": {
-                "input": 757,
-                "cache_read": 20224,
-                "cache_write": 0,
-                "output": 154,
-                "thinking": 22,
-                "total": 21135
-              },
-              "elapsed_ms": 0,
-              "call_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
-              ],
-              "segment_ids": [
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
-              ],
-              "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c"
-              ],
-              "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-                  "kind": "execution",
-                  "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git …",
-                  "at": "2026-09-19T10:44:19.201Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 15657
-                  },
-                  "tool": "exec",
-                  "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-                  "kind": "execution",
-                  "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git … · exit 0",
-                  "at": "2026-09-19T10:44:19.292Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 14216
-                  },
-                  "tool": "exec_command",
-                  "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-                  "status": "completed",
-                  "exit_code": 0,
-                  "output_excerpt": "/private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
-                  "kind": "execution",
-                  "label": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATU…",
-                  "at": "2026-09-19T10:44:33.279Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 33636
-                  },
-                  "tool": "exec",
-                  "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output:"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
-                  "kind": "execution",
-                  "label": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATU… · exit 0",
-                  "at": "2026-09-19T10:44:33.332Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 31859
-                  },
-                  "tool": "exec_command",
-                  "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
-                  "status": "completed",
-                  "exit_code": 0
-                }
-              ]
-            },
             {
               "kind": "research",
               "label": "Research / inspect",
-              "model_calls": 2,
+              "model_calls": 3,
               "execution_count": 3,
               "tokens": {
-                "input": 7690,
-                "cache_read": 32256,
+                "input": 12636,
+                "cache_read": 46336,
                 "cache_write": 0,
-                "output": 299,
-                "thinking": 45,
-                "total": 40245
+                "output": 472,
+                "thinking": 95,
+                "total": 59444
               },
               "elapsed_ms": 0,
               "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
               ],
@@ -1522,28 +1620,11 @@
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60"
               ],
               "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-                  "kind": "execution",
-                  "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git …",
-                  "at": "2026-09-19T10:44:19.201Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 15657
-                  },
-                  "tool": "exec",
-                  "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
                   "kind": "execution",
@@ -1558,20 +1639,6 @@
                   "status": "completed",
                   "exit_code": 0,
                   "output_excerpt": "/private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
-                  "kind": "execution",
-                  "label": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/…",
-                  "at": "2026-09-19T10:44:23.464Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 21402
-                  },
-                  "tool": "exec",
-                  "command": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: You are a Crew: an autonomous worker agent managed by the Mate. Work on your own; do not wait for a human. # Task # Add a Buy button to the end of README.md ## Task Append a \"Buy\" button to the ver…(trimmed for the fixture)"
                 },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
@@ -1587,20 +1654,6 @@
                   "status": "completed",
                   "exit_code": 0,
                   "output_excerpt": "You are a Crew: an autonomous worker agent managed by the Mate. Work on your own; do not wait for a human. # Task # Add a Buy button to the end of README.md ## Task Append a \"Buy\" button to the ver…(trimmed for the fixture)"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
-                  "kind": "execution",
-                  "label": "git status --short --branch git log --oneline --decorate -3 printf '%s\\n' '--- README --…",
-                  "at": "2026-09-19T10:44:28.606Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 27508
-                  },
-                  "tool": "exec",
-                  "command": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'checkout|check-out|buy now|purchase|stripe|payment|pay/' .",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: ## mate/buybtn aa900f3 (HEAD -\u003e mate/buybtn, main) seed the repository 1a328cb init --- README --- # shop A tiny shop. --- checkout references --- ./pages/checkout-express.html:1:\u003ch1\u003eExpress chec…(trimmed for the fixture)"
                 },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
@@ -1620,8 +1673,48 @@
               ]
             },
             {
-              "kind": "unknown",
-              "label": "Unclassified activity",
+              "kind": "coordination",
+              "label": "Coordinate",
+              "model_calls": 1,
+              "execution_count": 1,
+              "tokens": {
+                "input": 757,
+                "cache_read": 20224,
+                "cache_write": 0,
+                "output": 154,
+                "thinking": 22,
+                "total": 21135
+              },
+              "elapsed_ms": 0,
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
+              ],
+              "execution_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c"
+              ],
+              "evidence": [
+                {
+                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
+                  "kind": "execution",
+                  "label": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATU… · exit 0",
+                  "at": "2026-09-19T10:44:33.332Z",
+                  "source_ref": {
+                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                    "offset": 31859
+                  },
+                  "tool": "exec_command",
+                  "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
+                  "status": "completed",
+                  "exit_code": 0
+                }
+              ]
+            },
+            {
+              "kind": "response",
+              "label": "Respond",
               "model_calls": 1,
               "execution_count": 0,
               "tokens": {
@@ -1644,26 +1737,13 @@
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47",
                   "kind": "model_call",
-                  "label": "Model call; operation details unavailable",
+                  "label": "Model call that ended the turn without running a tool",
                   "at": "2026-09-19T10:44:33.343000000Z",
                   "source_ref": {
                     "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
                     "offset": 36956
                   }
-                }
-              ]
-            },
-            {
-              "kind": "response",
-              "label": "Respond",
-              "model_calls": 0,
-              "execution_count": 0,
-              "tokens": null,
-              "elapsed_ms": null,
-              "call_ids": [],
-              "segment_ids": [],
-              "execution_ids": [],
-              "evidence": [
+                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#msg_03dafd797f8f7aa1016aae67930c7c87d0a7b7894317c6b9aa",
                   "kind": "response",
@@ -1675,101 +1755,137 @@
                   }
                 }
               ]
-            },
-            {
-              "kind": "mixed",
-              "label": "Mixed activity",
-              "model_calls": 1,
-              "execution_count": 0,
-              "tokens": {
-                "input": 4946,
-                "cache_read": 14080,
-                "cache_write": 0,
-                "output": 173,
-                "thinking": 50,
-                "total": 19199
-              },
-              "elapsed_ms": null,
-              "call_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20"
-              ],
-              "segment_ids": [
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20"
-              ],
-              "execution_ids": [],
-              "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
-                  "kind": "model_call",
-                  "label": "Model call with multiple recorded work types; its tokens are counted once here",
-                  "at": "2026-09-19T10:44:11.839000000Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 16285
-                  }
-                }
-              ]
             }
           ],
           "sequence": [
             {
-              "kind": "mixed",
-              "label": "Mixed activity",
-              "started_at": "2026-09-19T10:44:19.201Z",
-              "segment_ids": [
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20"
-              ],
-              "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa"
-              ]
-            },
-            {
               "kind": "research",
               "label": "Research / inspect",
-              "started_at": "2026-09-19T10:44:23.464Z",
+              "started_at": "2026-09-19T10:44:19.292Z",
               "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60"
               ]
             },
             {
               "kind": "coordination",
               "label": "Coordinate",
-              "started_at": "2026-09-19T10:44:33.279Z",
+              "started_at": "2026-09-19T10:44:33.332Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c"
               ]
             },
             {
-              "kind": "unknown",
-              "label": "Unclassified activity",
+              "kind": "response",
+              "label": "Respond",
               "started_at": "2026-09-19T10:44:33.343000000Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47"
               ],
               "execution_ids": []
+            }
+          ],
+          "rule": "prompt-work-v1/observed-operations",
+          "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 8 command(s) in this recording are attributed to the one tool call that was open when they started; the harness does not name their parent.",
+          "steps": [
+            {
+              "kind": "research",
+              "label": "Research / inspect",
+              "started_at": "2026-09-19T10:44:11.839000000Z",
+              "ended_at": "2026-09-19T10:44:28.719000000Z",
+              "elapsed_ms": 16880,
+              "model_calls": 3,
+              "executions": 3,
+              "tokens": {
+                "input": 12636,
+                "cache_read": 46336,
+                "cache_write": 0,
+                "output": 472,
+                "thinking": 95,
+                "total": 59444
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
+              ],
+              "skills": [],
+              "parts": [
+                "research"
+              ],
+              "open": false
+            },
+            {
+              "kind": "coordination",
+              "label": "Coordinate",
+              "started_at": "2026-09-19T10:44:28.719000000Z",
+              "ended_at": "2026-09-19T10:44:33.343000000Z",
+              "elapsed_ms": 4624,
+              "model_calls": 1,
+              "executions": 1,
+              "tokens": {
+                "input": 757,
+                "cache_read": 20224,
+                "cache_write": 0,
+                "output": 154,
+                "thinking": 22,
+                "total": 21135
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
+              ],
+              "skills": [],
+              "parts": [
+                "coordination"
+              ],
+              "open": false
             },
             {
               "kind": "response",
               "label": "Respond",
-              "started_at": "2026-09-19T10:44:35.893Z",
-              "segment_ids": [],
-              "execution_ids": []
+              "started_at": "2026-09-19T10:44:33.343000000Z",
+              "ended_at": "2026-09-19T10:44:35.919000000Z",
+              "elapsed_ms": 2576,
+              "model_calls": 1,
+              "executions": 0,
+              "tokens": {
+                "input": 934,
+                "cache_read": 20224,
+                "cache_write": 0,
+                "output": 42,
+                "thinking": 0,
+                "total": 21200
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47"
+              ],
+              "skills": [],
+              "parts": [
+                "response"
+              ],
+              "open": false
             }
-          ],
-          "rule": "prompt-work-v1/observed-operations",
-          "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 4 operation observation(s) lack call attribution."
+          ]
         }
       },
       {
@@ -1804,7 +1920,7 @@
         "coverage": "native prompt",
         "outcome": "task_complete",
         "overview": {
-          "summary": "Research / inspect (1 calls) · Edit code / files (1 calls) · Review (1 executions) · Unclassified activity (1 calls) · Coordinate (2 calls) · +2 other work types",
+          "summary": "Research / inspect (1 calls) · Edit code / files (1 calls) · Review (1 executions) · Unclassified activity (1 executions) · Coordinate (2 calls) · +2 other work types",
           "categories": [
             {
               "kind": "research",
@@ -1828,26 +1944,10 @@
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
               ],
               "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
-                  "kind": "execution",
-                  "label": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' . pr…",
-                  "at": "2026-09-19T10:46:05.753Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 47023
-                  },
-                  "tool": "exec",
-                  "command": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: ./pages/checkout-express.html:1:\u003ch1\u003eExpress checkout\u003c/h1\u003e ./pages/checkout-classic.html:1:\u003ch1\u003eClassic checkout\u003c/h1\u003e --- top-level files --- pages/checkout-express.html pages/checkout-classic.html READ…(trimmed for the fixture)"
-                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
                   "kind": "execution",
@@ -1862,20 +1962,6 @@
                   "status": "completed",
                   "exit_code": 0,
                   "output_excerpt": "./pages/checkout-express.html:1:\u003ch1\u003eExpress checkout\u003c/h1\u003e ./pages/checkout-classic.html:1:\u003ch1\u003eClassic checkout\u003c/h1\u003e --- top-level files --- pages/checkout-express.html pages/checkout-classic.html READ…(trimmed for the fixture)"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-                  "kind": "execution",
-                  "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-                  "at": "2026-09-19T10:46:15.341Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 56467
-                  },
-                  "tool": "exec",
-                  "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
                 },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
@@ -1957,24 +2043,9 @@
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
               ],
               "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-                  "kind": "execution",
-                  "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-                  "at": "2026-09-19T10:46:15.341Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 56467
-                  },
-                  "tool": "exec",
-                  "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
                   "kind": "execution",
@@ -1995,43 +2066,18 @@
             {
               "kind": "unknown",
               "label": "Unclassified activity",
-              "model_calls": 1,
+              "model_calls": 0,
               "execution_count": 1,
-              "tokens": {
-                "input": 1172,
-                "cache_read": 21248,
-                "cache_write": 0,
-                "output": 52,
-                "thinking": 0,
-                "total": 22472
-              },
+              "tokens": null,
               "elapsed_ms": null,
-              "call_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
-              ],
+              "call_ids": [],
               "segment_ids": [
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
-                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
               ],
               "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-                  "kind": "execution",
-                  "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-                  "at": "2026-09-19T10:46:15.341Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 56467
-                  },
-                  "tool": "exec",
-                  "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
                   "kind": "execution",
@@ -2046,16 +2092,6 @@
                   "status": "completed",
                   "exit_code": 0,
                   "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94",
-                  "kind": "model_call",
-                  "label": "Model call; operation details unavailable",
-                  "at": "2026-09-19T10:46:24.439000000Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 71391
-                  }
                 }
               ]
             },
@@ -2083,28 +2119,11 @@
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd"
               ],
               "evidence": [
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-                  "kind": "execution",
-                  "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-                  "at": "2026-09-19T10:46:15.341Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 56467
-                  },
-                  "tool": "exec",
-                  "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
                   "kind": "execution",
@@ -2121,20 +2140,6 @@
                   "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
                 },
                 {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
-                  "kind": "execution",
-                  "label": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\" git…",
-                  "at": "2026-09-19T10:46:20.173Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 62075
-                  },
-                  "tool": "exec",
-                  "command": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\"\ngit status --short --branch\ngit log -1 --oneline",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output: [mate/buybtn 6b8ee07] docs: add Buy link to classic checkout fallback 1 file changed, 2 insertions(+) ## mate/buybtn 6b8ee07 docs: add Buy link to classic checkout fallback"
-                },
-                {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
                   "kind": "execution",
                   "label": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\" git… · exit 0",
@@ -2148,20 +2153,6 @@
                   "status": "completed",
                   "exit_code": 0,
                   "output_excerpt": "[mate/buybtn 6b8ee07] docs: add Buy link to classic checkout fallback 1 file changed, 2 insertions(+) ## mate/buybtn 6b8ee07 docs: add Buy link to classic checkout fallback"
-                },
-                {
-                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
-                  "kind": "execution",
-                  "label": "echo \"wait-mate: ready in branch mate/buybtn\" \u003e\u003e \"$MATE_STATUS\"",
-                  "at": "2026-09-19T10:46:24.375Z",
-                  "source_ref": {
-                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                    "offset": 67976
-                  },
-                  "tool": "exec",
-                  "command": "echo \"wait-mate: ready in branch mate/buybtn\" \u003e\u003e \"$MATE_STATUS\"",
-                  "status": "completed",
-                  "output_excerpt": "Script completed Wall time 0.1 seconds Output:"
                 },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd",
@@ -2182,14 +2173,35 @@
             {
               "kind": "response",
               "label": "Respond",
-              "model_calls": 0,
+              "model_calls": 1,
               "execution_count": 0,
-              "tokens": null,
+              "tokens": {
+                "input": 1172,
+                "cache_read": 21248,
+                "cache_write": 0,
+                "output": 52,
+                "thinking": 0,
+                "total": 22472
+              },
               "elapsed_ms": null,
-              "call_ids": [],
-              "segment_ids": [],
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
+              ],
               "execution_ids": [],
               "evidence": [
+                {
+                  "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94",
+                  "kind": "model_call",
+                  "label": "Model call that ended the turn without running a tool",
+                  "at": "2026-09-19T10:46:24.439000000Z",
+                  "source_ref": {
+                    "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                    "offset": 71391
+                  }
+                },
                 {
                   "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#msg_03dafd797f8f7aa1016aae6802168c87d0bd6858eca7e66143",
                   "kind": "response",
@@ -2241,12 +2253,11 @@
             {
               "kind": "research",
               "label": "Research / inspect",
-              "started_at": "2026-09-19T10:46:05.753Z",
+              "started_at": "2026-09-19T10:46:05.85Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d"
               ]
             },
@@ -2264,49 +2275,186 @@
             {
               "kind": "mixed",
               "label": "Mixed activity",
-              "started_at": "2026-09-19T10:46:15.341Z",
+              "started_at": "2026-09-19T10:46:15.439Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
               ]
             },
             {
               "kind": "coordination",
               "label": "Coordinate",
-              "started_at": "2026-09-19T10:46:20.173Z",
+              "started_at": "2026-09-19T10:46:20.288Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
               ],
               "execution_ids": [
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
-                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
                 "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd"
               ]
             },
             {
-              "kind": "unknown",
-              "label": "Unclassified activity",
+              "kind": "response",
+              "label": "Respond",
               "started_at": "2026-09-19T10:46:24.439000000Z",
               "segment_ids": [
                 "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
               ],
               "execution_ids": []
+            }
+          ],
+          "rule": "prompt-work-v1/observed-operations",
+          "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 1 operation observation(s) lack call attribution. 8 command(s) in this recording are attributed to the one tool call that was open when they started; the harness does not name their parent.",
+          "steps": [
+            {
+              "kind": "research",
+              "label": "Research / inspect",
+              "started_at": "2026-09-19T10:46:00.170000000Z",
+              "ended_at": "2026-09-19T10:46:05.863000000Z",
+              "elapsed_ms": 5693,
+              "model_calls": 1,
+              "executions": 1,
+              "tokens": {
+                "input": 1037,
+                "cache_read": 20224,
+                "cache_write": 0,
+                "output": 202,
+                "thinking": 44,
+                "total": 21463
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
+              ],
+              "skills": [],
+              "parts": [
+                "research"
+              ],
+              "open": false
+            },
+            {
+              "kind": "edit_code",
+              "label": "Edit code / files",
+              "started_at": "2026-09-19T10:46:05.863000000Z",
+              "ended_at": "2026-09-19T10:46:11.397000000Z",
+              "elapsed_ms": 5534,
+              "model_calls": 1,
+              "executions": 1,
+              "tokens": {
+                "input": 1338,
+                "cache_read": 20224,
+                "cache_write": 0,
+                "output": 208,
+                "thinking": 109,
+                "total": 21770
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#69"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#69"
+              ],
+              "skills": [],
+              "parts": [
+                "edit_code"
+              ],
+              "open": false
+            },
+            {
+              "kind": "mixed",
+              "label": "Mixed activity",
+              "started_at": "2026-09-19T10:46:11.397000000Z",
+              "ended_at": "2026-09-19T10:46:15.449000000Z",
+              "elapsed_ms": 4052,
+              "model_calls": 1,
+              "executions": 1,
+              "tokens": {
+                "input": 3618,
+                "cache_read": 18176,
+                "cache_write": 0,
+                "output": 110,
+                "thinking": 0,
+                "total": 21904
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
+              ],
+              "skills": [],
+              "parts": [
+                "coordination",
+                "research",
+                "review",
+                "unknown"
+              ],
+              "open": false
+            },
+            {
+              "kind": "coordination",
+              "label": "Coordinate",
+              "started_at": "2026-09-19T10:46:15.449000000Z",
+              "ended_at": "2026-09-19T10:46:24.439000000Z",
+              "elapsed_ms": 8990,
+              "model_calls": 2,
+              "executions": 2,
+              "tokens": {
+                "input": 1780,
+                "cache_read": 42496,
+                "cache_write": 0,
+                "output": 304,
+                "thinking": 81,
+                "total": 44580
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+              ],
+              "skills": [],
+              "parts": [
+                "coordination"
+              ],
+              "open": false
             },
             {
               "kind": "response",
               "label": "Respond",
-              "started_at": "2026-09-19T10:46:27.108Z",
-              "segment_ids": [],
-              "execution_ids": []
+              "started_at": "2026-09-19T10:46:24.439000000Z",
+              "ended_at": "2026-09-19T10:46:27.140000000Z",
+              "elapsed_ms": 2701,
+              "model_calls": 1,
+              "executions": 0,
+              "tokens": {
+                "input": 1172,
+                "cache_read": 21248,
+                "cache_write": 0,
+                "output": 52,
+                "thinking": 0,
+                "total": 22472
+              },
+              "call_ids": [
+                "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
+              ],
+              "segment_ids": [
+                "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
+              ],
+              "skills": [],
+              "parts": [
+                "response"
+              ],
+              "open": false
             }
-          ],
-          "rule": "prompt-work-v1/observed-operations",
-          "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 5 operation observation(s) lack call attribution."
+          ]
         }
       }
     ],
@@ -2314,8 +2462,8 @@
       {
         "id": "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
-        "kind": "mixed",
-        "label": "Mixed activity · echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git rev-parse --…",
+        "kind": "research",
+        "label": "Research / inspect · echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git rev-parse --…",
         "target": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
         "started_at": "2026-09-19T10:44:13.735Z",
         "ended_at": "2026-09-19T10:44:19.307000000Z",
@@ -2335,7 +2483,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2345,8 +2494,8 @@
         "id": "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
         "kind": "research",
-        "label": "Research / inspect · sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/b…",
-        "target": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
+        "label": "Research / inspect · /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
+        "target": "/private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
         "started_at": "2026-09-19T10:44:19.307000000Z",
         "ended_at": "2026-09-19T10:44:23.543000000Z",
         "elapsed_ms": 4236,
@@ -2365,7 +2514,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2376,7 +2526,7 @@
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
         "kind": "research",
         "label": "Research / inspect · git status --short --branch git log --oneline --decorate -3 printf '%s\\n' '--- README ---' sed -n '1…",
-        "target": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'checkout|check-out|buy now|purchase|stripe|payment|pay/' .",
+        "target": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'check…(trimmed for the fixture)",
         "started_at": "2026-09-19T10:44:23.543000000Z",
         "ended_at": "2026-09-19T10:44:28.719000000Z",
         "elapsed_ms": 5176,
@@ -2395,7 +2545,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2425,7 +2576,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2462,8 +2614,8 @@
         "id": "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b945-e2e2-7642-a6a4-f73c595af4db",
         "kind": "research",
-        "label": "Research / inspect · rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' . printf '%s\\n' …",
-        "target": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
+        "label": "Research / inspect · . query=checkout|checkout-express|checkout-classic|href=",
+        "target": ". query=checkout|checkout-express|checkout-classic|href=",
         "started_at": "2026-09-19T10:46:00.206Z",
         "ended_at": "2026-09-19T10:46:05.863000000Z",
         "elapsed_ms": 5657,
@@ -2482,7 +2634,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2542,7 +2695,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2572,7 +2726,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2602,7 +2757,8 @@
           "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
         ],
         "execution_ids": [
-          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH"
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
+          "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd"
         ],
         "repeat_count": 0,
         "outcome": "unknown",
@@ -2709,6 +2865,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
         "process_id": "37389",
         "tool": "exec_command",
         "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
@@ -2729,7 +2887,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 14216
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
@@ -2762,6 +2921,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
         "process_id": "3858",
         "tool": "exec_command",
         "command": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
@@ -2783,7 +2944,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 19624
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
@@ -2816,6 +2978,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
         "process_id": "83567",
         "tool": "exec_command",
         "command": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'check…(trimmed for the fixture)",
@@ -2836,7 +3000,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 25600
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
@@ -2869,6 +3034,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b944-3b9a-7393-892d-9e231c557341",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
         "process_id": "98425",
         "tool": "exec_command",
         "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
@@ -2888,7 +3055,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 31859
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
@@ -2921,6 +3089,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b945-e2e2-7642-a6a4-f73c595af4db",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
         "process_id": "1713",
         "tool": "exec_command",
         "command": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
@@ -2942,7 +3112,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 45218
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_lRN6aIOEMTBIKLTfZmsMY0o1",
@@ -3002,6 +3173,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b945-e2e2-7642-a6a4-f73c595af4db",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
         "process_id": "2284",
         "tool": "exec_command",
         "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
@@ -3022,7 +3195,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 54753
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
@@ -3055,6 +3229,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b945-e2e2-7642-a6a4-f73c595af4db",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
         "process_id": "11508",
         "tool": "exec_command",
         "command": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\"\ngit status --short --branch\ngit log -1 --oneline",
@@ -3075,7 +3251,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 60550
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       },
       {
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
@@ -3108,6 +3285,8 @@
         "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd",
         "session_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a",
         "prompt_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#prompt#01a0b945-e2e2-7642-a6a4-f73c595af4db",
+        "call_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90",
+        "wrapper_id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
         "process_id": "62368",
         "tool": "exec_command",
         "command": "echo \"wait-mate: ready in branch mate/buybtn\" \u003e\u003e \"$MATE_STATUS\"",
@@ -3127,7 +3306,8 @@
           "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
           "offset": 67125
         },
-        "measurement_kind": "native"
+        "measurement_kind": "native",
+        "parent_link": "started_within_tool_call"
       }
     ],
     "processes": [
@@ -3269,8 +3449,7 @@
         "Child-agent usage is unavailable from this transcript.",
         "Launch profile was not recorded; current configuration cannot reconstruct it.",
         "Native commands do not carry confirmed parent-wrapper identities.",
-        "Observed instruction inputs have measured bytes; their token count is unknown.",
-        "Some native executions have no confirmed model-call parent; their token attribution is unknown."
+        "Observed instruction inputs have measured bytes; their token count is unknown."
       ]
     },
     "time": {
@@ -3343,61 +3522,43 @@
       }
     ],
     "overview": {
-      "summary": "Coordinate (3 calls) · Research / inspect (3 calls) · Unclassified activity (2 calls) · Respond · Edit code / files (1 calls) · +2 other work types",
+      "summary": "Research / inspect (4 calls) · Coordinate (3 calls) · Respond (2 calls) · Edit code / files (1 calls) · Review (1 executions) · +2 other work types",
       "categories": [
         {
-          "kind": "coordination",
-          "label": "Coordinate",
-          "model_calls": 3,
+          "kind": "research",
+          "label": "Research / inspect",
+          "model_calls": 4,
           "execution_count": 5,
           "tokens": {
-            "input": 2537,
-            "cache_read": 62720,
+            "input": 13673,
+            "cache_read": 66560,
             "cache_write": 0,
-            "output": 458,
-            "thinking": 103,
-            "total": 65715
+            "output": 674,
+            "thinking": 139,
+            "total": 80907
           },
           "elapsed_ms": 0,
           "call_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
           ],
           "segment_ids": [
             "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
           ],
           "execution_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
             "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd"
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
           ],
           "evidence": [
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-              "kind": "execution",
-              "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git …",
-              "at": "2026-09-19T10:44:19.201Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 15657
-              },
-              "tool": "exec",
-              "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-            },
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
               "kind": "execution",
@@ -3414,19 +3575,99 @@
               "output_excerpt": "/private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
             },
             {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_214CNxCTIVrs2EPMqUaiaeqp",
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
               "kind": "execution",
-              "label": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATU…",
-              "at": "2026-09-19T10:44:33.279Z",
+              "label": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/… · exit 0",
+              "at": "2026-09-19T10:44:23.529Z",
               "source_ref": {
                 "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 33636
+                "offset": 19624
               },
-              "tool": "exec",
-              "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
+              "tool": "exec_command",
+              "command": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
               "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output:"
+              "exit_code": 0,
+              "output_excerpt": "You are a Crew: an autonomous worker agent managed by the Mate. Work on your own; do not wait for a human. # Task # Add a Buy button to the end of README.md ## Task Append a \"Buy\" button to the ver…(trimmed for the fixture)"
             },
+            {
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
+              "kind": "execution",
+              "label": "git status --short --branch git log --oneline --decorate -3 printf '%s\\n' '--- README --… · exit 0",
+              "at": "2026-09-19T10:44:28.706Z",
+              "source_ref": {
+                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                "offset": 25600
+              },
+              "tool": "exec_command",
+              "command": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'check…(trimmed for the fixture)",
+              "status": "completed",
+              "exit_code": 0,
+              "output_excerpt": "## mate/buybtn aa900f3 (HEAD -\u003e mate/buybtn, main) seed the repository 1a328cb init --- README --- # shop A tiny shop. --- checkout references --- ./pages/checkout-express.html:1:\u003ch1\u003eExpress chec…(trimmed for the fixture)"
+            },
+            {
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
+              "kind": "execution",
+              "label": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' . pr… · exit 0",
+              "at": "2026-09-19T10:46:05.85Z",
+              "source_ref": {
+                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                "offset": 45218
+              },
+              "tool": "exec_command",
+              "command": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
+              "status": "completed",
+              "exit_code": 0,
+              "output_excerpt": "./pages/checkout-express.html:1:\u003ch1\u003eExpress checkout\u003c/h1\u003e ./pages/checkout-classic.html:1:\u003ch1\u003eClassic checkout\u003c/h1\u003e --- top-level files --- pages/checkout-express.html pages/checkout-classic.html READ…(trimmed for the fixture)"
+            },
+            {
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
+              "kind": "execution",
+              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -… · exit 0",
+              "at": "2026-09-19T10:46:15.439Z",
+              "source_ref": {
+                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                "offset": 54753
+              },
+              "tool": "exec_command",
+              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
+              "status": "completed",
+              "exit_code": 0,
+              "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
+            }
+          ]
+        },
+        {
+          "kind": "coordination",
+          "label": "Coordinate",
+          "model_calls": 3,
+          "execution_count": 4,
+          "tokens": {
+            "input": 2537,
+            "cache_read": 62720,
+            "cache_write": 0,
+            "output": 458,
+            "thinking": 103,
+            "total": 65715
+          },
+          "elapsed_ms": 0,
+          "call_ids": [
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+          ],
+          "segment_ids": [
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#43",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#81",
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#90"
+          ],
+          "execution_ids": [
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd"
+          ],
+          "evidence": [
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2b624e3e-65fd-42a2-89a0-797f68737f5c",
               "kind": "execution",
@@ -3440,20 +3681,6 @@
               "command": "echo \"needs-decision: what is the checkout page URL for the Buy button?\" \u003e\u003e \"$MATE_STATUS\"",
               "status": "completed",
               "exit_code": 0
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-              "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-              "at": "2026-09-19T10:46:15.341Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 56467
-              },
-              "tool": "exec",
-              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
             },
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
@@ -3471,20 +3698,6 @@
               "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
             },
             {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_ZZy49buLnh9kPckCyCZPSsBy",
-              "kind": "execution",
-              "label": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\" git…",
-              "at": "2026-09-19T10:46:20.173Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 62075
-              },
-              "tool": "exec",
-              "command": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\"\ngit status --short --branch\ngit log -1 --oneline",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: [mate/buybtn 6b8ee07] docs: add Buy link to classic checkout fallback 1 file changed, 2 insertions(+) ## mate/buybtn 6b8ee07 docs: add Buy link to classic checkout fallback"
-            },
-            {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-6d65dd5f-f2ac-459e-b957-812ea2c422b5",
               "kind": "execution",
               "label": "git add README.md \u0026\u0026 git commit -m \"docs: add Buy link to classic checkout fallback\" git… · exit 0",
@@ -3498,20 +3711,6 @@
               "status": "completed",
               "exit_code": 0,
               "output_excerpt": "[mate/buybtn 6b8ee07] docs: add Buy link to classic checkout fallback 1 file changed, 2 insertions(+) ## mate/buybtn 6b8ee07 docs: add Buy link to classic checkout fallback"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_zu8Jl5qZeJ7Td0qBF8xiAZOH",
-              "kind": "execution",
-              "label": "echo \"wait-mate: ready in branch mate/buybtn\" \u003e\u003e \"$MATE_STATUS\"",
-              "at": "2026-09-19T10:46:24.375Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 67976
-              },
-              "tool": "exec",
-              "command": "echo \"wait-mate: ready in branch mate/buybtn\" \u003e\u003e \"$MATE_STATUS\"",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output:"
             },
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-955b4412-08c4-4433-aa82-a99df7b797bd",
@@ -3530,196 +3729,10 @@
           ]
         },
         {
-          "kind": "research",
-          "label": "Research / inspect",
-          "model_calls": 3,
-          "execution_count": 5,
-          "tokens": {
-            "input": 8727,
-            "cache_read": 52480,
-            "cache_write": 0,
-            "output": 501,
-            "thinking": 89,
-            "total": 61708
-          },
-          "elapsed_ms": 0,
-          "call_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62"
-          ],
-          "segment_ids": [
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#27",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#34",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#62",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
-          ],
-          "execution_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
-          ],
-          "evidence": [
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_2p5AeTnD7EO7iT1kMCIrvAWg",
-              "kind": "execution",
-              "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git …",
-              "at": "2026-09-19T10:44:19.201Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 15657
-              },
-              "tool": "exec",
-              "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-f6ab8853-eb28-4d9b-8eea-2a5b96534cfa",
-              "kind": "execution",
-              "label": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\" pwd -P git … · exit 0",
-              "at": "2026-09-19T10:44:19.292Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 14216
-              },
-              "tool": "exec_command",
-              "command": "echo \"working: verifying isolated worktree and task brief\" \u003e\u003e \"$MATE_STATUS\"\npwd -P\ngit rev-parse --show-toplevel",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "/private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.worktrees/shop-buybtn"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_h7J23DAERChgdc69FWH7I1LW",
-              "kind": "execution",
-              "label": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/…",
-              "at": "2026-09-19T10:44:23.464Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 21402
-              },
-              "tool": "exec",
-              "command": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: You are a Crew: an autonomous worker agent managed by the Mate. Work on your own; do not wait for a human. # Task # Add a Buy button to the end of README.md ## Task Append a \"Buy\" button to the ver…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-e2dfe0e6-0abd-4d2f-9ebc-4f3da7405202",
-              "kind": "execution",
-              "label": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/… · exit 0",
-              "at": "2026-09-19T10:44:23.529Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 19624
-              },
-              "tool": "exec_command",
-              "command": "sed -n '1,240p' /private/tmp/TestLiveAcceptanceTwoProjects1918684859/001/.mate/projects/shop/crews/buybtn/brief.md",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "You are a Crew: an autonomous worker agent managed by the Mate. Work on your own; do not wait for a human. # Task # Add a Buy button to the end of README.md ## Task Append a \"Buy\" button to the ver…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_LdeyfGt46XcP8VxQyq2BG6Id",
-              "kind": "execution",
-              "label": "git status --short --branch git log --oneline --decorate -3 printf '%s\\n' '--- README --…",
-              "at": "2026-09-19T10:44:28.606Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 27508
-              },
-              "tool": "exec",
-              "command": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'checkout|check-out|buy now|purchase|stripe|payment|pay/' .",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: ## mate/buybtn aa900f3 (HEAD -\u003e mate/buybtn, main) seed the repository 1a328cb init --- README --- # shop A tiny shop. --- checkout references --- ./pages/checkout-express.html:1:\u003ch1\u003eExpress chec…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-877f27bd-4d33-449c-b908-ac61c5f29f60",
-              "kind": "execution",
-              "label": "git status --short --branch git log --oneline --decorate -3 printf '%s\\n' '--- README --… · exit 0",
-              "at": "2026-09-19T10:44:28.706Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 25600
-              },
-              "tool": "exec_command",
-              "command": "git status --short --branch\ngit log --oneline --decorate -3\nprintf '%s\\n' '--- README ---'\nsed -n '1,260p' README.md\nprintf '%s\\n' '--- checkout references ---'\nrg -n -i --hidden --glob '!.git' 'check…(trimmed for the fixture)",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "## mate/buybtn aa900f3 (HEAD -\u003e mate/buybtn, main) seed the repository 1a328cb init --- README --- # shop A tiny shop. --- checkout references --- ./pages/checkout-express.html:1:\u003ch1\u003eExpress chec…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_v2CLPeYDY3l4UVsBFovoFWGo",
-              "kind": "execution",
-              "label": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' . pr…",
-              "at": "2026-09-19T10:46:05.753Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 47023
-              },
-              "tool": "exec",
-              "command": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: ./pages/checkout-express.html:1:\u003ch1\u003eExpress checkout\u003c/h1\u003e ./pages/checkout-classic.html:1:\u003ch1\u003eClassic checkout\u003c/h1\u003e --- top-level files --- pages/checkout-express.html pages/checkout-classic.html READ…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-2473668a-ec79-4acc-a7e0-ae48590f9b2d",
-              "kind": "execution",
-              "label": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' . pr… · exit 0",
-              "at": "2026-09-19T10:46:05.85Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 45218
-              },
-              "tool": "exec_command",
-              "command": "rg -n -i --hidden --glob '!.git' 'checkout|checkout-express|checkout-classic|href=' .\nprintf '%s\\n' '--- top-level files ---'\nrg --files -g '!*.git*' | sed -n '1,160p'",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "./pages/checkout-express.html:1:\u003ch1\u003eExpress checkout\u003c/h1\u003e ./pages/checkout-classic.html:1:\u003ch1\u003eClassic checkout\u003c/h1\u003e --- top-level files --- pages/checkout-express.html pages/checkout-classic.html READ…(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-              "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-              "at": "2026-09-19T10:46:15.341Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 56467
-              },
-              "tool": "exec",
-              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
-              "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -… · exit 0",
-              "at": "2026-09-19T10:46:15.439Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 54753
-              },
-              "tool": "exec_command",
-              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-            }
-          ]
-        },
-        {
-          "kind": "unknown",
-          "label": "Unclassified activity",
+          "kind": "response",
+          "label": "Respond",
           "model_calls": 2,
-          "execution_count": 1,
+          "execution_count": 0,
           "tokens": {
             "input": 2106,
             "cache_read": 41472,
@@ -3735,76 +3748,20 @@
           ],
           "segment_ids": [
             "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47",
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
             "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94"
           ],
-          "execution_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
-          ],
+          "execution_ids": [],
           "evidence": [
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#47",
               "kind": "model_call",
-              "label": "Model call; operation details unavailable",
+              "label": "Model call that ended the turn without running a tool",
               "at": "2026-09-19T10:44:33.343000000Z",
               "source_ref": {
                 "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
                 "offset": 36956
               }
             },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
-              "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-              "at": "2026-09-19T10:46:15.341Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 56467
-              },
-              "tool": "exec",
-              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-              "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
-              "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -… · exit 0",
-              "at": "2026-09-19T10:46:15.439Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 54753
-              },
-              "tool": "exec_command",
-              "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
-              "status": "completed",
-              "exit_code": 0,
-              "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-            },
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94",
-              "kind": "model_call",
-              "label": "Model call; operation details unavailable",
-              "at": "2026-09-19T10:46:24.439000000Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 71391
-              }
-            }
-          ]
-        },
-        {
-          "kind": "response",
-          "label": "Respond",
-          "model_calls": 0,
-          "execution_count": 0,
-          "tokens": null,
-          "elapsed_ms": null,
-          "call_ids": [],
-          "segment_ids": [],
-          "execution_ids": [],
-          "evidence": [
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#msg_03dafd797f8f7aa1016aae67930c7c87d0a7b7894317c6b9aa",
               "kind": "response",
@@ -3813,6 +3770,16 @@
               "source_ref": {
                 "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
                 "offset": 34925
+              }
+            },
+            {
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#94",
+              "kind": "model_call",
+              "label": "Model call that ended the turn without running a tool",
+              "at": "2026-09-19T10:46:24.439000000Z",
+              "source_ref": {
+                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
+                "offset": 71391
               }
             },
             {
@@ -3890,24 +3857,41 @@
             "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
           ],
           "execution_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
             "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
           ],
           "evidence": [
             {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#tool#call_9PMT8KAHoaoMWyhnSnXfuNnP",
+              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
               "kind": "execution",
-              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -…",
-              "at": "2026-09-19T10:46:15.341Z",
+              "label": "git diff --check git diff -- README.md tail -c 1 README.md | od -An -t x1 git rev-list -… · exit 0",
+              "at": "2026-09-19T10:46:15.439Z",
               "source_ref": {
                 "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 56467
+                "offset": 54753
               },
-              "tool": "exec",
+              "tool": "exec_command",
               "command": "git diff --check\ngit diff -- README.md\ntail -c 1 README.md | od -An -t x1\ngit rev-list --left-right --count main...HEAD\ngit status --short",
               "status": "completed",
-              "output_excerpt": "Script completed Wall time 0.1 seconds Output: diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
-            },
+              "exit_code": 0,
+              "output_excerpt": "diff --git a/README.md b/README.md index a4a2d26..2fab280 100644 --- a/README.md +++ b/README.md @@ -1,3 +1,5 @@ # shop A tiny shop. + +**[Buy](pages/checkout-classic.html)** 0a …(trimmed for the fixture)"
+            }
+          ]
+        },
+        {
+          "kind": "unknown",
+          "label": "Unclassified activity",
+          "model_calls": 0,
+          "execution_count": 1,
+          "tokens": null,
+          "elapsed_ms": null,
+          "call_ids": [],
+          "segment_ids": [
+            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
+          ],
+          "execution_ids": [
+            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db"
+          ],
+          "evidence": [
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#execution#exec-404253ab-426c-443d-a212-e87ddca7e2db",
               "kind": "execution",
@@ -3928,37 +3912,25 @@
         {
           "kind": "mixed",
           "label": "Mixed activity",
-          "model_calls": 2,
+          "model_calls": 1,
           "execution_count": 0,
           "tokens": {
-            "input": 8564,
-            "cache_read": 32256,
+            "input": 3618,
+            "cache_read": 18176,
             "cache_write": 0,
-            "output": 283,
-            "thinking": 50,
-            "total": 41103
+            "output": 110,
+            "thinking": 0,
+            "total": 21904
           },
           "elapsed_ms": null,
           "call_ids": [
-            "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
             "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
           ],
           "segment_ids": [
-            "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
             "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74"
           ],
           "execution_ids": [],
           "evidence": [
-            {
-              "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#20",
-              "kind": "model_call",
-              "label": "Model call with multiple recorded work types; its tokens are counted once here",
-              "at": "2026-09-19T10:44:11.839000000Z",
-              "source_ref": {
-                "path": "{{TESTDATA}}/codex-0.154-rollout.jsonl",
-                "offset": 16285
-              }
-            },
             {
               "id": "crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#74",
               "kind": "model_call",
@@ -3974,7 +3946,8 @@
       ],
       "sequence": [],
       "rule": "prompt-work-v1/observed-operations",
-      "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 9 operation observation(s) lack call attribution across 2 prompts."
+      "coverage": "Types inferred from recorded operations, not prompt wording or successful completion. Each call's tokens belong to one category; execution evidence and time can overlap. 1 operation observation(s) lack call attribution across 2 prompts. 8 command(s) in this recording are attributed to the one tool call that was open when they started; the harness does not name their parent.",
+      "steps": []
     },
     "top_output_segment_ids": [
       "segment#crew:shop:buybtn#01a0b944-33bb-7503-9db7-cd51ff61855a#turn#69",
@@ -4005,7 +3978,8 @@
       "repair_loops": 0,
       "segment_repeats": 0,
       "coverage": "Polling chains need native process identities; this harness reports them."
-    }
+    },
+    "skills": []
   }
 }
 
