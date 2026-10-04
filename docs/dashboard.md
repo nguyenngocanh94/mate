@@ -65,7 +65,7 @@ The only page that reads this API is the one this server serves.
 
 Tier 1: one card per registered project.
 
-`mate.harness` and `mate.running` come from the `actor` row (`harness`, `first_seen`, `gone_at`), which `v_now` has no column for; running means started and not stopped.
+`mate.harness` and `mate.running` come from the `actor` row (`harness`, `first_seen`, `gone_at`), which `v_now` has no column for; running means started and not stopped, where stopped is the current `mate.meta`'s `stopped_at`: a relaunch writes a meta without one and clears the `gone_at` of the life before it.
 `mate.state`, `mate.since`, `mate.tokens_today` and `mate.context_pct` are `v_now`.
 `crews_by_state` counts this project's crew actors by their `v_now` scene state, and a crew no projection has placed counts under `"unknown"` rather than being dropped.
 `inbox_waiting` is the length of `box.Inbox` through `query.LoadBox`, the same loader and the same number the console's rail header shows.
@@ -539,6 +539,7 @@ Below 720px the tables collapse to one card per row and the page does not scroll
 
 A second, read-only face on the same API, served at `/office/` from `internal/dashboard/ui/office/`: `index.html`, `office.css`, `office.js`, plus `../humanize.js` shared with the admin UI.
 It draws the workspace as an office from the owner's "Mate Office" design: a hallway with the captain's desk and the crews standing in it, and one room per project with the Mate at the big desk, a desk per open crew and a filing cabinet of closed tasks.
+A room's door light is the project's, not only its Mate's: `stopped` when the Mate is not running, `running` while the Mate or any open crew is at work (a Mate in any state but `idle`, `asleep`, `blocked` or `gone`; a crew `arriving`, `at_desk_working`, `walking_to_ceo` or `leaving`), and otherwise `idle 3h`, the age of the latest scene `since` among the Mate and its open crews.
 It holds to every rule of section 10 - same origin only, GET only, text set with `textContent`, no build step, `null` shown as `?`.
 
 | Hash | Opens |
