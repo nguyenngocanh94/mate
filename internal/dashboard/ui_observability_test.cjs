@@ -549,3 +549,154 @@ test("Mate refreshes observed execution time after a quiet five-second poll with
   assert.match(keyed(app.view, "data-detail", key).querySelector("summary").textContent, /usage not attributed/);
   assert.match(keyed(app.view, "data-detail", "mate-overview:active-exchange:category:mixed").querySelector("summary").textContent, /420 tokens/);
 });
+
+// The stages the projector folds a prompt's calls into, with the skill two
+// loads of which the card places. Stage tokens are the calls' own, so they
+// add up to the prompt and to the task, which the header says.
+const step = (kind, label, calls, executions, usage, extra = {}) => ({ kind, label, started_at: at(0), ended_at: at(10), elapsed_ms: 10000,
+  model_calls: calls.length, executions, tokens: usage, call_ids: calls, segment_ids: [], skills: [], parts: [kind], open: false, ...extra });
+const stepsFixture = () => {
+  const body = fixture();
+  const prompt = body.performance.prompt_turns[0];
+  prompt.overview.steps = [
+    step("instructions", "Read instructions", ["call-1"], 1, tokens(100, 200), { skills: ["token-review"], segment_ids: ["segment-read"] }),
+    step("mixed", "Mixed activity", ["call-2"], 2, tokens(10, 400), { parts: ["research", "test"], segment_ids: ["segment-test"] }),
+    step("response", "Respond", ["call-3"], 0, tokens(50, 300, 40, 20), { elapsed_ms: null, open: true })
+  ];
+  // The three calls' own usage: 310 + 420 + 390.
+  prompt.tokens = body.performance.tokens = tokens(160, 900, 60, 24);
+  body.performance.skills = [
+    { name: "token-review", count: 2, loads: [
+      { at: at(1), prompt_id: "prompt-1", call_id: "call-1", execution_id: "exec-skill", via: "tool" },
+      { at: at(2), prompt_id: "prompt-1", call_id: "", execution_id: "exec-unlinked", via: "read", path: ".claude/skills/token-review/SKILL.md" }] }
+  ];
+  return body;
+};
+const cells = row => row.querySelectorAll("[role]").filter(node => node.getAttribute("role") === "cell").map(node => node.textContent);
+const pinsOf = node => node.querySelectorAll(".sc-pin").map(pin => pin.textContent);
+
+test("steps card lists each stage in order with its type, counts, and an open stage in words", async () => {
+  const app = await boot(stepsFixture());
+  const card = app.view.querySelector(".steps-card");
+  assert.ok(card, "the steps card is rendered");
+  assert.match(card.querySelector(".sc-sub").textContent, /Agent test-build\|3 stages/);
+  const rows = card.querySelectorAll(".sc-stage");
+  assert.deepEqual(rows.map(row => row.getAttribute("data-kind")), ["instructions", "mixed", "response"]);
+  assert.deepEqual(cells(rows[0]), ["1", "Read instructions1", "1", "1", "310", "10s"]);
+  assert.deepEqual(cells(rows[1]), ["2", "Mixed activityResearch / inspect + Run tests / build", "1", "2", "420", "10s"],
+    "a mixed stage names what it mixed");
+  assert.deepEqual(cells(rows[2]), ["3", "Respondin progress", "1", "–", "390", "?"],
+    "an open stage says so in words, no tool call is a dash, and unknown time is ? rather than 0");
+  assert.equal(rows[2].getAttribute("data-open"), "true");
+  assert.match(card.querySelector("[data-band=\"sequence\"]").querySelector(".sc-aside").textContent, /3 stages · #3 in progress/);
+  const pieces = card.querySelector(".sc-strip").querySelectorAll(".sc-piece");
+  assert.deepEqual(pieces.map(piece => piece.getAttribute("data-kind")), ["instructions", "mixed", "response"], "one strip piece per stage, in order");
+  assert.equal(pieces[2].getAttribute("data-open"), "true");
+  assert.match(pieces[2].getAttribute("title"), /in progress/);
+  assert.doesNotMatch(card.textContent, /xcodebuild|rollout\.jsonl/, "the card names work types, never commands or files");
+});
+
+test("steps card places each skill load on its stage and says how it was loaded", async () => {
+  const app = await boot(stepsFixture());
+  const skills = keyed(app.view, "data-skills", "true");
+  assert.equal(skills.querySelector(".sc-aside").textContent, "1 skill · 2 loads");
+  const row = keyed(skills, "data-skill", "token-review");
+  assert.deepEqual(pinsOf(row), ["1"]);
+  assert.match(row.textContent, /token-review×2/);
+  assert.match(row.querySelector(".sc-skill-where").textContent, /^skill tool and read SKILL\.md · loaded in/);
+  assert.deepEqual(row.querySelectorAll(".sc-load").map(chip => chip.textContent), ["#1Read instructions", "stage not linked"],
+    "a load without a call link is listed and not given a stage");
+  assert.match(skills.textContent, /does not show that the skill was followed/);
+});
+
+test("a stage opens the work segments behind it", async () => {
+  const app = await boot(stepsFixture());
+  keyed(app.view, "data-focus", "step:segment-test").click();
+  assert.equal(keyed(app.view, "data-segment", "segment-test").open, true);
+});
+
+test("steps card says what is not recorded instead of drawing zeros", async () => {
+  const older = await boot();
+  const card = older.view.querySelector(".steps-card");
+  assert.match(card.textContent, /Steps not recorded yet/);
+  assert.match(card.textContent, /Skills not recorded yet/);
+  assert.match(card.querySelector(".sc-sub").textContent, /stages not recorded/);
+  assert.equal(card.querySelectorAll(".sc-stage").length, 0);
+  assert.equal(card.querySelectorAll(".sc-effort").length, 0, "no effort table of zeros");
+  assert.equal(card.querySelectorAll(".sc-strip").length, 0);
+
+  const body = stepsFixture();
+  body.performance.skills = [];
+  const none = await boot(body);
+  assert.match(keyed(none.view, "data-skills", "true").textContent, /No skill was loaded in this recording/);
+});
+
+test("a long task shows its first twelve stages and keeps the rest one click away", async () => {
+  const body = stepsFixture();
+  body.performance.prompt_turns[0].overview.steps = Array.from({ length: 30 }, (_, i) =>
+    step(i % 2 ? "test" : "edit_code", i % 2 ? "Run tests / build" : "Edit code / files", ["call-" + i], 1, tokens(10, 20)));
+  const app = await boot(body);
+  const card = app.view.querySelector(".steps-card");
+  const later = keyed(card, "data-detail", "steps-later:test-build");
+  assert.match(later.querySelector("summary").textContent, /Continue through 18 later stages/);
+  assert.equal(card.querySelectorAll(".sc-stage").length, 30, "every stage is in the page");
+  assert.equal(later.querySelectorAll(".sc-stage").length, 18);
+  assert.equal(later.querySelectorAll(".sc-stage")[0].getAttribute("data-stage"), "13");
+  assert.equal(card.querySelector(".sc-strip").querySelectorAll(".sc-piece").length, 30, "the strip still shows the whole task");
+});
+
+test("the effort table is summed from the stages and its total matches the header", async () => {
+  const app = await boot(stepsFixture());
+  const card = app.view.querySelector(".steps-card");
+  const header = card.querySelectorAll(".sc-big").map(node => node.textContent);
+  const total = cells(keyed(card, "data-effort", "total"));
+  assert.deepEqual(total, ["Total", "3", "3", header[0], "", "100%"]);
+  assert.equal(total[1], header[1], "model calls agree with the header");
+  assert.deepEqual(cells(keyed(card, "data-effort", "instructions")), ["Read instructions", "1", "1", "310", "", "27.7%"]);
+  assert.deepEqual(cells(keyed(card, "data-effort", "response")), ["Respond", "1", "–", "390", "", "34.8%"]);
+  assert.equal(card.querySelectorAll(".coverage-note").filter(note => /not in a recorded stage/.test(note.textContent)).length, 0);
+});
+
+test("every work type is listed in a fixed order, a type with no call with dashes", async () => {
+  const app = await boot(stepsFixture());
+  const rows = app.view.querySelector(".steps-card").querySelectorAll(".sc-effort").filter(row => row.getAttribute("data-effort") !== "total");
+  assert.deepEqual(rows.map(row => row.getAttribute("data-effort")),
+    ["research", "write_code", "edit_code", "test", "review", "coordination", "wait", "instructions", "response", "mixed", "unknown"]);
+  const write = rows[1];
+  assert.equal(write.getAttribute("data-empty"), "true");
+  assert.deepEqual(cells(write), ["Write code / files", "–", "–", "–", "", "–"]);
+  assert.equal(write.querySelector(".sc-track").children.length, 0, "an empty track");
+  assert.equal(rows[9].getAttribute("data-empty"), null, "mixed has a call here");
+});
+
+test("stages are numbered continuously across prompts with a separator per later prompt", async () => {
+  const body = stepsFixture();
+  body.performance.prompt_turns.push({ id: "prompt-2", prompt: "Fix the build and rerun it", prompt_at: at(50), started_at: at(50),
+    elapsed_ms: 5000, model_calls: 2, tokens: tokens(20, 40), segment_ids: [], overview: { categories: [], sequence: [], steps: [
+      step("edit_code", "Edit code / files", ["call-4"], 1, tokens(10, 20)),
+      step("test", "Run tests / build", ["call-5"], 1, tokens(10, 20))] } });
+  const app = await boot(body);
+  const card = app.view.querySelector(".steps-card");
+  const stagesTable = card.querySelector(".sc-stages");
+  const rows = stagesTable.querySelectorAll(".sc-row").filter(row => !/sc-th/.test(row.className));
+  assert.deepEqual(rows.map(row => row.getAttribute("data-stage") || row.getAttribute("data-prompt")), ["1", "2", "3", "prompt-2", "4", "5"]);
+  assert.match(rows[3].textContent, /^P2 \d\d:\d\d · Fix the build and rerun it$/);
+  const pieces = card.querySelector(".sc-strip").querySelectorAll(".sc-piece");
+  assert.deepEqual(pieces.map(piece => piece.getAttribute("data-prompt-start")), [null, null, null, "true", null]);
+  assert.match(card.querySelector(".sc-sub").textContent, /5 stages/);
+});
+
+test("a skill pin carries the skill's place in the skills list, on every stage that loaded it", async () => {
+  const body = stepsFixture();
+  body.performance.skills = [
+    { name: "alpha", count: 2, loads: [{ call_id: "call-1", via: "tool" }, { call_id: "call-3", via: "tool" }] },
+    { name: "beta", count: 1, loads: [{ call_id: "call-2", via: "read" }] }
+  ];
+  const app = await boot(body);
+  const card = app.view.querySelector(".steps-card");
+  assert.deepEqual(card.querySelector(".sc-strip").querySelectorAll(".sc-piece").map(pinsOf), [["1"], ["2"], ["1"]]);
+  assert.deepEqual(card.querySelectorAll(".sc-stage").map(pinsOf), [["1"], ["2"], ["1"]]);
+  assert.deepEqual(keyed(card, "data-skills", "true").querySelectorAll("li").map(pinsOf), [["1"], ["2"]]);
+  assert.deepEqual(keyed(card, "data-skill", "alpha").querySelectorAll(".sc-load").map(chip => chip.textContent), ["#1Read instructions", "#3Respond"]);
+  assert.match(keyed(card, "data-skill", "beta").textContent, /read SKILL\.md · loaded in#2Mixed activity/);
+});

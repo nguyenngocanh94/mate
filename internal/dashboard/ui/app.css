@@ -37,6 +37,26 @@
   --serious: #ec835a;
   --critical: #d03b3b;
 
+  /* Work kinds - one hue per kind, shared by every chip, swatch, strip and
+     timeline block on the page. Each clears 3:1 on --surface and
+     --surface-2. Wait is hatched from two greys; mixed and unclassified
+     work are patterns on the surface, not hues (the kinds block). */
+  --kind-research: #2563c9;
+  --kind-instructions: #8a5a2b;
+  --kind-write: #0b8580;
+  --kind-edit: #7a45cf;
+  --kind-test: #d0661a;
+  --kind-review: #bf2f86;
+  --kind-coordination: #6f7418;
+  --kind-response: #3b4859;
+  --kind-wait: #85837c;
+  --kind-wait-soft: #dcdad3;
+
+  /* A skill pin, and the warning hue dark enough to be read as text. */
+  --pin-bg: #0b0b0b;
+  --pin-ink: #ffffff;
+  --warning-ink: #9a6200;
+
   --radius: 6px;
   --gutter: 16px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -61,6 +81,21 @@
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
+
+    --kind-research: #5b9cf0;
+    --kind-instructions: #c9945e;
+    --kind-write: #33bdb3;
+    --kind-edit: #a888f5;
+    --kind-test: #f0883e;
+    --kind-review: #ec6cb5;
+    --kind-coordination: #b4b84a;
+    --kind-response: #9eb0c6;
+    --kind-wait: #8d8b84;
+    --kind-wait-soft: #3a3a37;
+
+    --pin-bg: #f2f1ed;
+    --pin-ink: #0d0d0d;
+    --warning-ink: #fab219;
   }
 }
 
@@ -81,6 +116,21 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+
+  --kind-research: #5b9cf0;
+  --kind-instructions: #c9945e;
+  --kind-write: #33bdb3;
+  --kind-edit: #a888f5;
+  --kind-test: #f0883e;
+  --kind-review: #ec6cb5;
+  --kind-coordination: #b4b84a;
+  --kind-response: #9eb0c6;
+  --kind-wait: #8d8b84;
+  --kind-wait-soft: #3a3a37;
+
+  --pin-bg: #f2f1ed;
+  --pin-ink: #0d0d0d;
+  --warning-ink: #fab219;
 }
 
 * { box-sizing: border-box; }
@@ -683,16 +733,21 @@ summary { cursor: pointer; }
 /* One colour per work kind, assigned to the kind itself and shared by the
    chips, legends, timeline blocks, filter swatches and segment steps, so a
    kind keeps its colour everywhere on the page. Colour never carries the
-   meaning alone: every swatch sits beside the kind's name. Mixed and
-   unclassified work is hatched, so the part the classifier could not name
-   reads as a gap rather than as one more kind. */
-[data-kind="research"], [data-kind="instructions"] { --kind: var(--series-1); --kind-bg: var(--series-1); }
-[data-kind="write_code"], [data-kind="edit_code"] { --kind: var(--series-3); --kind-bg: var(--series-3); }
-[data-kind="test"] { --kind: var(--series-4); --kind-bg: var(--series-4); }
-[data-kind="wait"] { --kind: var(--series-2); --kind-bg: var(--series-2); }
-[data-kind="review"], [data-kind="coordination"] { --kind: var(--ink-2); --kind-bg: var(--ink-2); }
-[data-kind="response"] { --kind: var(--muted); --kind-bg: var(--muted); }
-[data-kind="mixed"], [data-kind="unknown"] { --kind: var(--muted); --kind-bg: repeating-linear-gradient(135deg, var(--muted) 0 3px, transparent 3px 6px); }
+   meaning alone: every swatch sits beside the kind's name. Wait is hatched
+   grey; mixed and unclassified work are outlined patterns (dots and a cross
+   hatch), so the part the classifier could not name reads as a gap rather
+   than as one more kind. */
+[data-kind="research"] { --kind: var(--kind-research); --kind-bg: var(--kind-research); }
+[data-kind="instructions"] { --kind: var(--kind-instructions); --kind-bg: var(--kind-instructions); }
+[data-kind="write_code"] { --kind: var(--kind-write); --kind-bg: var(--kind-write); }
+[data-kind="edit_code"] { --kind: var(--kind-edit); --kind-bg: var(--kind-edit); }
+[data-kind="test"] { --kind: var(--kind-test); --kind-bg: var(--kind-test); }
+[data-kind="review"] { --kind: var(--kind-review); --kind-bg: var(--kind-review); }
+[data-kind="coordination"] { --kind: var(--kind-coordination); --kind-bg: var(--kind-coordination); }
+[data-kind="response"] { --kind: var(--kind-response); --kind-bg: var(--kind-response); }
+[data-kind="wait"] { --kind: var(--kind-wait); --kind-bg: repeating-linear-gradient(135deg, var(--kind-wait) 0 2px, var(--kind-wait-soft) 2px 4px); }
+[data-kind="mixed"] { --kind: var(--muted); --kind-edge: var(--muted); --kind-bg: radial-gradient(circle, var(--muted) 0.9px, transparent 1.2px) 0 0 / 4px 4px, var(--surface); }
+[data-kind="unknown"] { --kind: var(--muted); --kind-edge: var(--muted); --kind-bg: repeating-linear-gradient(45deg, var(--muted) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, var(--muted) 0 1px, transparent 1px 4px), var(--surface); }
 
 .kchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; font: 11.5px/1.6 var(--mono); color: var(--ink-2); white-space: nowrap; }
 .kchip > i { width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--kind-bg, var(--muted)); box-shadow: 0 0 0 1px var(--border); }
@@ -770,6 +825,92 @@ button.overview-stage:hover { border-color: var(--accent); color: var(--ink); }
 .overview-evidence-record .facts { font-size: 12px; overflow-wrap: anywhere; }
 .overview-evidence-record strong { font-weight: 500; }
 
+/* The steps card: one card in bands split by hairlines - the task and its
+   totals, the sequence of stages, the effort by work type, the skills loaded
+   and a legend. Dense on purpose: labels are small uppercase, numbers are
+   mono, tabular and right-aligned in fixed columns. Both tables are grids of
+   divs, not <table>, so the phone rule that stacks every table leaves them
+   as columns; their columns are sized to fit a 480px screen. */
+.steps-card { margin-top: 14px; padding: 0; min-width: 0; overflow: hidden; }
+.sc-band { padding: 12px 14px; border-top: 1px solid var(--grid); min-width: 0; }
+.sc-band:first-child { border-top: 0; }
+.sc-label { font: 600 10.5px/1.3 var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.sc-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.sc-pill { align-items: center; padding: 2px 8px 2px 6px; border: 1px solid var(--border); border-radius: 999px; font: 11.5px/1.4 var(--mono); color: var(--ink); }
+.sc-pill[data-tone="good"] { border-color: var(--good); }
+.sc-pill[data-tone="warning"] { border-color: var(--warning); }
+.sc-pill[data-tone="serious"] { border-color: var(--serious); }
+.sc-pill[data-tone="critical"] { border-color: var(--critical); }
+.sc-pill[data-tone="info"] { border-color: var(--accent); }
+.sc-task { font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.sc-sub { margin-top: 5px; font: 11.5px/1.4 var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.sc-sub .sc-label { font-family: var(--mono); }
+.sc-bar-sep { margin: 0 8px; color: var(--muted); }
+.sc-stats { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 12px; }
+.sc-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sc-big { font: 600 20px/1.15 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.sc-band-head { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sc-aside { font: 11px/1.3 var(--mono); color: var(--ink-2); text-align: right; }
+.sc-unknown { color: var(--warning-ink); font-weight: 700; }
+
+/* The strip: one piece per stage, as wide as its tokens, a wider gap where
+   a new prompt starts. Pins ride above the stage that loaded a skill. */
+.sc-strip { display: flex; align-items: flex-end; gap: 2px; }
+.sc-piece { display: flex; flex-direction: column; flex: 1 1 0; min-width: 3px; }
+.sc-piece[data-prompt-start] { margin-left: 8px; }
+.sc-pins { display: flex; gap: 2px; height: 19px; white-space: nowrap; }
+.sc-strip[data-pins="none"] .sc-pins { display: none; }
+.sc-fill { height: 32px; border-radius: 2px; background: var(--kind-bg, var(--muted)); box-shadow: inset 0 0 0 1px var(--kind-edge, transparent); }
+.sc-piece[data-open] .sc-fill { outline: 2px dashed var(--ink); outline-offset: 1px; }
+.sc-pin { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 3px; background: var(--pin-bg); color: var(--pin-ink); font: 700 10px/1 var(--mono); }
+
+/* The two tables. */
+.sc-table { margin-top: 12px; border: 1px solid var(--border); border-radius: 4px; min-width: 0; }
+.sc-row { display: grid; align-items: center; gap: 0 8px; padding: 5px 8px; border-top: 1px solid var(--grid); font-size: 12.5px; min-width: 0; }
+.sc-table > .sc-row:first-child { border-top: 0; }
+.sc-stages .sc-row { grid-template-columns: 1.7em minmax(0, 1fr) 2.6em 2.6em 5.2em 4.4em; }
+.sc-efforts .sc-row { grid-template-columns: minmax(0, 1.7fr) 2.6em 2.6em 5.2em minmax(24px, 1fr) 3.8em; }
+.sc-efforts .sc-what { flex-wrap: nowrap; }
+.sc-efforts .sc-what > span { min-width: 0; overflow-wrap: anywhere; }
+.sc-th { background: var(--surface-2); font: 600 10px/1.4 var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.sc-num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.sc-th .sc-num { font-family: var(--font); letter-spacing: 0.04em; }
+.sc-n { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.sc-what { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; min-width: 0; }
+.sc-swatch { display: inline-block; width: 12px; height: 12px; flex: none; border-radius: 2px; background: var(--kind-bg, var(--muted)); box-shadow: inset 0 0 0 1px var(--kind-edge, transparent); }
+.sc-stage-name { font-weight: 500; overflow-wrap: anywhere; }
+.sc-parts { font-size: 11px; color: var(--ink-2); overflow-wrap: anywhere; }
+.sc-open { padding: 0 5px; border: 1px dashed var(--ink); border-radius: 3px; font: 600 10px/1.5 var(--font); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+.sc-stage[data-open] { background: var(--surface-2); }
+.sc-tok { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sc-underline { display: block; height: 2px; min-width: 2px; border-radius: 1px; background: var(--kind, var(--muted)); }
+.sc-stages .sc-prompt { background: var(--surface-2); font: 11.5px/1.4 var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.sc-prompt > span { grid-column: 1 / -1; min-width: 0; }
+.sc-later > summary { padding: 6px 8px; border-top: 1px solid var(--grid); font-size: 12px; color: var(--ink-2); }
+.sc-later > summary:hover { color: var(--ink); }
+.sc-track { display: block; height: 4px; border-radius: 2px; background: var(--grid); overflow: hidden; }
+.sc-track > i { display: block; height: 100%; background: var(--kind, var(--muted)); }
+.sc-effort[data-empty] { color: var(--muted); }
+.sc-effort[data-empty] .sc-swatch { opacity: 0.45; }
+.sc-total { border-top: 2px solid var(--muted); font-weight: 700; }
+.sc-total .sc-num { font-weight: 700; }
+
+/* Skills, then the legend. */
+.sc-skills { margin: 0; padding: 0; list-style: none; }
+.sc-skills > li { padding: 8px 0; border-top: 1px solid var(--grid); min-width: 0; }
+.sc-skills > li:first-child { padding-top: 0; border-top: 0; }
+.sc-skill-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sc-skill-name { font: 700 12.5px/1.3 var(--mono); overflow-wrap: anywhere; min-width: 0; }
+.sc-skill-count { margin-left: auto; font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.sc-skill-where { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 5px; font-size: 11.5px; color: var(--ink-2); }
+.sc-load { display: inline-flex; align-items: center; gap: 5px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; font: 11px/1.5 var(--mono); color: var(--ink); }
+.sc-load .sc-swatch { width: 9px; height: 9px; }
+.sc-load-n { color: var(--ink-2); }
+.sc-load[data-linked="false"] { border-style: dashed; color: var(--ink-2); }
+.sc-note { margin: 8px 0 0; font-size: 11.5px; color: var(--ink-2); }
+.sc-legend { background: var(--surface-2); font: 11px/1.6 var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.sc-legend-gap { display: inline-block; width: 14px; }
+
 /* ---------------------------------------------------------------- phone */
 
 @media (max-width: 980px) {
@@ -783,6 +924,12 @@ button.overview-stage:hover { border-color: var(--accent); color: var(--ink); }
   .segment-numbers { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tool-mix td { white-space: normal; }
   .tool-mix .tool-mix-prompt { max-width: none; }
+  .sc-band { padding: 12px; }
+  .sc-row { gap: 0 6px; padding: 5px 6px; }
+  .sc-stages .sc-row { grid-template-columns: 1.5em minmax(0, 1fr) 2.5em 2.5em 4.8em 3.9em; }
+  .sc-efforts .sc-row { grid-template-columns: minmax(0, 1.7fr) 2.5em 2.5em 4.8em minmax(18px, 1fr) 3.6em; }
+  .sc-stats { gap: 8px 20px; }
+  .sc-big { font-size: 18px; }
   .work-current-title { font-size: 18px; }
   .work-metric strong { font-size: 21px; }
   .activity-timeline svg { min-height: 110px; }
