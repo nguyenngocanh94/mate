@@ -539,6 +539,7 @@ Below 720px the tables collapse to one card per row and the page does not scroll
 
 A second, read-only face on the same API, served at `/office/` from `internal/dashboard/ui/office/`: `index.html`, `office.css`, `office.js`, plus `../humanize.js` shared with the admin UI.
 It draws the workspace as an office from the owner's "Mate Office" design: a hallway with the captain's desk and the crews standing in it, and one room per project with the Mate at the big desk, a desk per open crew and a filing cabinet of closed tasks.
+A room's door light is the project's, not only its Mate's: `stopped` when the Mate is not running, `running` while the Mate or any open crew is at work (a Mate in any state but `idle`, `asleep`, `blocked` or `gone`; a crew `arriving`, `at_desk_working`, `walking_to_ceo` or `leaving`), and otherwise `idle 3h`, the age of the latest scene `since` among the Mate and its open crews.
 It holds to every rule of section 10 - same origin only, GET only, text set with `textContent`, no build step, `null` shown as `?`.
 
 | Hash | Opens |

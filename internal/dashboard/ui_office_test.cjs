@@ -194,11 +194,26 @@ test("every project is a room: its Mate at the big desk, open crews at desks, fi
   assert.match(shop.querySelector(".mate").text, /Mate · shop.*deciding.*Claude.*1\.8M today/);
   assert.equal(shop.querySelector(".cab .cnt").text, "4", "four finished tasks are filed, not seated");
   assert.match(shop.querySelector(".plate").text, /shop.*running.*2 waiting/);
+  assert.equal(roomOf(app.root, "docs-site").querySelector(".light").text, "running",
+    "an idle Mate with crews at work is a project at work");
   const infra = roomOf(app.root, "infra");
   assert.ok(infra.classes.includes("r-stopped"), "a room whose Mate is not running has its lights off");
   assert.match(infra.text, /stopped/);
   assert.match(infra.text, /Lights off · project stopped/);
   assert.match(app.root.querySelector(".top").text, /Today 2\.6M tokens/);
+});
+
+test("a room where nobody is working says how long since anyone moved", async () => {
+  const fx = fixture();
+  // docs-site's Mate is idle; stop its busy crews. The last to move is
+  // search, 20s ago, so that is how long the room has been quiet.
+  const states = { nav: "waiting_review", i18n: "waiting_at_ceo", search: "idle" };
+  fx.projects["docs-site"].tasks.forEach(t => { if (states[t.crew]) t.state = states[t.crew]; });
+  const app = await boot({ fixture: fx });
+  const light = roomOf(app.root, "docs-site").querySelector(".light");
+  assert.equal(light.text, "idle 20s");
+  assert.ok(light.classes.includes("idle"));
+  assert.equal(roomOf(app.root, "shop").querySelector(".light").text, "running");
 });
 
 test("a crew with a question stands in the hallway, and its empty desk shows it went", async () => {

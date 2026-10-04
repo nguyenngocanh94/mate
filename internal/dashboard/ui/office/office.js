@@ -748,6 +748,26 @@
 
   // ------------------------------------------------------------ rooms
 
+  // States in which an agent is doing something rather than waiting on
+  // someone or on nothing.
+  var MATE_RESTING = { idle: true, asleep: true, blocked: true, gone: true, "": true };
+  var CREW_WORKING = { arriving: true, at_desk_working: true, walking_to_ceo: true, leaving: true };
+
+  // The light on a room's door plate: the project, not just its Mate. It is
+  // "running" while the Mate or any open crew is at work, and otherwise says
+  // how long since anyone in the room last moved, so a project left alone
+  // for days does not light up like one that is busy.
+  function roomLight(running, m, open) {
+    if (!running) return el("span", { class: "light off" }, [el("i"), "stopped"]);
+    var busy = !MATE_RESTING[m.state || ""] || open.some(function (t) { return CREW_WORKING[t.state]; });
+    var last = [m.since].concat(open.map(function (t) { return t.since; }))
+      .map(parseAt).filter(function (t) { return t != null; });
+    if (busy || !last.length) return el("span", { class: "light" }, [el("i"), "running"]);
+    var at = Math.max.apply(null, last);
+    return el("span", { class: "light idle", title: "nobody has moved since " + new Date(at).toISOString() },
+      [el("i"), "idle " + formatAge(Date.now() - at)]);
+  }
+
   function roomCols(n) { return n <= 1 ? 1 : n <= 6 ? 2 : 3; }
 
   function room(name, index) {
@@ -768,7 +788,7 @@
       el("div", { class: "door", "data-door": name }, [el("i", { class: "dl" }), el("i", { class: "dr2" })]),
       el("div", { class: "plate" }, [
         el("b", { text: name }),
-        el("span", { class: "light" + (running ? "" : " off") }, [el("i"), running ? "running" : "stopped"]),
+        roomLight(running, m, open),
         wait > 0 ? el("span", { class: "wb" }, [icon("ask"), wait + " waiting"]) : null
       ]),
       lowCab ? null : cabinet(name, closed, false),
@@ -946,7 +966,7 @@
     return el("section", { class: "mroom r" + (index % 3) + (running ? "" : " r-stopped"), "aria-label": name + " room" }, [
       el("div", { class: "mr-h" }, [
         el("b", { text: name }),
-        el("span", { class: "light" + (running ? "" : " off") }, [el("i"), running ? "running" : "stopped"]),
+        roomLight(running, m, open),
         wait > 0 ? el("span", { class: "wb" }, [icon("ask"), wait + " waiting"]) : null,
         el("span", { class: "grow" }),
         cab
