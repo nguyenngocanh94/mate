@@ -1,0 +1,1330 @@
+{
+ "now_ms": 1791037927000,
+ "workspace": {
+  "generated_at": "2026-10-03T14:32:07.000000000Z",
+  "last_event_id": 900,
+  "root": "/Users/captain/studio",
+  "projects": [
+   {
+    "name": "shop",
+    "mode": "manual",
+    "mate": {
+     "harness": "claude",
+     "running": true,
+     "state": "deciding",
+     "since": "2026-10-03T14:18:07.000000000Z",
+     "tokens_today": 1800000,
+     "context_pct": 62,
+     "context_tokens": 124000
+    },
+    "crews_by_state": {
+     "at_desk_working": 1,
+     "waiting_review": 1,
+     "waiting_at_ceo": 1,
+     "blocked": 1,
+     "gone": 4
+    },
+    "inbox_waiting": 1
+   },
+   {
+    "name": "docs-site",
+    "mode": "auto",
+    "mate": {
+     "harness": "codex",
+     "running": true,
+     "state": "idle",
+     "since": "2026-10-03T14:23:07.000000000Z",
+     "tokens_today": 240000,
+     "context_pct": 18,
+     "context_tokens": 72000
+    },
+    "crews_by_state": {
+     "asleep": 1,
+     "at_desk_working": 1,
+     "walking_to_ceo": 1,
+     "idle": 1,
+     "arriving": 1
+    },
+    "inbox_waiting": 0
+   },
+   {
+    "name": "infra",
+    "mode": "auto",
+    "mate": {
+     "harness": "claude",
+     "running": false,
+     "state": "gone",
+     "since": "2026-10-03T11:32:07.000000000Z",
+     "tokens_today": 0,
+     "context_pct": null,
+     "context_tokens": null
+    },
+    "crews_by_state": {
+     "gone": 2
+    },
+    "inbox_waiting": 0
+   }
+  ]
+ },
+ "now": {
+  "generated_at": "2026-10-03T14:32:07.000000000Z",
+  "last_event_id": 900,
+  "now": [
+   {
+    "actor_id": "mate:shop",
+    "actor": "mate",
+    "actor_kind": "mate",
+    "project": "shop",
+    "state": "deciding",
+    "since": "2026-10-03T14:18:07.000000000Z",
+    "target": "api-fix",
+    "detail": "",
+    "tokens_today": 1800000,
+    "context_pct": 62,
+    "context_tokens": 124000
+   },
+   {
+    "actor_id": "user:shop",
+    "actor": "captain",
+    "actor_kind": "user",
+    "project": "shop",
+    "state": "",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null
+   },
+   {
+    "actor_id": "crew:shop:rd1",
+    "actor": "rd1",
+    "actor_kind": "crew",
+    "project": "shop",
+    "state": "at_desk_working",
+    "since": "2026-10-03T14:26:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 98200,
+    "context_pct": 41,
+    "context_tokens": 82000
+   },
+   {
+    "actor_id": "crew:shop:api-fix",
+    "actor": "api-fix",
+    "actor_kind": "crew",
+    "project": "shop",
+    "state": "waiting_review",
+    "since": "2026-10-03T14:21:07.000000000Z",
+    "target": "mate",
+    "detail": "handback",
+    "tokens_today": 88200,
+    "context_pct": 37,
+    "context_tokens": 74000
+   },
+   {
+    "actor_id": "crew:shop:ui-polish",
+    "actor": "ui-polish",
+    "actor_kind": "crew",
+    "project": "shop",
+    "state": "waiting_at_ceo",
+    "since": "2026-10-03T14:29:07.000000000Z",
+    "target": "mate",
+    "detail": "question",
+    "tokens_today": 52000,
+    "context_pct": 22,
+    "context_tokens": 44000
+   },
+   {
+    "actor_id": "crew:shop:db-migrate",
+    "actor": "db-migrate",
+    "actor_kind": "crew",
+    "project": "shop",
+    "state": "blocked",
+    "since": "2026-10-03T14:09:07.000000000Z",
+    "target": "",
+    "detail": "stale",
+    "tokens_today": 196000,
+    "context_pct": 88,
+    "context_tokens": 176000
+   },
+   {
+    "actor_id": "mate:docs-site",
+    "actor": "mate",
+    "actor_kind": "mate",
+    "project": "docs-site",
+    "state": "idle",
+    "since": "2026-10-03T14:23:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 240000,
+    "context_pct": 18,
+    "context_tokens": 72000
+   },
+   {
+    "actor_id": "user:docs-site",
+    "actor": "captain",
+    "actor_kind": "user",
+    "project": "docs-site",
+    "state": "",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null
+   },
+   {
+    "actor_id": "crew:docs-site:copy-edit",
+    "actor": "copy-edit",
+    "actor_kind": "crew",
+    "project": "docs-site",
+    "state": "asleep",
+    "since": "2026-10-03T13:45:07.000000000Z",
+    "target": "",
+    "detail": "stale",
+    "tokens_today": 4300,
+    "context_pct": 4.5,
+    "context_tokens": 9000
+   },
+   {
+    "actor_id": "crew:docs-site:nav",
+    "actor": "nav",
+    "actor_kind": "crew",
+    "project": "docs-site",
+    "state": "at_desk_working",
+    "since": "2026-10-03T14:30:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 41500,
+    "context_pct": 29,
+    "context_tokens": 74000
+   },
+   {
+    "actor_id": "crew:docs-site:i18n",
+    "actor": "i18n",
+    "actor_kind": "crew",
+    "project": "docs-site",
+    "state": "walking_to_ceo",
+    "since": "2026-10-03T14:31:07.000000000Z",
+    "target": "mate",
+    "detail": "question",
+    "tokens_today": 21800,
+    "context_pct": 14,
+    "context_tokens": 36000
+   },
+   {
+    "actor_id": "crew:docs-site:seo",
+    "actor": "seo",
+    "actor_kind": "crew",
+    "project": "docs-site",
+    "state": "idle",
+    "since": "2026-10-03T14:27:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 8400,
+    "context_pct": 4,
+    "context_tokens": 8000
+   },
+   {
+    "actor_id": "mate:infra",
+    "actor": "mate",
+    "actor_kind": "mate",
+    "project": "infra",
+    "state": "gone",
+    "since": "2026-10-03T11:32:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null
+   },
+   {
+    "actor_id": "user:infra",
+    "actor": "captain",
+    "actor_kind": "user",
+    "project": "infra",
+    "state": "",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null
+   },
+   {
+    "actor_id": "crew:infra:ci-cache",
+    "actor": "ci-cache",
+    "actor_kind": "crew",
+    "project": "infra",
+    "state": "gone",
+    "since": "2026-10-03T11:32:07.000000000Z",
+    "target": "",
+    "detail": "runtime_lost",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null
+   }
+  ]
+ },
+ "projects": {
+  "shop": {
+   "generated_at": "2026-10-03T14:32:07.000000000Z",
+   "last_event_id": 900,
+   "project": "shop",
+   "mode": "manual",
+   "mate": {
+    "harness": "claude",
+    "running": true,
+    "state": "deciding",
+    "since": "2026-10-03T14:18:07.000000000Z",
+    "target": "api-fix",
+    "detail": "",
+    "tokens_today": 1800000,
+    "context_pct": 62,
+    "context_tokens": 124000,
+    "turns": 140,
+    "tokens": {
+     "input": 283200,
+     "cache_read": 1880000,
+     "cache_write": 194600,
+     "output": 42200,
+     "thinking": 8000,
+     "total": 2400000
+    },
+    "cost": 6.31,
+    "last_turn": {
+     "id": "mate:shop#t140",
+     "ordinal": 140,
+     "started_at": "2026-10-03T14:30:57.000000000Z",
+     "ended_at": "2026-10-03T14:31:29.000000000Z",
+     "duration_ms": 32000,
+     "tokens": {
+      "input": 1200,
+      "cache_read": 90000,
+      "cache_write": 800,
+      "output": 400,
+      "thinking": 0,
+      "total": 92400
+     },
+     "context_tokens_after": 124000,
+     "context_pct": 62,
+     "tool_count": 2,
+     "ref": {}
+    }
+   },
+   "tasks": [
+    {
+     "crew": "rd1",
+     "text": "Cart summary redesign",
+     "branch": "mate/rd1",
+     "state": "at_desk_working",
+     "since": "2026-10-03T14:26:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 31,
+     "tokens": {
+      "input": 17300,
+      "cache_read": 110800,
+      "cache_write": 11500,
+      "output": 4300,
+      "thinking": 900,
+      "total": 143900
+     },
+     "cost": 0.52,
+     "last_model": "",
+     "context_tokens_last": 82000,
+     "context_pct": 41,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude"
+    },
+    {
+     "crew": "api-fix",
+     "text": "Retry order create on 409",
+     "branch": "mate/api-fix",
+     "state": "waiting_review",
+     "since": "2026-10-03T14:21:07.000000000Z",
+     "target": "mate",
+     "detail": "handback",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 24,
+     "tokens": {
+      "input": 10600,
+      "cache_read": 67900,
+      "cache_write": 7100,
+      "output": 2600,
+      "thinking": 0,
+      "total": 88200
+     },
+     "cost": 0.32,
+     "last_model": "",
+     "context_tokens_last": 74000,
+     "context_pct": 37,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude"
+    },
+    {
+     "crew": "ui-polish",
+     "text": "Button and spacing polish",
+     "branch": "mate/ui-polish",
+     "state": "waiting_at_ceo",
+     "since": "2026-10-03T14:29:07.000000000Z",
+     "target": "mate",
+     "detail": "question",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 12,
+     "tokens": {
+      "input": 6200,
+      "cache_read": 40100,
+      "cache_write": 4200,
+      "output": 1500,
+      "thinking": 0,
+      "total": 52000
+     },
+     "cost": 0.19,
+     "last_model": "",
+     "context_tokens_last": 44000,
+     "context_pct": 22,
+     "question_count": 1,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude"
+    },
+    {
+     "crew": "db-migrate",
+     "text": "Order indexes and backfill",
+     "branch": "mate/db-migrate",
+     "state": "blocked",
+     "since": "2026-10-03T14:09:07.000000000Z",
+     "target": "",
+     "detail": "stale",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 57,
+     "tokens": {
+      "input": 41200,
+      "cache_read": 228600,
+      "cache_write": 30100,
+      "output": 10500,
+      "thinking": 0,
+      "total": 310400
+     },
+     "cost": 1.12,
+     "last_model": "",
+     "context_tokens_last": 176000,
+     "context_pct": 88,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude"
+    },
+    {
+     "crew": "login-flow",
+     "text": "Login flow",
+     "branch": "mate/login-flow",
+     "state": "gone",
+     "since": "2026-10-01T14:32:07.000000000Z",
+     "target": "",
+     "detail": "merged",
+     "closed": true,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 10,
+     "tokens": {
+      "input": 40000,
+      "cache_read": 340000,
+      "cache_write": 15000,
+      "output": 7000,
+      "thinking": 0,
+      "total": 402000
+     },
+     "cost": 1.4,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude",
+     "close_state": "finished",
+     "closed_at": "2026-10-01T14:32:07.000000000Z",
+     "merged_at": "2026-10-01T14:32:07.000000000Z"
+    },
+    {
+     "crew": "search-facets",
+     "text": "Search facets",
+     "branch": "mate/search-facets",
+     "state": "gone",
+     "since": "2026-09-29T14:32:07.000000000Z",
+     "target": "",
+     "detail": "failed",
+     "closed": true,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 10,
+     "tokens": {
+      "input": 13000,
+      "cache_read": 110000,
+      "cache_write": 7000,
+      "output": 3000,
+      "thinking": 0,
+      "total": 133000
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude",
+     "close_state": "failed",
+     "closed_at": "2026-09-29T14:32:07.000000000Z"
+    },
+    {
+     "crew": "order-email",
+     "text": "Order email",
+     "branch": "mate/order-email",
+     "state": "gone",
+     "since": "2026-09-24T14:32:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": true,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 10,
+     "tokens": {
+      "input": 15000,
+      "cache_read": 130000,
+      "cache_write": 8000,
+      "output": 2200,
+      "thinking": 0,
+      "total": 155200
+     },
+     "cost": 0.6,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude",
+     "close_state": "finished",
+     "closed_at": "2026-09-24T14:32:07.000000000Z",
+     "merged_at": "2026-09-24T14:32:07.000000000Z"
+    },
+    {
+     "crew": "healthcheck",
+     "text": "Healthcheck",
+     "branch": "mate/healthcheck",
+     "state": "gone",
+     "since": "2026-09-10T14:32:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": true,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 10,
+     "tokens": {
+      "input": 2000,
+      "cache_read": 15000,
+      "cache_write": 1200,
+      "output": 500,
+      "thinking": 0,
+      "total": 18700
+     },
+     "cost": 0.07,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude",
+     "close_state": "finished",
+     "closed_at": "2026-09-10T14:32:07.000000000Z",
+     "merged_at": "2026-09-10T14:32:07.000000000Z"
+    }
+   ],
+   "inbox": [
+    {
+     "seq": 4,
+     "at": "2026-10-03T14:29:07.000000000Z",
+     "kind": "status",
+     "source": "crew",
+     "target": "crew:ui-polish",
+     "crew": "ui-polish",
+     "verb": "needs-decision",
+     "text": "keep the 6px button radius or move to 8px?",
+     "attention": true
+    }
+   ]
+  },
+  "docs-site": {
+   "generated_at": "2026-10-03T14:32:07.000000000Z",
+   "last_event_id": 900,
+   "project": "docs-site",
+   "mode": "auto",
+   "mate": {
+    "harness": "codex",
+    "running": true,
+    "state": "idle",
+    "since": "2026-10-03T14:23:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 240000,
+    "context_pct": 18,
+    "context_tokens": 72000,
+    "turns": 60,
+    "tokens": {
+     "input": 177000,
+     "cache_read": 390000,
+     "cache_write": 0,
+     "output": 45000,
+     "thinking": 0,
+     "total": 612000
+    },
+    "cost": null,
+    "last_turn": {
+     "id": "mate:docs-site#t60",
+     "ordinal": 60,
+     "started_at": "2026-10-03T14:22:07.000000000Z",
+     "ended_at": "2026-10-03T14:23:07.000000000Z",
+     "duration_ms": 60000,
+     "tokens": {
+      "input": 1000,
+      "cache_read": 9000,
+      "cache_write": 0,
+      "output": 300,
+      "thinking": 0,
+      "total": 10300
+     },
+     "context_tokens_after": 72000,
+     "context_pct": 18,
+     "tool_count": 1,
+     "ref": {}
+    }
+   },
+   "tasks": [
+    {
+     "crew": "copy-edit",
+     "text": "Tone pass on getting started",
+     "branch": "mate/copy-edit",
+     "state": "asleep",
+     "since": "2026-10-03T13:45:07.000000000Z",
+     "target": "",
+     "detail": "stale",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 5,
+     "tokens": {
+      "input": 3500,
+      "cache_read": 7600,
+      "cache_write": 0,
+      "output": 1000,
+      "thinking": 0,
+      "total": 12100
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 9000,
+     "context_pct": 4.5,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "codex"
+    },
+    {
+     "crew": "nav",
+     "text": "Sidebar navigation rewrite",
+     "branch": "mate/nav",
+     "state": "at_desk_working",
+     "since": "2026-10-03T14:30:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 19,
+     "tokens": {
+      "input": 18800,
+      "cache_read": 40800,
+      "cache_write": 0,
+      "output": 5100,
+      "thinking": 0,
+      "total": 64700
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 74000,
+     "context_pct": 29,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "codex"
+    },
+    {
+     "crew": "i18n",
+     "text": "Locale scaffolding",
+     "branch": "mate/i18n",
+     "state": "walking_to_ceo",
+     "since": "2026-10-03T14:31:07.000000000Z",
+     "target": "mate",
+     "detail": "question",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 9,
+     "tokens": {
+      "input": 6300,
+      "cache_read": 13700,
+      "cache_write": 0,
+      "output": 1800,
+      "thinking": 0,
+      "total": 21800
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 36000,
+     "context_pct": 14,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "codex"
+    },
+    {
+     "crew": "seo",
+     "text": "Meta tags and sitemap",
+     "branch": "mate/seo",
+     "state": "idle",
+     "since": "2026-10-03T14:27:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 6,
+     "tokens": {
+      "input": 1000,
+      "cache_read": 6500,
+      "cache_write": 600,
+      "output": 300,
+      "thinking": 0,
+      "total": 8400
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 8000,
+     "context_pct": 4,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "pi"
+    },
+    {
+     "crew": "search",
+     "text": "Site search index",
+     "branch": "mate/search",
+     "state": "arriving",
+     "since": "2026-10-03T14:31:47.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 0,
+     "tokens": {
+      "input": 0,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 0,
+      "thinking": 0,
+      "total": 0
+     },
+     "cost": null,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "pi"
+    }
+   ],
+   "inbox": []
+  },
+  "infra": {
+   "generated_at": "2026-10-03T14:32:07.000000000Z",
+   "last_event_id": 900,
+   "project": "infra",
+   "mode": "auto",
+   "mate": {
+    "harness": "claude",
+    "running": false,
+    "state": "gone",
+    "since": "2026-10-03T11:32:07.000000000Z",
+    "target": "",
+    "detail": "",
+    "tokens_today": 0,
+    "context_pct": null,
+    "context_tokens": null,
+    "turns": 80,
+    "tokens": {
+     "input": 50000,
+     "cache_read": 340000,
+     "cache_write": 20000,
+     "output": 8000,
+     "thinking": 0,
+     "total": 418000
+    },
+    "cost": 1.5,
+    "last_turn": null
+   },
+   "tasks": [
+    {
+     "crew": "ci-cache",
+     "text": "Cache Go modules in CI",
+     "branch": "mate/ci-cache",
+     "state": "gone",
+     "since": "2026-10-03T11:32:07.000000000Z",
+     "target": "",
+     "detail": "runtime_lost",
+     "closed": false,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 33,
+     "tokens": {
+      "input": 11700,
+      "cache_read": 75000,
+      "cache_write": 7800,
+      "output": 2800,
+      "thinking": 0,
+      "total": 97300
+     },
+     "cost": 0.35,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude"
+    },
+    {
+     "crew": "tf-upgrade",
+     "text": "Terraform upgrade",
+     "branch": "mate/tf-upgrade",
+     "state": "gone",
+     "since": "2026-09-24T14:32:07.000000000Z",
+     "target": "",
+     "detail": "",
+     "closed": true,
+     "spawned_at": "2026-10-03T12:32:07.000000000Z",
+     "age_ms": 7200000,
+     "turns": 10,
+     "tokens": {
+      "input": 25000,
+      "cache_read": 170000,
+      "cache_write": 11000,
+      "output": 4000,
+      "thinking": 0,
+      "total": 210000
+     },
+     "cost": 0.8,
+     "last_model": "",
+     "context_tokens_last": 0,
+     "context_pct": null,
+     "question_count": 0,
+     "handback_count": 0,
+     "waited_ms": 0,
+     "tool_count": 0,
+     "harness": "claude",
+     "close_state": "finished",
+     "closed_at": "2026-09-24T14:32:07.000000000Z",
+     "merged_at": "2026-09-24T14:32:07.000000000Z"
+    }
+   ],
+   "inbox": []
+  }
+ },
+ "tasks": {
+  "shop/db-migrate": {
+   "generated_at": "2026-10-03T14:32:07.000000000Z",
+   "last_event_id": 900,
+   "project": "shop",
+   "crew": "db-migrate",
+   "ledger": {
+    "crew": "db-migrate",
+    "text": "Order indexes and backfill",
+    "branch": "mate/db-migrate",
+    "state": "blocked",
+    "since": "2026-10-03T14:09:07.000000000Z",
+    "target": "",
+    "detail": "stale",
+    "closed": false,
+    "spawned_at": "2026-10-03T12:32:07.000000000Z",
+    "age_ms": 7200000,
+    "turns": 57,
+    "tokens": {
+     "input": 41200,
+     "cache_read": 228600,
+     "cache_write": 30100,
+     "output": 10500,
+     "thinking": 0,
+     "total": 310400
+    },
+    "cost": 1.12,
+    "last_model": "",
+    "context_tokens_last": 176000,
+    "context_pct": 88,
+    "question_count": 0,
+    "handback_count": 0,
+    "waited_ms": 0,
+    "tool_count": 0,
+    "harness": "claude"
+   },
+   "turns": [
+    {
+     "id": "crew:shop:db-migrate#t0",
+     "ordinal": 0,
+     "started_at": "2026-10-03T09:02:07.000000000Z",
+     "ended_at": "2026-10-03T09:03:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 1000,
+      "cache_read": 8000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 9800
+     },
+     "context_tokens_after": 100000,
+     "context_pct": 50,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t1",
+     "ordinal": 1,
+     "started_at": "2026-10-03T09:27:07.000000000Z",
+     "ended_at": "2026-10-03T09:28:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 2000,
+      "cache_read": 16000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 18800
+     },
+     "context_tokens_after": 106000,
+     "context_pct": 53,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t2",
+     "ordinal": 2,
+     "started_at": "2026-10-03T09:52:07.000000000Z",
+     "ended_at": "2026-10-03T09:53:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 3000,
+      "cache_read": 24000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 27800
+     },
+     "context_tokens_after": 112000,
+     "context_pct": 56,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t3",
+     "ordinal": 3,
+     "started_at": "2026-10-03T10:17:07.000000000Z",
+     "ended_at": "2026-10-03T10:18:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 4000,
+      "cache_read": 32000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 36800
+     },
+     "context_tokens_after": 118000,
+     "context_pct": 59,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t4",
+     "ordinal": 4,
+     "started_at": "2026-10-03T10:42:07.000000000Z",
+     "ended_at": "2026-10-03T10:43:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 5000,
+      "cache_read": 40000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 45800
+     },
+     "context_tokens_after": 124000,
+     "context_pct": 62,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t5",
+     "ordinal": 5,
+     "started_at": "2026-10-03T11:07:07.000000000Z",
+     "ended_at": "2026-10-03T11:08:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 6000,
+      "cache_read": 48000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 54800
+     },
+     "context_tokens_after": 130000,
+     "context_pct": 65,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t6",
+     "ordinal": 6,
+     "started_at": "2026-10-03T11:32:07.000000000Z",
+     "ended_at": "2026-10-03T11:33:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 7000,
+      "cache_read": 56000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 63800
+     },
+     "context_tokens_after": 136000,
+     "context_pct": 68,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t7",
+     "ordinal": 7,
+     "started_at": "2026-10-03T11:57:07.000000000Z",
+     "ended_at": "2026-10-03T11:58:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 8000,
+      "cache_read": 64000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 72800
+     },
+     "context_tokens_after": 142000,
+     "context_pct": 71,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t8",
+     "ordinal": 8,
+     "started_at": "2026-10-03T12:22:07.000000000Z",
+     "ended_at": "2026-10-03T12:23:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 9000,
+      "cache_read": 72000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 81800
+     },
+     "context_tokens_after": 148000,
+     "context_pct": 74,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t9",
+     "ordinal": 9,
+     "started_at": "2026-10-03T12:47:07.000000000Z",
+     "ended_at": "2026-10-03T12:48:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 10000,
+      "cache_read": 80000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 90800
+     },
+     "context_tokens_after": 154000,
+     "context_pct": 77,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t10",
+     "ordinal": 10,
+     "started_at": "2026-10-03T13:12:07.000000000Z",
+     "ended_at": "2026-10-03T13:13:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 11000,
+      "cache_read": 88000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 99800
+     },
+     "context_tokens_after": 160000,
+     "context_pct": 80,
+     "tool_count": 1,
+     "ref": {}
+    },
+    {
+     "id": "crew:shop:db-migrate#t11",
+     "ordinal": 11,
+     "started_at": "2026-10-03T13:37:07.000000000Z",
+     "ended_at": "2026-10-03T13:38:07.000000000Z",
+     "duration_ms": 60000,
+     "outcome": "tool_use",
+     "model": "claude-sonnet",
+     "tokens": {
+      "input": 12000,
+      "cache_read": 96000,
+      "cache_write": 500,
+      "output": 300,
+      "thinking": 0,
+      "total": 108800
+     },
+     "context_tokens_after": 166000,
+     "context_pct": 83,
+     "tool_count": 1,
+     "ref": {}
+    }
+   ],
+   "status_lines": [
+    {
+     "event_id": 700,
+     "at": "2026-10-03T13:52:07.000000000Z",
+     "verb": "working",
+     "text": "writing 0042_add_order_index",
+     "line": "working: writing 0042_add_order_index",
+     "ref": {}
+    },
+    {
+     "event_id": 720,
+     "at": "2026-10-03T14:09:07.000000000Z",
+     "verb": "working",
+     "text": "Running 0042_add_order_index",
+     "line": "working: Running 0042_add_order_index",
+     "ref": {}
+    }
+   ],
+   "questions": [],
+   "branch": {
+    "name": "mate/db-migrate",
+    "exists": true
+   },
+   "performance": {
+    "current_segment_id": "seg-run",
+    "segments": [
+     {
+      "id": "seg-run",
+      "kind": "test",
+      "label": "Run tests / build · migrate up",
+      "target": "db/migrations/0042_add_order_index.sql",
+      "started_at": "2026-10-03T14:09:07.000000000Z"
+     }
+    ],
+    "prompt_turns": [
+     {
+      "id": "p1",
+      "prompt": "Read the brief",
+      "overview": {
+       "steps": [
+        {
+         "kind": "research",
+         "label": "Research / inspect",
+         "started_at": "2026-10-03T09:32:07.000000000Z",
+         "model_calls": 4,
+         "tokens": {
+          "input": 4000,
+          "cache_read": 30000,
+          "cache_write": 1000,
+          "output": 800,
+          "thinking": 0,
+          "total": 35800
+         },
+         "open": false
+        },
+        {
+         "kind": "test",
+         "label": "Run tests / build",
+         "started_at": "2026-10-03T14:09:07.000000000Z",
+         "model_calls": 2,
+         "tokens": {
+          "input": 2000,
+          "cache_read": 20000,
+          "cache_write": 500,
+          "output": 300,
+          "thinking": 0,
+          "total": 22800
+         },
+         "open": true
+        }
+       ]
+      }
+     }
+    ],
+    "skills": [
+     {
+      "name": "db-migrations",
+      "count": 2,
+      "loads": []
+     }
+    ]
+   }
+  }
+ },
+ "mates": {
+  "shop": {
+   "generated_at": "2026-10-03T14:32:07.000000000Z",
+   "last_event_id": 900,
+   "project": "shop",
+   "mate": {
+    "harness": "claude",
+    "running": true,
+    "state": "deciding",
+    "since": "2026-10-03T14:18:07.000000000Z",
+    "target": "api-fix",
+    "detail": "",
+    "tokens_today": 1800000,
+    "context_pct": 62,
+    "context_tokens": 124000,
+    "turns": 140,
+    "tokens": {
+     "input": 283200,
+     "cache_read": 1880000,
+     "cache_write": 194600,
+     "output": 42200,
+     "thinking": 8000,
+     "total": 2400000
+    },
+    "cost": 6.31,
+    "last_turn": {
+     "id": "mate:shop#t140",
+     "ordinal": 140,
+     "started_at": "2026-10-03T14:30:57.000000000Z",
+     "ended_at": "2026-10-03T14:31:29.000000000Z",
+     "duration_ms": 32000,
+     "tokens": {
+      "input": 1200,
+      "cache_read": 90000,
+      "cache_write": 800,
+      "output": 400,
+      "thinking": 0,
+      "total": 92400
+     },
+     "context_tokens_after": 124000,
+     "context_pct": 62,
+     "tool_count": 2,
+     "ref": {}
+    }
+   },
+   "exchanges": [
+    {
+     "id": "prompt#1",
+     "source": "crew",
+     "prompt": "api-fix is ready",
+     "started_at": "2026-10-03T13:42:07.000000000Z",
+     "overview": {
+      "steps": [
+       {
+        "kind": "review",
+        "label": "Review",
+        "started_at": "2026-10-03T13:42:07.000000000Z",
+        "model_calls": 3,
+        "tokens": {
+         "input": 5000,
+         "cache_read": 300000,
+         "cache_write": 2000,
+         "output": 900,
+         "thinking": 0,
+         "total": 307900
+        }
+       },
+       {
+        "kind": "coordination",
+        "label": "Coordinate",
+        "started_at": "2026-10-03T14:18:07.000000000Z",
+        "model_calls": 2,
+        "tokens": {
+         "input": 3000,
+         "cache_read": 200000,
+         "cache_write": 1000,
+         "output": 600,
+         "thinking": 0,
+         "total": 204600
+        },
+        "open": true
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

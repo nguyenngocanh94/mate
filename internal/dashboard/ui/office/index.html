@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mate Office</title>
+<!--
+  Mate Office: the scene projection of docs/mvp.md M5 drawn as an office,
+  beside the admin UI at /. It reads the same read-only JSON API and nothing
+  else (docs/dashboard.md section 11).
+
+  Everything it loads is embedded in the binary and served from this origin:
+  no build step, no framework, no CDN, no font or script from anywhere else.
+  humanize.js is the admin UI's own number vocabulary, shared rather than
+  copied, so a number here and in `mate usage` can never disagree.
+-->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="office.css">
+</head>
+<body>
+<div class="mo" id="office">
+  <p class="boot">loading&#8230;</p>
+</div>
+<script src="../humanize.js"></script>
+<script src="office.js"></script>
+</body>
+</html>
