@@ -124,6 +124,7 @@ func (p *pass) ingestMeta(ctx context.Context) error {
 	p.b.actor(pendingActor{
 		ID: p.mate.ActorID, Project: project, Kind: ActorMate, Name: "mate",
 		Harness: mateMeta[MetaHarness], FirstSeen: startedAt, LastSeen: startedAt, GoneAt: stoppedAt,
+		FromMeta: p.mate.Present,
 	})
 	if p.mate.Present {
 		sessionID := strings.TrimSpace(mateMeta[MetaSessionID])
@@ -180,6 +181,7 @@ func (p *pass) ingestMeta(ctx context.Context) error {
 		p.b.actor(pendingActor{
 			ID: crew.ActorID, Project: project, Kind: ActorCrew, Name: crew.ID,
 			Harness: crew.harness(), FirstSeen: spawnedAt, LastSeen: spawnedAt, GoneAt: gone,
+			FromMeta: true,
 		})
 		if sessionID := strings.TrimSpace(crew.Meta[MetaSessionID]); sessionID != "" {
 			p.b.session(pendingSession{

@@ -65,7 +65,7 @@ The only page that reads this API is the one this server serves.
 
 Tier 1: one card per registered project.
 
-`mate.harness` and `mate.running` come from the `actor` row (`harness`, `first_seen`, `gone_at`), which `v_now` has no column for; running means started and not stopped.
+`mate.harness` and `mate.running` come from the `actor` row (`harness`, `first_seen`, `gone_at`), which `v_now` has no column for; running means started and not stopped, where stopped is the current `mate.meta`'s `stopped_at`: a relaunch writes a meta without one and clears the `gone_at` of the life before it.
 `mate.state`, `mate.since`, `mate.tokens_today` and `mate.context_pct` are `v_now`.
 `crews_by_state` counts this project's crew actors by their `v_now` scene state, and a crew no projection has placed counts under `"unknown"` rather than being dropped.
 `inbox_waiting` is the length of `box.Inbox` through `query.LoadBox`, the same loader and the same number the console's rail header shows.

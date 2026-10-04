@@ -910,3 +910,64 @@ func TestFrozenRefreshSnapshotCountsTheFinalCallExactlyOnce(t *testing.T) {
 		}
 	}
 }
+
+// A Mate that stopped and was launched again is running: the relaunch writes
+// a fresh mate.meta with no stopped_at, and the actor row must follow it
+// rather than keep the gone_at of the life that ended.
+func TestRelaunchedMateIsNoLongerGone(t *testing.T) {
+	f := newFixture(t)
+	meta, err := f.ws.ReadMateMeta(fixtureProject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta["stopped_at"] = "2026-09-19T11:00:00Z"
+	if err := f.ws.WriteMateMeta(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	f.ingest(t)
+	if gone := f.goneAt(t, f.mateActor()); gone != "2026-09-19T11:00:00.000000000Z" {
+		t.Fatalf("stopped Mate gone_at = %q", gone)
+	}
+
+	delete(meta, "stopped_at")
+	meta["started_at"] = "2026-09-19T11:00:10Z"
+	if err := f.ws.WriteMateMeta(fixtureProject, meta); err != nil {
+		t.Fatal(err)
+	}
+	f.ingest(t)
+	if gone := f.goneAt(t, f.mateActor()); gone != "" {
+		t.Fatalf("relaunched Mate still gone at %q", gone)
+	}
+}
+
+// A crew the logs name after a human deleted its meta keeps the gone_at the
+// meta once gave it: the logs say nothing about whether it is alive.
+func TestCrewWithoutMetaKeepsItsGoneAt(t *testing.T) {
+	f := newFixture(t)
+	meta, err := f.ws.ReadCrewMeta(fixtureProject, fixtureCrew)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta["state"] = "finished"
+	meta["stopped_at"] = "2026-09-19T11:00:00Z"
+	if err := f.ws.WriteCrewMeta(fixtureProject, fixtureCrew, meta); err != nil {
+		t.Fatal(err)
+	}
+	f.ingest(t)
+	if err := os.Remove(f.ws.CrewMeta(fixtureProject, fixtureCrew)); err != nil {
+		t.Fatal(err)
+	}
+	f.ingest(t)
+	if gone := f.goneAt(t, f.crewActor()); gone != "2026-09-19T11:00:00.000000000Z" {
+		t.Fatalf("crew gone_at after its meta went = %q", gone)
+	}
+}
+
+func (f *fixture) goneAt(t *testing.T, actorID string) string {
+	t.Helper()
+	var gone sql.NullString
+	if err := f.db.SQL().QueryRow(`SELECT gone_at FROM actor WHERE id = ?`, actorID).Scan(&gone); err != nil {
+		t.Fatal(err)
+	}
+	return gone.String
+}

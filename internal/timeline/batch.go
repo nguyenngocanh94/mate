@@ -161,6 +161,11 @@ type pendingActor struct {
 	FirstSeen time.Time
 	LastSeen  time.Time
 	GoneAt    time.Time
+	// FromMeta marks a record read from the actor's own `.meta`, which
+	// describes its current life: a zero GoneAt there means "not gone" and
+	// clears the gone_at of a life that ended before a relaunch. Any other
+	// record (a crew only the logs name) knows nothing about it and keeps it.
+	FromMeta bool
 }
 
 // batch is everything one project's pass found, before any of it is written.
@@ -402,9 +407,9 @@ func (w *writer) upsertActor(ctx context.Context, a pendingActor) error {
 		   harness   = CASE WHEN excluded.harness <> '' THEN excluded.harness ELSE actor.harness END,
 		   first_seen= COALESCE(actor.first_seen, excluded.first_seen),
 		   last_seen = MAX(COALESCE(actor.last_seen, ''), COALESCE(excluded.last_seen, '')),
-		   gone_at   = COALESCE(excluded.gone_at, actor.gone_at)`,
+		   gone_at   = CASE WHEN ? THEN excluded.gone_at ELSE COALESCE(excluded.gone_at, actor.gone_at) END`,
 		a.ID, a.Project, a.Kind, a.Name, a.Harness,
-		nullTime(a.FirstSeen), nullTime(a.LastSeen), nullTime(a.GoneAt))
+		nullTime(a.FirstSeen), nullTime(a.LastSeen), nullTime(a.GoneAt), a.FromMeta)
 	return err
 }
 
