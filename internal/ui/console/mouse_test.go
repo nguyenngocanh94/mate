@@ -85,6 +85,29 @@ func TestClickOnCompletedTogglesIt(t *testing.T) {
 	}
 }
 
+// A click on the workspace name in "workspace › project" is Esc: the
+// project list. The project name beside it only focuses the list.
+func TestClickOnTheWorkspaceNameReturnsToTheProjectList(t *testing.T) {
+	m, act, spy := bxPayments(t, 40, 36)
+	y := bxSlot(t, m, slotList).top
+	ws := m.workspaceName()
+	start := cells(m.g.HRule + " ")
+	m, cmd := send(t, m, press(start, y))
+	if m.cur().kind != frameWorkspace || cmd != nil {
+		t.Fatalf("frame = %v cmd = %v after clicking %q, want the project list and nothing run", m.cur().kind, cmd != nil, ws)
+	}
+	if len(act.reqs) != 0 || len(spy.calls) != 0 {
+		t.Fatalf("the workspace click ran something: %+v %+v", act.reqs, spy.calls)
+	}
+
+	m, _, _ = bxPayments(t, 40, 36)
+	y = bxSlot(t, m, slotList).top
+	m, _ = send(t, m, press(start+cells(ws)+2, y)) // past the name and the crumb
+	if m.cur().kind != frameProject || m.focus != paneList {
+		t.Fatalf("frame = %v focus = %v after clicking the project name, want to stay on the project with the list focused", m.cur().kind, m.focus)
+	}
+}
+
 // A click on a pane's rule focuses that pane and runs nothing.
 func TestClickOnARuleFocusesThatPane(t *testing.T) {
 	m, act, spy := bxPayments(t, 40, 36)
