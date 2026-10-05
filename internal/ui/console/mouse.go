@@ -1,9 +1,14 @@
 package console
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // The mouse (design I, "7 Keys and mouse"): a click on a row is Enter, a
-// click on a pane's rule focuses that pane, a click on ▸ toggles the
+// click on a pane's rule focuses that pane, a click on the workspace name
+// in the list rule goes back to the project list, a click on ▸ toggles the
 // group and on [assign] assigns, and the wheel scrolls the pane under the
 // pointer. mate draws no selection of its own: shift+drag is the
 // terminal's. Every hit test reads plan() and the same scroll offsets the
@@ -40,6 +45,9 @@ func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	if ev.Y == sl.top {
 		if press {
+			if sl.kind == slotList && m.workspaceCrumbHit(ev.X, p.w) {
+				return m.onBack(), nil
+			}
 			return m.focusSlot(sl.kind), nil
 		}
 		return m, nil
@@ -73,6 +81,41 @@ func slotAt(p framePlan, y int) (slot, bool) {
 		}
 	}
 	return slot{}, false
+}
+
+// workspaceCrumbHit reports whether x lands on the workspace name drawn in
+// the list rule. That name is the way back to the project list, the same
+// step as Esc. The project name after the crumb is not part of the target,
+// and neither is a rule that is not showing a project.
+func (m Model) workspaceCrumbHit(x, w int) bool {
+	if m.cur().kind != frameProject || x < 0 {
+		return false
+	}
+	ws := m.workspaceName()
+	if cells(ws) == 0 {
+		return false
+	}
+	start := cells(m.g.HRule + " ")
+	pos := 0
+	for _, s := range m.listRule(w).segs {
+		sw := cells(s.text)
+		if pos == start {
+			switch {
+			case strings.HasPrefix(s.text, ws):
+				return x >= start && x < start+cells(ws)
+			case s.text != "" && s.text != m.g.Ellipsis && strings.HasPrefix(ws, s.text):
+				// The rule was cut inside the name. Only the cells still
+				// showing it go back.
+				return x >= start && x < start+sw
+			}
+			return false
+		}
+		if pos > start {
+			return false
+		}
+		pos += sw
+	}
+	return false
 }
 
 func (m Model) focusSlot(k slotKind) Model {
