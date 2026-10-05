@@ -182,6 +182,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, deps, columns)).
+		WithNoHostHint(host.NoHostHint(os.Getenv)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).
 		WithNotice(notice).

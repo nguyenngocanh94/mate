@@ -137,7 +137,7 @@ func (m Model) showEntry(r row) menuEntry {
 	}
 	e.enabled = true
 	if m.stage == nil {
-		e.about = "No next pane: run mate console inside WezTerm or Ghostty, and Enter fills the pane beside it."
+		e.about = "No next pane: " + m.noHostHint() + ", and Enter fills the pane beside it."
 		return e
 	}
 	e.about = "Tells the host to run herdr agent attach " + stageLabel(target) +

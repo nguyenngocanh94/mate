@@ -143,3 +143,11 @@ func TestAMateThatIsNotRunningIsRefusedFromTheSnapshotAlone(t *testing.T) {
 		}
 	}
 }
+
+func TestEnterWithoutAHostGivesTheHint(t *testing.T) {
+	m := projectFrame(t, sampleTree()).WithNoHostHint("over ssh, do this")
+	m, _ = send(t, m, key("enter"))
+	if m.msg.text != "no next pane: over ssh, do this" {
+		t.Fatalf("message = %q, want the hint after the no-host line", m.msg.text)
+	}
+}

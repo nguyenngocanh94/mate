@@ -211,7 +211,7 @@ func (m Model) stageRow(r row) (Model, tea.Cmd) {
 func (m Model) beginStage(target StageTarget) (Model, tea.Cmd) {
 	label := stageLabel(target)
 	if m.stage == nil {
-		m.msg = errMsg("no next pane: run mate console inside WezTerm or Ghostty")
+		m.msg = errMsg("no next pane: " + m.noHostHint())
 		return m, nil
 	}
 	m.msg = infoMsg(m.g.Arrow + " next pane " + m.g.Dot + " opening " + label + m.g.Ellipsis)

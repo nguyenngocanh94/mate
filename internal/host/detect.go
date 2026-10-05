@@ -33,3 +33,14 @@ func Detect(getenv func(string) string) Kind {
 	}
 	return None
 }
+
+// NoHostHint says how to get a next pane when Detect found no driver. Over
+// ssh the host terminal is on the other machine and no variable crosses
+// to say which one it is; WezTerm's ssh multiplexing gives the remote shell
+// a pane of its own, Ghostty has no equivalent.
+func NoHostHint(getenv func(string) string) string {
+	if getenv != nil && (getenv("SSH_CONNECTION") != "" || getenv("SSH_TTY") != "") {
+		return "over ssh, connect with wezterm connect SSHMUX:<host> instead"
+	}
+	return "run mate console inside WezTerm or Ghostty"
+}
