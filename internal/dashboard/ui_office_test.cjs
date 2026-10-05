@@ -196,6 +196,9 @@ test("every project is a room: its Mate at the big desk, open crews at desks, fi
   assert.match(shop.querySelector(".plate").text, /shop.*running.*2 waiting/);
   assert.equal(roomOf(app.root, "docs-site").querySelector(".light").text, "running",
     "an idle Mate with crews at work is a project at work");
+  assert.equal(shop.querySelector(".plate .ptok").text, "3.7M tokens", "the Mate plus every task, open and closed");
+  assert.equal(roomOf(app.root, "docs-site").querySelector(".plate .ptok").text, "719k tokens");
+  assert.equal(roomOf(app.root, "infra").querySelector(".plate .ptok").text, "725.3k tokens");
   const infra = roomOf(app.root, "infra");
   assert.ok(infra.classes.includes("r-stopped"), "a room whose Mate is not running has its lights off");
   assert.match(infra.text, /stopped/);
@@ -361,7 +364,17 @@ test("when the scene cannot be read, tokens today is ? rather than 0", async () 
 test("a room whose project cannot be read says so and the others still draw", async () => {
   const app = await boot({ fail: { "/api/projects/docs-site": "sent.log is unreadable" } });
   assert.match(roomOf(app.root, "docs-site").text, /could not be read: sent\.log is unreadable/);
+  assert.equal(roomOf(app.root, "docs-site").querySelector(".plate .ptok b").text, "?", "an unread room is not 0 tokens");
+  assert.equal(roomOf(app.root, "shop").querySelector(".plate .ptok b").text, "3.7M");
   assert.equal(roomOf(app.root, "shop").querySelectorAll(".desk").length, 4);
+});
+
+test("a project token label is ? when any part of the sum is missing", async () => {
+  const fx = fixture();
+  delete fx.projects.shop.mate.tokens.total;
+  const app = await boot({ fixture: fx });
+  assert.equal(roomOf(app.root, "shop").querySelector(".plate .ptok b").text, "?", "a partial sum is not the project's total");
+  assert.equal(roomOf(app.root, "docs-site").querySelector(".plate .ptok").text, "719k tokens");
 });
 
 test("a failed poll turns the live pill stale with the reason", async () => {
@@ -407,6 +420,8 @@ test("on a phone the rooms are cards and the drawer is a bottom sheet over a scr
   const app = await boot({ phone: true });
   assert.equal(app.root.querySelectorAll("section.room").length, 0);
   assert.equal(app.root.querySelectorAll("section.mroom").length, 3);
+  const shop = app.root.querySelector('section.mroom[aria-label="shop room"]');
+  assert.equal(shop.querySelector(".ptok").text, "3.7M tokens");
   const scrim = app.root.querySelector(".scrim");
   assert.ok(scrim.hasAttribute("hidden"));
   const rd1 = app.root.querySelectorAll(".mc").find(n => n.querySelector(".id").text === "rd1");

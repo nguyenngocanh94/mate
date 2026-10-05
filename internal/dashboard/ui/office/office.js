@@ -529,6 +529,31 @@
     return row ? row.tokens_today : null;
   }
 
+  // projectTokens is the total line of `mate usage`: the Mate's own turns
+  // plus every task this project has recorded, open and closed.
+  // tokens.total already leaves thinking out. Unknown when the project
+  // page has not been read, or when any part of the sum is missing, so a
+  // room never shows a partial total as if it were the whole.
+  function projectTokens(name) {
+    var b = body(name);
+    if (!b || !b.mate || !b.mate.tokens || b.mate.tokens.total == null) return null;
+    if (!Array.isArray(b.tasks)) return null;
+    var sum = b.mate.tokens.total;
+    for (var i = 0; i < b.tasks.length; i++) {
+      var t = b.tasks[i].tokens;
+      if (!t || t.total == null) return null;
+      sum += t.total;
+    }
+    return sum;
+  }
+
+  function spentLabel(name) {
+    return el("span", {
+      class: "ptok",
+      title: "tokens this project has consumed: the Mate plus every task (the total line of mate usage)"
+    }, [el("b", { text: tok(projectTokens(name)) }), " tokens"]);
+  }
+
   // A cabinet row's final state: merged when the timeline saw the merge,
   // otherwise the crew's own closing state (finished, failed).
   function finalState(t) {
@@ -789,6 +814,7 @@
       el("div", { class: "plate" }, [
         el("b", { text: name }),
         roomLight(running, m, open),
+        spentLabel(name),
         wait > 0 ? el("span", { class: "wb" }, [icon("ask"), wait + " waiting"]) : null
       ]),
       lowCab ? null : cabinet(name, closed, false),
@@ -967,6 +993,7 @@
       el("div", { class: "mr-h" }, [
         el("b", { text: name }),
         roomLight(running, m, open),
+        spentLabel(name),
         wait > 0 ? el("span", { class: "wb" }, [icon("ask"), wait + " waiting"]) : null,
         el("span", { class: "grow" }),
         cab
