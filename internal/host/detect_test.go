@@ -1,6 +1,9 @@
 package host
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDetect(t *testing.T) {
 	t.Parallel()
@@ -54,5 +57,27 @@ func TestOpenNilForNoneAndITerm(t *testing.T) {
 	}
 	if Open(ITerm, Options{}) != nil {
 		t.Fatal("Open(ITerm) is reserved and must be nil")
+	}
+}
+
+func TestNoHostHint(t *testing.T) {
+	t.Parallel()
+	local := NoHostHint(func(string) string { return "" })
+	if !strings.Contains(local, "inside WezTerm or Ghostty") {
+		t.Fatalf("local hint = %q", local)
+	}
+	for _, key := range []string{"SSH_CONNECTION", "SSH_TTY"} {
+		got := NoHostHint(func(k string) string {
+			if k == key {
+				return "x"
+			}
+			return ""
+		})
+		if !strings.Contains(got, "SSHMUX:") {
+			t.Fatalf("%s set: hint = %q, want the wezterm ssh multiplexing advice", key, got)
+		}
+	}
+	if NoHostHint(nil) != local {
+		t.Fatal("nil getenv must give the local hint")
 	}
 }

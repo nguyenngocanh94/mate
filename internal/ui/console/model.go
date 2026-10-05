@@ -239,6 +239,9 @@ type Model struct {
 	// stage is the host-pane attach (docs/mvp.md M10). Enter and a click on
 	// a Mate/Crew row call it and stay on the tree. nil means no host pane.
 	stage StageFunc
+	// noHost says how to get a next pane while stage is nil; blank means
+	// the default advice.
+	noHost string
 	// w and h come from tea.WindowSizeMsg and from nowhere else. Before the
 	// first size message they are 0 and View renders nothing, rather than
 	// guessing a size and drawing a frame the terminal never asked for.
@@ -422,6 +425,21 @@ func (m Model) WithNotice(text string) Model {
 func (m Model) WithStage(fn StageFunc) Model {
 	m.stage = fn
 	return m
+}
+
+// WithNoHostHint replaces the advice Enter gives while there is no host
+// pane, such as what to do instead over ssh.
+func (m Model) WithNoHostHint(text string) Model {
+	m.noHost = text
+	return m
+}
+
+// noHostHint is how to get a next pane, as Enter and the menu say it.
+func (m Model) noHostHint() string {
+	if m.noHost != "" {
+		return m.noHost
+	}
+	return "run mate console inside WezTerm or Ghostty"
 }
 
 // baseCtx is ctx if WithContext set one, else context.Background().
