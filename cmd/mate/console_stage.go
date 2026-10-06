@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"time"
 
@@ -20,29 +19,31 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
-// consoleColumns are the Console's sibling columns (docs/mvp.md M13): the
-// stage, which shows the agent of the row Enter was pressed on, and - only
-// while that row is a Crew - the review, which shows the crew's worktree
-// in the Fresh editor. Each column runs `mate pane serve` for its whole life;
-// the Console tells it what to show over its socket, and the host never
-// re-splits a column once made.
+// consoleColumns are the Console's surfaces (docs/mvp.md M13): the stage
+// column, which shows the agent of the row Enter was pressed on, and the
+// review tab, which `e` opens on a crew's report. The review is a tab in
+// the same window: a column left Fresh about half the window, and a
+// separate window covered the console. Each surface runs `mate pane serve`
+// for its whole life; the Console tells it what to show over its socket,
+// and the host never re-splits a column or opens a second review tab.
 type consoleColumns struct {
 	h host.Host
-	// cols is the stage alone; withReview adds the review after it.
-	cols       []host.Column
-	withReview []host.Column
-	dir        string
-	stage      string
-	review     string // "" when Fresh is not installed
-	editor     string
-	herdr      string
+	// cols is the stage column. reviewCol is the program of the review
+	// tab; its Role is empty when Fresh is not installed.
+	cols      []host.Column
+	reviewCol host.Column
+	dir       string
+	stage     string
+	review    string // "" when Fresh is not installed
+	editor    string
+	herdr     string
 	// env is what every column's program gets over the pane's own: the
 	// Console's PATH.
 	env []string
 }
 
-// newConsoleColumns plans the columns for this Console: the stage always,
-// the review when the Fresh editor (`fresh`) is installed.
+// newConsoleColumns plans the surfaces for this Console: the stage column
+// always, the review tab when the Fresh editor (`fresh`) is installed.
 func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -64,7 +65,7 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 	c.cols = []host.Column{column(roleStage, c.stage)}
 	if editor := findTool(getenv, "fresh"); filepath.IsAbs(editor) {
 		c.editor, c.review = editor, filepath.Join(dir, roleReview+".sock")
-		c.withReview = append(slices.Clip(c.cols), column(roleReview, c.review))
+		c.reviewCol = column(roleReview, c.review)
 	}
 	return c, nil
 }
@@ -164,29 +165,49 @@ func (c *consoleColumns) close() {
 }
 
 // consoleStage is the Console's Enter seam: the stage attaches the row's
-// agent; on a Crew row the review opens the crew's worktree, and on a Mate
-// row it closes, so the Console is two columns unless a crew is shown. A
-// nil columns yields a nil StageFunc, which the Console reads as "no next
-// pane".
+// agent and stays there. The report tab is `e`, not Enter. A nil columns
+// yields a nil StageFunc, which the Console reads as "no next pane".
 func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) console.StageFunc {
 	if c == nil {
 		return nil
 	}
 	return func(ctx context.Context, target console.StageTarget) error {
-		ref, meta, err := stageRef(ws, target)
+		ref, _, err := stageRef(ws, target)
 		if err != nil {
 			return err
 		}
 		if err := herdrSession(ctx, ws, deps); err != nil {
 			return err
 		}
-		if err := c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env}); err != nil {
-			return err
+		return c.show(ctx, c.cols, c.stage, panerun.Command{Argv: host.AttachArgv(c.herdr, ref.HerdrSession, ref.AgentName), Env: c.env})
+	}
+}
+
+// consoleReview is the Console's `e` seam: a tab beside the Console runs
+// Fresh on that crew's report. A nil columns yields a nil ReviewFunc.
+func consoleReview(ws *store.Workspace, c *consoleColumns) console.ReviewFunc {
+	if c == nil {
+		return nil
+	}
+	return func(ctx context.Context, target console.StageTarget) error {
+		if c.review == "" {
+			return fmt.Errorf("a crew's report needs the Fresh editor: brew install fresh-editor")
 		}
-		if target.Kind != console.StageCrew {
-			return c.hideReview(ctx)
+		if target.Kind != console.StageCrew || target.ID == "" || target.ProjectID == "" {
+			return fmt.Errorf("e opens a crew's report")
 		}
-		return c.showReview(ctx, ws, target, meta)
+		dir, file, err := reviewReport(ws, target)
+		if err != nil {
+			return fmt.Errorf("report: %w", err)
+		}
+		argv := []string{c.editor, dir}
+		if file != "" {
+			argv = []string{c.editor, file}
+		}
+		if err := c.showTab(ctx, panerun.Command{Argv: argv, Dir: dir, Env: c.env}); err != nil {
+			return fmt.Errorf("report: %w", err)
+		}
+		return nil
 	}
 }
 
@@ -233,55 +254,49 @@ func herdrDown(session string) error {
 		fmt.Sprintf("herdr is not running; start or resume the Mate with s to bring it back (session %s)", session))
 }
 
-// showReview opens a crew's worktree in the review column, making the
-// column if it is not there; nothing without Fresh. Fresh opens on the
-// folder with its explorer marking what git sees changed; its Review Diff
-// is one palette command away.
-func (c *consoleColumns) showReview(ctx context.Context, ws *store.Workspace, target console.StageTarget, meta map[string]string) error {
-	if c.review == "" {
-		return nil
+// showTab tells the review tab what to run. A tab that is gone - never
+// opened, or closed - is opened, and asked again. A tab whose runner died
+// under a pane the host keeps is closed and opened again; that does not
+// touch the stage column. A tab already showing is brought to the front
+// after the file changes.
+func (c *consoleColumns) showTab(ctx context.Context, cmd panerun.Command) error {
+	err := panerun.Send(ctx, c.review, cmd)
+	if !errors.Is(err, panerun.ErrGone) {
+		if err != nil {
+			return err
+		}
+		return c.h.Front(ctx, roleReview)
 	}
-	folder, err := reviewFolder(ws, target, meta)
-	if err != nil {
-		return fmt.Errorf("file changes: %w", err)
+	if err := c.h.Tab(ctx, c.reviewCol); err != nil {
+		return err
 	}
-	if err := c.show(ctx, c.withReview, c.review, panerun.Command{Argv: []string{c.editor, folder}, Dir: folder, Env: c.env}); err != nil {
-		return fmt.Errorf("file changes: %w", err)
+	err = c.waitSend(ctx, c.review, cmd)
+	if !errors.Is(err, panerun.ErrGone) {
+		return err
 	}
-	return nil
+	if err := c.h.Close(ctx, roleReview); err != nil {
+		return err
+	}
+	if err := c.h.Tab(ctx, c.reviewCol); err != nil {
+		return err
+	}
+	return c.waitSend(ctx, c.review, cmd)
 }
 
-// hideReview closes the review column, if it is open: its runner stops
-// the editor first, then the host closes the pane.
-func (c *consoleColumns) hideReview(ctx context.Context) error {
-	if c.review == "" {
-		return nil
+// reviewReport is where `e` opens Fresh: the crew's own folder
+// (`crews/<id>/`, the one that crew worked in), and report.md inside it
+// when the crew has written one. The folder stays after the crew stops.
+func reviewReport(ws *store.Workspace, target console.StageTarget) (dir, file string, err error) {
+	dir = ws.CrewDir(target.ProjectID, target.ID)
+	st, err := os.Stat(dir)
+	if err != nil || !st.IsDir() {
+		return "", "", fmt.Errorf("crew %s has no folder", target.ID)
 	}
-	if err := panerun.Send(ctx, c.review, panerun.Command{Exit: true}); err != nil && !errors.Is(err, panerun.ErrGone) {
-		return fmt.Errorf("file changes: %w", err)
+	report := ws.CrewReport(target.ProjectID, target.ID)
+	if st, err := os.Stat(report); err == nil && !st.IsDir() {
+		return dir, report, nil
 	}
-	return c.h.Close(ctx, roleReview)
-}
-
-// reviewFolder is what the review column opens for a crew: a ship's
-// worktree, where its changes are, or for a scout, which changes no code
-// and writes its report under `.mate/`, the workspace's `.mate` directory.
-func reviewFolder(ws *store.Workspace, target console.StageTarget, meta map[string]string) (string, error) {
-	if spawn.CrewIsScout(ws, target.ProjectID, target.ID, meta) {
-		return ws.StateDir(), nil
-	}
-	wt := meta[spawn.MetaWorktree]
-	if wt == "" {
-		return "", fmt.Errorf("crew %s records no worktree", target.ID)
-	}
-	// The meta records it relative to the workspace root.
-	if !filepath.IsAbs(wt) {
-		wt = filepath.Join(ws.Root(), wt)
-	}
-	if _, err := os.Stat(wt); err != nil {
-		return "", fmt.Errorf("the worktree of crew %s is gone", target.ID)
-	}
-	return wt, nil
+	return dir, "", nil
 }
 
 // stageRef resolves the Herdr identity of the agent a target names out

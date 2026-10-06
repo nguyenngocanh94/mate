@@ -26,7 +26,7 @@ const (
 // paneIdle is what each column says while it shows nothing.
 var paneIdle = map[string]string{
 	roleStage:  "mate · agent\r\n\r\nEnter on a Mate or Crew row in the console shows it here.",
-	roleReview: "mate · file changes\r\n\r\nEnter on a Mate or Crew row shows its repo's changes here.",
+	roleReview: "mate · report\r\n\r\ne on a crew opens its report here.",
 }
 
 // cmdPane dispatches `mate pane serve`, the program the Console's columns

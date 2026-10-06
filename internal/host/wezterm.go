@@ -21,7 +21,10 @@ type wezTerm struct {
 
 	mu sync.Mutex
 	// ours is the pane each column's role was made in, by this process.
+	// tabs is the pane each review tab's role was made in. A tab is not a
+	// neighbor of the Console, so it stays out of the column walk.
 	ours map[string]string
+	tabs map[string]string
 }
 
 func newWezTerm(opt Options) *wezTerm {
@@ -34,6 +37,7 @@ func newWezTerm(opt Options) *wezTerm {
 		bin:    weztermCLI(opt, exec.LookPath, weztermBundles),
 		self:   self,
 		ours:   map[string]string{},
+		tabs:   map[string]string{},
 	}
 }
 
@@ -74,18 +78,92 @@ func (w *wezTerm) Layout(ctx context.Context, cols []Column) error {
 	return nil
 }
 
-// Close kills the columns this process made. WezTerm closes a pane whose
-// program exits, so this only settles what the runners left.
+// Tab opens col as a new tab in the Console's window. A tab already open
+// for that role is kept, so a later show only swaps the program inside it.
+func (w *wezTerm) Tab(ctx context.Context, col Column) error {
+	if err := validColumns([]Column{col}); err != nil {
+		return err
+	}
+	if w.self == "" {
+		return observability.NewError(observability.CodeUsage, "wezterm tabs need WEZTERM_PANE")
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if id := w.tabs[col.Role]; id != "" {
+		alive, err := w.paneAlive(ctx, id)
+		if err != nil {
+			return err
+		}
+		if alive {
+			return nil
+		}
+	}
+	// spawn without --new-window is a tab in the pane's window, beside the
+	// Console's tab, not a split of it.
+	id, err := w.spawn(ctx, append([]string{"cli", "spawn", "--pane-id", w.self, "--"}, col.Argv...))
+	if err != nil {
+		return err
+	}
+	w.tabs[col.Role] = id
+	return nil
+}
+
+// Front selects the review tab. The captain asked to see it.
+func (w *wezTerm) Front(ctx context.Context, role string) error {
+	w.mu.Lock()
+	id := w.tabs[role]
+	w.mu.Unlock()
+	if id == "" {
+		return nil
+	}
+	_, err := run(ctx, w.runner, w.bin, []string{"cli", "activate-pane", "--pane-id", id}, nil)
+	return err
+}
+
+func (w *wezTerm) spawn(ctx context.Context, cli []string) (string, error) {
+	id, err := run(ctx, w.runner, w.bin, cli, nil)
+	if err != nil {
+		return "", err
+	}
+	if id == "" {
+		return "", observability.NewError(observability.CodeRuntimeUnavailable, "wezterm returned no pane id for the new tab")
+	}
+	return id, nil
+}
+
+// paneAlive reports whether id is still a pane. The captain closing the
+// tab is how a review goes away between shows.
+func (w *wezTerm) paneAlive(ctx context.Context, id string) (bool, error) {
+	n, err := strconv.Atoi(id)
+	if err != nil {
+		return false, nil
+	}
+	panes, err := w.listPanes(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, p := range panes {
+		if p.PaneID == n {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Close kills the columns and tabs this process made. WezTerm closes a
+// pane whose program exits, so this only settles what the runners left.
 func (w *wezTerm) Close(ctx context.Context, roles ...string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for role, id := range w.ours {
-		if len(roles) > 0 && !slices.Contains(roles, role) {
-			continue
+	for _, panes := range []map[string]string{w.ours, w.tabs} {
+		for role, id := range panes {
+			if len(roles) > 0 && !slices.Contains(roles, role) {
+				continue
+			}
+			// A pane already gone makes kill-pane fail; that is the goal met.
+			_, _ = run(ctx, w.runner, w.bin, []string{"cli", "kill-pane", "--pane-id", id}, nil)
+			delete(panes, role)
 		}
-		// A pane already gone makes kill-pane fail; that is the goal met.
-		_, _ = run(ctx, w.runner, w.bin, []string{"cli", "kill-pane", "--pane-id", id}, nil)
-		delete(w.ours, role)
 	}
 	return nil
 }
@@ -158,20 +236,30 @@ func (w *wezTerm) activate(ctx context.Context) error {
 	return err
 }
 
+type wezPane struct {
+	PaneID int `json:"pane_id"`
+	Size   struct {
+		Cols int `json:"cols"`
+	} `json:"size"`
+}
+
+func (w *wezTerm) listPanes(ctx context.Context) ([]wezPane, error) {
+	out, err := run(ctx, w.runner, w.bin, []string{"cli", "list", "--format", "json"}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var panes []wezPane
+	if err := json.Unmarshal([]byte(out), &panes); err != nil {
+		return nil, observability.WrapError(observability.CodeRuntimeUnavailable, "wezterm cli list", err)
+	}
+	return panes, nil
+}
+
 // selfCols is the console pane's width now, from `cli list`: before the
 // first column exists, the whole window.
 func (w *wezTerm) selfCols(ctx context.Context) (int, bool) {
-	out, err := run(ctx, w.runner, w.bin, []string{"cli", "list", "--format", "json"}, nil)
+	panes, err := w.listPanes(ctx)
 	if err != nil {
-		return 0, false
-	}
-	var panes []struct {
-		PaneID int `json:"pane_id"`
-		Size   struct {
-			Cols int `json:"cols"`
-		} `json:"size"`
-	}
-	if err := json.Unmarshal([]byte(out), &panes); err != nil {
 		return 0, false
 	}
 	for _, p := range panes {

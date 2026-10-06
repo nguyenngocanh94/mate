@@ -8,7 +8,7 @@ Mỗi board có một golden cùng tên trong `internal/ui/console/testdata/gold
 
 mate là pane bên trái, khoảng 20% cửa sổ, rộng 32–48 cột.
 Bên phải là cột agent của host (WezTerm, Ghostty), dựng lúc mở console (M13): Enter trên hàng Mate/Crew cho nó chạy `herdr agent attach <agent>`.
-Chỉ khi hàng là Crew mới có thêm cột file changes, Fresh: trên worktree của crew với ship, trên `.mate/` của workspace với scout (report của scout nằm ở đó); Enter trên hàng Mate đóng cột đó.
+Phím `e` trên hàng Crew (kể cả crew đã dừng) mở một tab trong cùng cửa sổ, cạnh tab console, và chạy Fresh trên `report.md` trong folder của crew (`projects/<p>/crews/<id>/`) khi file đó đã có, còn không thì mở chính folder. Đổi crew thì cùng tab đổi file và được chọn lại. Enter không mở và không đóng tab đó. Tab, không phải cột và không phải cửa sổ mới: cột chỉ còn khoảng nửa phần cửa sổ còn lại, còn cửa sổ mới che console.
 mate không vẽ terminal của agent, không PTY, không session header.
 Không có title bar, chữ "mate console", đường dẫn workspace, đồng hồ, khung cửa sổ.
 
@@ -69,6 +69,7 @@ Lift rule: trên hàng có nền sel, faint lên dim, dim lên fg.
 | --- | --- |
 | ↑ ↓ | di chuyển (field trong detail) |
 | enter | show in next pane · mở project · bật tắt Completed |
+| e | report của crew: tab Fresh trên `report.md` trong folder crew |
 | a | sheet actions của hàng đang chọn |
 | tab · esc | pane kế · về list |
 | n · r · q | new project · refresh (hoặc retry stage lỗi) · quit |

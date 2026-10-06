@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
-	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/panerun"
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -213,23 +212,32 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 }
 
-// recordingColumns is a Console's two columns with a recorder listening on
-// each socket in place of `mate pane serve`: what each column was told to
-// show, in order.
+// recordingColumns is a Console's stage column and review tab with a
+// recorder listening on each socket in place of `mate pane serve`: what
+// each surface was told to show, in order.
 type recordingColumns struct {
 	*consoleColumns
 	mu          sync.Mutex
 	shown       map[string][]panerun.Command
 	layouts     int
+	fronts      int
 	closedRoles []string
 }
 
 type layoutCounter struct {
 	n      *int
 	closed *[]string
+	fronts *int
 }
 
 func (l layoutCounter) Layout(context.Context, []host.Column) error { *l.n++; return nil }
+func (layoutCounter) Tab(context.Context, host.Column) error        { return nil }
+func (l layoutCounter) Front(context.Context, string) error {
+	if l.fronts != nil {
+		*l.fronts++
+	}
+	return nil
+}
 func (l layoutCounter) Close(_ context.Context, roles ...string) error {
 	*l.closed = append(*l.closed, roles...)
 	return nil
@@ -244,7 +252,7 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	r := &recordingColumns{shown: map[string][]panerun.Command{}}
 	r.consoleColumns = &consoleColumns{
-		h: layoutCounter{&r.layouts, &r.closedRoles}, dir: dir,
+		h: layoutCounter{n: &r.layouts, closed: &r.closedRoles, fronts: &r.fronts}, dir: dir,
 		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
 		editor: "/opt/fresh", herdr: "/opt/herdr",
 	}
@@ -280,7 +288,8 @@ func (r *recordingColumns) of(role string) []panerun.Command {
 	return append([]panerun.Command(nil), r.shown[role]...)
 }
 
-// Enter on a Mate row attaches the Mate in the stage and closes the review.
+// Enter on a Mate row attaches the Mate in the stage. The report tab is
+// `e`, so Enter neither opens nor closes it.
 func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	action := consoleAction(w, deps)
@@ -300,11 +309,8 @@ func TestConsoleStageResolvesMateMeta(t *testing.T) {
 	if len(stage) != 1 || !slices.Equal(stage[0].Argv, want) {
 		t.Fatalf("stage shown %+v, want %q", stage, want)
 	}
-	// A Mate has no worktree: the review column closes, so the Console is
-	// two columns.
-	review := rec.of(roleReview)
-	if len(review) != 1 || !review[0].Exit || rec.closedRoles[0] != roleReview {
-		t.Fatalf("review told %+v, host closed %q; want the review column closed", review, rec.closedRoles)
+	if len(rec.of(roleReview)) != 0 || len(rec.closedRoles) != 0 || rec.fronts != 0 {
+		t.Fatalf("review told %+v, host closed %q, fronts %d; Enter leaves the report tab alone", rec.of(roleReview), rec.closedRoles, rec.fronts)
 	}
 }
 
@@ -388,13 +394,8 @@ func TestConsoleStageShowsACrewFromItsMeta(t *testing.T) {
 	if len(stage) != 1 || stage[0].Argv[5] != res.Agent || stage[0].Argv[2] != w.Session() {
 		t.Fatalf("staged %+v, want exactly the crew's own agent %s", stage, res.Agent)
 	}
-	review := rec.of(roleReview)
-	wt := filepath.Join(w.Root(), res.Worktree)
-	if filepath.IsAbs(res.Worktree) {
-		wt = res.Worktree
-	}
-	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/fresh", wt}) || review[0].Dir != wt {
-		t.Fatalf("review shown %+v, want Fresh on the crew's worktree %s", review, wt)
+	if len(rec.of(roleReview)) != 0 || rec.fronts != 0 {
+		t.Fatalf("review shown %d, fronts %d; Enter does not open the report", len(rec.of(roleReview)), rec.fronts)
 	}
 	if rec.layouts != 0 {
 		t.Fatalf("laid out %d times; the recorder's columns were all there", rec.layouts)
@@ -436,6 +437,8 @@ func TestConsoleStageRemakesAClosedColumn(t *testing.T) {
 type layoutFunc func()
 
 func (f layoutFunc) Layout(context.Context, []host.Column) error { f(); return nil }
+func (layoutFunc) Tab(context.Context, host.Column) error        { return nil }
+func (layoutFunc) Front(context.Context, string) error           { return nil }
 func (layoutFunc) Close(context.Context, ...string) error        { return nil }
 
 // A column whose runner died under a pane the host keeps is made afresh:
@@ -466,6 +469,8 @@ func TestConsoleStageRemakesAColumnWhoseRunnerDied(t *testing.T) {
 type closeAware struct{ layout, close func() }
 
 func (c closeAware) Layout(context.Context, []host.Column) error { c.layout(); return nil }
+func (closeAware) Tab(context.Context, host.Column) error        { return nil }
+func (closeAware) Front(context.Context, string) error           { return nil }
 func (c closeAware) Close(_ context.Context, roles ...string) error {
 	if len(roles) == 0 { // the review closing is not the columns made afresh
 		c.close()
@@ -473,49 +478,163 @@ func (c closeAware) Close(_ context.Context, roles ...string) error {
 	return nil
 }
 
-// The review column is not there until a crew is shown: the first Enter on
-// a crew lays it out, stage then review.
-func TestConsoleStageMakesTheReviewForACrew(t *testing.T) {
+// `e` opens the report tab the first time. That is a tab, not a column, so
+// the stage layout is never asked.
+func TestConsoleReviewMakesTheTabForACrew(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
 	absent := filepath.Join(rec.dir, "absent.sock")
 	live := rec.review
 	rec.review = absent
-	rec.withReview = []host.Column{{Role: roleStage}, {Role: roleReview}}
+	rec.reviewCol = host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}
+	var opened []host.Column
 	var laid [][]host.Column
-	rec.h = colsHost{func(cols []host.Column) { laid = append(laid, cols); _ = os.Symlink(live, absent) }}
-	if err := consoleStage(w, deps, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
+	rec.h = reviewHost{
+		layout: func(cols []host.Column) { laid = append(laid, cols) },
+		open:   func(col host.Column) { opened = append(opened, col); _ = os.Symlink(live, absent) },
+	}
+	if err := consoleReview(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(laid) != 1 || len(laid[0]) != 2 || laid[0][1].Role != roleReview {
-		t.Fatalf("laid out %v, want stage and review once", laid)
+	if len(laid) != 0 {
+		t.Fatalf("laid out %v; the report is a tab, not a column", laid)
 	}
-	if len(rec.of(roleReview)) != 1 {
-		t.Fatal("the review was not shown once made")
+	if len(opened) != 1 || opened[0].Role != roleReview {
+		t.Fatalf("opened %v, want the report tab once", opened)
+	}
+	if len(rec.of(roleReview)) != 1 || len(rec.of(roleStage)) != 0 {
+		t.Fatal("the report tab was not shown once, or the stage was touched")
 	}
 }
 
-type colsHost struct{ f func([]host.Column) }
-
-func (h colsHost) Layout(_ context.Context, cols []host.Column) error { h.f(cols); return nil }
-func (colsHost) Close(context.Context, ...string) error               { return nil }
-
-// A scout changes no code and writes its report under `.mate/`: the review
-// opens the workspace's `.mate` directory, not its worktree.
-func TestConsoleStageOpensDotMateForAScout(t *testing.T) {
+// A report tab whose runner died under a pane the host keeps is closed
+// and opened again. The stage column is left where it is.
+func TestConsoleReviewRemakesATabWhoseRunnerDied(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
-	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
-		Project: "shop", Crew: "sc", BriefText: brieftest.Scout("Find out why the cart empties.", "What empties it?"), Scout: true,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
-	if err := consoleStage(w, deps, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "sc", ProjectID: "shop"}); err != nil {
+	dead := filepath.Join(rec.dir, "dead-review.sock")
+	live := rec.review
+	rec.review = dead
+	rec.reviewCol = host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}
+	prev := columnStartWait
+	columnStartWait = 100 * time.Millisecond
+	t.Cleanup(func() { columnStartWait = prev })
+	opened := 0
+	var closed []string
+	rec.h = reviewHost{
+		open: func(host.Column) { opened++ },
+		close: func(roles []string) {
+			closed = append(closed, roles...)
+			if slices.Contains(roles, roleReview) {
+				_ = os.Symlink(live, dead)
+			}
+		},
+	}
+	if err := consoleReview(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
+	if opened != 2 || !slices.Equal(closed, []string{roleReview}) || len(rec.of(roleReview)) != 1 || len(rec.of(roleStage)) != 0 {
+		t.Fatalf("opened %d, closed %v, shown %d; want the report tab closed and opened again, and the stage left up", opened, closed, len(rec.of(roleReview)))
+	}
+}
+
+type reviewHost struct {
+	layout func([]host.Column)
+	open   func(host.Column)
+	close  func([]string)
+}
+
+func (h reviewHost) Layout(_ context.Context, cols []host.Column) error {
+	if h.layout != nil {
+		h.layout(cols)
+	}
+	return nil
+}
+
+func (h reviewHost) Tab(_ context.Context, col host.Column) error {
+	if h.open != nil {
+		h.open(col)
+	}
+	return nil
+}
+
+func (reviewHost) Front(context.Context, string) error { return nil }
+
+func (h reviewHost) Close(_ context.Context, roles ...string) error {
+	if h.close != nil {
+		h.close(roles)
+	}
+	return nil
+}
+
+// `e` opens the crew's own folder, and report.md inside it once that file
+// exists. The worktree and the workspace `.mate/` are not the report. The
+// folder stays after the crew stops, so `e` still opens it.
+func TestConsoleReviewOpensTheCrewReport(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	res := spawnFakeCrew(t, w, deps, "shop", "k3")
+	rec := newRecordingColumns(t)
+	fn := consoleReview(w, rec.consoleColumns)
+	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
+	ctx := context.Background()
+
+	if err := fn(ctx, target); err != nil {
+		t.Fatalf("open the folder: %v", err)
+	}
+	dir := w.CrewDir("shop", "k3")
 	review := rec.of(roleReview)
-	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/fresh", w.StateDir()}) || review[0].Dir != w.StateDir() {
-		t.Fatalf("review shown %+v, want Fresh on %s", review, w.StateDir())
+	if len(review) != 1 || !slices.Equal(review[0].Argv, []string{"/opt/fresh", dir}) || review[0].Dir != dir {
+		t.Fatalf("review shown %+v, want Fresh on the crew folder %s", review, dir)
+	}
+	wt := res.Worktree
+	if !filepath.IsAbs(wt) {
+		wt = filepath.Join(w.Root(), wt)
+	}
+	if review[0].Dir == wt || review[0].Dir == w.StateDir() {
+		t.Fatalf("opened %s, which is the worktree or the workspace .mate", review[0].Dir)
+	}
+	if rec.fronts != 1 {
+		t.Fatalf("fronts = %d, want the existing tab selected", rec.fronts)
+	}
+
+	report := w.CrewReport("shop", "k3")
+	if err := os.WriteFile(report, []byte("# report\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := fn(ctx, target); err != nil {
+		t.Fatalf("open the report: %v", err)
+	}
+	review = rec.of(roleReview)
+	if len(review) != 2 || !slices.Equal(review[1].Argv, []string{"/opt/fresh", report}) || review[1].Dir != dir {
+		t.Fatalf("review shown %+v, want Fresh on %s with dir %s", review, report, dir)
+	}
+	if rec.fronts != 2 {
+		t.Fatalf("fronts = %d, want the tab selected again for the new file", rec.fronts)
+	}
+
+	if _, err := spawn.StopCrew(ctx, w, deps, "shop", "k3", true); err != nil {
+		t.Fatalf("StopCrew: %v", err)
+	}
+	if err := fn(ctx, target); err != nil {
+		t.Fatalf("a stopped crew's report: %v", err)
+	}
+	if got := rec.of(roleReview); len(got) != 3 || !slices.Equal(got[2].Argv, []string{"/opt/fresh", report}) {
+		t.Fatalf("after stop, review shown %+v", got)
+	}
+
+	err := fn(ctx, console.StageTarget{Kind: console.StageMate, ProjectID: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "e opens a crew's report") {
+		t.Fatalf("mate: %v, want a refusal that e opens a crew's report", err)
+	}
+	err = fn(ctx, console.StageTarget{Kind: console.StageCrew, ID: "nope", ProjectID: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "no folder") {
+		t.Fatalf("missing crew: %v, want no folder", err)
+	}
+	rec.review = ""
+	err = fn(ctx, target)
+	if err == nil || !strings.Contains(err.Error(), "brew install fresh-editor") {
+		t.Fatalf("no fresh: %v", err)
 	}
 }

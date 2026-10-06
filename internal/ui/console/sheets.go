@@ -359,6 +359,7 @@ var keyTable = [][2]string{
 	{"s", "start the mate"},
 	{"m", "flip its mode"},
 	{"y", "copy"},
+	{"e", "crew report"},
 	{"l", "box: whole log"},
 	{"r", "refresh"},
 	{"q", "quit"},

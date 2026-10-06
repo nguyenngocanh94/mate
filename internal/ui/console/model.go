@@ -239,6 +239,9 @@ type Model struct {
 	// stage is the host-pane attach (docs/mvp.md M10). Enter and a click on
 	// a Mate/Crew row call it and stay on the tree. nil means no host pane.
 	stage StageFunc
+	// review is `e`: a tab beside the Console opens that crew's report.
+	// nil means there is no host tab to open.
+	review ReviewFunc
 	// noHost says how to get a next pane while stage is nil; blank means
 	// the default advice.
 	noHost string
@@ -424,6 +427,13 @@ func (m Model) WithNotice(text string) Model {
 // no host pane, and Enter says so rather than showing anything here.
 func (m Model) WithStage(fn StageFunc) Model {
 	m.stage = fn
+	return m
+}
+
+// WithReview installs `e`. A nil function means there is no host tab, and
+// `e` says so rather than opening a report here.
+func (m Model) WithReview(fn ReviewFunc) Model {
+	m.review = fn
 	return m
 }
 
