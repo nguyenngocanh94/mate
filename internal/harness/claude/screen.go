@@ -269,6 +269,10 @@ const (
 	claudeTrustAccept   = "Yes, I trust this folder"
 	claudeTrustQuit     = "No, exit"
 	claudeTrustFooter   = "Enter to confirm · Esc to cancel"
+	// Measured 2026-10-06 against 2.1.285
+	// (testdata/startup/claude-2.1.285-bypass-dialog.txt).
+	claudeBypassQuestion = "WARNING: Claude Code running in Bypass Permissions mode"
+	claudeBypassAccept   = "Yes, I accept"
 	// ClaudeComposerMarker is the glyph Claude draws for both its highlight
 	// and its composer; alone on a line it is the empty composer.
 	ClaudeComposerMarker = "❯"
@@ -292,6 +296,23 @@ func claudeStartup() harness.StartupProfile {
 				QuestionWindow: 6,
 				SelectKeys:     []string{"down"},
 				TargetLabel:    claudeTrustAccept,
+			},
+			{
+				// Named, never answered: the settle refuses on it with
+				// no key pressed. Its explanation runs seven lines
+				// between the warning and the options.
+				Screen:   harness.StartupScreenBypassDialog,
+				Question: claudeBypassQuestion,
+				Options: []harness.DialogOption{
+					{Label: claudeTrustQuit},
+					{Label: claudeBypassAccept},
+				},
+				Target:         1,
+				Footer:         claudeTrustFooter,
+				Marker:         ClaudeComposerMarker,
+				QuestionWindow: 10,
+				SelectKeys:     []string{"down"},
+				TargetLabel:    claudeBypassAccept,
 			},
 		},
 		// The empty composer is the marker alone on its line. A shell

@@ -38,6 +38,12 @@ const (
 	// run until they are trusted, such as codex-cli's "Hooks need review"
 	// dialog. The settle answers it through HookInstaller.ReviewOwn.
 	StartupScreenHooksReview StartupScreen = "hooks_review"
+	// StartupScreenBypassDialog is Claude's one-time "Bypass Permissions
+	// mode" acceptance, drawn by --dangerously-skip-permissions until the
+	// operator has accepted it once. It is recognised only so the settle can
+	// refuse at once with what to do; mate never answers it (the open captain
+	// call gomate-claude-bypass-mode-screen).
+	StartupScreenBypassDialog StartupScreen = "bypass_dialog"
 )
 
 // StartupDialogAnswer is the key sequence that answers one measured startup
