@@ -140,6 +140,25 @@ func (w *Workspace) WriteCrewMeta(project, crew string, meta map[string]string) 
 	return w.writeFile(w.CrewMeta(project, crew), data, 0o644)
 }
 
+// UpdateCrewMeta sets keys in `crews/<crew>.meta`: the file is read again at
+// the moment of the write, the keys in set are applied and every other key is
+// kept, so a writer that only means to add a key (the pull request watcher)
+// does not write back a stale copy of the rest. A crew with no meta is
+// refused: nothing here creates one.
+func (w *Workspace) UpdateCrewMeta(project, crew string, set map[string]string) error {
+	meta, err := w.ReadCrewMeta(project, crew)
+	if err != nil {
+		return err
+	}
+	if len(meta) == 0 {
+		return fmt.Errorf("store: crew %s/%s has no meta to update", project, crew)
+	}
+	for k, v := range set {
+		meta[k] = v
+	}
+	return w.WriteCrewMeta(project, crew, meta)
+}
+
 // ReadMateMeta reads `mate/mate.meta`.
 func (w *Workspace) ReadMateMeta(project string) (map[string]string, error) {
 	if err := ValidateProjectName(project); err != nil {

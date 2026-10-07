@@ -246,3 +246,26 @@ func TestProjectModeGitHubRoundTrips(t *testing.T) {
 		t.Fatalf("LoadProject = %+v, %v; want mode github", got, err)
 	}
 }
+
+func TestUpdateCrewMetaKeepsEveryOtherKey(t *testing.T) {
+	w := newWorkspace(t)
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{"a": "b"}); err == nil {
+		t.Fatal("UpdateCrewMeta created a meta for a crew that has none")
+	}
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"branch": "mate/k3", "state": "spawned"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{"pr_url": "u", "state": "working"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := w.ReadCrewMeta("shop", "k3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["branch"] != "mate/k3" || got["pr_url"] != "u" || got["state"] != "working" {
+		t.Fatalf("meta = %v", got)
+	}
+}

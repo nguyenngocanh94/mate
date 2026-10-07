@@ -154,6 +154,19 @@ func (w *Workspace) CrewStatus(project, crew string) string {
 	return filepath.Join(w.CrewsDir(project), crew+".status")
 }
 
+// CrewPRWatch is `projects/<project>/crews/<crew>.prwatch`: the pid of the
+// background `mate pr watch` of the crew's pull request, one number per file
+// (docs/mvp.md M18).
+func (w *Workspace) CrewPRWatch(project, crew string) string {
+	return filepath.Join(w.CrewsDir(project), crew+".prwatch")
+}
+
+// CrewPRWatchLog is `projects/<project>/crews/<crew>/prwatch.log`, where the
+// detached watcher writes what it did.
+func (w *Workspace) CrewPRWatchLog(project, crew string) string {
+	return filepath.Join(w.CrewDir(project, crew), "prwatch.log")
+}
+
 // CrewDir is `projects/<project>/crews/<crew>`, kept after teardown.
 func (w *Workspace) CrewDir(project, crew string) string {
 	return filepath.Join(w.CrewsDir(project), crew)

@@ -119,7 +119,10 @@ func Gather(v box.View, cursor map[string]int64, now time.Time) []Item {
 			if entries[i].Kind != box.KindStatus {
 				continue
 			}
-			if box.ParseStatus(entries[i].Text).State == box.StateWaitMate {
+			st := box.ParseStatus(entries[i].Text)
+			// `mate pr watch` delivers pr-merged and pr-closed to the
+			// Mate itself; repeating them in a digest would wake it twice.
+			if st.State == box.StateWaitMate && st.Verb != box.VerbPRMerged && st.Verb != box.VerbPRClosed {
 				waiting[entries[i].Seq] = true
 			}
 			break

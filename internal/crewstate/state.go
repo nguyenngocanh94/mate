@@ -83,6 +83,30 @@ const (
 	MetaStoppedAt = "stopped_at"
 )
 
+// Meta keys of a crew's pull request (docs/mvp.md M18), written by
+// `mate pr watch` and read by `crew stop`, recovery and the console.
+const (
+	// MetaPRURL is the pull request the crew opened.
+	MetaPRURL = "pr_url"
+	// MetaPRState is PRStateOpen until the watcher sees the pull request
+	// end, then PRStateMerged or PRStateClosed.
+	MetaPRState = "pr_state"
+	// MetaMergeCommit is the commit a merged pull request produced on its
+	// base branch; for a squash or rebase merge it is not on the crew's
+	// branch at all.
+	MetaMergeCommit = "merge_commit"
+	// MetaPRSync says what the watcher did to the primary checkout after
+	// a merge: `fast-forwarded`, or `skipped: <why>`.
+	MetaPRSync = "pr_sync"
+)
+
+// The values of MetaPRState.
+const (
+	PRStateOpen   = "open"
+	PRStateMerged = "merged"
+	PRStateClosed = "closed"
+)
+
 // Declaration is everything the displayed state is resolved from.
 type Declaration struct {
 	// Meta is `crews/<id>.meta`, read whole. Only state= and stopped_at=

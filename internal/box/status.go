@@ -43,9 +43,25 @@ const (
 	legacyFailed  = "failed"
 )
 
+// The pull request verbs of the github mode (docs/mvp.md M18). A crew writes
+// `pr-open:` when it opens its pull request; `mate pr watch` writes
+// `pr-merged:` or `pr-closed:` when it ends. All three parse as State
+// wait-mate - the crew is handed back and waiting on the Mate - and keep the
+// verb they were written with in Status.Verb, so a reader that cares which
+// one it was (the digest, which does not repeat what the watcher delivered)
+// can tell.
+const (
+	VerbPROpen   = "pr-open"
+	VerbPRMerged = "pr-merged"
+	VerbPRClosed = "pr-closed"
+)
+
 // Status is a parsed `crews/<id>.status` line.
 type Status struct {
 	State State
+	// Verb is the verb as written when it is one of the pull request verbs,
+	// and empty otherwise.
+	Verb string
 	// Text is the message after the verb; the whole raw line when the line
 	// did not parse as "verb: text" (State is StateUnknown), and the whole
 	// raw line for a legacy `blocked:`/`failed:` line, whose original verb
@@ -68,6 +84,8 @@ func ParseStatus(line string) Status {
 	switch verb {
 	case string(StateWorking), string(StateNeedsDecision), string(StateWaitMate):
 		return Status{State: State(verb), Text: text}
+	case VerbPROpen, VerbPRMerged, VerbPRClosed:
+		return Status{State: StateWaitMate, Verb: verb, Text: text}
 	case legacyDone:
 		return Status{State: StateWaitMate, Text: text}
 	case legacyBlocked:

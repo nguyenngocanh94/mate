@@ -168,7 +168,8 @@ func New(ws *store.Workspace, deps Deps) *Sender {
 
 // Request is one line to queue.
 type Request struct {
-	// Source is store.OutboxSourceAssign or store.OutboxSourceDigest.
+	// Source is store.OutboxSourceAssign, OutboxSourceDigest,
+	// OutboxSourceStow or OutboxSourcePR.
 	Source string
 	// Key is the dedup key; see store.OutboxItem.Key.
 	Key string
@@ -179,7 +180,7 @@ type Request struct {
 }
 
 func (r Request) validate() error {
-	if r.Source != store.OutboxSourceAssign && r.Source != store.OutboxSourceDigest && r.Source != store.OutboxSourceStow {
+	if r.Source != store.OutboxSourceAssign && r.Source != store.OutboxSourceDigest && r.Source != store.OutboxSourceStow && r.Source != store.OutboxSourcePR {
 		return observability.NewError(observability.CodeUsage, fmt.Sprintf("outbox: unknown source %q", r.Source))
 	}
 	if strings.TrimSpace(r.Key) == "" {
