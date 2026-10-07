@@ -459,6 +459,7 @@ svg.fc { position: absolute; left: 17%; top: 17%; width: 66%; height: 66%; fill:
 .td { color: var(--ink2); line-height: 1.25; }
 .td small { display: block; font-size: 12px; }
 .tt2 { text-align: right; font-weight: 600; }
+.tu { grid-column: 1 / -1; margin-top: 0; font-size: 12px; font-weight: 500; }
 .cab-empty { padding: 16px 20px; color: var(--ink2); }
 
 /* ------------------------------------------------------------ phone */

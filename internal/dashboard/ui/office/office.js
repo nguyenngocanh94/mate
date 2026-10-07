@@ -52,6 +52,7 @@
     sun: "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
     moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
     arrowR: "M5 12h14M13 6l6 6-6 6",
+    usage: "M4 20V11M10 20V4M16 20v-7M22 20H2",
     cabinet: "M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM4 9h16M4 15h16M10 6h4M10 12h4M10 18h4"
   };
 
@@ -1029,6 +1030,13 @@
 
   // usageSection is the design's "Token usage now": the total, the cost,
   // the four buckets in their fixed order, the context window and today.
+  // The admin page's token consumption for one task, in a new tab. The
+  // Mate has no task page, so it gets no such link.
+  function usageLink(name, crew, extra) {
+    return el("a", { class: "link usage-link" + (extra ? " " + extra : ""), href: "../#/p/" + enc(name) + "/t/" + enc(crew) + "/usage",
+      target: "_blank", rel: "noopener" }, [icon("usage"), "Usage details"]);
+  }
+
   function usageSection(o) {
     var t = o.tokens || null;
     var total = t ? t.total : null;
@@ -1074,7 +1082,8 @@
       el("div", { class: "today" }, [
         el("div", { class: "tv" }, ["Tokens today", el("b", { text: tok(o.today) })]),
         el("div", null, [sparkNode(o.spark), el("div", { class: "sx" }, [el("span", { text: "6h ago" }), el("span", { text: "now" })])])
-      ])
+      ]),
+      o.link || null
     ]);
   }
 
@@ -1198,7 +1207,7 @@
       usageSection({
         tokens: t.tokens, cost: t.cost, updated: b ? b.generated_at : null,
         contextPct: t.context_pct, contextTokens: t.turns > 0 ? t.context_tokens_last : null,
-        today: crewTokensToday(name, crew), spark: crewSpark()
+        today: crewTokensToday(name, crew), spark: crewSpark(), link: usageLink(name, crew)
       })
     ];
 
@@ -1298,7 +1307,8 @@
             el("span", { class: "tn", text: t.crew }),
             el("span", null, chip(f)),
             el("span", { class: "td", title: closedAt(t) }, [age(closedAt(t)) + " ago", el("small", { text: monthDay(closedAt(t)) })]),
-            el("span", { class: "tt2", text: tok(t.tokens ? t.tokens.total : null) })
+            el("span", { class: "tt2", text: tok(t.tokens ? t.tokens.total : null) }),
+            usageLink(name, t.crew, "tu")
           ]);
         }))
       ]);

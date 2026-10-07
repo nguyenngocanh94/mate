@@ -338,6 +338,7 @@
   var segmentKindFilter = "all";  // "all" or one work kind of KINDS
   var selectedFinding = "";
   var selectedSegment = "";
+  var revealUsage = false;        // a /usage route is waiting for its card to render
 
   function link(hash) { return "#" + hash; }
 
@@ -350,8 +351,10 @@
 
   function parseHash() {
     var h = (location.hash || "#/").replace(/^#/, "");
-    var m = /^\/p\/([^/]+)\/t\/([^/]+)\/?$/.exec(h);
-    if (m) return { tier: "task", project: decodeURIComponent(m[1]), crew: decodeURIComponent(m[2]) };
+    // An optional /usage suffix opens the task and scrolls to its token
+    // consumption; routeHash never writes it, so the crumbs stay plain.
+    var m = /^\/p\/([^/]+)\/t\/([^/]+?)(\/usage)?\/?$/.exec(h);
+    if (m) return { tier: "task", project: decodeURIComponent(m[1]), crew: decodeURIComponent(m[2]), usage: !!m[3] };
     m = /^\/p\/([^/]+)\/mate\/?$/.exec(h);
     if (m) return { tier: "mate", project: decodeURIComponent(m[1]), crew: "" };
     m = /^\/p\/([^/]+)\/?$/.exec(h);
@@ -2458,6 +2461,13 @@
       if (again) again.focus({ preventScroll: true });
     }
     window.scrollTo(0, y);
+    // A /usage route scrolls once, when the task has rendered, and not again
+    // on later polls.
+    if (revealUsage && route.tier === "task" && data && !(data.error instanceof Error)) {
+      revealUsage = false;
+      var card = matchingNode("data-answer", "tokens");
+      if (card) card.scrollIntoView({ block: "start", behavior: "auto" });
+    }
   }
 
   function currentPath() {
@@ -2552,6 +2562,7 @@
     }
     if (next.tier !== route.tier || next.project !== route.project) filter = "open";
     route = next;
+    revealUsage = !!next.usage;
     data = null;
     renderCrumbs();
     draw();
