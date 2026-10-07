@@ -14,6 +14,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/facts"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -196,7 +197,10 @@ func cmdProjectList(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// cmdProjectRemove implements `mate project remove <name>`.
+// cmdProjectRemove implements `mate project remove <name>`: it stops the
+// project's crews and Mate, then drops it from workspace.yaml (docs/mvp.md
+// task 75). Everything on disk stays, so `mate project add <name>` brings
+// the history back.
 func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project remove", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -217,11 +221,45 @@ func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := w.RemoveProject(name); err != nil {
-		return fmt.Errorf("project remove %s: %w", name, err)
+	return projectRemove(context.Background(), w, spawn.LiveDeps(harnesses), name, spawn.CallerFromEnv(), stdout, stderr)
+}
+
+// projectRemove is cmdProjectRemove's core, over any deps, for tests.
+func projectRemove(ctx context.Context, w *store.Workspace, deps spawn.Deps, name, caller string, stdout, stderr io.Writer) error {
+	res, err := spawn.RemoveProject(ctx, w, deps, name, removeProjectOptions(w, deps, caller, stderr, nil))
+	for _, s := range res.Stopped {
+		fmt.Fprintln(stdout, stoppedAgentLine(name, s))
+	}
+	if err != nil {
+		return err
 	}
 	fmt.Fprintf(stdout, "removed project %s\n", name)
 	return nil
+}
+
+// removeProjectOptions is how the CLI and the Console stop a project's Mate
+// for a removal: with the stow `mate mate stop` runs.
+func removeProjectOptions(w *store.Workspace, deps spawn.Deps, caller string, stderr io.Writer, progress func(string)) spawn.RemoveProjectOptions {
+	return spawn.RemoveProjectOptions{
+		Progress: progress,
+		Stow: func(ctx context.Context, project string) error {
+			_, err := stowBeforeStop(ctx, w, deps, project, caller, false, stderr)
+			return err
+		},
+	}
+}
+
+// stoppedAgentLine is the one line a removal prints per agent it stopped.
+func stoppedAgentLine(project string, s spawn.StoppedAgent) string {
+	switch {
+	case s.Cleared && s.Crew != "":
+		return fmt.Sprintf("%s/%s: not listed by Herdr; run meta cleared", project, s.Crew)
+	case s.Crew != "":
+		return crewStopReport(project, s.Crew, s.Stop)
+	case s.Stop.AlreadyGone:
+		return fmt.Sprintf("%s: Mate already gone (agent %s)", project, s.Stop.Agent)
+	}
+	return fmt.Sprintf("%s: Mate stopped (agent %s, session_id kept for resume)", project, s.Stop.Agent)
 }
 
 // cmdProjectYolo implements `mate project yolo <name> on|off`: the one
