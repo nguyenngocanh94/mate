@@ -71,34 +71,41 @@ type crewRef struct {
 
 func crews(env Env) []crewRef {
 	var out []crewRef
-	w := env.WS
-	for _, ref := range w.Projects() {
-		cfg, err := w.LoadProject(ref.Name)
-		if err != nil {
+	for _, ref := range env.WS.Projects() {
+		out = append(out, crewsOf(env.WS, ref.Name)...)
+	}
+	return out
+}
+
+// crewsOf reads every crew meta of one project; a project or meta that cannot
+// be read has no crews here, the pass over the others goes on.
+func crewsOf(w *store.Workspace, project string) []crewRef {
+	cfg, err := w.LoadProject(project)
+	if err != nil {
+		return nil
+	}
+	entries, err := os.ReadDir(w.CrewsDir(project))
+	if err != nil {
+		return nil
+	}
+	var out []crewRef
+	for _, e := range entries {
+		id := strings.TrimSuffix(e.Name(), ".meta")
+		if e.IsDir() || id == e.Name() || store.ValidateCrewID(id) != nil {
 			continue
 		}
-		entries, err := os.ReadDir(w.CrewsDir(ref.Name))
-		if err != nil {
+		meta, err := w.ReadCrewMeta(project, id)
+		if err != nil || len(meta) == 0 {
 			continue
 		}
-		for _, e := range entries {
-			id := strings.TrimSuffix(e.Name(), ".meta")
-			if e.IsDir() || id == e.Name() || store.ValidateCrewID(id) != nil {
-				continue
-			}
-			meta, err := w.ReadCrewMeta(ref.Name, id)
-			if err != nil || len(meta) == 0 {
-				continue
-			}
-			c := crewRef{project: ref.Name, crew: id, meta: meta}
-			if rel := meta[spawn.MetaWorktree]; rel != "" {
-				c.worktree = filepath.Join(w.Root(), filepath.FromSlash(rel))
-			}
-			if repo, err := cfg.CrewRepo(meta); err == nil {
-				c.repo = w.RepoDir(repo.Path)
-			}
-			out = append(out, c)
+		c := crewRef{project: project, crew: id, meta: meta}
+		if rel := meta[spawn.MetaWorktree]; rel != "" {
+			c.worktree = filepath.Join(w.Root(), filepath.FromSlash(rel))
 		}
+		if repo, err := cfg.CrewRepo(meta); err == nil {
+			c.repo = w.RepoDir(repo.Path)
+		}
+		out = append(out, c)
 	}
 	return out
 }
@@ -137,6 +144,9 @@ func RepairWorktrees(ctx context.Context, env Env) []Fix {
 // binary they name is gone, keeping every other key and hook. Which files
 // those are is the Mate's harness's to say.
 func RepairHooks(env Env) []Fix {
+	if env.Binary == "" {
+		return nil
+	}
 	var fixes []Fix
 	for _, ref := range env.WS.Projects() {
 		meta, err := env.WS.ReadMateMeta(ref.Name)

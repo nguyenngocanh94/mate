@@ -107,6 +107,12 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	pilot.Start(ctx)
 	defer pilot.Stop()
 
+	// What a machine restart or a copied workspace left behind is put right
+	// in the background, without asking: the console is usable meanwhile and
+	// its status line says where recovery is (docs/mvp.md M17).
+	recovery, stopRecovery := startConsoleRecovery(ctx, ws, deps)
+	defer stopRecovery()
+
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
 		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleLiveness(loadCtx, ws, deps))
 		if err != nil {
@@ -118,6 +124,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		// state - when it last sent, why it last could not - rides along the
 		// same way, and so does the observer's standing word about the
 		// terminal runtime it could not reach.
+		snap = recovery.apply(snap)
 		snap = withCrewHealth(snap, watcher.Snapshot())
 		snap = withRuntimeNotice(snap, watcher)
 		snap = withAutoStatus(snap, pilot.Snapshot())
