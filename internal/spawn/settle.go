@@ -161,6 +161,13 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 			if err != nil {
 				return settled, err
 			}
+		} else if class == harness.StartupScreenBypassDialog {
+			answer, err := screens.StartupAnswer(class)
+			if err != nil {
+				return settled, err
+			}
+			return settled, startupRefusal(handle, kind, screen,
+				fmt.Sprintf("%s asks to accept Bypass Permissions mode, which mate launches it with; mate does not accept it for you and pressed nothing. Run `%s --dangerously-skip-permissions` once yourself and choose %q; %s saves the choice and does not ask again. Then start again", kind, kind, answer.TargetLabel, kind))
 		} else if what, ok := startupDialogs[class]; ok {
 			if settled.markAnswered(class) {
 				return settled, startupRefusal(handle, kind, screen,

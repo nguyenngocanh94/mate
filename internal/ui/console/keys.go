@@ -99,6 +99,8 @@ func (m Model) onListKey(key string) (tea.Model, tea.Cmd) {
 		return m.beginMateStart()
 	case "m":
 		return m.beginModeToggle(m.modeTarget())
+	case "e":
+		return m.beginReview()
 	case "y":
 		if r, ok := m.selectedRow(); ok {
 			if v, ok := m.rowCopyValue(r); ok {
@@ -151,6 +153,8 @@ func (m Model) onDetailKey(key string) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		m.detailSel = clampInt(m.detailSel+1, 0, max0(n-1))
 		return m, nil
+	case "e":
+		return m.beginReview()
 	case "y":
 		if v, ok := m.detailCopy(); ok {
 			return m.copyText(v)

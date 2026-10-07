@@ -26,3 +26,13 @@ ran with the operator's own Claude config, so its status line and plan name are 
   suggestion's wording changes between launches (`Try "refactor <filepath>"` was also
   seen). Before the classifier knew this shape every Claude Mate start timed out with
   `startup screen not recognised`.
+
+Captured 2026-10-06 through `herdr pane read`, against Claude Code 2.1.285, from a Mate
+launch whose `~/.claude/settings.json` had never accepted Bypass Permissions mode
+(the shell's long command line rejoined onto one row, nothing else changed):
+
+- `claude-2.1.285-bypass-dialog.txt` - the one-time "Bypass Permissions mode" acceptance
+  that `--dangerously-skip-permissions` raises until `skipDangerousModePermissionPrompt`
+  is saved. The cursor is on **No, exit**. Before the classifier knew it every Claude
+  Mate start sat on it for the full readiness budget and failed with
+  `startup screen not recognised`.

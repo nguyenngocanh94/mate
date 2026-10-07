@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
@@ -152,6 +153,41 @@ func TestStartMateRefusesAnUnrecognisedScreen(t *testing.T) {
 	}
 	if len(rt.SentKeys) != 0 {
 		t.Fatalf("keys %v were pressed into a screen mate cannot name", rt.SentKeys)
+	}
+	if len(rt.Tabs) != 0 {
+		t.Fatalf("tabs left behind: %v", rt.Tabs)
+	}
+}
+
+// Claude's one-time Bypass Permissions acceptance is named so the start fails
+// at once with what to do, not after the whole budget as an unrecognised
+// screen; and mate never answers it for the captain.
+func TestStartMateRefusesTheClaudeBypassDialogAtOnce(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.StartupPromptTimeout = time.Hour
+	rt.NextStartupScreen = screen(t, "claude-2.1.285-bypass-dialog.txt")
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+		done <- err
+	}()
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the start waited on the bypass dialog instead of refusing at once")
+	}
+	if err == nil {
+		t.Fatal("the bypass dialog must fail the start")
+	}
+	if !strings.Contains(err.Error(), "Bypass Permissions mode") || strings.Contains(err.Error(), "not recognised") {
+		t.Fatalf("error = %v, want it to name the bypass dialog", err)
+	}
+	if len(rt.SentKeys) != 0 {
+		t.Fatalf("keys %v were pressed into the bypass dialog", rt.SentKeys)
 	}
 	if len(rt.Tabs) != 0 {
 		t.Fatalf("tabs left behind: %v", rt.Tabs)

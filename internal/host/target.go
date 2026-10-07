@@ -35,7 +35,7 @@ func validColumns(cols []Column) error {
 	return nil
 }
 
-// Host lays out the Console's columns.
+// Host lays out the Console's columns and its tabs in the same window.
 type Host interface {
 	// Layout makes sure every column in cols exists to the right of the
 	// Console, in order. A column this process made that is still there is
@@ -44,8 +44,16 @@ type Host interface {
 	// shell stays. A column of ours that cols leaves out is left as it is;
 	// Close removes it.
 	Layout(ctx context.Context, cols []Column) error
-	// Close closes the named columns this process made, or all of them
-	// when no role is named. Ghostty keeps a pane whose program has
+	// Tab opens col as a new tab in the Console's window, not a split and
+	// not another window. A tab this process already opened for col.Role
+	// that is still open is left as it is. The new tab is selected. Close
+	// removes it.
+	Tab(ctx context.Context, col Column) error
+	// Front selects the tab this process opened for role. A role with no
+	// tab is left alone.
+	Front(ctx context.Context, role string) error
+	// Close closes the named columns and tabs this process made, or all of
+	// them when no role is named. Ghostty keeps a pane whose program has
 	// exited, so a column's runner ending is not enough.
 	Close(ctx context.Context, roles ...string) error
 }

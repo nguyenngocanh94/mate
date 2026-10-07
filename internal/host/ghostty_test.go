@@ -17,24 +17,44 @@ import (
 const ghSelf = "AAAA0000-0000-0000-0000-000000000000"
 
 // ghosttyTab answers the AppleScript the driver sends: one tab of terminal
-// ids, the Console focused.
+// ids, the Console focused. windows are terminals in other windows.
 type ghosttyTab struct {
-	ids     []string
-	next    int
-	splits  []string // "<from> <direction> <command>"
-	actions []string
+	ids        []string
+	windowIDs  []string
+	windowCmds []string
+	selected   []string
+	next       int
+	splits     []string // "<from> <direction> <command>"
+	actions    []string
 }
 
 var (
-	reAnchor  = regexp.MustCompile(`first terminal whose id is "([^"]+)"`)
-	reCommand = regexp.MustCompile(`set command of cfg to "([^"]*)"`)
-	reDir     = regexp.MustCompile(`split anchor direction (\w+)`)
-	reAction  = regexp.MustCompile(`perform action "([^"]+)"`)
+	reAnchor   = regexp.MustCompile(`first terminal whose id is "([^"]+)"`)
+	reCommand  = regexp.MustCompile(`set command of cfg to "([^"]*)"`)
+	reDir      = regexp.MustCompile(`split anchor direction (\w+)`)
+	reAction   = regexp.MustCompile(`perform action "([^"]+)"`)
+	reContains = regexp.MustCompile(`contains "([^"]+)"`)
 )
 
 func (g *ghosttyTab) handle(_ context.Context, spec process.Spec) (process.Result, error) {
 	src := string(spec.Stdin)
 	switch {
+	case strings.Contains(src, "new tab in"):
+		id := fmt.Sprintf("CCCC0000-0000-0000-0000-%012d", g.next)
+		g.next++
+		g.windowIDs = append(g.windowIDs, id)
+		g.windowCmds = append(g.windowCmds, reCommand.FindStringSubmatch(src)[1])
+		return process.Result{Stdout: []byte(id + "\n")}, nil
+	case strings.Contains(src, "select tab"):
+		g.selected = append(g.selected, reContains.FindStringSubmatch(src)[1])
+		return process.Result{Stdout: []byte("ok\n")}, nil
+	case strings.Contains(src, "count of (every terminal whose id is"):
+		id := reAnchorAny.FindStringSubmatch(src)[1]
+		state := "gone"
+		if slices.Contains(g.ids, id) || slices.Contains(g.windowIDs, id) {
+			state = "open"
+		}
+		return process.Result{Stdout: []byte(state + "\n")}, nil
 	case strings.Contains(src, "focused terminal of selected tab"):
 		return process.Result{Stdout: []byte(ghSelf + "\n")}, nil
 	case strings.Contains(src, "repeat with w in windows"):
@@ -173,3 +193,60 @@ func TestGhosttyCloseClosesOnlyItsColumns(t *testing.T) {
 }
 
 var reAnchorAny = regexp.MustCompile(`whose id is "([^"]+)"`)
+
+// The review is a tab in the Console's window, not a split and not a new
+// window. A second open keeps it, and closing the role closes only that
+// terminal.
+func TestGhosttyOpensTheReviewInATab(t *testing.T) {
+	t.Parallel()
+	tab := &ghosttyTab{ids: []string{ghSelf}}
+	g := newGhosttyForTest(tab, nil)
+	ctx := context.Background()
+	review := testColumns[1]
+	if err := g.Tab(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	if len(tab.splits) != 0 {
+		t.Fatalf("splits %q; a review tab must not split the Console", tab.splits)
+	}
+	if !slices.Equal(tab.windowCmds, []string{"/bin/mate pane serve --role review"}) {
+		t.Fatalf("tabs = %q", tab.windowCmds)
+	}
+	if err := g.Front(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(tab.selected, []string{"CCCC0000-0000-0000-0000-000000000000"}) {
+		t.Fatalf("selected %q, want the review tab", tab.selected)
+	}
+	if err := g.Tab(ctx, review); err != nil || len(tab.windowCmds) != 1 {
+		t.Fatalf("an open review tab was opened again: %v %q", err, tab.windowCmds)
+	}
+	// The stage still splits off the Console. The review tab is not a
+	// terminal of this tab, so it is not a foreign pane.
+	if err := g.Layout(ctx, testColumns[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if len(tab.splits) != 1 || !strings.HasPrefix(tab.splits[0], ghSelf+" right /bin/mate pane serve --role stage") {
+		t.Fatalf("splits = %q, want only the stage", tab.splits)
+	}
+	var closed []string
+	g.runner = &process.FakeRunner{Handler: func(ctx context.Context, spec process.Spec) (process.Result, error) {
+		if src := string(spec.Stdin); strings.Contains(src, "close t") {
+			closed = append(closed, reAnchorAny.FindStringSubmatch(src)[1])
+			tab.windowIDs = slices.DeleteFunc(tab.windowIDs, func(id string) bool { return id == closed[len(closed)-1] })
+		}
+		return tab.handle(ctx, spec)
+	}}
+	if err := g.Close(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	if len(closed) != 1 || closed[0] != "CCCC0000-0000-0000-0000-000000000000" {
+		t.Fatalf("closed %q, want only the review tab", closed)
+	}
+	if err := g.Tab(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	if len(tab.windowCmds) != 2 {
+		t.Fatalf("tabs = %q, want the review opened again after it was closed", tab.windowCmds)
+	}
+}

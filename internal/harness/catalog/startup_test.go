@@ -54,6 +54,9 @@ func TestClassifyStartupScreenOnCapturedScreens(t *testing.T) {
 		{claude.KindClaude, "claude-2.1.270-ready.txt", harness.StartupScreenReady},
 		// 2.1.282 draws a suggestion inside the empty composer.
 		{claude.KindClaude, "claude-2.1.282-ready.txt", harness.StartupScreenReady},
+		// --dangerously-skip-permissions' one-time acceptance (2.1.285).
+		{claude.KindClaude, "claude-2.1.285-bypass-dialog.txt", harness.StartupScreenBypassDialog},
+		{codex.KindCodex, "claude-2.1.285-bypass-dialog.txt", harness.StartupScreenUnrecognized},
 		// `codex resume <id>` (task 35): the old conversation is replayed
 		// above the composer, prompt lines and all.
 		{codex.KindCodex, "codex-0.154.0-resume-ready.txt", harness.StartupScreenReady},

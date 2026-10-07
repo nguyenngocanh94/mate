@@ -31,9 +31,9 @@ func cmdConsole(dir string, stdout, stderr io.Writer) error {
 }
 
 // cmdConsoleLaunch is `mate console [<workspace-dir>]`: the interactive
-// console, and on a known host (WezTerm, Ghostty) it lays out its columns -
-// the agent stage and the file review - before the TUI starts, so Enter
-// fills them.
+// console, and on a known host (WezTerm, Ghostty) it lays out the stage
+// column before the TUI starts, so Enter fills it. `e` opens the report
+// tab later, in the same window.
 func cmdConsoleLaunch(args []string, stdout, stderr io.Writer) error {
 	if len(args) > 1 {
 		return newUsageError("usage: mate console [<workspace-dir>]")
@@ -164,7 +164,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 				}
 			}
 			if !layoutFailed && columns.review == "" {
-				addNotice("a crew's file changes need the Fresh editor: brew install fresh-editor")
+				addNotice("a crew's report needs the Fresh editor: brew install fresh-editor")
 			}
 		}
 	}
@@ -182,6 +182,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, deps, columns)).
+		WithReview(consoleReview(ws, columns)).
 		WithNoHostHint(host.NoHostHint(os.Getenv)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).

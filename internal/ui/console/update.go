@@ -28,6 +28,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.onActionDone(msg)
 	case stageDoneMsg:
 		return m.onStageDone(msg), nil
+	case reviewDoneMsg:
+		return m.onReviewDone(msg), nil
 	case tea.KeyMsg:
 		return m.onKey(msg)
 	case tea.MouseMsg:

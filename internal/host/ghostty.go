@@ -21,8 +21,12 @@ type ghostty struct {
 	mu sync.Mutex
 	// self is the Console's own terminal, the one focused when the first
 	// layout ran; ours is the terminal each column's role was made in.
+	// tabs is the terminal each review tab's role was made in. Another tab
+	// is not a terminal of the Console's tab and must not count as a column
+	// when the Console is narrowed.
 	self string
 	ours map[string]string
+	tabs map[string]string
 }
 
 func newGhostty(opt Options) *ghostty {
@@ -36,6 +40,7 @@ func newGhostty(opt Options) *ghostty {
 		selfCols:  opt.SelfCols,
 		settle:    150 * time.Millisecond,
 		ours:      map[string]string{},
+		tabs:      map[string]string{},
 	}
 }
 
@@ -80,18 +85,74 @@ func (g *ghostty) Layout(ctx context.Context, cols []Column) error {
 	return nil
 }
 
+// Tab opens col as a new tab in the Console's window. A tab already open
+// for that role is kept, so a later show only swaps the program inside it.
+func (g *ghostty) Tab(ctx context.Context, col Column) error {
+	if err := validColumns([]Column{col}); err != nil {
+		return err
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.self == "" {
+		id, err := g.terminalID(ctx, ghosttyFocusedScript)
+		if err != nil {
+			return err
+		}
+		g.self = id
+	}
+	if id := g.tabs[col.Role]; id != "" {
+		open, err := g.terminalOpen(ctx, id)
+		if err != nil {
+			return err
+		}
+		if open {
+			return nil
+		}
+	}
+	id, err := g.terminalID(ctx, ghosttyNewTabScript(g.self, strings.Join(col.Argv, " ")))
+	if err != nil {
+		return err
+	}
+	g.tabs[col.Role] = id
+	return nil
+}
+
+// Front selects the review tab. The captain asked to see it.
+func (g *ghostty) Front(ctx context.Context, role string) error {
+	g.mu.Lock()
+	id := g.tabs[role]
+	g.mu.Unlock()
+	if id == "" {
+		return nil
+	}
+	_, err := g.script(ctx, ghosttySelectTabScript(id))
+	return err
+}
+
+// terminalOpen reports whether id is still a terminal. The captain closing
+// the tab is how a review goes away between shows.
+func (g *ghostty) terminalOpen(ctx context.Context, id string) (bool, error) {
+	out, err := g.script(ctx, ghosttyTerminalOpenScript(id))
+	if err != nil {
+		return false, err
+	}
+	return out == "open", nil
+}
+
 func (g *ghostty) Close(ctx context.Context, roles ...string) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	var first error
-	for role, id := range g.ours {
-		if len(roles) > 0 && !slices.Contains(roles, role) {
-			continue
+	for _, terms := range []map[string]string{g.ours, g.tabs} {
+		for role, id := range terms {
+			if len(roles) > 0 && !slices.Contains(roles, role) {
+				continue
+			}
+			if _, err := g.script(ctx, ghosttyCloseScript(id)); err != nil && first == nil {
+				first = err
+			}
+			delete(terms, role)
 		}
-		if _, err := g.script(ctx, ghosttyCloseScript(id)); err != nil && first == nil {
-			first = err
-		}
-		delete(g.ours, role)
 	}
 	return first
 }
@@ -251,6 +312,55 @@ func ghosttyTabScript(self string) string {
 		end repeat
 	end repeat
 	error "the console's terminal is gone"
+end tell
+`
+}
+
+// ghosttyNewTabScript opens a tab in the window that holds the Console.
+func ghosttyNewTabScript(self, command string) string {
+	return `tell application "Ghostty"
+	set cfg to new surface configuration
+	set command of cfg to "` + command + `"
+	set wait after command of cfg to false
+	set targetID to ""
+	repeat with w in windows
+		repeat with tb in tabs of w
+			if (id of every terminal of tb) contains ` + mustQuote(self) + ` then
+				set targetID to id of w
+				exit repeat
+			end if
+		end repeat
+		if targetID is not "" then exit repeat
+	end repeat
+	if targetID is "" then error "the console's terminal is gone"
+	set nt to new tab in (first window whose id is targetID) with configuration cfg
+	return id of focused terminal of nt
+end tell
+`
+}
+
+// ghosttySelectTabScript selects the tab that holds id.
+func ghosttySelectTabScript(id string) string {
+	return `tell application "Ghostty"
+	repeat with w in windows
+		repeat with tb in tabs of w
+			if (id of every terminal of tb) contains ` + mustQuote(id) + ` then
+				select tab tb
+				return "ok"
+			end if
+		end repeat
+	end repeat
+	error "the review tab is gone"
+end tell
+`
+}
+
+func ghosttyTerminalOpenScript(id string) string {
+	return `tell application "Ghostty"
+	if (count of (every terminal whose id is ` + mustQuote(id) + `)) is 0 then
+		return "gone"
+	end if
+	return "open"
 end tell
 `
 }

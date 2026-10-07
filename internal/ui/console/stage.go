@@ -22,6 +22,11 @@ import (
 // so on the status line.
 type StageFunc func(context.Context, StageTarget) error
 
+// ReviewFunc opens the named crew's report in a tab beside the Console.
+// `e` calls it. A nil ReviewFunc means there is no host tab, and `e` says
+// so on the status line.
+type ReviewFunc func(context.Context, StageTarget) error
+
 // StageTargetKind says whether a target is a Mate or a Crew.
 type StageTargetKind string
 
@@ -271,6 +276,86 @@ func (m Model) stagedName(t StageTarget) string {
 // retryStage is r while the last stage failed: the same target again.
 func (m Model) retryStage() (Model, tea.Cmd) {
 	return m.beginStage(m.staged.target)
+}
+
+// beginReview is `e` on a crew: open its report in the host tab and stay
+// on the tree. A row that is not a crew is said so, and nothing opens.
+func (m Model) beginReview() (Model, tea.Cmd) {
+	target, ok := m.reviewTarget()
+	if !ok {
+		m.msg = errMsg("e opens a crew's report")
+		return m, nil
+	}
+	if m.review == nil {
+		m.msg = errMsg("no next pane: " + m.noHostHint())
+		return m, nil
+	}
+	label := target.ID
+	m.msg = infoMsg(m.g.Arrow + " report " + m.g.Dot + " opening " + label + m.g.Ellipsis)
+	fn := m.review
+	ctx := m.baseCtx()
+	return m, func() tea.Msg {
+		return reviewDoneMsg{err: fn(ctx, target), target: target}
+	}
+}
+
+type reviewDoneMsg struct {
+	err    error
+	target StageTarget
+}
+
+func (m Model) onReviewDone(msg reviewDoneMsg) Model {
+	if msg.err != nil {
+		m.msg = errMsg(oneLine(msg.err.Error()))
+		return m
+	}
+	m.msg = infoMsg(m.g.Arrow + " report " + m.g.Dot + " " + msg.target.ID)
+	return m
+}
+
+// reviewTarget is the crew `e` names: the box item under the cursor when
+// the box has focus, otherwise the selected row when that row is a crew.
+func (m Model) reviewTarget() (StageTarget, bool) {
+	if m.focus == paneBox {
+		if t, ok := m.boxCrewTarget(); ok {
+			return t, true
+		}
+	}
+	r, ok := m.selectedRow()
+	if !ok || r.kind != rowCrew {
+		return StageTarget{}, false
+	}
+	return m.stageTargetFor(r)
+}
+
+// boxCrewTarget is the crew a box row names, including one whose project
+// is not the frame on screen.
+func (m Model) boxCrewTarget() (StageTarget, bool) {
+	items := m.boxItems()
+	sel := m.boxSelection(items)
+	if sel < 0 || items[sel].e.Crew == "" {
+		return StageTarget{}, false
+	}
+	id, project := items[sel].e.Crew, items[sel].project
+	for _, p := range m.tree.Projects {
+		if p.ProjectID != project {
+			continue
+		}
+		for _, c := range p.Crews {
+			if c.CrewID != id {
+				continue
+			}
+			agent := ""
+			if c.AgentName.IsKnown() {
+				agent = c.AgentName.Value
+			}
+			return StageTarget{
+				Kind: StageCrew, ID: id, ProjectID: project,
+				HarnessKind: c.HarnessKind, AgentName: agent,
+			}, true
+		}
+	}
+	return StageTarget{Kind: StageCrew, ID: id, ProjectID: project}, true
 }
 
 // clipboardSequence is OSC 52's clipboard write for text.

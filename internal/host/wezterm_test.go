@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
@@ -19,8 +20,10 @@ var testColumns = []Column{
 }
 
 // weztermRow is one tab: pane ids left to right, the Console first.
+// extra holds panes in other windows.
 type weztermRow struct {
 	panes []string
+	extra []string
 	next  int
 	cols  int
 }
@@ -35,7 +38,13 @@ func (r *weztermRow) handle(_ context.Context, spec process.Spec) (process.Resul
 		}
 		return process.Result{}, nil
 	case len(a) >= 2 && a[1] == "list":
-		return process.Result{Stdout: []byte(`[{"pane_id":` + r.panes[0] + `,"size":{"cols":` + strconv.Itoa(r.cols) + `}}]`)}, nil
+		return process.Result{Stdout: []byte(r.listJSON())}, nil
+	case len(a) >= 2 && a[1] == "spawn":
+		// A spawn is a new tab, not a pane of the Console's row.
+		id := strconv.Itoa(r.next)
+		r.next++
+		r.extra = append(r.extra, id)
+		return process.Result{Stdout: []byte(id + "\n")}, nil
 	case len(a) >= 5 && a[1] == "split-pane":
 		i := slices.Index(r.panes, a[3])
 		id := strconv.Itoa(r.next)
@@ -47,6 +56,20 @@ func (r *weztermRow) handle(_ context.Context, spec process.Spec) (process.Resul
 		return process.Result{Stdout: []byte(id + "\n")}, nil
 	}
 	return process.Result{}, nil
+}
+
+func (r *weztermRow) listJSON() string {
+	all := append(append([]string{}, r.panes...), r.extra...)
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, id := range all {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(`{"pane_id":` + id + `,"size":{"cols":` + strconv.Itoa(r.cols) + `}}`)
+	}
+	b.WriteByte(']')
+	return b.String()
 }
 
 func splits(calls []process.Spec) [][]string {
@@ -318,4 +341,80 @@ func TestWezTermAddsAndClosesTheReviewAlone(t *testing.T) {
 	if !slices.Equal(row.panes, []string{"10", "20", "22"}) {
 		t.Fatalf("row = %v, want the review made again right of the stage", row.panes)
 	}
+}
+
+// The review is a tab in the Console's window, not a split and not a new
+// window: spawn without --new-window, leave the Console's row alone, keep
+// the same tab while it is open, and kill only that pane when the role
+// is closed.
+func TestWezTermOpensTheReviewInATab(t *testing.T) {
+	t.Parallel()
+	row := &weztermRow{panes: []string{"10"}, next: 20, cols: 200}
+	var killed []string
+	fake := &process.FakeRunner{Handler: func(ctx context.Context, spec process.Spec) (process.Result, error) {
+		if len(spec.Args) > 3 && spec.Args[1] == "kill-pane" {
+			killed = append(killed, spec.Args[3])
+			row.extra = slices.DeleteFunc(row.extra, func(id string) bool { return id == spec.Args[3] })
+			row.panes = slices.DeleteFunc(row.panes, func(id string) bool { return id == spec.Args[3] })
+			return process.Result{}, nil
+		}
+		return row.handle(ctx, spec)
+	}}
+	h := Open(WezTerm, Options{Runner: fake, Pane: "10", WezTerm: "wezterm"})
+	ctx := context.Background()
+	review := testColumns[1]
+	if err := h.Tab(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(row.panes, []string{"10"}) || !slices.Equal(row.extra, []string{"20"}) {
+		t.Fatalf("row %v extra %v; the review must not join the Console's row", row.panes, row.extra)
+	}
+	spawned := spawns(fake.Calls)
+	want := append([]string{"cli", "spawn", "--pane-id", "10", "--"}, review.Argv...)
+	if len(spawned) != 1 || !slices.Equal(spawned[0], want) || slices.Contains(spawned[0], "--new-window") {
+		t.Fatalf("spawn = %q, want %q", spawned, want)
+	}
+	if err := h.Front(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	if last := fake.Calls[len(fake.Calls)-1].Args; !slices.Equal(last, []string{"cli", "activate-pane", "--pane-id", "20"}) {
+		t.Fatalf("front = %q, want the review tab selected", last)
+	}
+	n := len(fake.Calls)
+	if err := h.Tab(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	if len(spawns(fake.Calls[n:])) != 0 {
+		t.Fatal("an open review tab was spawned again")
+	}
+	// The stage column still splits beside the Console. The tab is not a
+	// pane to its right, so it is not a foreign pane.
+	if err := h.Layout(ctx, testColumns[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(row.panes, []string{"10", "21"}) || !slices.Equal(row.extra, []string{"20"}) {
+		t.Fatalf("row %v extra %v; want the stage beside the Console and the review still a tab", row.panes, row.extra)
+	}
+	if err := h.Close(ctx, "review"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(killed, []string{"20"}) || !slices.Equal(row.extra, []string{}) || !slices.Equal(row.panes, []string{"10", "21"}) {
+		t.Fatalf("killed %v, row %v, extra %v; want only the review tab closed", killed, row.panes, row.extra)
+	}
+	if err := h.Tab(ctx, review); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(row.extra, []string{"22"}) {
+		t.Fatalf("extra %v, want a new review tab", row.extra)
+	}
+}
+
+func spawns(calls []process.Spec) [][]string {
+	var out [][]string
+	for _, c := range calls {
+		if len(c.Args) > 1 && c.Args[1] == "spawn" {
+			out = append(out, c.Args)
+		}
+	}
+	return out
 }

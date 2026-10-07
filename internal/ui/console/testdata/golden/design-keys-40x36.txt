@@ -13,7 +13,6 @@
   repo     ~/src/payments-api           
   crews    2 live · 1 completed         
   tokens   182k                         
-  mode     manual                       
 ─ keys ─────────────────────── any key ─
   ↑ ↓         move; fields in detail    
   enter       show in next pane         
@@ -24,6 +23,7 @@
   s           start the mate            
   m           flip its mode             
   y           copy                      
+  e           crew report               
   l           box: whole log            
   r           refresh                   
   q           quit                      

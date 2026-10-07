@@ -1,0 +1,18 @@
+erics@MacBook-Pro-cua-Erics mate % claude --dangerously-skip-permissions --session-id 17f84e16-fd75-4a2d-ae99-bfc597d6e74e --settings /Users/erics/workspace/.mate/projects/hellovietnam/mate/.claude/settings.json --setting-sources project --strict-mcp-config --tools Bash,Read,Write,Edit,Glob,Grep,Skill --autocompact 300000 --model opus --effort medium
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  WARNING: Claude Code running in Bypass Permissions mode
+
+  In Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous
+  commands.
+  This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be
+  restored if damaged.
+
+  By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.
+
+  https://code.claude.com/docs/en/security
+
+  ❯ No, exit
+    Yes, I accept
+
+  Enter to confirm · Esc to cancel

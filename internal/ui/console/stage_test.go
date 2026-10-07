@@ -144,6 +144,57 @@ func TestAMateThatIsNotRunningIsRefusedFromTheSnapshotAlone(t *testing.T) {
 	}
 }
 
+func TestEOnACrewOpensItsReportAndEnterDoesNot(t *testing.T) {
+	stage := &stageSpy{}
+	review := &stageSpy{}
+	m := toRunningAttempt(t, loaded(t, sampleTree(), nil)).WithStage(stage.fn).WithReview(review.fn)
+	m, cmd := send(t, m, key("enter"))
+	if cmd == nil {
+		t.Fatal("Enter on the Crew returned no Cmd")
+	}
+	m, _ = send(t, m, cmd())
+	if len(stage.calls) != 1 || len(review.calls) != 0 {
+		t.Fatalf("after Enter, stage=%d review=%d; Enter only shows the agent", len(stage.calls), len(review.calls))
+	}
+	m, cmd = send(t, m, key("e"))
+	if cmd == nil {
+		t.Fatal("e on the Crew returned no Cmd")
+	}
+	m, _ = send(t, m, cmd())
+	if len(review.calls) != 1 || review.calls[0].Kind != StageCrew || review.calls[0].ID != stage.calls[0].ID {
+		t.Fatalf("review calls = %+v, want the same crew", review.calls)
+	}
+	if len(stage.calls) != 1 {
+		t.Fatal("e also asked the stage to show the agent")
+	}
+	if !strings.Contains(m.msg.text, "report") || !strings.Contains(m.msg.text, review.calls[0].ID) {
+		t.Fatalf("message = %q, want the report status for %s", m.msg.text, review.calls[0].ID)
+	}
+}
+
+func TestEOnAMateSaysThereIsNoReport(t *testing.T) {
+	review := &stageSpy{}
+	m := projectFrame(t, sampleTree()).WithReview(review.fn)
+	m, cmd := send(t, m, key("e"))
+	if cmd != nil || len(review.calls) != 0 {
+		t.Fatal("e on a Mate opened a report")
+	}
+	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "e opens a crew's report") {
+		t.Fatalf("message = %+v, want the refusal", m.msg)
+	}
+}
+
+func TestEWithoutAHostSaysThereIsNoNextPane(t *testing.T) {
+	m := toRunningAttempt(t, loaded(t, sampleTree(), nil))
+	m, cmd := send(t, m, key("e"))
+	if cmd != nil {
+		t.Fatal("e without a ReviewFunc returned a Cmd")
+	}
+	if m.msg.tone != toneError || !strings.Contains(m.msg.text, "no next pane") {
+		t.Fatalf("message = %+v, want the no-host line", m.msg)
+	}
+}
+
 func TestEnterWithoutAHostGivesTheHint(t *testing.T) {
 	m := projectFrame(t, sampleTree()).WithNoHostHint("over ssh, do this")
 	m, _ = send(t, m, key("enter"))
