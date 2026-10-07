@@ -197,3 +197,53 @@ func TestEnsureSessionHookAddsItAndKeepsTheRest(t *testing.T) {
 		}
 	}
 }
+
+func TestRepointHooksRewritesOnlyAMissingMateBinary(t *testing.T) {
+	gone := "/old machine/bin/mate"
+	kept := "/usr/local/bin/mate"
+	settings, err := ClaudeSettings(gone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A hook of the captain's own sits beside mate's, and one mate hook
+	// points at a binary that still exists.
+	var doc map[string]any
+	if err := json.Unmarshal(settings, &doc); err != nil {
+		t.Fatal(err)
+	}
+	hooks := doc["hooks"].(map[string]any)
+	hooks["PreToolUse"] = []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "'/opt/tool' hook audit"}}}}
+	hooks["Notification"] = []any{hookMatcher(kept, "hook", "mate-prompt")}
+	data, _ := json.Marshal(doc)
+
+	exists := func(p string) bool { return p == kept || p == "/opt/tool" }
+	out, changed, err := RepointHooks(data, "/new/bin/mate", exists)
+	if err != nil || !changed {
+		t.Fatalf("RepointHooks = changed %v, %v; want a rewrite", changed, err)
+	}
+	got := string(out)
+	if strings.Contains(got, "old machine") {
+		t.Fatalf("a hook still names the missing binary:\n%s", got)
+	}
+	for _, want := range []string{"'/new/bin/mate' hook mate-prompt", "'/new/bin/mate' hook mate-stop", "'/new/bin/mate' hook mate-session",
+		"'/opt/tool' hook audit", "'/usr/local/bin/mate' hook mate-prompt", AutoMemoryKey} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("settings lost %q:\n%s", want, got)
+		}
+	}
+	again, changed, err := RepointHooks(out, "/new/bin/mate", exists)
+	if err != nil || changed || string(again) != got {
+		t.Fatalf("a second pass changed %v, %v; want it to be idempotent", changed, err)
+	}
+}
+
+func TestRepointHooksQuotedPath(t *testing.T) {
+	settings, err := ClaudeSettings("/Users/o'neil/bin/mate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, changed, err := RepointHooks(settings, "/new/mate", func(string) bool { return false })
+	if err != nil || !changed || strings.Contains(string(out), "neil") {
+		t.Fatalf("RepointHooks = %v, %v:\n%s", changed, err, out)
+	}
+}

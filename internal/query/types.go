@@ -43,6 +43,21 @@ type Snapshot struct {
 	// reads files only, so it cannot ask whether Herdr is up. An empty
 	// Notice is the ordinary state - the last poll that asked got an answer.
 	Runtime RuntimeStatus
+	// Recovery is what the console's recovery of this workspace is saying
+	// about itself (M17). cmd/mate merges it after Load; the zero value is a
+	// workspace with nothing to recover or one that has not started.
+	Recovery RecoveryStatus
+}
+
+// RecoveryStatus is the one line the status line shows for recovery: its
+// progress while it runs, then a summary.
+type RecoveryStatus struct {
+	// Line is the text; empty says nothing.
+	Line string
+	// Active is true while recovery is still running.
+	Active bool
+	// Failed is true when the summary names something that did not come back.
+	Failed bool
 }
 
 // RuntimeStatus is what the observer last knew about the terminal runtime.

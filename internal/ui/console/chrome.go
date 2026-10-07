@@ -173,6 +173,18 @@ func (m Model) footerMessage() footerMsg {
 	if m.msg.text != "" {
 		return m.msg
 	}
+	// Recovery outranks the opening notice and the runtime notice: while it
+	// runs, Herdr being down is the thing it is fixing, and afterwards its
+	// summary is the news.
+	if r := m.tree.Recovery; r.Line != "" {
+		switch {
+		case r.Failed:
+			return warnMsg(r.Line)
+		case r.Active:
+			return infoMsg(r.Line)
+		}
+		return okMsg(r.Line)
+	}
 	if m.notice != "" {
 		return warnMsg(m.notice)
 	}

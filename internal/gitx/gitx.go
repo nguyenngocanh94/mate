@@ -203,6 +203,15 @@ func (g Git) WorktreeAttached(ctx context.Context, path string) (bool, error) {
 	return res.ExitCode == 0 && SamePath(res.Stdout, path), nil
 }
 
+// RepairWorktree is `git -C repo worktree repair <path>`: it rewrites the two
+// links between a repository and one of its linked worktrees after either was
+// moved or copied. The paths git writes are absolute, so a workspace taken to
+// another directory or machine needs this before git recognises its worktrees.
+func (g Git) RepairWorktree(ctx context.Context, repo, path string) error {
+	_, err := g.run(ctx, repo, "worktree", "repair", path)
+	return err
+}
+
 // PruneWorktrees is `git -C repo worktree prune`: it drops the
 // administrative entries of worktrees whose directories are gone.
 func (g Git) PruneWorktrees(ctx context.Context, repo string) error {

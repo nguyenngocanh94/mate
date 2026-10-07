@@ -39,6 +39,13 @@ type RelaunchResult struct {
 	// AlreadyGone is true when the recorded agent was not in Herdr before
 	// this call: the shape a Herdr crash leaves behind.
 	AlreadyGone bool
+	// Resumed is true when the new agent picked up the harness conversation
+	// recorded in the crew's meta; ResumedFrom is that session id.
+	// ResumeNote says why a resume that was asked for did not happen, and
+	// the first prompt carries it to the fresh agent.
+	Resumed     bool
+	ResumedFrom string
+	ResumeNote  string
 	// TrustDialog and UpdateDialog are what the startup settle had to
 	// answer, exactly as a spawn reports them.
 	TrustDialog  bool
@@ -56,7 +63,14 @@ type RelaunchResult struct {
 	launchedAt time.Time
 }
 
-// RelaunchCrew starts a fresh agent for an existing crew in the worktree it
+// RelaunchOptions are the choices of a relaunch beyond which crew it is.
+type RelaunchOptions struct {
+	// Resume continues the harness conversation recorded in the crew's meta
+	// (`session_id=`) instead of starting a new one.
+	Resume bool
+}
+
+// RelaunchCrew starts an agent for an existing crew in the worktree it
 // already has (docs/mvp.md, "Đợt 2 sau M7"; firstmate's `relaunch --note`).
 //
 // It is the recovery path for a crew whose Herdr pane or agent is gone -
@@ -66,18 +80,26 @@ type RelaunchResult struct {
 // and the worktree is already there, and a spawn would refuse both. Relaunch
 // reuses them and starts the crew's recorded harness again.
 //
-// The new agent is a fresh harness session, never a resume: the brief on
-// disk - plus whatever the crew already wrote to its `.status` file - is the
-// durable instruction, and firstmate's relaunch deliberately does not trust a
-// harness-private conversation to survive a crash. note, when non-empty, is
-// one extra line of progress carried into the first prompt, so a replacement
-// does not repeat work that is only described in a dead pane.
+// The new agent is a fresh harness session unless the caller asks to resume
+// (RelaunchOptions.Resume): the brief on disk - plus whatever the crew already
+// wrote to its `.status` file - is the durable instruction, and firstmate's
+// relaunch deliberately does not trust a harness-private conversation to
+// survive a crash. The console's own recovery does ask, because a machine
+// restart leaves the conversation on disk; a resume that cannot be made, or
+// that does not come up, goes fresh once with the brief pointer and a note
+// saying the earlier conversation is gone. note, when non-empty, is one extra
+// line of progress carried into the first prompt, so a replacement does not
+// repeat work that is only described in a dead pane.
 //
 // A crew that is already closed (`state=finished|failed`) is refused: the
 // task is over, and starting an agent for it would resurrect a decision
 // nobody made. A crew whose worktree is gone is refused too - there is
 // nothing to relaunch into, and a new spawn is the right answer.
-func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew, note string) (RelaunchResult, error) {
+func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew, note string, opts ...RelaunchOptions) (RelaunchResult, error) {
+	var opt RelaunchOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 	if w == nil {
 		return RelaunchResult{}, errUsage("spawn: a workspace is required")
 	}
@@ -155,6 +177,9 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		repoCfg:  repoCfg,
 	}
 
+	decision := crewResumeDecision(deps, plan, meta, opt)
+	plan.resumeID = decision.SessionID
+
 	// 1. Everything that can be refused without touching the old agent:
 	// the harness files and the argv. Claude gets a fresh settings file and
 	// session id; Codex's discovery file is refreshed from the brief
@@ -209,11 +234,50 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 		return RelaunchResult{}, err
 	}
 	saga := &crewRelaunchSaga{deps: deps, session: session, tab: tab, madeTab: true}
-	if _, err := relaunchInTab(ctx, w, deps, saga, plan, briefPath, prep.SessionID, launch, note); err != nil {
+	prompt := RelaunchPrompt(briefPath, note)
+	if decision.Note != "" {
+		prompt = resumeLostPrompt(briefPath, note, decision.Note)
+	}
+	if _, err := relaunchInTab(ctx, w, deps, saga, plan, briefPath, prep.SessionID, launch, prompt); err != nil {
 		saga.compensate(ctx)
-		return RelaunchResult{}, err
+		if !decision.Resume || ctx.Err() != nil {
+			return RelaunchResult{}, err
+		}
+		// A resume that did not come up is not a reason to leave the crew
+		// without an agent: the conversation is a convenience, the brief
+		// and `.status` are the memory. One fresh attempt, in a tab of its
+		// own, and the prompt says the earlier conversation is gone.
+		decision = resumeDecision{Note: fmt.Sprintf(
+			"resuming the %s session %s failed (%v); started a fresh session instead",
+			kind, decision.SessionID, oneLineErr(err))}
+		plan.resumeID = ""
+		if prep, err = prepareCrewLaunch(ctx, w, deps, deps.git(), plan); err != nil {
+			return RelaunchResult{}, err
+		}
+		if launch, err = buildCrewLaunchSpec(ctx, plan, prep); err != nil {
+			return RelaunchResult{}, err
+		}
+		tab, err = deps.Runtime.CreateAgentTab(ctx, runtime.TabSpec{
+			Workspace: wsHandle,
+			Label:     CrewTabLabelPrefix + crew,
+			Cwd:       worktree,
+			Env:       crewPaneEnv(plan, session, w.CrewStatus(project, crew)),
+		})
+		if err != nil {
+			return RelaunchResult{}, err
+		}
+		saga = &crewRelaunchSaga{deps: deps, session: session, tab: tab, madeTab: true}
+		prompt = resumeLostPrompt(briefPath, note, decision.Note)
+		if _, err := relaunchInTab(ctx, w, deps, saga, plan, briefPath, prep.SessionID, launch, prompt); err != nil {
+			saga.compensate(ctx)
+			return RelaunchResult{}, err
+		}
 	}
 	result := saga.result
+	result.Resumed, result.ResumeNote = decision.Resume, decision.Note
+	if decision.Resume {
+		result.ResumedFrom = decision.SessionID
+	}
 	result.Project, result.Crew, result.Harness = project, crew, kind
 	result.Model, result.Effort = plan.model, plan.effort
 	result.Stopped, result.AlreadyGone = stopped, !stopped
@@ -238,6 +302,12 @@ func RelaunchCrew(ctx context.Context, w *store.Workspace, deps Deps, project, c
 	next[MetaState] = CrewStateSpawned
 	if strings.TrimSpace(next[MetaStartedAt]) == "" {
 		next[MetaStartedAt] = deps.now().Format(time.RFC3339)
+	}
+	delete(next, MetaResumed)
+	delete(next, MetaResumedFrom)
+	if result.Resumed {
+		next[MetaResumed] = "true"
+		next[MetaResumedFrom] = result.ResumedFrom
 	}
 	delete(next, MetaStoppedAt)
 	delete(next, MetaTeardown)
@@ -354,7 +424,7 @@ func (s *crewRelaunchSaga) compensate(ctx context.Context) {
 // compensate: the agent, its startup screen, readiness, the prompt and the
 // result. The meta is deliberately not written here; the caller writes it
 // in one place after this returns.
-func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *crewRelaunchSaga, plan crewPlan, briefPath, sessionID string, launch harness.LaunchSpec, note string) (RelaunchResult, error) {
+func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *crewRelaunchSaga, plan crewPlan, briefPath, sessionID string, launch harness.LaunchSpec, prompt string) (RelaunchResult, error) {
 	reservation, err := runtime.AllocateAgentName(deps.Names, saga.session.Name, CrewAgentNamePrefix, plan.crew, runtime.FailOnCollision)
 	if err != nil {
 		return RelaunchResult{}, err
@@ -384,7 +454,7 @@ func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *cre
 	if readiness := runtime.ClassifyObservation(observed); readiness.Kind == runtime.ReadinessFailed {
 		return RelaunchResult{}, readiness.Err
 	}
-	delivered, warning, tail, err := deliverPrompt(ctx, deps, handle, RelaunchPrompt(briefPath, note), plan.profile)
+	delivered, warning, tail, err := deliverPrompt(ctx, deps, handle, prompt, plan.profile)
 	if err != nil {
 		return RelaunchResult{}, err
 	}
@@ -415,4 +485,42 @@ func RelaunchPrompt(briefPath, note string) string {
 		return BriefPrompt(briefPath)
 	}
 	return fmt.Sprintf("Read and follow the brief at %s. Progress so far: %s. Start now.", briefPath, note)
+}
+
+// resumeLostPrompt is RelaunchPrompt for a relaunch that asked to resume and
+// could not: the same brief pointer, plus the sentence that tells the fresh
+// agent its earlier conversation is not coming back, so it reads `.status`
+// and the worktree for what is already done instead of waiting for it.
+func resumeLostPrompt(briefPath, note, why string) string {
+	base := strings.TrimSuffix(RelaunchPrompt(briefPath, note), " Start now.")
+	return fmt.Sprintf("%s Note: %s; your earlier conversation is not available, so check the status file and the worktree for what is already done. Start now.",
+		base, strings.Join(strings.Fields(why), " "))
+}
+
+// crewResumeDecision is whether a relaunch can resume, and the note that says
+// why not when it was asked to and cannot. The id is the crew's `session_id=`;
+// a harness that names its session only after the first prompt (Codex) left
+// none at spawn, so the rollout it wrote in the worktree after launch is asked
+// for, the way a Mate's stop does.
+func crewResumeDecision(deps Deps, plan crewPlan, meta map[string]string, opt RelaunchOptions) resumeDecision {
+	if !opt.Resume {
+		return resumeDecision{}
+	}
+	if strings.TrimSpace(meta[MetaSessionID]) == "" {
+		meta = withKey(meta, MetaSessionID, sessionAtStop(deps, plan.kind, plan.worktree, meta, ""))
+	}
+	decision := decideResume(meta, plan.kind, StartRequest{Resume: true})
+	if !decision.Resume && decision.Note == "" {
+		return resumeDecision{Note: fmt.Sprintf("the crew's meta records no %s session to resume; started a fresh session instead", plan.kind)}
+	}
+	return checkResume(plan.profile, decision)
+}
+
+func withKey(meta map[string]string, key, value string) map[string]string {
+	out := make(map[string]string, len(meta)+1)
+	for k, v := range meta {
+		out[k] = v
+	}
+	out[key] = value
+	return out
 }

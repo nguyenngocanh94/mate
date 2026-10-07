@@ -23,6 +23,7 @@ import (
 // what the file says, not because anything checked the pane is alive - the
 // caveat travels on the field's own Reason, the way every other
 // unverifiable fact in this package does (mvp.md section 2, decision 8).
+// LoadLive is the same read with Herdr's answer in hand.
 //
 // Reads that fail degrade to an Unknown field rather than failing the whole
 // snapshot: one unreadable project.yaml must not blank the workspace. Only
@@ -32,10 +33,18 @@ import (
 // harnesses is the binary's harness catalog: the snapshot carries it, and
 // resolves the workspace's default Mate harness against it.
 func Load(ctx context.Context, ws *store.Workspace, harnesses Harnesses) (Snapshot, error) {
-	return load(ctx, ws, harnesses, time.Now)
+	return load(ctx, ws, harnesses, Liveness{}, time.Now)
 }
 
-func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, now func() time.Time) (Snapshot, error) {
+// LoadLive is Load with Herdr's answer about which agents are up (M17). A
+// Mate or Crew whose meta records a pane but whom Herdr does not list is
+// stopped, not running: after a machine restart the file still names a pane
+// that no longer exists, and `s` must be able to bring the agent back.
+func LoadLive(ctx context.Context, ws *store.Workspace, harnesses Harnesses, live Liveness) (Snapshot, error) {
+	return load(ctx, ws, harnesses, live, time.Now)
+}
+
+func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, live Liveness, now func() time.Time) (Snapshot, error) {
 	if ws == nil {
 		return Snapshot{}, fmt.Errorf("query: no workspace is open")
 	}
@@ -68,7 +77,7 @@ func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, now fun
 		if err := ctx.Err(); err != nil {
 			return Snapshot{}, err
 		}
-		snap.Projects = append(snap.Projects, loadProject(ws, ref, &w))
+		snap.Projects = append(snap.Projects, loadProject(ws, ref, live, &w))
 	}
 	snap.AsOf = now().UTC()
 	snap.Warnings = w.list
@@ -91,7 +100,7 @@ func defaultMateHarness(ws *store.Workspace, harnesses Harnesses) HarnessKind {
 	return ""
 }
 
-func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) ProjectNode {
+func loadProject(ws *store.Workspace, ref store.ProjectRef, live Liveness, w *warnings) ProjectNode {
 	row := RowRef{Kind: RowProject, ID: ref.Name, Label: ref.Name}
 	// The mode is the presence of `mate/.auto` and nothing else: there is no
 	// separate record of it, so a project whose flag file cannot be read at
@@ -118,7 +127,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 		p.Repos = KnownField(repos)
 	}
 
-	p.Mate = loadMate(ws, ref.Name, w)
+	p.Mate = loadMate(ws, ref.Name, live, w)
 	p.Mate.Held = note(w, loadHeld(ws, ref.Name), "held", RowRef{Kind: RowMate, ID: ref.Name, Label: ref.Name})
 	// The box is read before the Crews because a Crew's state depends on
 	// it: `blocked` is an open incident in the merged view and nothing
@@ -137,7 +146,7 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 		}
 		p.Mate.LastEvent = lastActivity(mateLines, "nothing has been typed into the Mate's pane yet")
 	}
-	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, view, viewOK, w)
+	p.Crews, p.ClosedCrews = loadCrews(ws, ref.Name, p.Repos, view, viewOK, live, w)
 	for i := range p.Crews {
 		p.Crews[i].Attention = crewAttention(p.Crews[i])
 	}
@@ -149,11 +158,12 @@ func loadProject(ws *store.Workspace, ref store.ProjectRef, w *warnings) Project
 // does: mvp.md has no separate designation record, so the file's presence is
 // the designation.
 //
-// The status is derived from the keys the file carries and nothing else. A
-// recorded pane means the Mate was started; the caveat that this does not
-// prove the agent is alive rides on the Binding field, which is where the
-// Console already renders it.
-func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
+// The status is derived from the keys the file carries, and from Herdr's
+// answer when LoadLive has one. A recorded pane means the Mate was started;
+// without an answer the caveat that this does not prove the agent is alive
+// rides on the Binding field, which is where the Console already renders
+// it. With one, a pane Herdr does not list reads as stopped.
+func loadMate(ws *store.Workspace, project string, live Liveness, w *warnings) MateNode {
 	row := RowRef{Kind: RowMate, ID: project, Label: project}
 	path := ws.MateMeta(project)
 
@@ -171,7 +181,13 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 	kind := HarnessKind(meta["harness"])
 	pane := meta["pane"]
 	status := MateCreated
-	if pane != "" {
+	// A recorded pane Herdr does not list is a Mate the machine lost, not
+	// one that is running; it is stopped, and `s` resumes it.
+	gone := pane != "" && live.Asked && !live.Alive(meta["agent"])
+	switch {
+	case gone:
+		status = MateStopped
+	case pane != "":
 		status = MateRunning
 	}
 
@@ -195,6 +211,14 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 		out.Binding = AbsentField[BindingValue]("mate.meta records no pane; the Mate has not been started")
 		return out
 	}
+	if gone {
+		out.Binding = AbsentField[BindingValue]("mate.meta records pane " + pane + " but Herdr lists no agent " + meta["agent"] + "; the Mate is stopped")
+		return out
+	}
+	note := "recorded in mate.meta; this does not prove the agent is alive"
+	if live.Asked {
+		note = "recorded in mate.meta; Herdr lists the agent"
+	}
 	out.Binding = KnownNote(BindingValue{
 		Status:    BindingActive,
 		AgentName: out.AgentName.Value,
@@ -203,7 +227,7 @@ func loadMate(ws *store.Workspace, project string, w *warnings) MateNode {
 		Workspace: meta["workspace"],
 		Tab:       meta["tab"],
 		Pane:      pane,
-	}, "recorded in mate.meta; this does not prove the agent is alive")
+	}, note)
 	return out
 }
 
@@ -278,7 +302,7 @@ const noTimeline = "no timeline database has been read for this row yet"
 // ends a task (ProjectNode.Crews). A Crew whose meta could not be read is
 // kept, as a row whose fields say they could not be read, because an
 // unreadable record is not evidence of a closed one.
-func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], view box.View, viewOK bool, w *warnings) ([]CrewNode, int) {
+func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], view box.View, viewOK bool, live Liveness, w *warnings) ([]CrewNode, int) {
 	ids, err := crewIDs(ws.CrewsDir(project))
 	if err != nil {
 		// A project whose crews directory cannot be listed gets no Crew
@@ -291,7 +315,7 @@ func loadCrews(ws *store.Workspace, project string, repos Field[[]RepoValue], vi
 	out := make([]CrewNode, 0, len(ids))
 	closed := 0
 	for _, id := range ids {
-		c := loadCrew(ws, project, id, repos, view, viewOK, w)
+		c := loadCrew(ws, project, id, repos, view, viewOK, live, w)
 		if c.Closed {
 			closed++
 			continue
@@ -324,7 +348,7 @@ func crewIDs(dir string) ([]string, error) {
 	return ids, nil
 }
 
-func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue], view box.View, viewOK bool, w *warnings) CrewNode {
+func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue], view box.View, viewOK bool, live Liveness, w *warnings) CrewNode {
 	row := RowRef{Kind: RowCrew, ID: id, Label: "crew " + id}
 	c := CrewNode{
 		CrewID:    id,
@@ -380,9 +404,16 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 	} else {
 		c.AgentName = AbsentField[string]("crews/" + id + ".meta records no agent name")
 	}
-	if pane == "" {
+	switch {
+	case pane == "":
 		c.Binding = AbsentField[BindingValue]("crews/" + id + ".meta records no pane")
-	} else {
+	case live.Asked && !live.Alive(meta["agent"]):
+		c.Binding = AbsentField[BindingValue]("crews/" + id + ".meta records pane " + pane + " but Herdr lists no agent " + meta["agent"] + "; restart brings it back")
+	default:
+		note := "recorded in crews/" + id + ".meta; this does not prove the agent is alive"
+		if live.Asked {
+			note = "recorded in crews/" + id + ".meta; Herdr lists the agent"
+		}
 		c.Binding = KnownNote(BindingValue{
 			Status:    BindingActive,
 			AgentName: c.AgentName.Value,
@@ -391,7 +422,7 @@ func loadCrew(ws *store.Workspace, project, id string, repos Field[[]RepoValue],
 			Workspace: meta["workspace"],
 			Tab:       meta["tab"],
 			Pane:      pane,
-		}, "recorded in crews/"+id+".meta; this does not prove the agent is alive")
+		}, note)
 	}
 
 	openIncident := viewOK && len(box.BlockingIncidents(view, id)) > 0

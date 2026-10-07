@@ -211,3 +211,37 @@ func TestKeyLineFollowsFocus(t *testing.T) {
 		t.Fatalf("box key line = %q", l)
 	}
 }
+
+// Recovery's line (M17) is the status line while it runs and after it: the
+// progress is info, a clean summary is green, one that names a failure is a
+// warning. It outranks the runtime notice, which is the thing it is fixing,
+// and an explicit message still wins over it.
+func TestFooterMessageShowsRecovery(t *testing.T) {
+	tree := sampleTree()
+	tree.Runtime = query.RuntimeStatus{Notice: "herdr is not running; start or resume the Mate to bring it back"}
+	cases := []struct {
+		name string
+		r    query.RecoveryStatus
+		want footerMsg
+	}{
+		{"running", query.RecoveryStatus{Line: "recovering 1 of 3…", Active: true}, infoMsg("recovering 1 of 3…")},
+		{"done", query.RecoveryStatus{Line: "recovered 3"}, okMsg("recovered 3")},
+		{"failed", query.RecoveryStatus{Line: "recovered 2; 1 failed: crew shop/k4: gone", Failed: true}, warnMsg("recovered 2; 1 failed: crew shop/k4: gone")},
+	}
+	for _, tc := range cases {
+		tree.Recovery = tc.r
+		m := newFixture(t, tree, 120, 36, unicodeGlyphs)
+		if got := m.footerMessage(); got != tc.want {
+			t.Fatalf("%s: footerMessage = %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+	tree.Recovery = query.RecoveryStatus{Line: "recovering 1 of 3…", Active: true}
+	m := newFixture(t, tree, 120, 36, unicodeGlyphs)
+	if !strings.Contains(renderFrame(t, m), "recovering 1 of 3…") {
+		t.Fatalf("recovery is not on the status line:\n%s", renderFrame(t, m))
+	}
+	m.msg = errMsg("Show refused: binding stale")
+	if got := m.footerMessage(); got != m.msg {
+		t.Fatalf("an explicit message must win over recovery: got %+v", got)
+	}
+}
