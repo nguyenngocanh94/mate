@@ -280,6 +280,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		branch:           branch,
 		worktree:         worktree,
 		repoCfg:          repoCfg,
+		github:           cfg.Mode == store.ModeGitHub,
 	})
 	if err != nil {
 		saga.compensate(ctx)
@@ -355,6 +356,8 @@ type crewPlan struct {
 	branch           string
 	worktree         string
 	repoCfg          store.RepoConfig
+	// github is the project's delivery mode being `github`.
+	github bool
 	// resumeID is the harness session a relaunch resumes; empty is a fresh
 	// session.
 	resumeID string
@@ -367,7 +370,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	// that the compensated worktree still leaves the evidence behind.
 	briefPath := w.CrewBrief(plan.project, plan.crew)
 	statusPath := w.CrewStatus(plan.project, plan.crew)
-	brief, err := renderCrewBrief(w, plan)
+	brief, err := renderCrewBrief(w, deps, plan)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -729,8 +732,16 @@ func assertIsolatedWorktree(ctx context.Context, git gitx.Git, repo, worktree st
 
 // renderCrewBrief fills the embedded template with this crew's task, paths
 // and the captain's standing crew rules.
-func renderCrewBrief(w *store.Workspace, plan crewPlan) ([]byte, error) {
+func renderCrewBrief(w *store.Workspace, deps Deps, plan crewPlan) ([]byte, error) {
+	binary, err := deps.binary()
+	if err != nil {
+		return nil, err
+	}
 	return mateassets.RenderBrief(mateassets.BriefParams{
+		GitHub:             plan.github,
+		MateBin:            binary,
+		Project:            plan.project,
+		Crew:               plan.crew,
 		Task:               plan.brief,
 		Scout:              plan.scout,
 		RepoPath:           plan.repo,

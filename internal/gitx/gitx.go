@@ -282,6 +282,27 @@ func (g Git) DeleteBranch(ctx context.Context, repo, branch string) error {
 	return err
 }
 
+// RemoteURL is `git -C repo remote get-url <name>`: the URL the remote
+// points at, or "" when the repo has no remote of that name (git exits
+// non-zero for that, which is an answer here and not a failure).
+func (g Git) RemoteURL(ctx context.Context, repo, name string) (string, error) {
+	res, err := g.runner().Run(ctx, Command{Dir: repo, Args: []string{"remote", "get-url", name}})
+	if err != nil {
+		return "", err
+	}
+	if res.ExitCode != 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(res.Stdout), nil
+}
+
+// Fetch is `git -C repo fetch <remote>`: it updates the remote-tracking
+// branches and nothing in the working tree.
+func (g Git) Fetch(ctx context.Context, repo, remote string) error {
+	_, err := g.run(ctx, repo, "fetch", remote)
+	return err
+}
+
 // GitPath resolves one of git's own files for a working tree, absolutely:
 // `git -C dir rev-parse --path-format=absolute --git-path <name>`. The crew
 // saga uses it for info/exclude, which git shares across a repo's worktrees.

@@ -31,7 +31,9 @@ type ProjectConfig struct {
 	// Repos are the git repositories the project owns, zero or more
 	// (docs/mvp.md M9). A crew works in exactly one of them.
 	Repos []RepoConfig `yaml:"repos"`
-	// Mode is `local-only` in the MVP; no other value is accepted.
+	// Mode is the delivery mode, `local-only` (the default) or `github`; no
+	// other value is accepted. Only the captain sets it, with
+	// `mate project mode`.
 	Mode string `yaml:"mode"`
 	// Yolo lets Mate merge without asking the user.
 	Yolo bool `yaml:"yolo"`
@@ -202,13 +204,13 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 }
 
 // normaliseProject fills the defaults and checks the fields: the repos per
-// normaliseRepos, and the mode must be the one the MVP supports.
+// normaliseRepos, and the mode must be one of the two delivery modes.
 func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
 	if cfg.Mode == "" {
 		cfg.Mode = ModeLocalOnly
 	}
-	if cfg.Mode != ModeLocalOnly {
-		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: the MVP supports only %q", cfg.Mode, ModeLocalOnly)
+	if cfg.Mode != ModeLocalOnly && cfg.Mode != ModeGitHub {
+		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: want %q or %q", cfg.Mode, ModeLocalOnly, ModeGitHub)
 	}
 	repos, err := w.normaliseRepos(cfg.Repos)
 	if err != nil {

@@ -872,3 +872,38 @@ type silentPrompt struct {
 func (s *silentPrompt) PromptAgent(_ context.Context, _ runtime.AgentHandle, _ string) error {
 	return nil
 }
+
+// In the github mode the brief a crew is spawned with tells a ship to push
+// its branch and open a pull request, and to watch it (docs/mvp.md M18).
+func TestSpawnCrewInGitHubModeRendersThePullRequestBrief(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	cfg, err := w.LoadProject("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Mode = store.ModeGitHub
+	if err := w.SaveProject("shop", cfg); err != nil {
+		t.Fatal(err)
+	}
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project:   "shop",
+		Crew:      "k3",
+		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
+	}); err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	brief, err := os.ReadFile(w.CrewBrief("shop", "k3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"gh pr create --base main --head mate/k3", "pr watch shop k3 <the same URL>"} {
+		if !strings.Contains(string(brief), want) {
+			t.Errorf("brief.md does not carry %q:\n%s", want, brief)
+		}
+	}
+	if strings.Contains(string(brief), "Never push to any remote") {
+		t.Errorf("a github-mode brief still forbids pushing:\n%s", brief)
+	}
+}

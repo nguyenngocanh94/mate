@@ -9,6 +9,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/assets"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 var (
@@ -80,6 +81,10 @@ type Params struct {
 	// writes it.
 	CrewsDir string
 }
+
+// GitHub reports whether the project delivers through GitHub pull requests
+// (store.ModeGitHub); the templates branch on it.
+func (p Params) GitHub() bool { return p.Mode == store.ModeGitHub }
 
 // HarnessParams is one harness as the harness-adapters skill describes it.
 type HarnessParams struct {
@@ -215,6 +220,15 @@ type BriefParams struct {
 	Scout bool
 	// RepoPath is the absolute path of the project's primary git checkout.
 	RepoPath string
+	// GitHub selects the github delivery mode (store.ModeGitHub): a ship
+	// pushes its branch and opens a pull request instead of being forbidden
+	// to. A scout is unchanged by it.
+	GitHub bool
+	// MateBin, Project and Crew name the `mate pr watch` command a ship
+	// runs after it opens a pull request; used only when GitHub is set.
+	MateBin string
+	Project string
+	Crew    string
 	// WorktreePath is the absolute path of the Crew's own worktree.
 	WorktreePath string
 	// Branch is the Crew's branch name.

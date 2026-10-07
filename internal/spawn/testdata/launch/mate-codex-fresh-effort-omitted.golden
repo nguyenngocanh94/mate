@@ -133,8 +133,8 @@ CODEX_HOME={{CODEX_HOME}}
 }
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/settings.json ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/brief-writing/SKILL.md mode=-rw-r--r-- bytes=5736 ---
-(rendered asset) sha256=288e9146796cf9cfe8d05b456340f851f858627e3576337695abb1abb647073e
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/brief-writing/SKILL.md mode=-rw-r--r-- bytes=5787 ---
+(rendered asset) sha256=20f779b5873726286d2f4a66f2e404de34f5d7c6fda13445f03ad838c99c5d9f
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/brief-writing/SKILL.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/crew-dispatch/SKILL.md mode=-rw-r--r-- bytes=11351 ---
@@ -181,8 +181,8 @@ CODEX_HOME={{CODEX_HOME}}
 (rendered asset) sha256=77d5dd4f67ee64fdff5649fc62d8546ef64f40f8d6b207d966d8b1fdcb70c6ff
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/stuck-crew-recovery/SKILL.md ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md mode=-rw-r--r-- bytes=5577 ---
-(rendered asset) sha256=a9aa7e40807608f0f0b34659b0afdc856e04998a0eed343edc420d55ba2498fe
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md mode=-rw-r--r-- bytes=5563 ---
+(rendered asset) sha256=b8f511de91f9351ec321d3dd16ab8357d83743ee18b670060d3d21a5c42f5006
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/token-review/SKILL.md mode=-rw-r--r-- bytes=8444 ---

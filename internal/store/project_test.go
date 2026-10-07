@@ -228,3 +228,21 @@ func TestStoreAutoFlag(t *testing.T) {
 		t.Fatalf("SetAuto(false) on a missing flag: %v", err)
 	}
 }
+
+// The github mode (docs/mvp.md M18) is the second delivery mode, and it
+// survives a save and a load.
+func TestProjectModeGitHubRoundTrips(t *testing.T) {
+	w := newWorkspace(t)
+	cfg := store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}
+	if err := w.AddProject("shop", cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Mode = store.ModeGitHub
+	if err := w.SaveProject("shop", cfg); err != nil {
+		t.Fatalf("SaveProject github: %v", err)
+	}
+	got, err := w.LoadProject("shop")
+	if err != nil || got.Mode != store.ModeGitHub {
+		t.Fatalf("LoadProject = %+v, %v; want mode github", got, err)
+	}
+}

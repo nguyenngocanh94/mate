@@ -115,7 +115,7 @@ worktree=.worktrees/shop-k3
 (rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2356 ---
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2357 ---
 {
   "version": 1,
   "captured_at": "2026-09-17T10:00:00Z",
@@ -191,12 +191,12 @@ worktree=.worktrees/shop-k3
     {
       "path": "embedded:crew/brief.md.tmpl",
       "role": "crew_prompt_template",
-      "sha256": "8375b828647af556f67e98066eba1ccb6107cf7aaf6041e730b5f3f174a9b7b5",
-      "bytes": 9578,
+      "sha256": "4023dd889036197525b999fbb5bbd57d9ae797dc5a918cc06d212df0abe09e39",
+      "bytes": 11740,
       "state": "configured"
     }
   ],
-  "fingerprint": "aebfa6ba7d1b0fa4cda1b44e87d22329592c8658ef1c6aadd8214eee5621f60d"
+  "fingerprint": "1209769aefbc51968891e5a2dbea292fb6236223133af139650e7dd695088fd4"
 }
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json ---
 
