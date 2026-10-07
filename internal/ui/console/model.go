@@ -102,6 +102,12 @@ const (
 	// It is dangerous - a live crew would be stopped first - so the menu's
 	// confirmation stands in front of it, like ActionRestartMate.
 	ActionRestartCrew Action = "restart_crew"
+	// ActionRemoveProject takes a Project out of the workspace: it stops the
+	// Project's crews and Mate, then unregisters it (mvp.md task 75). Nothing
+	// on disk is deleted, so adding the Project again brings its history
+	// back. It is dangerous only in that it stops agents, so the confirmation
+	// is a plain `y`, not a typed name.
+	ActionRemoveProject Action = "remove_project"
 	// TODO: v1 also had retry, discard and switch_harness. mate has no
 	// retry (a Crew runs once), and no discard action: throwing work away
 	// is `mate crew stop --discard`, on the captain's explicit word.

@@ -408,6 +408,9 @@ func (m Model) actionObjectDescription(c actionChoice) (string, string, string) 
 		}
 		scope = "This Mate only. Its crews keep running."
 		effect = "The agent stops; the binding is released once the service confirms it."
+	case ActionRemoveProject:
+		scope = "This Project's Mate and every running crew; the Project leaves the workspace list."
+		effect = "Refused, leaving the Project listed, if any agent cannot be stopped (a crew with unlanded work, for one). Memory, backlog, crew records and repos stay; each crew is stopped as Stop crew does, so a landed branch and its worktree go with it."
 	case ActionRestartMate:
 		scope = "This Mate only. Its crews keep running."
 		effect = "The Mate is stopped and started again; the next pane shows the new one."
