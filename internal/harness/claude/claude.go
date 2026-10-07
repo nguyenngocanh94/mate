@@ -159,6 +159,23 @@ func (claudeHooks) ReviewOwn(context.Context, harness.HookReviewPane, string, []
 }
 
 // DigestMaxBytes implements HookInstaller.
+// Repoint implements HookInstaller.
+func (claudeHooks) Repoint(binary, cwd string, exists func(string) bool) (bool, error) {
+	path := ClaudeSettingsPath(cwd)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	out, changed, err := RepointHooks(data, binary, exists)
+	if err != nil || !changed {
+		return false, err
+	}
+	return true, os.WriteFile(path, out, 0o644)
+}
+
 func (claudeHooks) DigestMaxBytes() int { return ClaudeSessionHookMaxBytes }
 
 // BareSessionHook implements HookInstaller: every Claude Mate's settings

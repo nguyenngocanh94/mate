@@ -49,7 +49,12 @@ type WorkspaceConfig struct {
 	// Session is the Herdr session name of this workspace. It is derived from
 	// the absolute path once, at Init, and then stored, so moving or
 	// re-resolving the workspace never renames a live session.
-	Session  string       `yaml:"session"`
+	Session string `yaml:"session"`
+	// Root is the absolute path the workspace had when it was last written.
+	// It is what tells a console that the workspace was copied or moved: the
+	// path in the file is no longer the path it was opened at, and the
+	// absolute paths mate wrote into briefs are the old ones.
+	Root     string       `yaml:"root,omitempty"`
 	Defaults Defaults     `yaml:"defaults"`
 	Projects []ProjectRef `yaml:"projects"`
 }
@@ -85,6 +90,7 @@ func Init(workspaceDir string, defaults Defaults) (*Workspace, error) {
 	w.cfg = WorkspaceConfig{
 		Version:  workspaceVersion,
 		Session:  SessionName(root),
+		Root:     root,
 		Defaults: defaults,
 	}
 	if err := w.mkdirAll(w.ProjectsDir()); err != nil {
@@ -185,6 +191,24 @@ func (w *Workspace) Config() WorkspaceConfig {
 
 // Session is the Herdr session name of this workspace.
 func (w *Workspace) Session() string { return w.cfg.Session }
+
+// RecordedRoot is the root workspace.yaml last recorded, "" for a workspace
+// written before the file carried one.
+func (w *Workspace) RecordedRoot() string { return w.cfg.Root }
+
+// SetRoot records the workspace's current root in workspace.yaml.
+func (w *Workspace) SetRoot(root string) error {
+	w.cfg.Root = root
+	return w.SaveConfig()
+}
+
+// SetSession gives the workspace another Herdr session name. It is for a
+// workspace copied beside its original, which must never share the original's
+// session; nothing else renames a session.
+func (w *Workspace) SetSession(name string) error {
+	w.cfg.Session = name
+	return w.SaveConfig()
+}
 
 // Defaults are the workspace-wide harness defaults.
 func (w *Workspace) Defaults() Defaults { return w.cfg.Defaults }

@@ -228,6 +228,11 @@ func (codexHooks) Own(binary, cwd string) []harness.OwnHook {
 	}}
 }
 
+// Repoint implements HookInstaller. Codex's hooks.json is written whole by
+// every Mate launch, and recovery starts a stopped Mate before anything reads
+// it, so there is nothing to repoint ahead of that.
+func (codexHooks) Repoint(string, string, func(string) bool) (bool, error) { return false, nil }
+
 // DigestMaxBytes implements HookInstaller.
 func (codexHooks) DigestMaxBytes() int { return CodexSessionHookMaxBytes }
 
