@@ -16,6 +16,8 @@ const (
 	// holds a Project's finished Crews. It is presentation only: the
 	// records stay in the snapshot.
 	rowCompletedGroup
+	// rowHandedBackGroup hides wait-mate rows without closing their tasks.
+	rowHandedBackGroup
 )
 
 // row is one selectable row of the current frame. idx indexes the slice
@@ -43,17 +45,28 @@ func projectRows(projects []query.ProjectNode) []row {
 	return rows
 }
 
-func projectDetailRows(p query.ProjectNode, completedOpen bool) []row {
+func projectDetailRows(p query.ProjectNode, completedOpen, handedBackOpen bool) []row {
 	rows := make([]row, 0, 1+len(p.Crews)+1)
 	rows = append(rows, row{kind: rowMate, id: mateRowID(p.Mate)})
 	var finished []row
+	var handedBack []row
 	for i, c := range p.Crews {
 		r := row{kind: rowCrew, idx: i, id: c.CrewID}
 		if c.Closed {
 			finished = append(finished, r)
 			continue
 		}
+		if c.Status == query.CrewWaitMate {
+			handedBack = append(handedBack, r)
+			continue
+		}
 		rows = append(rows, r)
+	}
+	if len(handedBack) > 0 {
+		rows = append(rows, row{kind: rowHandedBackGroup, idx: -1, id: handedBackGroupID(p.ProjectID)})
+		if handedBackOpen {
+			rows = append(rows, handedBack...)
+		}
 	}
 	if len(finished) == 0 {
 		return rows
@@ -76,3 +89,5 @@ func mateRowID(mate query.MateNode) string {
 }
 
 func completedGroupID(parentID string) string { return "completed:" + parentID }
+
+func handedBackGroupID(parentID string) string { return "handed-back:" + parentID }

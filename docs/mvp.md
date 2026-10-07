@@ -116,13 +116,13 @@ Lớp gộp giữ đủ mọi dòng, nhưng console chỉ hiển thị phần ch
 Mỗi mục inbox là một dòng: giờ, crew, và nó cần gì bằng chữ thường (`needs an answer`, `stuck, quiet too long`, `agent gone`, `send wedged`), không hiện text của status (quyết định 2026-09-19: text đó là bản tóm tắt crew tự viết, đọc nó không thay được việc nhìn pane).
 Người dùng hoặc tự vào xem (Enter, hoặc click vào hàng: mở luôn pane của crew đó) hoặc giao cho Mate (`[assign]`); `[all]` mới hiện verb và text đầy đủ của từng dòng.
 Một mục rời inbox khi crew đó ghi thêm một dòng status mới (luật chính xác, dựa trên thứ tự byte trong file), hoặc khi `sent.log` có một dòng gửi tới `crew:<id>` sau thời điểm của câu hỏi (luật xấp xỉ, vì status không có timestamp riêng).
-`wait-mate` không nằm trong inbox: cột STATE của bảng crew đã mang nó, và người dùng vẫn Enter vào pane crew để đối thoại tiếp bất cứ lúc nào (quyết định 2026-09-18).
+`wait-mate` không nằm trong inbox. Từ quyết định 2026-10-07, crew bàn giao rời các hàng crew đang làm và vào nhóm `Handed back (N)` thu gọn mặc định; mở nhóm rồi Enter vào pane crew để đối thoại, review hoặc merge. Crew ghi lại `working` hay `needs-decision` thì trở lại danh sách đang làm; incident đang mở vẫn ưu tiên `blocked` và hiện trong danh sách.
 
 **Đóng crew là quyết định của người dùng hoặc Mate, không phải của crew** (quyết định 2026-09-18).
 `wait-mate:` chỉ là báo cáo của crew.
 Task kết thúc khi `mate crew stop` chạy: scout đóng khi người dùng nhận report và hài lòng (chủ động bảo Mate đóng), ship đóng khi branch đã merge (người dùng merge, sau này `mate merge`).
 Crew đã đóng (`state=finished|failed` trong meta) biến khỏi cây console, khỏi inbox và khỏi `crew list` mặc định (`--all` để xem); `crews/<id>/` giữ nguyên.
-Cây console vì thế chỉ hiện việc đang chạy, kể cả crew đã nói `wait-mate` mà chưa ai đóng.
+Cây console mặc định thu gọn crew `wait-mate` trong nhóm `Handed back`; `crew list` mặc định cũng ẩn chúng (`--all` hiện cả bàn giao và đã đóng). Đây là bộ lọc hiển thị, không đóng task, không dừng pane hay xoá worktree; digest vẫn nhận bàn giao như trước.
 Phím `l` dưới focus box bật `[all]`, hiện lại toàn bộ log để debug; mặc định tắt và không lưu lại.
 
 Gửi vào pane Mate là trường hợp đặc biệt vì người dùng cùng sở hữu composer.
@@ -150,7 +150,7 @@ Quy tắc:
 - Trạng thái hiển thị của một crew suy ra theo đúng thứ tự: `.meta` có `state=finished|failed` thì lấy nó; không thì có incident mở trong `incidents.log` thì `blocked`; không thì verb cuối trong `.status`; không có dòng nào thì `spawned`. Không còn `reserved`, `stopped`, `parked`, `done`, `unknown` như trạng thái.
 - Bên cạnh trạng thái luôn có một cột sức khỏe do quan sát, không phải trạng thái: agent còn trong Herdr không, composer bận hay rảnh, pane đứng yên bao lâu. `mate state` in `state: <trạng thái> · health: <quan sát>`. Herdr `agent_status` không được dùng cho cả hai cột (quyết định 8).
 - Inbox: `needs-decision` chưa ai trả lời, và incident đang mở. Luật rời inbox giữ nguyên (dòng status mới của cùng crew, hoặc `sent.log` có dòng tới `crew:<id>` sau câu hỏi); incident rời inbox khi observer ghi dòng `resolved` cho nó. Vì observer không ghi vào `.status`, một incident không bao giờ làm câu hỏi của crew rời inbox.
-- Cây console và `crew list` hiện mọi crew chưa `finished`/`failed`; `crew list --all` hiện cả đã đóng.
+- Các hàng crew mặc định của console và `crew list` hiện `spawned`, `working`, `needs-decision`, `blocked`. Console có nhóm `Handed back` thu gọn cho `wait-mate`; `crew list --all` hiện cả `wait-mate` và đã đóng. `wait-mate` vẫn là task mở, chỉ `crew stop` mới đóng nó.
 - `crew stop` từ chối trước khi giết agent nếu branch chưa landed vào default branch và không có `--discard`. Không còn kết cục "agent đã chết, worktree giữ lại". Scout có branch không commit gì nên luôn sạch.
 - Spawn thất bại (dialog không nhận ra, agent không lên, trust không qua) ghi `state=failed` và lý do vào `.meta` ngay tại chỗ, không để lại thư mục mồ côi ở `spawned`.
 

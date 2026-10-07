@@ -17,7 +17,7 @@ func TestOnlyTheTwoTerminalStatesAreClosed(t *testing.T) {
 		query.CrewNeedsDecision, query.CrewWaitMate, query.CrewBlocked,
 	} {
 		if s.Closed() {
-			t.Fatalf("%s must stay in the active list", s)
+			t.Fatalf("%s must not close the task", s)
 		}
 	}
 	if !query.CrewFinished.Closed() || !query.CrewFailed.Closed() {
@@ -98,9 +98,9 @@ func TestJumpToFinishedCrewExpandsCompletedGroup(t *testing.T) {
 	}
 }
 
-// A crew that has handed its work back is still in flight until somebody
-// runs `crew stop` (2026-09-18).
-func TestWaitMateStaysInTheActiveCrewList(t *testing.T) {
+// Hand-back hides the crew's row without closing its task or losing the
+// pane and actions. A new working status returns it to the active list.
+func TestWaitMateLeavesTheActiveCrewListUntilItWorksAgain(t *testing.T) {
 	tree := sampleTree()
 	tree.Projects[0].Crews[0].Status = query.CrewWaitMate
 	tree.Projects[0].Crews[0].Closed = false
@@ -108,12 +108,58 @@ func TestWaitMateStaysInTheActiveCrewList(t *testing.T) {
 	m := loaded(t, tree, nil)
 	m, _ = send(t, m, key("enter"))
 	for _, r := range m.currentRows() {
-		if r.kind == rowCompletedGroup {
-			t.Fatalf("wait-mate must not be hidden in a Completed group: %+v", m.currentRows())
+		if r.kind == rowCrew && r.id == tree.Projects[0].Crews[0].CrewID {
+			t.Fatalf("wait-mate still has an active crew row: %+v", m.currentRows())
 		}
 	}
-	if !strings.Contains(renderFrame(t, m), "wait-mate") {
-		t.Fatalf("the wait-mate crew's status is not drawn:\n%s", renderFrame(t, m))
+	frame := renderFrame(t, m)
+	if !strings.Contains(frame, "▸ Handed back (1)") || strings.Contains(frame, tree.Projects[0].Crews[0].Task) {
+		t.Fatalf("hand-back must collapse behind its own group:\n%s", frame)
+	}
+	if len(m.currentProject().Crews) != 2 || m.currentProject().Crews[0].Closed {
+		t.Fatal("hiding the crew changed the task records")
+	}
+	tree.Projects[0].Crews[0].Status = query.CrewWorking
+	m, _ = send(t, m, treeLoadedMsg{tree: tree})
+	if indexOfRowID(m.currentRows(), tree.Projects[0].Crews[0].CrewID) < 0 {
+		t.Fatal("a crew that works again did not return to the active list")
+	}
+}
+
+func TestHandedBackCrewCanBeRevealedAndSelected(t *testing.T) {
+	m := loaded(t, mergeTree(), nil)
+	m, _ = send(t, m, key("enter"))
+	m, _ = send(t, m, key("down"))
+	m, _ = send(t, m, key("enter"))
+	if !strings.Contains(renderFrame(t, m), "▾ Handed back (1)") {
+		t.Fatalf("Enter did not reveal the handed-back crew:\n%s", renderFrame(t, m))
+	}
+	m, _ = send(t, m, key("down"))
+	want := mergeTree().Projects[0].Crews[1].CrewID
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != want {
+		t.Fatalf("selected %+v, want the handed-back crew %s", r, want)
+	}
+	m, _ = send(t, m, key("a"))
+	if !actEntry(t, m, "M").enabled {
+		t.Fatal("the handed-back crew lost its merge action")
+	}
+}
+
+func TestSelectedCrewHandbackCollapsesItsRowOnRefresh(t *testing.T) {
+	tree := sampleTree()
+	m := toRunningAttempt(t, loaded(t, tree, nil))
+	crewID := tree.Projects[0].Crews[1].CrewID
+	tree.Projects[0].Crews[1].Status = query.CrewWaitMate
+	m, _ = send(t, m, treeLoadedMsg{tree: tree})
+	if indexOfRowID(m.currentRows(), crewID) >= 0 {
+		t.Fatal("refresh kept the selected wait-mate crew in the active list")
+	}
+	m, ok := m.jumpToCrew(crewID)
+	if !ok {
+		t.Fatal("could not jump to the hidden crew from history")
+	}
+	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != crewID {
+		t.Fatalf("jump selected %+v, want the handed-back crew", r)
 	}
 }
 

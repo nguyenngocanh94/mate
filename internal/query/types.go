@@ -119,10 +119,9 @@ type ProjectNode struct {
 	Repos Field[[]RepoValue]
 	// Crews are the Project's open Crews, oldest first. A Crew is open
 	// until the Mate or the captain closes it with `mate crew stop`
-	// (mvp.md section 4): a `done:` line is the Crew's report, not the end
-	// of its task - a scout ends when the captain accepts the report, a
-	// ship ends when its branch is merged - so a Crew that said `done`
-	// stays listed until somebody closes it.
+	// (mvp.md section 4). Hand-back does not end a task: wait-mate crews
+	// stay in this snapshot for pane routing, actions and observations,
+	// while the console collapses their rows under Handed back.
 	Crews []CrewNode
 	// ClosedCrews is how many of the Project's recorded Crews have been
 	// closed (`stopped_at` in their meta). Their records stay under
