@@ -501,6 +501,9 @@ The three tiers are one document, routed on the hash, so a link to a task surviv
 | `#/p/<project>/mate` | Mate: prompt-level questions, replies, decisions and outcomes; filter by captain, crew or system |
 | `#/p/<project>/t/<crew>` | task: the ledger header, the turn timeline, status lines, questions, the branch diff |
 
+`#/p/<project>/t/<crew>/usage` is the task tier exactly as above, then scrolls once to the token consumption card (`data-answer="tokens"`) when it has rendered; the crumbs and links keep producing the plain task hash, and a URL without the suffix does not scroll.
+Mate Office links to it.
+
 A project or crew name is `encodeURIComponent`-ed into the hash, and a turn id into the path of `/turns/{turn}` (section 5).
 
 ### Live update
@@ -547,8 +550,10 @@ It holds to every rule of section 10 - same origin only, GET only, text set with
 | Hash | Opens |
 | --- | --- |
 | `#mate/<project>` | the Mate drawer: current activity, facing, last turn, mode, usage, the crews in the room |
-| `#crew/<project>/<crew>` | the crew drawer: state and why, current activity, step, target, usage, the task, a link to the admin timeline |
-| `#cabinet/<project>` | the filing cabinet: closed tasks by age, each with its final state |
+| `#crew/<project>/<crew>` | the crew drawer: state and why, current activity, step, target, usage with a `Usage details` button, the task, a link to the admin timeline |
+| `#cabinet/<project>` | the filing cabinet: closed tasks by age, each with its final state and a `Usage details` button under it |
+
+`Usage details` is a link to `../#/p/<project>/t/<crew>/usage` (names `encodeURIComponent`-ed) that opens the admin page in a new tab (`target="_blank"`, `rel="noopener"`); the Mate has none.
 
 Reads: `/api/workspace`, `/api/now`, `/api/projects/{p}` per project, and for an open drawer `/api/projects/{p}/mate` or `/api/projects/{p}/tasks/{crew}`.
 It long-polls `/api/events` from the lowest `last_event_id` it holds (`wait=5` with a drawer open, 20 otherwise) and re-reads the floor when anyone moved.

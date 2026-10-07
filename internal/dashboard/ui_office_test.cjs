@@ -320,6 +320,38 @@ test("the filing cabinet lists finished tasks by drawer, with their final state"
   assert.ok(roomOf(app.root, "shop").querySelector(".cab").classes.includes("open"), "its top drawer is pulled out");
 });
 
+// The admin page's token consumption for a task, in a new tab; the Mate has
+// no task page, so its drawer has no such button.
+const usageHref = (project, crew) => "../#/p/" + encodeURIComponent(project) + "/t/" + encodeURIComponent(crew) + "/usage";
+const usageLinks = d => d.querySelectorAll("a").filter(a => a.text === "Usage details");
+
+test("the crew drawer and every cabinet row link to the task's usage in a new tab", async () => {
+  const app = await boot({ hash: "#crew/shop/db-migrate" });
+  let links = usageLinks(app.drawer());
+  assert.equal(links.length, 1);
+  assert.equal(links[0].getAttribute("href"), usageHref("shop", "db-migrate"));
+  assert.equal(links[0].getAttribute("target"), "_blank");
+  assert.equal(links[0].getAttribute("rel"), "noopener");
+  assert.ok(app.drawer().querySelectorAll("a").some(a => a.getAttribute("href") === "../#/p/shop/t/db-migrate"), "Open timeline is unchanged");
+  assert.ok(links[0].querySelector("svg"), "an icon beside the words");
+
+  for (const project of ["shop", "infra"]) {
+    const cab = await boot({ hash: "#cabinet/" + project });
+    const rows = cab.drawer().querySelectorAll(".tr");
+    assert.ok(rows.length > 0, project + " has finished tasks");
+    for (const row of rows) {
+      const a = usageLinks(row);
+      assert.equal(a.length, 1);
+      assert.equal(a[0].getAttribute("href"), usageHref(project, row.querySelector(".tn").text));
+      assert.equal(a[0].getAttribute("target"), "_blank");
+      assert.equal(a[0].getAttribute("rel"), "noopener");
+    }
+  }
+
+  const mate = await boot({ hash: "#mate/shop" });
+  assert.equal(usageLinks(mate.drawer()).length, 0, "no button for the Mate");
+});
+
 test("Escape, the close button and a click on the floor close the drawer", async () => {
   const app = await boot({ hash: "#mate/shop" });
   assert.ok(!app.drawer().hasAttribute("hidden"));

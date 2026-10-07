@@ -700,3 +700,17 @@ test("a skill pin carries the skill's place in the skills list, on every stage t
   assert.deepEqual(keyed(card, "data-skill", "alpha").querySelectorAll(".sc-load").map(chip => chip.textContent), ["#1Read instructions", "#3Respond"]);
   assert.match(keyed(card, "data-skill", "beta").textContent, /read SKILL\.md · loaded in#2Mixed activity/);
 });
+
+test("a /usage suffix opens the task tier and scrolls to the token card once, keeping the plain crumb", async () => {
+  const app = await boot(fixture(), "#/p/shop/t/test-build/usage");
+  assert.match(app.view.textContent, /Check TripUITests progress/, "the task tier renders as without the suffix");
+  assert.equal(app.doc.scrolledTo, keyed(app.view, "data-answer", "tokens"));
+  const crumb = app.doc.root.children.find(node => node.children.length && node.querySelectorAll("a").some(a => a.textContent === "test-build"));
+  assert.equal(crumb.querySelectorAll("a").pop().getAttribute("href"), "#/p/shop/t/test-build", "breadcrumbs stay plain");
+  app.doc.scrolledTo = null;
+  await app.refresh(fixture(), true);
+  assert.equal(app.doc.scrolledTo, null, "later polls do not scroll again");
+
+  const plain = await boot();
+  assert.equal(plain.doc.scrolledTo, undefined, "old URLs do not scroll");
+});
