@@ -1010,6 +1010,39 @@ Mỗi PR từ 1 đến 6 giữ nguyên hành vi của Claude và Codex.
 | 69 | PR 6: Claude và Codex vào `internal/harness/claude` và `internal/harness/codex`; mặc định và danh mục harness cho store, query, Console lấy từ registry; skill `harness-adapters` sinh từ registry; suite hợp đồng mục 1 đến 4 | Ratchet bằng 0 ngoài allowlist; suite pass cho cả hai. |
 | 70 | PR 7: pi, chỉ vai Crew | Diff chỉ gồm package mới, một dòng catalog, một hàng dispatch, fixture và tài liệu, cộng ba chỗ sửa hợp đồng: `LaunchPlan.ContextFlag`, `GracefulStopper.ClearKeys`, `query.Harness.Mate`. Suite hợp đồng pass cho pi; Mate trên pi bị từ chối nêu `Hooks`. Đã xong 2026-10-01, không chạy test live (captain chốt). |
 
+### M17. Console tự hồi phục khi mở
+
+Chốt 2026-10-07: tắt máy (hay restart) không làm hỏng dữ liệu trên đĩa; meta, brief, worktree, `.status` còn nguyên, chỉ mất tiến trình (Herdr server, pane). Mở `mate console` sau đó mà mate không chạy là sai. Console khi mở kiểm tra sức khoẻ và hồi phục mọi thứ hồi phục được, không hỏi: Herdr tắt thì bật server mới; pane của Mate/Crew không còn thì mở pane mới và resume session id của harness. Chép workspace sang máy khác (hay dời trên cùng máy) đi cùng đường đó: dữ liệu không hỏng, chỉ các liên kết với máy phải dựng lại.
+
+Trước M17: pane ghi trong meta được coi là sự thật (`internal/query/load.go`: có `pane` là `running`), nên sau restart `s` bị khoá ("Mate is recorded running") dù status line bảo bấm `s`; `crew relaunch` luôn chạy hội thoại mới; worktree tạo với đường dẫn tuyệt đối và mate không bao giờ chạy `git worktree repair`; hook trong `mate/.claude/settings.json` giữ đường dẫn binary cũ; dời workspace trên cùng máy làm `EnsureSession` từ chối vì owner marker (`<configHome>/mate/session-owners/<session>`) ghi workspace id của đường dẫn cũ.
+
+Quyết định:
+
+- Một package `internal/recover` chạy nền khi console mở (cả `mate console` lẫn `mate <dir>`), console dùng được trong lúc nó chạy. Thứ tự: (1) liên kết với máy, (2) Herdr server, (3) Mate và Crew. Mỗi bước tự phát hiện việc của nó, chạy lại nhiều lần vẫn an toàn, và một mục hỏng không chặn mục khác.
+- Liên kết với máy, chỉ có việc khi workspace đã bị chép hay dời:
+  - Worktree của crew không gắn với repo (`gitx.WorktreeAttached` sai): `git -C <repo> worktree repair <worktree>`.
+  - Hook trong `mate/.claude/settings.json` trỏ tới binary `mate` không tồn tại: viết lại bằng binary hiện tại, giữ mọi hook khác.
+  - Owner marker ghi workspace id khác id của đường dẫn hiện tại: workspace đó không còn trên đĩa thì nhận lại marker; còn (chép trên cùng máy) thì đặt tên session mới vào `workspace.yaml`, không bao giờ dùng chung session với bản kia.
+  - `workspace.yaml` có thêm `root:` (đường dẫn tuyệt đối lúc ghi gần nhất). Khác đường dẫn hiện tại thì thay tiền tố gốc cũ bằng gốc mới trong `crews/<id>/brief.md`, rồi ghi `root:` mới. Workspace cũ chưa có `root:` thì suy gốc cũ từ `gitdir` trong file `.git` của một worktree; không suy được thì bỏ qua bước này.
+  - Không viết lại đường dẫn trong `mate.db`: timeline đã tự tìm lại transcript khi file không còn.
+- Herdr: session không chạy thì `EnsureSession`.
+- Mate và Crew, đối chiếu meta với `ListAgents` của session:
+  - Bật lại: meta còn ghi `pane` mà agent không có trong `ListAgents` (đang chạy thì máy chết).
+  - Để yên: meta không ghi `pane` (stop có chủ đích đã xoá nó), crew `finished|failed`, và mọi agent Herdr còn liệt kê là sống.
+  - Mate: `StartMate` với `Resume:true`, đúng harness trong meta (đường của Restart trong console).
+  - Crew: relaunch có thêm resume: `session_id` trong meta, đúng harness/model/effort, `--resume <id>` với Claude, `codex resume <id>` với Codex. Resume không được (hội thoại nằm ở `~/.claude`, `~/.codex` của máy cũ, hay launch hỏng) thì chạy mới một lần với con trỏ brief kèm ghi chú hội thoại trước không còn, như fallback của `StartMate`. `mate crew relaunch` tay vẫn chạy mới như cũ.
+- Khoá `.mate/recover.lock` (flock): hai console mở cùng lúc thì chỉ một cái hồi phục, cái kia chờ rồi thấy không còn gì để làm.
+- Loader của console (`query`) đọc trạng thái Mate/Crew theo đối chiếu với Herdr, không theo `pane` trong meta: session không chạy hay agent không còn là `stopped`, nên `s` và nhãn Resume dùng được kể cả khi hồi phục hỏng.
+- Hiển thị: status line `recovering <n> of <m>…` rồi một dòng tổng kết (`recovered <k>`, kèm mục hỏng). Hàng hỏng giữ lỗi của nó; `R` vẫn dùng được trên hàng đó.
+- Không làm: hồi phục khi Herdr chết trong lúc console đang mở (vẫn chỉ báo trên status line; mở lại console để hồi phục); pane còn nhưng harness bên trong đã thoát; tự bật lại crew đã dừng có chủ đích.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 71 | Loader đối chiếu với Herdr: Mate/Crew có `pane` mà agent không sống là `stopped`; `s` mở lại được sau restart. | Unit với `runtime.Fake`: Herdr tắt, agent mất, agent sống, stop có chủ đích. |
+| 72 | Crew relaunch có resume (`spawn.RelaunchCrew` nhận `Resume`), fallback chạy mới một lần kèm ghi chú. | Unit: argv resume cho Claude và Codex; resume hỏng thì chạy mới và gửi con trỏ brief có ghi chú; relaunch tay vẫn chạy mới. |
+| 73 | Liên kết với máy: `git worktree repair`, hook Claude, owner marker, `root:` và tiền tố trong `brief.md`. | Unit trên repo git thật trong thư mục tạm, dời thư mục rồi hồi phục; owner marker ba trường hợp (khớp, workspace cũ mất, workspace cũ còn); hook giữ hook lạ. |
+| 74 | `internal/recover` và console: chạy nền khi mở, khoá, status line, lỗi theo hàng. | Unit thứ tự và khoá với `runtime.Fake`; golden status line; test wiring console. `TestLiveRecoverAfterHerdrDies` (skip trừ `MATE_LIVE=1`): tắt Herdr, mở console, Mate và một crew Claude sống lại với `resumed=true`. |
+
 ### Token review: task nào tốn, vì sao, sửa harness của project ở đâu
 
 Captain yêu cầu 2026-10-03, sau khi M15 đã giới hạn context của chính Mate: Mate cần chỉ ra được task nào tiêu thụ quá nhiều token và đề xuất skill, docs cho repo của project.
