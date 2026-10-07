@@ -355,6 +355,9 @@ type crewPlan struct {
 	branch           string
 	worktree         string
 	repoCfg          store.RepoConfig
+	// resumeID is the harness session a relaunch resumes; empty is a fresh
+	// session.
+	resumeID string
 }
 
 // spawnInWorktree is everything a failure has to compensate for: the brief,
@@ -753,12 +756,13 @@ func prepareCrewLaunch(ctx context.Context, w *store.Workspace, deps Deps, git g
 		return harness.Prepared{}, err
 	}
 	prep, err := plan.profile.Launcher().Prepare(ctx, harness.PrepareRequest{
-		Role:         harness.RoleCrew,
-		Cwd:          plan.worktree,
-		StateDir:     w.CrewDir(plan.project, plan.crew),
-		ContextPath:  w.CrewBrief(plan.project, plan.crew),
-		Binary:       binary,
-		NewSessionID: deps.NewSessionID,
+		Role:            harness.RoleCrew,
+		Cwd:             plan.worktree,
+		StateDir:        w.CrewDir(plan.project, plan.crew),
+		ContextPath:     w.CrewBrief(plan.project, plan.crew),
+		Binary:          binary,
+		ResumeSessionID: plan.resumeID,
+		NewSessionID:    deps.NewSessionID,
 	})
 	if err != nil {
 		return harness.Prepared{}, err
@@ -822,8 +826,9 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, prep harness.Prepar
 		// No launch env: Herdr 0.8.2 applies `--env` when a pane is created,
 		// so the crew's identity (and MATE_STATUS) is injected by the tab
 		// create above.
-		Model:  plan.model,
-		Effort: plan.effort,
+		Model:           plan.model,
+		Effort:          plan.effort,
+		ResumeSessionID: plan.resumeID,
 	})
 }
 
