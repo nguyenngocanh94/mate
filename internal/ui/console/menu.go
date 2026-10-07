@@ -89,6 +89,13 @@ func (m Model) menuFor(r row, ok bool) []menuEntry {
 		}
 		return []menuEntry{{key: "enter", label: label, kind: entryOpen, enabled: true,
 			about: "Finished crews stay in the snapshot; this shows or hides them in the list."}}
+	case rowHandedBackGroup:
+		label := "Show handed back"
+		if m.handedBackOpen[m.cur().id] {
+			label = "Hide handed back"
+		}
+		return []menuEntry{{key: "enter", label: label, kind: entryOpen, enabled: true,
+			about: "Crews waiting on the Mate keep their panes and actions; this shows or hides their rows."}}
 	}
 	return nil
 }

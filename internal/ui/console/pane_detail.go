@@ -88,6 +88,8 @@ func (m Model) detailTitle() (title gline, meta string) {
 		}
 	case rowCompletedGroup:
 		return gl().add("Completed", tFg), ""
+	case rowHandedBackGroup:
+		return gl().add("Handed back", tFg), ""
 	}
 	return gl().add(r.id, tFg), ""
 }
@@ -114,6 +116,11 @@ func (m Model) detailFields(w int) []detailField {
 		}
 	case rowCompletedGroup:
 		return m.completedDetailFields()
+	case rowHandedBackGroup:
+		return []detailField{
+			{label: "crews", lines: text(fmt.Sprintf("%d wait-mate", len(m.handedBackCrews())), tFg)},
+			{label: "status", lines: text("waiting on the Mate", tFg)},
+		}
 	}
 	return nil
 }
