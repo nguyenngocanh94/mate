@@ -108,7 +108,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	defer pilot.Stop()
 
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
-		snap, err := query.Load(loadCtx, ws, consoleHarnesses())
+		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleLiveness(loadCtx, ws, deps))
 		if err != nil {
 			return snap, err
 		}

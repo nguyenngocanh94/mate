@@ -156,11 +156,19 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 	if err != nil {
 		return "", err
 	}
-	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Harness: kind})
+	// Resume is the 's' on a stopped Mate: the conversation recorded in
+	// mate.meta comes back, or a fresh one starts with a note saying why.
+	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Harness: kind, Resume: req.Action == console.ActionResume})
 	if err != nil {
 		return "", err
 	}
 	line := fmt.Sprintf("Mate %s is running on %s in pane %s", res.Agent, res.Harness, res.Pane)
+	if res.Resumed {
+		line += "; resumed session " + res.ResumedFrom
+	}
+	if res.ResumeNote != "" {
+		line += "; " + res.ResumeNote
+	}
 	if res.Adopted {
 		line += "; adopted: an interrupted start had left it running unrecorded"
 	}
