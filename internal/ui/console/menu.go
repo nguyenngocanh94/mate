@@ -80,6 +80,7 @@ func (m Model) menuFor(r row, ok bool) []menuEntry {
 			m.startMateEntry(r),
 			m.modeEntry(r.id),
 			m.newProjectEntry(),
+			m.choiceEntry("x", "Remove project…", m.removeProjectChoice(r)),
 		}
 	case rowCompletedGroup:
 		label := "Show completed"
@@ -331,7 +332,11 @@ func (m Model) runEntry(i int) (Model, tea.Cmd) {
 		return m.beginModeToggle(project)
 	}
 	if e.confirms() {
-		m.confirm = &actionConfirmation{choice: e.choice, key: e.key, label: e.label}
+		key := e.key
+		if e.choice.confirmKey != "" {
+			key = e.choice.confirmKey
+		}
+		m.confirm = &actionConfirmation{choice: e.choice, key: key, label: e.label}
 		return m, nil
 	}
 	m = m.closeActions()
