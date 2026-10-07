@@ -11,7 +11,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/process"
-	"github.com/nguyenngocanh94/mate/internal/recover"
+	"github.com/nguyenngocanh94/mate/internal/recovery"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -19,7 +19,7 @@ import (
 
 // TestLiveRecoverAfterHerdrDies is the M17 proof: a real Claude Mate and a
 // real Claude crew have each had a conversation, their panes are lost, and
-// recover.Run - what the console runs when it opens - brings both back with
+// recovery.Run - what the console runs when it opens - brings both back with
 // resumed=true and the recorded session ids.
 //
 // The panes are lost by force-stopping the two agents behind mate's back, not
@@ -113,9 +113,9 @@ func TestLiveRecoverAfterHerdrDies(t *testing.T) {
 		}
 	}
 
-	res := recover.Run(ctx, w, deps, nil)
+	res := recovery.Run(ctx, w, deps, nil)
 	if res.Err != nil {
-		t.Fatalf("recover.Run: %v", res.Err)
+		t.Fatalf("recovery.Run: %v", res.Err)
 	}
 	if len(res.Items) != 2 {
 		t.Fatalf("recovered %+v, want the Mate and the crew", res.Items)

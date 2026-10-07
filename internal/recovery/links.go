@@ -8,7 +8,7 @@
 // owner marker, the old root inside a brief. Every step finds its own work, so
 // a pass over a healthy workspace changes nothing and running one twice is
 // safe, and a step that fails is reported without stopping the others.
-package recover
+package recovery
 
 import (
 	"context"

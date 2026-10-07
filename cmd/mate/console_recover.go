@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
-	"github.com/nguyenngocanh94/mate/internal/recover"
+	"github.com/nguyenngocanh94/mate/internal/recovery"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -39,12 +39,12 @@ type consoleRecovery struct {
 // stop cancels what is left and waits briefly for it to undo a half-started
 // agent.
 func startConsoleRecovery(ctx context.Context, ws *store.Workspace, deps spawn.Deps) (r *consoleRecovery, stop func()) {
-	return startRecovery(ctx, func(ctx context.Context, progress func(recover.Progress)) recover.Result {
-		return recover.Run(ctx, ws, deps, progress)
+	return startRecovery(ctx, func(ctx context.Context, progress func(recovery.Progress)) recovery.Result {
+		return recovery.Run(ctx, ws, deps, progress)
 	})
 }
 
-func startRecovery(ctx context.Context, run func(context.Context, func(recover.Progress)) recover.Result) (*consoleRecovery, func()) {
+func startRecovery(ctx context.Context, run func(context.Context, func(recovery.Progress)) recovery.Result) (*consoleRecovery, func()) {
 	r := &consoleRecovery{now: time.Now, done: make(chan struct{})}
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
@@ -61,7 +61,7 @@ func startRecovery(ctx context.Context, run func(context.Context, func(recover.P
 	}
 }
 
-func (r *consoleRecovery) progress(p recover.Progress) {
+func (r *consoleRecovery) progress(p recovery.Progress) {
 	line := "recovering…"
 	if p.Total > 0 {
 		line = fmt.Sprintf("recovering %d of %d…", p.Done, p.Total)
@@ -71,7 +71,7 @@ func (r *consoleRecovery) progress(p recover.Progress) {
 	r.mu.Unlock()
 }
 
-func (r *consoleRecovery) finish(res recover.Result) {
+func (r *consoleRecovery) finish(res recovery.Result) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.doneAt = r.now()
@@ -87,7 +87,7 @@ func (r *consoleRecovery) finish(res recover.Result) {
 // recoverySummary is the line recovery leaves behind: what came back, what
 // was repaired, and the first thing that did not. A pass that found nothing
 // says nothing.
-func recoverySummary(res recover.Result) query.RecoveryStatus {
+func recoverySummary(res recovery.Result) query.RecoveryStatus {
 	if res.Idle() {
 		return query.RecoveryStatus{}
 	}

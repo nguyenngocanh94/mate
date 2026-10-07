@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
-	"github.com/nguyenngocanh94/mate/internal/recover"
+	"github.com/nguyenngocanh94/mate/internal/recovery"
 )
 
 func recoverySnapshot() query.Snapshot {
@@ -24,12 +24,12 @@ func recoverySnapshot() query.Snapshot {
 func TestConsoleRecoveryReportsProgressThenASummaryAndRowErrors(t *testing.T) {
 	step := make(chan struct{})
 	release := make(chan struct{})
-	r, stop := startRecovery(context.Background(), func(_ context.Context, progress func(recover.Progress)) recover.Result {
-		progress(recover.Progress{Total: 2})
-		progress(recover.Progress{Done: 1, Total: 2})
+	r, stop := startRecovery(context.Background(), func(_ context.Context, progress func(recovery.Progress)) recovery.Result {
+		progress(recovery.Progress{Total: 2})
+		progress(recovery.Progress{Done: 1, Total: 2})
 		close(step)
 		<-release
-		return recover.Result{Items: []recover.Item{
+		return recovery.Result{Items: []recovery.Item{
 			{Project: "shop", Resumed: true},
 			{Project: "shop", Crew: "k2", Err: errors.New("the worktree of crew k2 is gone\nsecond line")},
 		}}
@@ -68,14 +68,14 @@ func TestConsoleRecoveryReportsProgressThenASummaryAndRowErrors(t *testing.T) {
 func TestRecoverySummaryWordsEachOutcome(t *testing.T) {
 	cases := []struct {
 		name   string
-		res    recover.Result
+		res    recovery.Result
 		line   string
 		failed bool
 	}{
-		{"nothing to do says nothing", recover.Result{}, "", false},
-		{"two back", recover.Result{Items: []recover.Item{{Project: "a"}, {Project: "a", Crew: "k1"}}}, "recovered 2", false},
-		{"links count", recover.Result{Fixes: []recover.Fix{{Step: "worktree", What: "x"}, {Step: "root", What: "y"}}}, "recovered 0; repaired 2 links", false},
-		{"herdr would not start", recover.Result{Err: errors.New("herdr session s could not be started")}, "1 failed: herdr session s could not be started", true},
+		{"nothing to do says nothing", recovery.Result{}, "", false},
+		{"two back", recovery.Result{Items: []recovery.Item{{Project: "a"}, {Project: "a", Crew: "k1"}}}, "recovered 2", false},
+		{"links count", recovery.Result{Fixes: []recovery.Fix{{Step: "worktree", What: "x"}, {Step: "root", What: "y"}}}, "recovered 0; repaired 2 links", false},
+		{"herdr would not start", recovery.Result{Err: errors.New("herdr session s could not be started")}, "1 failed: herdr session s could not be started", true},
 	}
 	for _, tc := range cases {
 		got := recoverySummary(tc.res)
