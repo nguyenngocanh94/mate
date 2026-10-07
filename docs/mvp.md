@@ -1056,6 +1056,29 @@ Chốt 2026-10-07: `mate project remove` trước đây chỉ bỏ project khỏ
 | --- | --- | --- |
 | 75 | `spawn.RemoveProject`, `mate project remove` và mục `Remove project…` của console. | Unit với `runtime.Fake`: Mate và mọi crew dừng trước khi bỏ đăng ký (stow chạy sau crew, trước Mate); một crew không dừng được thì project còn đăng ký và lỗi nêu crew đó; agent Herdr không liệt kê chỉ bị xoá meta chạy; remove rồi add lại giữ `memory.md` và hồ sơ crew. Unit `cmd/mate` cho CLI và cầu nối console, test console cho mục menu và sheet (`y` chạy, Esc/Enter huỷ, phím của mục không xác nhận). Đã xong 2026-10-07: `internal/spawn/project_remove.go`; `mate mate stop` và `project remove` dùng chung `stowBeforeStop`. Lệch spec: bước đóng workspace không có code riêng (Herdr đóng workspace khi tab cuối đóng, không có phương thức runtime đóng workspace, và `collapseEmptyProjectWorkspaces` chỉ gỡ bản trùng khi `EnsureProjectWorkspace`); stop crew vẫn gỡ worktree và branch của crew đã landed, và crew còn việc chưa landed chặn việc xoá cho tới khi landed hoặc `crew stop --discard`. Không chạy test live. |
 
+### M18. Giao hàng qua PR; crew đánh thức Mate khi PR merge
+
+Captain chốt 2026-10-07. Thực tế ở hellovietnam: Mate và crew đã tự push và mở PR (brief cấm), captain merge trên GitHub, và không ai báo cho Mate. Lúc 09:50 thêm một lỗ hổng: captain nhắn Mate một câu thì `.auto` bị xoá, crew báo `wait-mate` 24 giây sau, và suốt hơn 5 phút không digest nào tới Mate, inbox cũng không hiện gì (`mate.db`: `mode.changed` auto→manual 02:50:10Z, `status.appended` 02:50:30Z, không có `digest.sent` tới hết 02:59Z; con trỏ `.auto-cursor` dừng trước dòng đó, và crew bị đóng lúc 02:55Z nên `Gather` không bao giờ gửi nó nữa).
+
+Quyết định:
+
+- Prompt của captain không còn tắt auto. Hook `UserPromptSubmit` không xoá `.auto` nữa và cơ chế bật lại sau 5 phút (`rearm`) bỏ đi. Outbox vẫn chỉ gõ khi lượt của Mate đã xong và composer trống, nên digest không chen vào giữa câu captain đang gõ. Manual chỉ còn là captain bật bằng tay (`m`). Thay quyết định "Hook `UserPromptSubmit` … xoá `.auto`" ở mục 5.
+- Khi project ở manual, `wait-mate` mới nhất của mỗi crew mở vào inbox của captain (`needs Mate`), để luôn có ít nhất một bên được báo.
+- Mode mới `github` bên cạnh `local-only`, theo project, của captain: `mate project mode <p> github|local-only`. Đặt `github` thì kiểm tra `gh auth status` và `origin` của mọi repo trỏ tới GitHub; sai thì từ chối và nói sửa gì. Brief, manual và skill rẽ theo mode: ở `github`, crew ship push branch của nó và mở PR bằng `gh pr create`, không bao giờ merge; `local-only` giữ nguyên lệnh cấm.
+- Sau khi mở PR, crew ghi `pr-open: <url>` vào `.status` và chạy `mate pr watch <project> <crew> <url>`. Lệnh này tự tách thành tiến trình nền (pid ở `crews/<id>.prwatch`), ghi `pr_url` vào meta, và hỏi `gh pr view --json state,mergeCommit` mỗi 60 giây. Crew vẫn sống sau khi mở PR, để sửa khi Mate chuyển lời review hay CI hỏng.
+- PR merged: watcher `git fetch` rồi fast-forward branch mặc định của checkout chính (checkout bẩn hay không đứng trên branch mặc định thì bỏ bước này và ghi lý do), ghi `pr_state=merged` và `merge_commit` vào meta, ghi `pr-merged: <url>` vào `.status`, rồi đánh thức Mate: xếp một dòng nguồn `pr` vào outbox và tự giao bằng chính code của outbox sender, nên không cần console mở; khoá `mate/.outbox.lock` giữ cho hai bên không gõ trùng. Dòng `pr` được giao ở cả auto lẫn manual. PR đóng mà không merge thì như vậy với `pr-closed`. Watcher thoát sau đó.
+- `pr-open`, `pr-merged`, `pr-closed` là động từ status mới; trạng thái của crew là `wait-mate`. Digest của autopilot không gửi lại dòng `pr-merged`/`pr-closed` (watcher đã giao).
+- `crew stop` coi `pr_state=merged` là đã landed, kể cả squash/rebase merge, và xoá branch local bằng `-D`. `mate merge` ở mode `github` là `gh pr merge` theo đúng luật hiện tại (Mate chỉ khi `yolo`; `Merge` trong console là captain). Skill `review-delivery`: nhận `pr-merged` thì `crew stop` rồi làm việc tiếp theo trong backlog.
+- Hồi phục của M17 bật lại watcher cho crew có `pr_url` mà `pr_state` chưa `merged|closed` và pid trong `.prwatch` không còn sống.
+- Không làm: đánh thức crew khi CI hỏng hay có review comment.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 76 | Prompt của captain không tắt auto; bỏ `rearm`; manual thì `wait-mate` vào inbox. | Test tái hiện 09:50: captain nhắn, crew `wait-mate` trong 5 phút sau, có ít nhất một bên được báo (digest tới Mate khi auto; inbox khi manual). Unit cho hook và inbox. |
+| 77 | Mode `github`: `store`, `mate project mode`, kiểm tra `gh`/`origin`, brief/manual/skill rẽ theo mode. | Unit cho validate (gh giả qua seam), golden brief và manual cho cả hai mode. |
+| 78 | `mate pr watch`: tách nền, poll, merged/closed, fast-forward, meta, `.status`, đánh thức Mate qua outbox không cần console. | Unit với `gh` và git giả qua seam: merged, closed, checkout bẩn, outbox nhận đúng một dòng `pr`, giao khi manual; test tách nền và `.prwatch`. |
+| 79 | `crew stop` nhận `pr_state=merged`; `mate merge` ở `github` là `gh pr merge`; skill `review-delivery`; hồi phục bật lại watcher. | Unit: squash-merged không bị coi là unlanded; yolo off thì Mate bị từ chối; recovery bật lại watcher đã chết. |
+
 ### Token review: task nào tốn, vì sao, sửa harness của project ở đâu
 
 Captain yêu cầu 2026-10-03, sau khi M15 đã giới hạn context của chính Mate: Mate cần chỉ ra được task nào tiêu thụ quá nhiều token và đề xuất skill, docs cho repo của project.
