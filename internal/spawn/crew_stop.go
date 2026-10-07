@@ -138,8 +138,13 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 	}
 	out.Branch, out.Worktree = branch, worktree
 
+	// A pull request merged on GitHub landed the work even when its branch
+	// is not an ancestor of the default branch - a squash or rebase merge
+	// writes new commits (docs/mvp.md M18) - so `mate pr watch`'s record of
+	// it stands in for the ancestry check.
+	prMerged := meta[crewstate.MetaPRState] == crewstate.PRStateMerged
 	branchExists := false
-	isAncestor := true
+	landed := true
 	ahead := 0
 	if branch != "" {
 		branchExists, err = git.BranchExists(ctx, repo, branch)
@@ -147,11 +152,12 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 			return StopResult{}, err
 		}
 		if branchExists {
-			isAncestor, err = git.IsAncestor(ctx, repo, branch, repoCfg.DefaultBranch)
+			landed, err = git.IsAncestor(ctx, repo, branch, repoCfg.DefaultBranch)
 			if err != nil {
 				return StopResult{}, err
 			}
-			if !isAncestor {
+			landed = landed || prMerged
+			if !landed {
 				ahead, err = git.AheadCount(ctx, repo, branch, repoCfg.DefaultBranch)
 				if err != nil {
 					return StopResult{}, err
@@ -179,7 +185,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 			}
 		}
 	}
-	unlanded := !isAncestor || dirty > 0
+	unlanded := !landed || dirty > 0
 	out.Unlanded, out.Ahead, out.DirtyFiles = unlanded, ahead, dirty
 
 	if unlanded && !discard {
@@ -260,7 +266,7 @@ func StopCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew 
 		}
 		out.WorktreeRemoved = true
 	}
-	if branchExists && (isAncestor || discard) {
+	if branchExists && (landed || discard) {
 		if err := worktrees.Release(ctx, lease, ReleaseParts{Branch: true}); err != nil {
 			return out, err
 		}
@@ -319,10 +325,12 @@ func orphanedWorktreeChanges(ctx context.Context, git gitx.Git, repo, worktree, 
 
 // clearCrewRunMeta drops the keys that named a live pane and keeps
 // everything a review or a later teardown decision still needs: the task,
-// the branch, the worktree and the harness session identity.
+// the branch, the worktree, the harness session identity and the pull
+// request the crew opened and how it ended.
 func clearCrewRunMeta(meta map[string]string) map[string]string {
 	next := map[string]string{}
-	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, store.MetaRepo, MetaStartedAt, MetaLaunchedAt} {
+	for _, key := range []string{MetaTask, MetaHarness, MetaSession, MetaSessionID, MetaTranscript, MetaWorktree, MetaBranch, store.MetaRepo, MetaStartedAt, MetaLaunchedAt,
+		crewstate.MetaPRURL, crewstate.MetaPRState, crewstate.MetaMergeCommit, crewstate.MetaPRSync} {
 		if v, ok := meta[key]; ok {
 			next[key] = v
 		}

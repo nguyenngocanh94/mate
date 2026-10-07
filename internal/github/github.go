@@ -151,17 +151,20 @@ type PR struct {
 	MergeCommit string
 	// Base is the branch the pull request targets.
 	Base string
+	// HeadSHA is the commit the pull request's branch points at on GitHub.
+	HeadSHA string
 }
 
-// PRView is `gh pr view <url> --json state,mergeCommit,baseRefName`.
+// PRView is `gh pr view <url> --json state,mergeCommit,baseRefName,headRefOid`.
 func (c Client) PRView(ctx context.Context, dir, url string) (PR, error) {
-	out, err := c.run(ctx, dir, "pr", "view", url, "--json", "state,mergeCommit,baseRefName")
+	out, err := c.run(ctx, dir, "pr", "view", url, "--json", "state,mergeCommit,baseRefName,headRefOid")
 	if err != nil {
 		return PR{}, err
 	}
 	var raw struct {
 		State       string `json:"state"`
 		BaseRefName string `json:"baseRefName"`
+		HeadRefOid  string `json:"headRefOid"`
 		MergeCommit *struct {
 			Oid string `json:"oid"`
 		} `json:"mergeCommit"`
@@ -169,7 +172,7 @@ func (c Client) PRView(ctx context.Context, dir, url string) (PR, error) {
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return PR{}, fmt.Errorf("github: gh pr view %s: unreadable output: %w", url, err)
 	}
-	pr := PR{State: strings.ToUpper(strings.TrimSpace(raw.State)), Base: raw.BaseRefName}
+	pr := PR{State: strings.ToUpper(strings.TrimSpace(raw.State)), Base: raw.BaseRefName, HeadSHA: raw.HeadRefOid}
 	if raw.MergeCommit != nil {
 		pr.MergeCommit = raw.MergeCommit.Oid
 	}
@@ -178,8 +181,14 @@ func (c Client) PRView(ctx context.Context, dir, url string) (PR, error) {
 
 // PRMerge is `gh pr merge <url> --merge`: it lands the pull request on
 // GitHub with a merge commit. Branch deletion is left alone on purpose; the
-// crew's branch is removed by `crew stop`.
-func (c Client) PRMerge(ctx context.Context, dir, url string) error {
-	_, err := c.run(ctx, dir, "pr", "merge", url, "--merge")
+// crew's branch is removed by `crew stop`. A non-empty matchHead adds
+// `--match-head-commit`, which makes GitHub refuse the merge if the branch
+// moved past the commit that was reviewed.
+func (c Client) PRMerge(ctx context.Context, dir, url, matchHead string) error {
+	args := []string{"pr", "merge", url, "--merge"}
+	if matchHead != "" {
+		args = append(args, "--match-head-commit", matchHead)
+	}
+	_, err := c.run(ctx, dir, args...)
 	return err
 }

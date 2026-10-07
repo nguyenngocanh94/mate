@@ -95,15 +95,15 @@ func TestAuthStatusNamesAMissingBinary(t *testing.T) {
 }
 
 func TestPRViewReadsStateAndMergeCommit(t *testing.T) {
-	const view = "pr view https://github.com/acme/shop/pull/7 --json state,mergeCommit,baseRefName"
+	const view = "pr view https://github.com/acme/shop/pull/7 --json state,mergeCommit,baseRefName,headRefOid"
 	f := &fakeRunner{results: map[string]github.Result{
-		view: {Stdout: `{"state":"MERGED","mergeCommit":{"oid":"abc123"},"baseRefName":"main"}`},
+		view: {Stdout: `{"state":"MERGED","mergeCommit":{"oid":"abc123"},"baseRefName":"main","headRefOid":"def456"}`},
 	}}
 	pr, err := github.Client{Runner: f}.PRView(context.Background(), "/ws/shop", "https://github.com/acme/shop/pull/7")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pr.State != github.StateMerged || pr.MergeCommit != "abc123" || pr.Base != "main" {
+	if pr.State != github.StateMerged || pr.MergeCommit != "abc123" || pr.Base != "main" || pr.HeadSHA != "def456" {
 		t.Fatalf("PR = %+v", pr)
 	}
 	if f.calls[0].Dir != "/ws/shop" {
@@ -119,5 +119,21 @@ func TestPRViewReadsStateAndMergeCommit(t *testing.T) {
 	f.results[view] = github.Result{ExitCode: 1, Stderr: "no pull requests found\n"}
 	if _, err := (github.Client{Runner: f}).PRView(context.Background(), "", "https://github.com/acme/shop/pull/7"); err == nil || !strings.Contains(err.Error(), "no pull requests found") {
 		t.Fatalf("err = %v, want gh's own words", err)
+	}
+}
+
+func TestPRMergeNamesTheHeadItWasReviewedAt(t *testing.T) {
+	f := &fakeRunner{}
+	gh := github.Client{Runner: f}
+	if err := gh.PRMerge(context.Background(), "/ws/shop", "https://github.com/acme/shop/pull/7", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := gh.PRMerge(context.Background(), "/ws/shop", "https://github.com/acme/shop/pull/7", "abc"); err != nil {
+		t.Fatal(err)
+	}
+	got := []string{strings.Join(f.calls[0].Args, " "), strings.Join(f.calls[1].Args, " ")}
+	want := []string{"pr merge https://github.com/acme/shop/pull/7 --merge", "pr merge https://github.com/acme/shop/pull/7 --merge --match-head-commit abc"}
+	if got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("calls = %q, want %q", got, want)
 	}
 }

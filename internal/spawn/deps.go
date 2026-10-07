@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/process"
@@ -113,6 +114,9 @@ type Deps struct {
 	// BriefDeliveryTimeout bounds the wait for a crew pane to leave idle
 	// after the brief prompt. Zero means DefaultBriefDeliveryTimeout.
 	BriefDeliveryTimeout time.Duration
+	// GitHub is the `gh` the github mode merges pull requests with
+	// (docs/mvp.md M18). The zero value is the real gh.
+	GitHub github.Client
 	// Git runs the crew worktree commands. The zero value is the real git.
 	Git gitx.Git
 	// Worktrees acquires and releases crew working copies. Nil means

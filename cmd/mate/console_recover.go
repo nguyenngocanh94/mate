@@ -92,7 +92,7 @@ func recoverySummary(res recovery.Result) query.RecoveryStatus {
 		return query.RecoveryStatus{}
 	}
 	var parts []string
-	if len(res.Items) > 0 || res.Err == nil {
+	if len(res.Items) > 0 || (res.Err == nil && len(res.Watchers) == 0) {
 		parts = append(parts, fmt.Sprintf("recovered %d", res.Recovered()))
 	}
 	links := 0
@@ -104,12 +104,25 @@ func recoverySummary(res recovery.Result) query.RecoveryStatus {
 	if links > 0 {
 		parts = append(parts, fmt.Sprintf("repaired %d %s", links, plural(links, "link", "links")))
 	}
+	if n := len(res.Watchers) - failedWatchers(res); n > 0 {
+		parts = append(parts, fmt.Sprintf("restarted %d pull request %s", n, plural(n, "watcher", "watchers")))
+	}
 	failures := res.Failures()
 	if len(failures) > 0 {
 		failed := fmt.Sprintf("%d failed: %s", len(failures), failures[0])
 		parts = append(parts, failed)
 	}
 	return query.RecoveryStatus{Line: strings.Join(parts, "; "), Failed: len(failures) > 0}
+}
+
+func failedWatchers(res recovery.Result) int {
+	n := 0
+	for _, w := range res.Watchers {
+		if w.Err != nil {
+			n++
+		}
+	}
+	return n
 }
 
 func oneLineText(s string) string {

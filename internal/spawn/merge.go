@@ -9,6 +9,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -74,12 +75,20 @@ type MergeResult struct {
 	Merged bool
 	// Stop is the teardown StopCrew performed. Its State is `finished`.
 	Stop StopResult
+	// PullRequest is the pull request merged on GitHub (the github mode),
+	// and Sync what happened to the primary checkout afterwards.
+	PullRequest string
+	Sync        string
 }
 
 // Line is the one line a successful merge prints, in the console and in the
 // CLI alike: both surfaces report the same event, so they report it in the
 // same words.
 func (r MergeResult) Line() string {
+	if r.PullRequest != "" {
+		return fmt.Sprintf("%s/%s: merged pull request %s as %s (%s); crew finished, worktree and branch removed",
+			r.Project, r.Crew, r.PullRequest, shortCommit(r.After), r.Sync)
+	}
 	return fmt.Sprintf("%s/%s: merged %d commit(s) into %s (%s..%s); crew finished, worktree and branch removed",
 		r.Project, r.Crew, r.Commits, r.DefaultBranch, shortCommit(r.Before), shortCommit(r.After))
 }
@@ -208,6 +217,12 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		}
 	}
 
+	// In the github mode the branch is landed by merging its pull request on
+	// GitHub, under the same caller rules as above (docs/mvp.md M18).
+	if cfg.Mode == store.ModeGitHub {
+		return mergePullRequest(ctx, w, deps, repoCfg, repo, out, meta, reviewed)
+	}
+
 	exists, err := git.BranchExists(ctx, repo, out.Branch)
 	if err != nil {
 		return MergeResult{}, err
@@ -300,6 +315,73 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		return out, observability.WrapError(observability.CodeStateConflict,
 			fmt.Sprintf("%s/%s: merged %d commit(s) into %s (%s..%s), but the crew was not torn down and is still open; rerun `mate crew stop %s %s` - the merge is done and must not be repeated",
 				project, crew, out.Commits, repoCfg.DefaultBranch, shortCommit(out.Before), shortCommit(out.After), project, crew), err)
+	}
+	return out, nil
+}
+
+// mergePullRequest is MergeCrew in the github mode: `gh pr merge` instead of
+// a fast-forward, then the same teardown. The caller rules were applied
+// before it is reached, so a crew and a Mate under yolo off never get here.
+//
+// Every refusal below changes nothing either: the crew has no pull request
+// recorded, it is not open any more, or the reviewed commit is no longer the
+// branch's head. After the merge the pull request's end is recorded in the
+// crew's meta exactly as `mate pr watch` records it, the primary checkout is
+// fast-forwarded when it can be (the note says why not otherwise), and
+// StopCrew finds the work landed through pr_state=merged.
+func mergePullRequest(ctx context.Context, w *store.Workspace, deps Deps, repoCfg store.RepoConfig, repo string, out MergeResult, meta map[string]string, reviewed []ReviewedCommit) (MergeResult, error) {
+	project, crew := out.Project, out.Crew
+	url := strings.TrimSpace(meta[crewstate.MetaPRURL])
+	if url == "" {
+		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
+			fmt.Sprintf("crew %s/%s has no pull request recorded; it opens one with gh pr create and runs `mate pr watch %s %s <url>`", project, crew, project, crew))
+	}
+	pr, err := deps.GitHub.PRView(ctx, repo, url)
+	if err != nil {
+		return MergeResult{}, observability.WrapError(observability.CodeRuntimeUnavailable, "merge refused: could not read "+url, err)
+	}
+	if pr.State != github.StateOpen {
+		return MergeResult{}, mergeRefusal(observability.CodeStateConflict,
+			fmt.Sprintf("%s is %s, not open; nothing to merge", url, strings.ToLower(pr.State)))
+	}
+	matchHead := ""
+	if len(reviewed) > 0 {
+		if reviewed[0].Head == "" || pr.HeadSHA != reviewed[0].Head {
+			return MergeResult{}, mergeRefusal(observability.CodeStateConflict, "review is stale; the pull request's branch changed")
+		}
+		matchHead = reviewed[0].Head
+	}
+	if err := deps.GitHub.PRMerge(ctx, repo, url, matchHead); err != nil {
+		return MergeResult{}, observability.WrapError(observability.CodeStateConflict, "merge refused: gh could not merge "+url, err)
+	}
+	merged, err := deps.GitHub.PRView(ctx, repo, url)
+	if err != nil {
+		return MergeResult{}, observability.WrapError(observability.CodeRuntimeUnavailable,
+			fmt.Sprintf("%s/%s: gh merged %s but its state could not be read; the merge is done and must not be repeated - rerun `mate pr watch %s %s %s` to record it", project, crew, url, project, crew, url), err)
+	}
+	if merged.State != github.StateMerged {
+		return MergeResult{}, observability.NewError(observability.CodeStateConflict,
+			fmt.Sprintf("%s/%s: gh accepted the merge of %s but it is %s, not merged yet (a required check or an auto-merge queue?); the crew is still open", project, crew, url, strings.ToLower(merged.State)))
+	}
+	sync := deps.git().SyncDefaultBranch(ctx, repo, repoCfg.DefaultBranch)
+	set := map[string]string{
+		crewstate.MetaPRURL:       url,
+		crewstate.MetaPRState:     crewstate.PRStateMerged,
+		crewstate.MetaMergeCommit: merged.MergeCommit,
+		crewstate.MetaPRSync:      sync,
+	}
+	if err := w.UpdateCrewMeta(project, crew, set); err != nil {
+		return out, err
+	}
+	_ = w.AppendStatus(project, crew, "pr-merged: "+url)
+	out.PullRequest, out.Sync, out.After, out.Merged = url, sync, merged.MergeCommit, true
+
+	stop, err := StopCrew(ctx, w, deps, project, crew, false)
+	out.Stop = stop
+	if err != nil {
+		return out, observability.WrapError(observability.CodeStateConflict,
+			fmt.Sprintf("%s/%s: merged %s, but the crew was not torn down and is still open; rerun `mate crew stop %s %s` - the merge is done and must not be repeated",
+				project, crew, url, project, crew), err)
 	}
 	return out, nil
 }

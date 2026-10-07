@@ -6,8 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/prwatch"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -33,6 +35,19 @@ func (i Item) Name() string {
 	return "crew " + i.Project + "/" + i.Crew
 }
 
+// Watcher is one pull request watcher recovery found dead and started again
+// (docs/mvp.md M18).
+type Watcher struct {
+	Project, Crew string
+	// PID is the new watcher's pid.
+	PID int
+	// Err is why it could not be started.
+	Err error
+}
+
+// Name is how the watcher is called in a sentence.
+func (w Watcher) Name() string { return "pull request watcher of " + w.Project + "/" + w.Crew }
+
 // Progress is reported as recovery moves. Total is 0 until the agents to
 // restart are known.
 type Progress struct {
@@ -45,6 +60,8 @@ type Result struct {
 	Fixes []Fix
 	// Items are the agents it tried to restart, in the order it tried them.
 	Items []Item
+	// Watchers are the pull request watchers it started again.
+	Watchers []Watcher
 	// Err is a failure that stopped the agent step as a whole: Herdr could
 	// not be asked or could not be started.
 	Err error
@@ -73,6 +90,11 @@ func (r Result) Failures() []string {
 	if r.Err != nil {
 		out = append(out, oneLine(r.Err))
 	}
+	for _, wt := range r.Watchers {
+		if wt.Err != nil {
+			out = append(out, wt.Name()+": "+oneLine(wt.Err))
+		}
+	}
 	for _, it := range r.Items {
 		if it.Err != nil {
 			out = append(out, it.Name()+": "+oneLine(it.Err))
@@ -83,7 +105,7 @@ func (r Result) Failures() []string {
 
 // Idle is true when the pass found nothing to do and nothing wrong.
 func (r Result) Idle() bool {
-	return len(r.Fixes) == 0 && len(r.Items) == 0 && r.Err == nil
+	return len(r.Fixes) == 0 && len(r.Items) == 0 && len(r.Watchers) == 0 && r.Err == nil
 }
 
 func oneLine(err error) string {
@@ -126,6 +148,12 @@ func Run(ctx context.Context, ws *store.Workspace, deps spawn.Deps, progress fun
 		res.Err = err
 		return res
 	}
+
+	// 1b. Pull request watchers. They are background processes of their own
+	// and need no Herdr, so this runs before Herdr is asked and whatever
+	// Herdr answers: a watcher that died with the machine is the reason a
+	// merged pull request would go unreported (docs/mvp.md M18).
+	res.Watchers = RestartWatchers(ws)
 
 	// 2. Which agents are gone. Herdr is asked without starting anything: a
 	// workspace whose agents all stopped on purpose has no reason to bring
@@ -174,6 +202,34 @@ func lost(ws *store.Workspace, live query.Liveness) []Item {
 				continue
 			}
 			out = append(out, Item{Project: ref.Name, Crew: c.crew})
+		}
+	}
+	return out
+}
+
+// WatcherStarter starts a detached pull request watcher. A test replaces it.
+var WatcherStarter prwatch.Starter = prwatch.ExecStarter{}
+
+// RestartWatchers starts `mate pr watch` again for every open crew whose meta
+// records a pull request that has not ended (`pr_state` is neither `merged`
+// nor `closed`) and whose watcher is not alive, by the pid in its
+// `.prwatch` file. A crew that is over has nobody to wake and is left alone.
+func RestartWatchers(ws *store.Workspace) []Watcher {
+	var out []Watcher
+	for _, ref := range ws.Projects() {
+		for _, c := range crewsOf(ws, ref.Name) {
+			url := strings.TrimSpace(c.meta[crewstate.MetaPRURL])
+			if url == "" || query.CrewStateOf(c.meta, false, "").Closed() {
+				continue
+			}
+			if state := c.meta[crewstate.MetaPRState]; state == crewstate.PRStateMerged || state == crewstate.PRStateClosed {
+				continue
+			}
+			if prwatch.Running(ws, ref.Name, c.crew) {
+				continue
+			}
+			started, err := prwatch.Ensure(ws, WatcherStarter, ref.Name, c.crew, url)
+			out = append(out, Watcher{Project: ref.Name, Crew: c.crew, PID: started.PID, Err: err})
 		}
 	}
 	return out

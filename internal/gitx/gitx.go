@@ -454,6 +454,40 @@ func (g Git) MergeFFOnly(ctx context.Context, repo, branch string) error {
 	return err
 }
 
+// SyncDefaultBranch brings the default branch of a primary checkout up to
+// what a pull request merge put on origin (docs/mvp.md M18): fetch, then
+// fast-forward. It never forces anything and never touches a checkout
+// somebody is working in, so it answers with a note instead of an error:
+// "fast-forwarded <branch>" when it moved the branch, and "skipped: <why>"
+// when the checkout is not on the default branch, has uncommitted files,
+// could not fetch or could not fast-forward.
+func (g Git) SyncDefaultBranch(ctx context.Context, repo, defaultBranch string) string {
+	skip := func(format string, args ...any) string {
+		return "skipped: " + fmt.Sprintf(format, args...)
+	}
+	head, err := g.CurrentBranch(ctx, repo)
+	if err != nil {
+		return skip("could not read the checkout's branch: %v", err)
+	}
+	if head != defaultBranch {
+		return skip("the primary checkout is on %s, not %s", head, defaultBranch)
+	}
+	dirty, err := g.IsDirty(ctx, repo)
+	if err != nil {
+		return skip("could not read the checkout's state: %v", err)
+	}
+	if dirty > 0 {
+		return skip("the primary checkout has %d uncommitted file(s)", dirty)
+	}
+	if err := g.Fetch(ctx, repo, "origin"); err != nil {
+		return skip("git fetch origin failed: %v", err)
+	}
+	if err := g.MergeFFOnly(ctx, repo, "origin/"+defaultBranch); err != nil {
+		return skip("fast-forward to origin/%s failed: %v", defaultBranch, err)
+	}
+	return "fast-forwarded " + defaultBranch
+}
+
 // SamePath reports whether a and b name the same location, resolving
 // symlinks when both sides exist. macOS /tmp is /private/tmp and git reports
 // the resolved path, so the tangle guard cannot compare strings.

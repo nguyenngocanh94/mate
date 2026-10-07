@@ -195,37 +195,13 @@ func (d Deps) appendStatusOnce(project, crew, line string) error {
 	return d.WS.AppendStatus(project, crew, line)
 }
 
-// syncCheckout brings the default branch of the primary checkout up to the
-// merge: fetch, then fast-forward. It says what it did, or why it did not,
-// and never forces anything: a checkout the captain is working in is theirs.
+// syncCheckout is gitx.Git.SyncDefaultBranch, except that a pull request
+// that targeted some other branch than the default moves nothing.
 func (d Deps) syncCheckout(ctx context.Context, repo, defaultBranch string, pr github.PR) string {
-	skip := func(format string, args ...any) string {
-		return "skipped: " + fmt.Sprintf(format, args...)
-	}
 	if pr.Base != "" && pr.Base != defaultBranch {
-		return skip("the pull request targets %s, not %s", pr.Base, defaultBranch)
+		return fmt.Sprintf("skipped: the pull request targets %s, not %s", pr.Base, defaultBranch)
 	}
-	head, err := d.Git.CurrentBranch(ctx, repo)
-	if err != nil {
-		return skip("could not read the checkout's branch: %v", err)
-	}
-	if head != defaultBranch {
-		return skip("the primary checkout is on %s, not %s", head, defaultBranch)
-	}
-	dirty, err := d.Git.IsDirty(ctx, repo)
-	if err != nil {
-		return skip("could not read the checkout's state: %v", err)
-	}
-	if dirty > 0 {
-		return skip("the primary checkout has %d uncommitted file(s)", dirty)
-	}
-	if err := d.Git.Fetch(ctx, repo, "origin"); err != nil {
-		return skip("git fetch origin failed: %v", err)
-	}
-	if err := d.Git.MergeFFOnly(ctx, repo, "origin/"+defaultBranch); err != nil {
-		return skip("fast-forward to origin/%s failed: %v", defaultBranch, err)
-	}
-	return "fast-forwarded " + defaultBranch
+	return d.Git.SyncDefaultBranch(ctx, repo, defaultBranch)
 }
 
 // wake queues the line for the Mate and tries to deliver it through the

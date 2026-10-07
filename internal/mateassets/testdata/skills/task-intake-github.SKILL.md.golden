@@ -1,0 +1,59 @@
+---
+name: task-intake
+description: Read before scoping a new task.
+---
+
+## 5. Task intake
+
+The captain will describe a piece of work in plain language.
+Before commissioning anything, consult the evidence you already have: `/ws/.mate/projects/shop/PROJECT.md`, `/ws/.mate/projects/shop/mate/memory.md`, and the reports and hand-backs of earlier Crews under `/ws/.mate/projects/shop/crews/` (`mate backlog shop --all` lists them).
+If established evidence already answers an informational question, relay it without a design-only scout.
+When implementation intent is unclear, answer and ask one concise implementation question when useful, rather than dispatching speculative design work.
+Never both present a likely-enough solution and launch a parallel design exercise that is not expected to change it.
+A diagnostic request, report, recommendation, or implementation-ready finding is evidence, not authorization to change code: a scout's report that says "fix X" authorizes nothing until the captain asks for the fix.
+Load `diagnostic-reasoning` before scoping a reported bug and before acting on a diagnostic report.
+
+Then resolve three things before you brief anyone.
+
+**Shape: ship or scout.**
+
+- **Ship** (the default): the deliverable is a change to one of the project's repos.
+  It lands on that repo's default branch through the project's mode, `github`: the Crew pushes its branch and opens a GitHub pull request, and the pull request is merged on GitHub, never by the Crew.
+  Once implementation is asked for, dispatch a ship and keep any remaining bounded research inside it, unless unresolved uncertainty could materially change whether or what to build.
+- **Scout:** the deliverable is knowledge - an investigation, a plan, a bug reproduction, an audit.
+  Use one when the captain asks for knowledge, or when unresolved uncertainty could materially change whether or what to build.
+  It ends in a report at `/ws/.mate/projects/shop/crews/<id>/report.md`, never a merge and never a commit, and it is spawned with `--scout` (section 4).
+  That path is the deliverable's only home: `crews/<id>/` outlives the Crew, the worktree does not.
+  A "what's wrong", "how would we", or "find out why" question is a scout task; dispatch it instead of digging through the code yourself.
+
+**Repo: one Crew per repo.**
+Every task, ship or scout, is about exactly one repo, the one its Crew works in.
+A request that needs changes in two repos - an API field and the page that shows it - is two tasks, one Crew per repo, each with its own brief, branch and merge; nothing lands in both repos at once.
+When one depends on the other, the dependent task is blocked by the first (below) until its branch has landed.
+A question that spans repos is one scout per repo, or one scout in the repo the question is mostly about, told what it may assume about the other.
+
+**Readiness: dispatchable or blocked.**
+
+- **Dispatchable:** no overlap with an in-flight Crew's files or subsystem. Dispatch it now; there is no concurrency cap.
+- **Blocked:** touches the same area as an in-flight Crew, or depends on an unmerged branch. Record it in `/ws/.mate/projects/shop/mate/backlog.md` under Queued with a `blocked-by:` note, and tell the captain in plain language what is waiting and why.
+
+Overlap is two Crews that would change the same files, so two Crews in different repos never overlap; a dependency between them still blocks.
+A scout changes nothing, so it never overlaps: it reads its repo's default branch as it is now and is dispatchable beside any ship, even one that is editing the files it reads or waiting on the captain.
+If an unmerged branch could change its answer, say so in the scout's `## What we already know`; do not hold the scout back for it.
+
+Then name the crew after the task (section 4, `<id>`) and go straight to section 6.
+Do not answer the captain with a plan and wait; a dispatchable task is dispatched in the same turn you accept it.
+
+**An unanswered question in the request is usually not a reason to stop.**
+Most requests leave something open - which of two pages, which of two names, how far to go.
+That does not make the task undispatchable, and it is not yours to settle by going and looking at the project.
+Write the gap into the brief's `## Open decisions` with who decides it (section 6), dispatch, and let the Crew reach it and append `needs-decision:`.
+That is what the state exists for: the question then sits in the captain's box where they can answer it or hand it to you, and costs them nothing while they are not looking, whereas a Mate that stops to ask first costs them the whole task.
+
+**Ask the captain first** only when the gap could change whether or what gets built, and your evidence already says it probably will.
+The request assumes something the evidence contradicts - "add a button to the landing page" when `project facts` shows an empty tree and no task ever built a landing page - so the likely outcome of dispatching is a Crew that stops within minutes on the same question, having built nothing.
+Then ask one question, evidence first (section 13), or propose a scout if nobody can answer it without looking; do not dispatch a ship that is expected to stop.
+
+The one request you may refuse to dispatch is one you cannot shape into a brief at all - you do not know what is being asked for.
+Say that in one line of plain text and end your turn; never leave your pane sitting on a question widget, a menu, or any prompt that waits for a selection, because a pane waiting on a selection cannot receive the captain's next line at all (section 13).
+
