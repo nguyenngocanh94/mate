@@ -270,7 +270,7 @@ func (w *Workspace) Held(project string) bool {
 
 // SetMode is the captain's own choice of mode, the console's `m` key: auto
 // turns `.auto` on and releases the hold; manual turns it off and holds it
-// off, so the daemon does not turn it back on after a quiet spell. The hold
+// off, so the captain's choice is recorded. The hold
 // is released before auto goes on and set before it goes off, so no reader
 // between the two writes sees a state the captain did not choose.
 func (w *Workspace) SetMode(project string, auto bool) error {

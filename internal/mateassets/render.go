@@ -6,11 +6,9 @@ import (
 	"slices"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/nguyenngocanh94/mate/assets"
 	"github.com/nguyenngocanh94/mate/internal/harness"
-	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 var (
@@ -81,12 +79,6 @@ type Params struct {
 	// crew's `.meta` and `.status` file lives. The Mate reads it, never
 	// writes it.
 	CrewsDir string
-}
-
-// QuietAfter is how long the captain's silence has to last before the
-// console turns auto mode back on, as the manual says it.
-func (Params) QuietAfter() string {
-	return fmt.Sprintf("%d minutes", int(store.QuietAfter/time.Minute))
 }
 
 // HarnessParams is one harness as the harness-adapters skill describes it.

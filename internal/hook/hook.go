@@ -35,8 +35,10 @@ const PromptMarker = "⟦mate⟧ "
 // no Mate still running predates the sentinel switch.
 const legacyPromptMarker = 0x1f
 
-// AutoOffText is the second sent.log line HandlePrompt appends when a plain
-// user prompt (no marker) turns auto mode off.
+// AutoOffText is the second sent.log line HandlePrompt used to append when a
+// plain user prompt turned auto mode off. Nothing writes it since docs/mvp.md
+// M18 (a captain prompt no longer turns auto off); the timeline still reads
+// it out of logs written before.
 const AutoOffText = "auto mode off: user prompt"
 
 // maxLastAssistantRunes bounds the Stop hook's recorded answer so one huge
@@ -60,14 +62,14 @@ type stopPayload struct {
 }
 
 // HandlePrompt implements `mate hook mate-prompt`. It appends one
-// sent.log line for the prompt and, when a plain user prompt (no marker)
-// finds auto mode on, clears `.auto` and appends a second app line
-// recording that.
+// sent.log line for the prompt and nothing else.
 //
 // A marker-prefixed prompt is the app's own doing (docs/mvp.md section 5's
 // auto-mode digest, or its user-mode confirmation send): it is recorded as
-// Source: app with the marker stripped, and never turns auto mode off,
-// because the sentinel's whole purpose is telling the difference.
+// Source: app with the marker stripped; a plain prompt is Source: user. Neither
+// changes the mode. A plain prompt used to delete `.auto`, and a crew's
+// `wait-mate` that landed afterwards was told to nobody (docs/mvp.md M18);
+// the mode is now only what the captain chose with the console's `m` key.
 func HandlePrompt(w *store.Workspace, project string, raw []byte) error {
 	var payload promptPayload
 	if err := json.Unmarshal(raw, &payload); err != nil {
@@ -86,18 +88,6 @@ func HandlePrompt(w *store.Workspace, project string, raw []byte) error {
 	}
 	if err := w.AppendSent(project, store.SentEntry{Source: source, Target: store.TargetMate, Text: text}); err != nil {
 		return fmt.Errorf("hook: append sent.log: %w", err)
-	}
-	if source != store.SourceUser {
-		return nil
-	}
-	if !w.Auto(project) {
-		return nil
-	}
-	if err := w.SetAuto(project, false); err != nil {
-		return fmt.Errorf("hook: clear .auto: %w", err)
-	}
-	if err := w.AppendSent(project, store.SentEntry{Source: store.SourceApp, Target: store.TargetMate, Text: AutoOffText}); err != nil {
-		return fmt.Errorf("hook: append auto-off sent.log: %w", err)
 	}
 	return nil
 }

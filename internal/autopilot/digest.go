@@ -102,6 +102,11 @@ func Gather(v box.View, cursor map[string]int64, now time.Time) []Item {
 
 	inbox := make(map[int]box.Item, len(v.Entries))
 	for _, it := range box.Inbox(v) {
+		if it.State == box.StateWaitMate {
+			// A manual view's inbox carries wait-mate for the captain;
+			// the rule below is what digests it.
+			continue
+		}
 		inbox[it.Entry.Seq] = it
 	}
 

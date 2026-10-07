@@ -116,8 +116,8 @@ func (w *Workspace) AutoFlag(project string) string {
 }
 
 // ManualHold is `projects/<project>/mate/.manual`; its presence means the
-// captain chose manual mode with the console's `m` key, so the auto daemon
-// never turns auto mode back on by itself (internal/autopilot, Rearm).
+// captain chose manual mode with the console's `m` key, so context refresh
+// does not run on its own while the captain holds the Mate.
 func (w *Workspace) ManualHold(project string) string {
 	return filepath.Join(w.MateDir(project), manualHoldName)
 }

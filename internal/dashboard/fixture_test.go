@@ -108,6 +108,11 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatalf("AppendStatus: %v", err)
 		}
 	}
+	// A status line's time is its file's mtime. The project is manual, so
+	// the crew's wait-mate is an inbox item and its time is in the numbers.
+	if err := os.Chtimes(ws.CrewStatus(fixtureProject, fixtureCrew), fixtureReportAt, fixtureReportAt); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
 	for _, entry := range []store.SentEntry{
 		{Time: fixtureRequestAt, Source: store.SourceUser, Target: store.TargetMate,
 			Text: "Add a Buy button to the end of README.md in project shop, linking to our checkout page. Use a crew."},

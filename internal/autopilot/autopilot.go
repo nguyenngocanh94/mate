@@ -45,16 +45,6 @@ type Deps struct {
 	Sleeper Sleeper
 	// Interval is the digest window; zero means DefaultInterval.
 	Interval time.Duration
-	// QuietAfter is how long the captain leaves a finished Mate alone
-	// before auto mode comes back on; zero means DefaultQuietAfter.
-	QuietAfter time.Duration
-}
-
-func (d Deps) quietAfter() time.Duration {
-	if d.QuietAfter > 0 {
-		return d.QuietAfter
-	}
-	return DefaultQuietAfter
 }
 
 func (d Deps) now() time.Time {
@@ -119,10 +109,6 @@ type Pilot struct {
 	ws   *store.Workspace
 	deps Deps
 
-	// talk is each project's sent.log as far as rearm has read it. Only
-	// the ticking goroutine touches it.
-	talk map[string]*talk
-
 	mu      sync.Mutex
 	seen    map[string]bool
 	notices map[string]Status
@@ -133,7 +119,7 @@ type Pilot struct {
 // New builds a daemon over a workspace. It queues nothing until Start or
 // Tick is called.
 func New(ws *store.Workspace, deps Deps) *Pilot {
-	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool), talk: make(map[string]*talk), notices: make(map[string]Status)}
+	return &Pilot{ws: ws, deps: deps, seen: make(map[string]bool), notices: make(map[string]Status)}
 }
 
 // Start begins ticking in its own goroutine until Stop or a cancelled
@@ -256,19 +242,15 @@ func (p *Pilot) tickProject(ctx context.Context, project string) error {
 	p.mu.Unlock()
 	now := p.deps.now()
 	if !p.ws.Auto(project) {
-		rearmed, err := p.rearm(project, now)
-		if err != nil {
-			return err
-		}
-		if !rearmed {
-			// Manual. Nothing is queued. A digest still waiting from
-			// before the flag went off is the outbox's to withdraw: it
-			// re-reads the flag before it types, so the captain who took
-			// over is not answered by a machine. The cursor stays on
-			// disk, which is what makes turning auto back on resume
-			// rather than replay.
-			return nil
-		}
+		// Manual, which only the captain chooses (the console's `m` key;
+		// a prompt to the Mate does not, docs/mvp.md M18). Nothing is
+		// queued. A digest still waiting from before the flag went off is
+		// the outbox's to withdraw: it re-reads the flag before it types,
+		// so the captain who took over is not answered by a machine. The
+		// cursor stays on disk, which is what makes turning auto back on
+		// resume rather than replay; the crews' wait-mate lines wait in
+		// the captain's inbox meanwhile.
+		return nil
 	}
 	if p.deps.Maintain != nil {
 		changed, err := p.deps.Maintain(ctx, project)

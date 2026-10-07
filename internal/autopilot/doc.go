@@ -31,12 +31,14 @@
 //     marks the digest sent, under the same lock this package gathers
 //     under.
 //
-// # The three ways a project stops being digested
+// # The two ways a project stops being digested
 //
-// The `.auto` flag disappearing is the only stop condition, and it has three
-// writers: the Mate's own UserPromptSubmit hook deletes it the moment the
-// captain types an unmarked prompt (internal/hook), the console's `m` key
-// toggles it, and a user can remove the file by hand. The daemon re-reads
+// The `.auto` flag disappearing is the only stop condition, and it has two
+// writers: the console's `m` key toggles it, and a user can remove the file
+// by hand. The captain typing to the Mate no longer turns it off (docs/mvp.md
+// M18; it used to, and a crew's `wait-mate` landing in that window was told
+// to nobody). A manual project's crews wait in the captain's inbox instead
+// (internal/box). The daemon re-reads
 // the flag at the top of each project's turn, and the outbox reads it again
 // immediately before it types a digest (and withdraws the digest instead), so
 // a captain who takes over is not answered by a machine a moment later.

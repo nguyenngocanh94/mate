@@ -12,8 +12,7 @@ import (
 // queues behind it (measured 2026-09-26/27, a Mate polling two Crews for nine
 // minutes while the captain's messages waited), and the daemon's digest is
 // refused every cycle. A Crew's news reaches the captain's box at once, and
-// the Mate through a digest once the captain has been quiet for
-// autopilot.DefaultQuietAfter or has chosen auto mode.
+// the Mate through a digest while the project is in auto mode.
 //
 // The manual says so and a Mate did not comply (task 24): the manual is read
 // once at bootstrap and the tool output every time. So the reminder is the

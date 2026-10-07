@@ -43,6 +43,11 @@ type View struct {
 	// spawn failed. Their lines stay in Entries as history; Inbox skips
 	// them, because nobody can answer a crew that is gone.
 	Closed map[string]bool
+	// Manual is true when the project's `.auto` flag was absent at load: the
+	// captain chose manual mode with the console's `m` key, so no digest
+	// will tell the Mate anything and Inbox keeps a crew's latest
+	// `wait-mate` for the captain (docs/mvp.md M18).
+	Manual bool
 	// Cursor resumes a later LoadSince from exactly where this View ended.
 	Cursor Cursor
 }
@@ -173,7 +178,7 @@ func load(ws *store.Workspace, project string, cursor Cursor) (View, error) {
 		attention[i], attention[j] = attention[j], attention[i]
 	}
 
-	return View{Entries: entries, ByCrew: byCrew, Attention: attention, Closed: closed, Cursor: newCursor}, nil
+	return View{Entries: entries, ByCrew: byCrew, Attention: attention, Closed: closed, Manual: !ws.Auto(project), Cursor: newCursor}, nil
 }
 
 // listCrews returns the crew ids of a project, from the `<id>.status`

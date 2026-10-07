@@ -9,9 +9,12 @@ import "time"
 // every message in `sent.log` - because the merge is the record and a
 // record that drops lines is not one. The inbox is a filter over it, and
 // only the surfaces that ask a reader to *do* something use it.
-// `wait-mate` is not in it (decision 2026-09-18, mvp.md section 4b): it is
-// the crew's report, the crews table's STATE column already carries it, and
-// the user can type into the crew's pane at any time without being told to.
+// `wait-mate` is not in it while the project is in auto mode (decision
+// 2026-09-18, mvp.md section 4b): it is the crew's report, the crews table's
+// STATE column already carries it, the user can type into the crew's pane at
+// any time without being told to, and the digest tells the Mate. In manual
+// mode no digest is sent, so a crew's latest `wait-mate` is an item too
+// (mvp.md M18): at least one of the captain and the Mate is always told.
 //
 // # What is in the inbox
 //
@@ -115,7 +118,7 @@ func Inbox(v View) []Item {
 			// captain ended the task, and there is no pane to answer into.
 			continue
 		}
-		item, ok := inboxItem(e)
+		item, ok := inboxItem(e, v.Manual)
 		if !ok || inboxResolved(e, lastStatus, replies) {
 			continue
 		}
@@ -126,12 +129,14 @@ func Inbox(v View) []Item {
 
 // inboxItem reports whether one entry is the kind of thing the inbox asks
 // about, and builds the Item if it is. A message never is: it is a record of
-// something already said, and nothing about it is waiting on a decision.
-func inboxItem(e Entry) (Item, bool) {
+// something already said, and nothing about it is waiting on a decision. A
+// `wait-mate` is one only in manual mode; the caller's later-status rule then
+// leaves just each crew's latest.
+func inboxItem(e Entry, manual bool) (Item, bool) {
 	switch e.Kind {
 	case KindStatus:
 		st := ParseStatus(e.Text)
-		if !Attention(st.State) {
+		if !Attention(st.State) && !(manual && st.State == StateWaitMate) {
 			return Item{}, false
 		}
 		return Item{Entry: e, State: st.State, Text: st.Text}, true

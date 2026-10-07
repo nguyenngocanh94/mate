@@ -128,7 +128,7 @@ func TestRecallPrintsSection12Point5InOrder(t *testing.T) {
 	mustOrder(t, out,
 		// 1: mode, the backlog table, inbox, outbox.
 		"mode: manual · yolo off", "crews (mate backlog shop):", "ID  STATE", "k1  spawned", "5 open, 1 closed",
-		"inbox: 2 unresolved", `stuck, quiet too long: "no status for 15m"`, `k3 needs an answer: "choose red or blue for the button" (crews/k3.status)`,
+		"inbox: 3 unresolved", `stuck, quiet too long: "no status for 15m"`, `k3 needs an answer: "choose red or blue for the button" (crews/k3.status)`, `k4 wait-mate: "ready in branch mate/k4" (crews/k4.status)`,
 		"outbox: nothing queued",
 		// 2: facts with head.
 		"commits: 2 on main", "head: ",
@@ -195,7 +195,7 @@ func TestRecallLiveIsPartOneOnly(t *testing.T) {
 	if got := partHeadings(out); len(got) != 1 || got[0] != "== 1. Live state ==" {
 		t.Fatalf("--live printed parts %q", got)
 	}
-	mustOrder(t, out, "Contract: live state only.", "k3  needs-decision", "inbox: 2 unresolved", "outbox: nothing queued")
+	mustOrder(t, out, "Contract: live state only.", "k3  needs-decision", "inbox: 3 unresolved", "outbox: nothing queued")
 	for _, gone := range []string{"PROJECT.md", "memory.md", "budget:"} {
 		if strings.Contains(out, gone) {
 			t.Errorf("--live printed %q", gone)
