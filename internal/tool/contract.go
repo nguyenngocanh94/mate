@@ -60,10 +60,12 @@ type Viewer interface {
 	// Bindings are the console keys the tool takes. Scope is the row of the
 	// console tree the key means something on.
 	Bindings() []Binding
-	// Argv builds the command for the host pane. findTool resolves a binary
-	// name to an absolute path, or "" when it is not installed (cmd/mate's
-	// seam). A missing binary is an error that carries Info.Install.
-	Argv(ctx ViewerContext, findTool func(string) string) ([]string, error)
+	// Argv builds the process for the host pane: Name is the binary
+	// findTool found, Dir where it runs, Env what it needs set. findTool
+	// resolves a binary name to an absolute path, or "" when it is not
+	// installed (cmd/mate's seam). A missing binary is an error that
+	// carries Info.Install.
+	Argv(ctx ViewerContext, findTool func(string) string) (Invocation, error)
 	// Placeholder is the pane's waiting line while there is nothing to
 	// show.
 	Placeholder() string
@@ -132,12 +134,19 @@ type CommandEnv struct {
 // cmd/mate's runTool is the one that starts real processes.
 type Runner func(ctx context.Context, inv Invocation, in io.Reader, out, stderr io.Writer) error
 
-// Invocation is one process a Runner starts: no shell, args whole.
+// Invocation is one process a Runner starts, or a Viewer has the host
+// pane start: no shell, args whole.
 type Invocation struct {
+	// Name is the program: a name a Runner looks up, or, from a Viewer, the
+	// absolute path findTool found.
 	Name string
 	Args []string
-	Dir  string
-	Env  []string
+	// Dir is the working directory; empty is the starter's own.
+	Dir string
+	// Env are KEY=VALUE pairs set over the environment the process
+	// inherits. A tool that must not see an inherited variable sets it
+	// empty: there is no unset.
+	Env []string
 }
 
 // Recall prints a few lines for a Mate's context at startup.
@@ -147,7 +156,12 @@ type Recall interface {
 	Render(ctx context.Context, env CommandEnv, maxBytes int) (text string, present bool, err error)
 }
 
-// Skill is the Mate's skill for the tool, generated from the registry.
+// Skill is the Mate's skill for the tool, generated from the registry. The
+// core writes it beside the Mate's own skills on every start. Its markdown
+// is a text/template over internal/mateassets.Params, the parameters the
+// Mate's manual is rendered with, so a skill can name the mate binary, the
+// project and the workspace as the manual does; the core parses and fills
+// it, and a template that does not parse stops the Mate's start.
 type Skill interface {
 	// SkillName is the skill's directory name: "task-management".
 	SkillName() string

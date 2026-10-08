@@ -7,5 +7,5 @@ Beads work (up to 10 active/blocked and 10 ready; mate tasks shop --list):
 
 == bd fails
 == Tool: Beads ==
-Beads: unreadable (bd: exit status 3: database is locked)
+Beads: unreadable (bd: exit status 3: database is locked; run mate tool beads shop -- ready)
 

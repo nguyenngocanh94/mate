@@ -34,8 +34,8 @@ func (p fakeProfile) Capabilities() tool.Capabilities {
 type fakeViewer struct{ bindings []tool.Binding }
 
 func (v fakeViewer) Bindings() []tool.Binding { return v.bindings }
-func (fakeViewer) Argv(tool.ViewerContext, func(string) string) ([]string, error) {
-	return nil, nil
+func (fakeViewer) Argv(tool.ViewerContext, func(string) string) (tool.Invocation, error) {
+	return tool.Invocation{}, nil
 }
 func (fakeViewer) Placeholder() string { return "" }
 

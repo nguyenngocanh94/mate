@@ -52,17 +52,18 @@ func (viewer) Bindings() []tool.Binding {
 	return []tool.Binding{{Key: "e", Label: "report", Scope: tool.ScopeCrew, Role: "review"}}
 }
 
-// Argv is Fresh on the crew's report.md when it wrote one, else on the
-// crew's folder. mate never writes report.md.
-func (viewer) Argv(ctx tool.ViewerContext, findTool func(string) string) ([]string, error) {
+// Argv is Fresh, in the crew's folder, on the crew's report.md when it
+// wrote one, else on the folder. mate never writes report.md.
+func (viewer) Argv(ctx tool.ViewerContext, findTool func(string) string) (tool.Invocation, error) {
 	editor := findTool(info.Binaries[0])
 	if !filepath.IsAbs(editor) {
-		return nil, fmt.Errorf("a crew's report needs the Fresh editor: %s", info.Install)
+		return tool.Invocation{}, fmt.Errorf("a crew's report needs the Fresh editor: %s", info.Install)
 	}
+	open := ctx.CrewDir
 	if ctx.ReportPath != "" {
-		return []string{editor, ctx.ReportPath}, nil
+		open = ctx.ReportPath
 	}
-	return []string{editor, ctx.CrewDir}, nil
+	return tool.Invocation{Name: editor, Args: []string{open}, Dir: ctx.CrewDir}, nil
 }
 
 func (viewer) Placeholder() string {

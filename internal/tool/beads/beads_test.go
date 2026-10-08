@@ -159,6 +159,12 @@ func TestProjectCommandsExportAndKeepLiteralArguments(t *testing.T) {
 		if c.Dir != f.env.ProjectDir || !slices.Contains(c.Env, "BEADS_DIR="+f.env.DataDir) {
 			t.Fatalf("wrong scope: %+v", c)
 		}
+		// Every ambient tracker variable is cleared over what bd inherits.
+		for _, key := range []string{"BEADS_DB", "BD_DB", "BEADS_DOLT_SERVER_HOST"} {
+			if !slices.Contains(c.Env, key+"=") {
+				t.Fatalf("ambient %s not cleared: %q", key, c.Env)
+			}
+		}
 		for _, e := range c.Env {
 			if strings.Contains(e, "wrong") {
 				t.Fatalf("ambient tracker leaked: %s", e)
@@ -296,7 +302,7 @@ func TestRecallWithNothingToDoIsAbsentAndAFailureIsAnError(t *testing.T) {
 		t.Fatalf("empty tracker: %q, %v, %v; want absent", text, present, err)
 	}
 	fail = true
-	if _, present, err := (recall{}).Render(context.Background(), f.env, 4096); present || err == nil || err.Error() != "bd: exit status 3: database is locked" {
+	if _, present, err := (recall{}).Render(context.Background(), f.env, 4096); present || err == nil || err.Error() != "bd: exit status 3: database is locked; run mate tool beads shop -- ready" {
 		t.Fatalf("failing bd: %v, %v", present, err)
 	}
 }
@@ -373,17 +379,22 @@ func TestViewerIsBeadsViewerOnTheProject(t *testing.T) {
 		t.Fatalf("Placeholder() = %q", got)
 	}
 	ctx := tool.ViewerContext{ProjectDir: "/ws/shop"}
-	argv, err := v.Argv(ctx, func(name string) string { return "/opt/bin/" + name })
-	if err != nil || !slices.Equal(argv, []string{"/opt/bin/bv", "--db", "/ws/shop/.beads"}) {
-		t.Fatalf("Argv = %q, %v", argv, err)
+	inv, err := v.Argv(ctx, func(name string) string { return "/opt/bin/" + name })
+	if err != nil || inv.Name != "/opt/bin/bv" || !slices.Equal(inv.Args, []string{"--db", "/ws/shop/.beads"}) || inv.Dir != "/ws/shop" {
+		t.Fatalf("Argv = %+v, %v", inv, err)
+	}
+	// bv runs with the environment bd does: one place spells it.
+	if !slices.Equal(inv.Env, environment("/ws/shop/.beads")) || !slices.Contains(inv.Env, "BEADS_DIR=/ws/shop/.beads") ||
+		!slices.Contains(inv.Env, "BV_NO_UPDATE_CHECK=1") || !slices.Contains(inv.Env, "BV_NO_GITIGNORE=1") || !slices.Contains(inv.Env, "BEADS_DB=") {
+		t.Fatalf("Argv env = %q", inv.Env)
 	}
 	const missing = "a project's tasks need Beads Viewer (bv): see docs/beads.md"
 	for name, find := range map[string]func(string) string{
 		"not found": func(string) string { return "" },
 		"relative":  func(name string) string { return name },
 	} {
-		if argv, err := v.Argv(ctx, find); err == nil || err.Error() != missing {
-			t.Errorf("%s: Argv = %q, %v; want %q", name, argv, err, missing)
+		if inv, err := v.Argv(ctx, find); err == nil || err.Error() != missing {
+			t.Errorf("%s: Argv = %+v, %v; want %q", name, inv, err, missing)
 		}
 	}
 }

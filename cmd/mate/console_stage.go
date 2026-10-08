@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/host"
@@ -256,8 +258,11 @@ func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) conso
 
 // consoleToolView is the Console's seam for the tool keys of the snapshot
 // (`e`: the crew's report; `t`: the project's tasks): the tool bound to
-// key on the target's row builds its command (tool.Viewer.Argv), and that
-// tool's tab beside the Console runs it. A nil columns yields a nil ToolViewFunc.
+// key on the target's row builds its process (tool.Viewer.Argv), and that
+// tool's tab beside the Console runs it, in the directory and with the
+// environment the tool asked for. A tool whose data the project does not
+// have yet gets it made first (consoleToolData). A nil columns yields a
+// nil ToolViewFunc.
 func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry) console.ToolViewFunc {
 	if c == nil {
 		return nil
@@ -279,20 +284,67 @@ func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry
 		if err != nil {
 			return fmt.Errorf("%s: %w", b.Label, err)
 		}
+		if err := consoleToolData(ctx, ws, target.ProjectID, p); err != nil {
+			return fmt.Errorf("%s: %w", b.Label, err)
+		}
 		// Argv's error is the tool's own sentence: how to install it.
-		argv, err := p.Capabilities().Viewer.Impl.Argv(vctx, c.findTool)
+		inv, err := p.Capabilities().Viewer.Impl.Argv(vctx, c.findTool)
 		if err != nil {
 			return err
 		}
-		dir := vctx.CrewDir
+		dir := inv.Dir
+		if dir == "" {
+			dir = vctx.CrewDir
+		}
 		if dir == "" {
 			dir = vctx.ProjectDir
 		}
-		if err := c.showRoleTab(ctx, tab.col, tab.socket, panerun.Command{Argv: argv, Dir: dir, Env: c.env}); err != nil {
+		cmd := panerun.Command{
+			Argv: append([]string{inv.Name}, inv.Args...),
+			Dir:  dir,
+			Env:  append(slices.Clone(c.env), inv.Env...),
+		}
+		if err := c.showRoleTab(ctx, tab.col, tab.socket, cmd); err != nil {
 			return fmt.Errorf("%s: %w", b.Label, err)
 		}
 		return nil
 	}
+}
+
+// consoleToolData makes a tool's data for project when the tool keeps data
+// and the project has none yet, the way `mate tasks` made the tracker
+// before opening the viewer: Beads Viewer on a project with no tracker
+// shows nothing. The viewer's export is not refreshed here when the data
+// exists: bv reads the tracker itself (--db). Making it is refused on the
+// old layout, where the project directory may be one of its repos, and
+// while older data sits where toolDataRefusal says. The tool's own
+// diagnostic, if it failed, is the last line of what it wrote.
+func consoleToolData(ctx context.Context, ws *store.Workspace, project string, p tool.Profile) error {
+	data := p.Capabilities().Data
+	if !data.Verified() {
+		return nil
+	}
+	exists, err := data.Impl.Exists(ws.ProjectHome(project))
+	if err != nil || exists {
+		return err
+	}
+	if ws.LayoutOld() {
+		return store.ErrLayoutOld
+	}
+	if err := toolDataRefusal(ws, project, p, false); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, toolCommandTimeout)
+	defer cancel()
+	var diagnostic bytes.Buffer
+	if err := data.Impl.Init(ctx, toolEnv(ws, project, p), &diagnostic); err != nil {
+		lines := strings.Split(strings.TrimSpace(diagnostic.String()), "\n")
+		if last := strings.TrimSpace(lines[len(lines)-1]); last != "" {
+			return fmt.Errorf("%w: %s", err, last)
+		}
+		return err
+	}
+	return nil
 }
 
 // toolBinding is the binding of key on the target's row: a crew target is

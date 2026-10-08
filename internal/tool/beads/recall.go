@@ -38,20 +38,20 @@ func (recall) Render(ctx context.Context, env tool.CommandEnv, maxBytes int) (st
 	}
 	ok, err := t.initialized()
 	if err != nil || !ok {
-		return "", false, err
+		return "", false, t.unreadable(err)
 	}
 	unlock, err := t.lock(ctx)
 	if err != nil {
-		return "", false, err
+		return "", false, t.unreadable(err)
 	}
 	defer unlock()
 	active, err := t.read(ctx, "list", "--status", "in_progress,blocked", "--limit", recallLimit, "--sort", "priority", "--brief", "--json", "--readonly")
 	if err != nil {
-		return "", false, err
+		return "", false, t.unreadable(err)
 	}
 	ready, err := t.read(ctx, "ready", "--limit", recallLimit, "--exclude-type", "epic", "--brief", "--json", "--readonly")
 	if err != nil {
-		return "", false, err
+		return "", false, t.unreadable(err)
 	}
 	if len(active)+len(ready) == 0 {
 		return "", false, nil
@@ -72,6 +72,24 @@ func (recall) Render(ctx context.Context, env tool.CommandEnv, maxBytes int) (st
 	}
 	return b.String(), true, nil
 }
+
+// unreadable is a recall failure followed by the command that reads the
+// tracker by hand, the Mate's next step; nil stays nil. The failure is
+// clipped so the core's own bound on the line never cuts the command.
+func (t project) unreadable(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &recallError{err: err, hint: fmt.Sprintf("run mate tool %s %s -- ready", info.Name, t.name)}
+}
+
+type recallError struct {
+	err  error
+	hint string
+}
+
+func (e *recallError) Error() string { return clip(e.err.Error(), 150) + "; " + e.hint }
+func (e *recallError) Unwrap() error { return e.err }
 
 // read runs one read-only bd query and decodes its JSON.
 func (t project) read(ctx context.Context, args ...string) ([]issue, error) {

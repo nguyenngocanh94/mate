@@ -191,10 +191,12 @@ func TestToolCommandsRefuseTheOldLayout(t *testing.T) {
 	}
 }
 
-// t on a project opens Beads Viewer on the project's tracker in its own
-// tab, and the second t reuses it.
+// t on a project makes its tracker when it has none, then opens Beads
+// Viewer on it in its own tab, with Beads' environment; the second t
+// reuses the tab.
 func TestConsoleTasksOpensAndReusesIndependentTab(t *testing.T) {
 	w, _ := consoleFixture(t, "shop")
+	fakeBD(t)
 	rec := newRecordingColumns(t)
 	tab := rec.tabs[roleTasks]
 	live := tab.socket
@@ -222,7 +224,32 @@ func TestConsoleTasksOpensAndReusesIndependentTab(t *testing.T) {
 		t.Fatalf("opened=%d tasks=%d", opened, len(shown))
 	}
 	home := w.ProjectHome("shop")
-	if !slices.Equal(shown[0].Argv, []string{"/opt/bv", "--db", filepath.Join(home, ".beads")}) || shown[0].Dir != home {
+	tracker := filepath.Join(home, ".beads")
+	if !slices.Equal(shown[0].Argv, []string{"/opt/bv", "--db", tracker}) || shown[0].Dir != home {
 		t.Fatalf("argv: %+v", shown[0])
+	}
+	if !slices.Contains(shown[0].Env, "BEADS_DIR="+tracker) || !slices.Contains(shown[0].Env, "BV_NO_UPDATE_CHECK=1") || !slices.Contains(shown[0].Env, "BEADS_DB=") {
+		t.Fatalf("env: %q", shown[0].Env)
+	}
+	if _, err := os.Stat(filepath.Join(tracker, "metadata.json")); err != nil {
+		t.Fatalf("t did not make the tracker: %v", err)
+	}
+}
+
+// t refuses, and opens nothing, while a tracker from before layout 2 is
+// still under .mate.
+func TestConsoleTasksRefusesBesideAnOldTracker(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	fakeBD(t)
+	if err := os.MkdirAll(filepath.Join(w.ProjectDir("shop"), ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := newRecordingColumns(t)
+	err := consoleToolView(w, rec.consoleColumns, tools)(context.Background(), "t", console.StageTarget{ProjectID: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "a Beads tracker from before layout 2") || len(rec.of(roleTasks)) != 0 {
+		t.Fatalf("t beside an old tracker = %v, shown %d", err, len(rec.of(roleTasks)))
+	}
+	if _, err := os.Stat(filepath.Join(w.ProjectHome("shop"), ".beads")); !os.IsNotExist(err) {
+		t.Fatalf("t made a tracker over the old one: %v", err)
 	}
 }

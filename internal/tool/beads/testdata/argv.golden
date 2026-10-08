@@ -2,6 +2,14 @@
 name: bd
 args: ["init" "--prefix" "shop" "--skip-agents" "--skip-hooks" "--non-interactive"]
 dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
 env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
 env:  BD_NON_INTERACTIVE=1
 env:  BV_NO_UPDATE_CHECK=1
@@ -10,6 +18,14 @@ env:  BV_NO_GITIGNORE=1
 name: bd
 args: ["ready" "--json"]
 dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
 env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
 env:  BD_NON_INTERACTIVE=1
 env:  BV_NO_UPDATE_CHECK=1
@@ -18,6 +34,14 @@ env:  BV_NO_GITIGNORE=1
 name: bd
 args: ["export"]
 dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
 env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
 env:  BD_NON_INTERACTIVE=1
 env:  BV_NO_UPDATE_CHECK=1
@@ -27,6 +51,14 @@ env:  BV_NO_GITIGNORE=1
 name: bd
 args: ["init" "--prefix" "shop" "--skip-agents" "--skip-hooks" "--non-interactive"]
 dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
 env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
 env:  BD_NON_INTERACTIVE=1
 env:  BV_NO_UPDATE_CHECK=1
@@ -35,6 +67,14 @@ env:  BV_NO_GITIGNORE=1
 name: bd
 args: ["export"]
 dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
 env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
 env:  BD_NON_INTERACTIVE=1
 env:  BV_NO_UPDATE_CHECK=1
@@ -43,3 +83,16 @@ env:  BV_NO_GITIGNORE=1
 == Viewer.Argv
 name: bv
 args: ["--db" "{{WORKSPACE}}/shop/.beads"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DB=
+env:  BD_DB=
+env:  BEADS_DOLT_SERVER_HOST=
+env:  BEADS_DOLT_SERVER_PORT=
+env:  BEADS_DOLT_SERVER_SOCKET=
+env:  BEADS_DOLT_MODE=
+env:  BEADS_DOLT_DATABASE=
+env:  BEADS_DATABASE=
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1

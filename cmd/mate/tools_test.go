@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -53,8 +54,8 @@ func (k keyTool) Capabilities() tool.Capabilities {
 type keyViewer []tool.Binding
 
 func (v keyViewer) Bindings() []tool.Binding { return v }
-func (keyViewer) Argv(tool.ViewerContext, func(string) string) ([]string, error) {
-	return nil, nil
+func (keyViewer) Argv(tool.ViewerContext, func(string) string) (tool.Invocation, error) {
+	return tool.Invocation{}, nil
 }
 func (keyViewer) Placeholder() string { return "" }
 
@@ -79,15 +80,15 @@ func (planViewer) Bindings() []tool.Binding {
 		{Key: "P", Label: "crew plan", Scope: tool.ScopeCrew, Role: rolePlan},
 	}
 }
-func (v planViewer) Argv(ctx tool.ViewerContext, findTool func(string) string) ([]string, error) {
+func (v planViewer) Argv(ctx tool.ViewerContext, findTool func(string) string) (tool.Invocation, error) {
 	if v.opened != nil {
 		*v.opened = append(*v.opened, ctx)
 	}
 	bin := findTool("plan")
 	if bin == "" {
-		return nil, errors.New("no plan: brew install plan")
+		return tool.Invocation{}, errors.New("no plan: brew install plan")
 	}
-	return []string{bin, ctx.ProjectDir}, nil
+	return tool.Invocation{Name: bin, Args: []string{ctx.ProjectDir}, Env: []string{"PLAN_QUIET=1"}}, nil
 }
 func (planViewer) Placeholder() string { return "mate · plan" }
 
@@ -152,8 +153,9 @@ func TestConsoleToolViewOnAProject(t *testing.T) {
 		t.Fatalf("opened on %+v, want the project directory only", opened)
 	}
 	shown := rec.of(rolePlan)
-	if len(shown) != 1 || !slices.Equal(shown[0].Argv, []string{"/opt/plan", project}) || shown[0].Dir != project {
-		t.Fatalf("plan tab shown %+v", shown)
+	if len(shown) != 1 || !slices.Equal(shown[0].Argv, []string{"/opt/plan", project}) || shown[0].Dir != project ||
+		!slices.Equal(shown[0].Env, append(slices.Clone(rec.env), "PLAN_QUIET=1")) {
+		t.Fatalf("plan tab shown %+v, want the tool's environment over the Console's", shown)
 	}
 	if len(rec.of(roleReview)) != 0 {
 		t.Fatal("the review tab was touched")
@@ -200,5 +202,72 @@ func TestPaneIdleComesFromTheTool(t *testing.T) {
 	}
 	if got, ok := paneIdleOf(roleTasks, tools); !ok || got != "mate · tasks\r\n\r\nt on a project opens Beads Viewer here." {
 		t.Errorf("paneIdleOf(tasks) = %q, %v; want Beads Viewer's placeholder", got, ok)
+	}
+}
+
+// dataTool is a project-scoped viewer whose tool keeps data: `d` opens it,
+// and every Exists, Init and Argv lands in calls, in order.
+type dataTool struct {
+	calls  *[]string
+	exists *bool
+}
+
+func (dataTool) Name() tool.Name { return "keeper" }
+func (dataTool) Info() tool.Info {
+	return tool.Info{Name: "keeper", Title: "Keeper", Binaries: []string{"keep"}, Install: "brew install keep"}
+}
+func (d dataTool) Capabilities() tool.Capabilities {
+	return tool.Capabilities{
+		Viewer: capability.Cap[tool.Viewer]{Status: capability.Verified, Impl: dataViewer(d)},
+		Data:   capability.Cap[tool.Data]{Status: capability.Verified, Impl: dataStore(d)},
+	}
+}
+
+type dataViewer dataTool
+
+func (dataViewer) Bindings() []tool.Binding {
+	return []tool.Binding{{Key: "d", Label: "data", Scope: tool.ScopeProject, Role: rolePlan}}
+}
+func (v dataViewer) Argv(ctx tool.ViewerContext, findTool func(string) string) (tool.Invocation, error) {
+	*v.calls = append(*v.calls, "argv")
+	return tool.Invocation{Name: findTool("keep"), Args: []string{ctx.ProjectDir}}, nil
+}
+func (dataViewer) Placeholder() string { return "mate · data" }
+
+type dataStore dataTool
+
+func (d dataStore) Dir(projectDir string) string { return filepath.Join(projectDir, ".keep") }
+func (d dataStore) Exists(string) (bool, error) {
+	*d.calls = append(*d.calls, "exists")
+	return *d.exists, nil
+}
+func (d dataStore) Init(_ context.Context, env tool.CommandEnv, _ io.Writer) error {
+	*d.calls = append(*d.calls, "init "+filepath.Base(env.ProjectDir)+" "+filepath.Base(env.DataDir))
+	*d.exists = true
+	return nil
+}
+
+// A tool key on a project whose tool keeps data it does not have yet makes
+// the data first, once, then opens the viewer; with the data there it only
+// opens the viewer.
+func TestConsoleToolViewMakesMissingToolData(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	var calls []string
+	exists := false
+	reg, err := tool.NewRegistry(dataTool{&calls, &exists})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := newRecordingColumns(t)
+	view := consoleToolView(w, rec.consoleColumns, reg)
+	for i := 0; i < 2; i++ {
+		if err := view(context.Background(), "d", console.StageTarget{ProjectID: "shop"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	calls = slices.DeleteFunc(calls, func(c string) bool { return c == "exists" })
+	want := []string{"init shop .keep", "argv", "argv"}
+	if !slices.Equal(calls, want) || len(rec.of(rolePlan)) != 2 {
+		t.Fatalf("calls %q, shown %d; want %q", calls, len(rec.of(rolePlan)), want)
 	}
 }

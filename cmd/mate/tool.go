@@ -104,11 +104,15 @@ func toolEnv(w *store.Workspace, project string, p tool.Profile) tool.CommandEnv
 }
 
 // runTool is the tool.Runner that starts real processes: no shell, the
-// caller's streams attached. A binary that is not installed is exec's own
-// error, for the tool to say how to install it.
+// caller's streams attached, inv.Env set over this process's environment.
+// A binary that is not installed is exec's own error, for the tool to say
+// how to install it.
 func runTool(ctx context.Context, inv tool.Invocation, in io.Reader, out, stderr io.Writer) error {
 	cmd := exec.CommandContext(ctx, inv.Name, inv.Args...)
-	cmd.Dir, cmd.Env = inv.Dir, inv.Env
+	cmd.Dir = inv.Dir
+	if len(inv.Env) > 0 {
+		cmd.Env = append(os.Environ(), inv.Env...)
+	}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = in, out, stderr
 	if err := cmd.Run(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {

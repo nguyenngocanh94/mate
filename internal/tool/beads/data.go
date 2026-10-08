@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/tool"
@@ -94,33 +93,34 @@ func (t project) lock(ctx context.Context) (func(), error) {
 }
 
 // trackerEnv are the variables that would point bd or bv at another
-// tracker. The ambient ones are dropped, so a project command never lands
-// in a tracker the captain's shell happens to name.
+// tracker. The inherited ones are cleared, so a project command never
+// lands in a tracker the captain's shell happens to name; BEADS_DIR is
+// then set to the project's.
 var trackerEnv = []string{
 	"BEADS_DIR", "BEADS_DB", "BD_DB",
 	"BEADS_DOLT_SERVER_HOST", "BEADS_DOLT_SERVER_PORT", "BEADS_DOLT_SERVER_SOCKET",
 	"BEADS_DOLT_MODE", "BEADS_DOLT_DATABASE", "BEADS_DATABASE",
 }
 
-// environment is this process's environment with the tracker selection
-// replaced by this project's, and Beads kept from prompting, checking for
-// updates or editing .gitignore. Upstream variables reach only these
-// subprocesses.
-func (t project) environment() []string {
+// environment is what bd and bv run with, set over what they inherit: the
+// tracker selection cleared (bd 1.3.1 reads an empty variable as unset)
+// and replaced by this tracker, and Beads kept from prompting, checking
+// for updates or editing .gitignore. It is the one place the Beads
+// environment is spelled, for the Command, the Data and the Viewer alike.
+func environment(dir string) []string {
 	var env []string
-	for _, entry := range os.Environ() {
-		key, _, _ := strings.Cut(entry, "=")
-		if !slices.Contains(trackerEnv, key) {
-			env = append(env, entry)
+	for _, key := range trackerEnv {
+		if key != "BEADS_DIR" {
+			env = append(env, key+"=")
 		}
 	}
-	return append(env, "BEADS_DIR="+t.dir, "BD_NON_INTERACTIVE=1", "BV_NO_UPDATE_CHECK=1", "BV_NO_GITIGNORE=1")
+	return append(env, "BEADS_DIR="+dir, "BD_NON_INTERACTIVE=1", "BV_NO_UPDATE_CHECK=1", "BV_NO_GITIGNORE=1")
 }
 
 // run starts name in the project directory with the project's tracker
 // selected.
 func (t project) run(ctx context.Context, name string, args []string, in io.Reader, out, stderr io.Writer) error {
-	err := t.env.Run(ctx, tool.Invocation{Name: name, Args: args, Dir: t.env.ProjectDir, Env: t.environment()}, in, out, stderr)
+	err := t.env.Run(ctx, tool.Invocation{Name: name, Args: args, Dir: t.env.ProjectDir, Env: environment(t.dir)}, in, out, stderr)
 	if errors.Is(err, exec.ErrNotFound) {
 		return fmt.Errorf("%s is not installed; see %s for installation: %w", name, info.Docs, err)
 	}

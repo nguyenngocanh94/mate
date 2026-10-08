@@ -131,7 +131,7 @@ func taskToolOn(w *store.Workspace, project string, starting bool) (tool.Profile
 // runViewerHere runs p's viewer on the project in this terminal rather than
 // in a Console tab, with extra arguments after its own.
 func runViewerHere(ctx context.Context, p tool.Profile, env tool.CommandEnv, extra []string, in io.Reader, out, stderr io.Writer) error {
-	argv, err := p.Capabilities().Viewer.Impl.Argv(tool.ViewerContext{ProjectDir: env.ProjectDir}, func(name string) string {
+	inv, err := p.Capabilities().Viewer.Impl.Argv(tool.ViewerContext{ProjectDir: env.ProjectDir}, func(name string) string {
 		if path := findTool(os.Getenv, name); filepath.IsAbs(path) {
 			return path
 		}
@@ -140,6 +140,9 @@ func runViewerHere(ctx context.Context, p tool.Profile, env tool.CommandEnv, ext
 	if err != nil {
 		return err
 	}
-	argv = append(argv, extra...)
-	return runTool(ctx, tool.Invocation{Name: argv[0], Args: argv[1:], Dir: env.ProjectDir}, in, out, stderr)
+	inv.Args = append(inv.Args, extra...)
+	if inv.Dir == "" {
+		inv.Dir = env.ProjectDir
+	}
+	return runTool(ctx, inv, in, out, stderr)
 }

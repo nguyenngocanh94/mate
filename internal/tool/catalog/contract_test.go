@@ -86,7 +86,7 @@ func profileErrs(p tool.Profile, ws workspace) []error {
 			errs = append(errs, err)
 		}
 	}
-	// Item 4: a Viewer builds its argv from the binaries findTool finds,
+	// Item 4: a Viewer builds its process from the binaries findTool finds,
 	// and says how to install them when it finds none.
 	if caps.Viewer.Verified() {
 		errs = append(errs, viewerErrs(caps.Viewer.Impl, info, ws)...)
@@ -119,12 +119,20 @@ func viewerErrs(v tool.Viewer, info tool.Info, ws workspace) []error {
 		errs = append(errs, fmt.Errorf("Viewer.Argv with no binary installed: %q does not say %q", err, info.Install))
 	}
 	const bin = "/contract/bin/"
-	argv, err := v.Argv(ctx, func(name string) string { return bin + name })
-	switch {
-	case err != nil:
-		errs = append(errs, fmt.Errorf("Viewer.Argv with every binary installed: %w", err))
-	case len(argv) == 0 || !strings.HasPrefix(argv[0], bin):
-		errs = append(errs, fmt.Errorf("Viewer.Argv = %q, which does not start with a binary findTool found", argv))
+	inv, err := v.Argv(ctx, func(name string) string { return bin + name })
+	if err != nil {
+		return append(errs, fmt.Errorf("Viewer.Argv with every binary installed: %w", err))
+	}
+	if !strings.HasPrefix(inv.Name, bin) {
+		errs = append(errs, fmt.Errorf("Viewer.Argv = %+v, which does not start a binary findTool found", inv))
+	}
+	if inv.Dir != "" && !filepath.IsAbs(inv.Dir) {
+		errs = append(errs, fmt.Errorf("Viewer.Argv runs in %q, not an absolute directory", inv.Dir))
+	}
+	for _, e := range inv.Env {
+		if key, _, ok := strings.Cut(e, "="); !ok || key == "" {
+			errs = append(errs, fmt.Errorf("Viewer.Argv sets %q, not KEY=VALUE", e))
+		}
 	}
 	return errs
 }
@@ -137,7 +145,7 @@ type fake struct {
 	install string
 	keys    []tool.Binding
 	dir     func(projectDir string) string
-	argv    func(findTool func(string) string) ([]string, error)
+	argv    func(findTool func(string) string) (tool.Invocation, error)
 	edit    func(*tool.Capabilities)
 }
 
@@ -174,15 +182,15 @@ func (f *fake) Capabilities() tool.Capabilities {
 type fakeViewer struct{ f *fake }
 
 func (v fakeViewer) Bindings() []tool.Binding { return v.f.keys }
-func (v fakeViewer) Argv(_ tool.ViewerContext, findTool func(string) string) ([]string, error) {
+func (v fakeViewer) Argv(_ tool.ViewerContext, findTool func(string) string) (tool.Invocation, error) {
 	if v.f.argv != nil {
 		return v.f.argv(findTool)
 	}
 	path := findTool(string(v.f.name))
 	if path == "" {
-		return nil, fmt.Errorf("%s is not installed; %s", v.f.name, v.f.install)
+		return tool.Invocation{}, fmt.Errorf("%s is not installed; %s", v.f.name, v.f.install)
 	}
-	return []string{path}, nil
+	return tool.Invocation{Name: path, Env: []string{"ALPHA_QUIET=1"}}, nil
 }
 func (fakeViewer) Placeholder() string { return "nothing yet" }
 
@@ -223,24 +231,42 @@ func TestContractRefusesBrokenTools(t *testing.T) {
 		}), "not an absolute path"},
 		{"no install line", broken(func(f *fake) { f.install = "" }), "needs Info.Install"},
 		{"missing binary not an error", broken(func(f *fake) {
-			f.argv = func(find func(string) string) ([]string, error) { return []string{find("alpha")}, nil }
+			f.argv = func(find func(string) string) (tool.Invocation, error) {
+				return tool.Invocation{Name: find("alpha")}, nil
+			}
 		}), "returned no error"},
 		{"missing binary without install line", broken(func(f *fake) {
-			f.argv = func(find func(string) string) ([]string, error) {
+			f.argv = func(find func(string) string) (tool.Invocation, error) {
 				if find("alpha") == "" {
-					return nil, errors.New("alpha is missing")
+					return tool.Invocation{}, errors.New("alpha is missing")
 				}
-				return []string{find("alpha")}, nil
+				return tool.Invocation{Name: find("alpha")}, nil
 			}
 		}), "does not say"},
 		{"argv ignores findTool", broken(func(f *fake) {
-			f.argv = func(find func(string) string) ([]string, error) {
+			f.argv = func(find func(string) string) (tool.Invocation, error) {
 				if find("alpha") == "" {
-					return nil, errors.New(f.install)
+					return tool.Invocation{}, errors.New(f.install)
 				}
-				return []string{"alpha"}, nil
+				return tool.Invocation{Name: "alpha"}, nil
 			}
-		}), "does not start with a binary findTool found"},
+		}), "does not start a binary findTool found"},
+		{"viewer runs in a relative directory", broken(func(f *fake) {
+			f.argv = func(find func(string) string) (tool.Invocation, error) {
+				if find("alpha") == "" {
+					return tool.Invocation{}, errors.New(f.install)
+				}
+				return tool.Invocation{Name: find("alpha"), Dir: "shop"}, nil
+			}
+		}), "not an absolute directory"},
+		{"viewer env not KEY=VALUE", broken(func(f *fake) {
+			f.argv = func(find func(string) string) (tool.Invocation, error) {
+				if find("alpha") == "" {
+					return tool.Invocation{}, errors.New(f.install)
+				}
+				return tool.Invocation{Name: find("alpha"), Env: []string{"QUIET"}}, nil
+			}
+		}), "not KEY=VALUE"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := profileErrs(tc.p, ws)

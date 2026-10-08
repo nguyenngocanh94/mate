@@ -39,6 +39,18 @@ func trackerEnvKey(entry string) bool {
 	return false
 }
 
+// writeInvocation is one process as the golden records it.
+func writeInvocation(w io.Writer, inv tool.Invocation, normalize func(string) string) {
+	fmt.Fprintf(w, "name: %s\n", inv.Name)
+	fmt.Fprintf(w, "args: %s\n", normalize(fmt.Sprintf("%q", inv.Args)))
+	fmt.Fprintf(w, "dir:  %s\n", normalize(inv.Dir))
+	for _, e := range inv.Env {
+		if trackerEnvKey(e) {
+			fmt.Fprintf(w, "env:  %s\n", normalize(e))
+		}
+	}
+}
+
 func TestTrackerArgvGolden(t *testing.T) {
 	// Only the variables set here reach the profile: whatever tracker
 	// settings this machine has are unset for the test.
@@ -78,17 +90,9 @@ func TestTrackerArgvGolden(t *testing.T) {
 		if err := path.call(f.env); err != nil {
 			t.Fatalf("%s: %v", path.name, err)
 		}
-		normalize := strings.NewReplacer(f.root, "{{WORKSPACE}}").Replace
 		fmt.Fprintf(&got, "== %s\n", path.name)
 		for _, c := range calls {
-			fmt.Fprintf(&got, "name: %s\n", c.Name)
-			fmt.Fprintf(&got, "args: %s\n", normalize(fmt.Sprintf("%q", c.Args)))
-			fmt.Fprintf(&got, "dir:  %s\n", normalize(c.Dir))
-			for _, e := range c.Env {
-				if trackerEnvKey(e) {
-					fmt.Fprintf(&got, "env:  %s\n", normalize(e))
-				}
-			}
+			writeInvocation(&got, c, strings.NewReplacer(f.root, "{{WORKSPACE}}").Replace)
 			got.WriteString("\n")
 		}
 	}
@@ -96,12 +100,13 @@ func TestTrackerArgvGolden(t *testing.T) {
 	// The tasks tab runs what the Viewer builds; the Console starts it,
 	// not the Runner.
 	f := newFixture(t, nil)
-	argv, err := viewer{}.Argv(tool.ViewerContext{ProjectDir: f.env.ProjectDir}, func(name string) string { return "/bin/" + name })
+	inv, err := viewer{}.Argv(tool.ViewerContext{ProjectDir: f.env.ProjectDir}, func(name string) string { return "/bin/" + name })
 	if err != nil {
 		t.Fatal(err)
 	}
-	normalize := strings.NewReplacer(f.root, "{{WORKSPACE}}").Replace
-	fmt.Fprintf(&got, "== Viewer.Argv\nname: %s\nargs: %s\n", filepath.Base(argv[0]), normalize(fmt.Sprintf("%q", argv[1:])))
+	inv.Name = filepath.Base(inv.Name)
+	fmt.Fprintf(&got, "== Viewer.Argv\n")
+	writeInvocation(&got, inv, strings.NewReplacer(f.root, "{{WORKSPACE}}").Replace)
 
 	golden := filepath.Join("testdata", "argv.golden")
 	if *updateArgv {

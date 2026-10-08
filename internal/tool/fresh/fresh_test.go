@@ -51,14 +51,14 @@ func TestFreshArgv(t *testing.T) {
 	found := func(name string) string { return "/opt/bin/" + name }
 	ctx := tool.ViewerContext{ProjectDir: "/ws/shop", CrewDir: "/ws/.mate/projects/shop/crews/k3"}
 
-	argv, err := v.Argv(ctx, found)
-	if err != nil || !slices.Equal(argv, []string{"/opt/bin/fresh", ctx.CrewDir}) {
-		t.Fatalf("no report: Argv = %q, %v", argv, err)
+	inv, err := v.Argv(ctx, found)
+	if err != nil || inv.Name != "/opt/bin/fresh" || !slices.Equal(inv.Args, []string{ctx.CrewDir}) || inv.Dir != ctx.CrewDir || inv.Env != nil {
+		t.Fatalf("no report: Argv = %+v, %v", inv, err)
 	}
 	ctx.ReportPath = ctx.CrewDir + "/report.md"
-	argv, err = v.Argv(ctx, found)
-	if err != nil || !slices.Equal(argv, []string{"/opt/bin/fresh", ctx.ReportPath}) {
-		t.Fatalf("report: Argv = %q, %v", argv, err)
+	inv, err = v.Argv(ctx, found)
+	if err != nil || inv.Name != "/opt/bin/fresh" || !slices.Equal(inv.Args, []string{ctx.ReportPath}) || inv.Dir != ctx.CrewDir {
+		t.Fatalf("report: Argv = %+v, %v", inv, err)
 	}
 
 	const missing = "a crew's report needs the Fresh editor: brew install fresh-editor"
@@ -66,8 +66,8 @@ func TestFreshArgv(t *testing.T) {
 		"not found": func(string) string { return "" },
 		"relative":  func(name string) string { return name },
 	} {
-		if argv, err := v.Argv(ctx, find); err == nil || err.Error() != missing {
-			t.Errorf("%s: Argv = %q, %v; want %q", name, argv, err, missing)
+		if inv, err := v.Argv(ctx, find); err == nil || err.Error() != missing {
+			t.Errorf("%s: Argv = %+v, %v; want %q", name, inv, err, missing)
 		}
 	}
 }
