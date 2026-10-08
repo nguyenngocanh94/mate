@@ -244,3 +244,36 @@ func TestChainKeepsADialogTheFixtureRecognises(t *testing.T) {
 		t.Fatalf("log %q", lines)
 	}
 }
+
+// skipsBlank is a failing primary that skips a blank screen, as the jev
+// observer does.
+type skipsBlank struct{ stub }
+
+func (s *skipsBlank) Skips(pane string) bool { return strings.TrimSpace(pane) == "" }
+
+// A screen the primary skips is the fixture's reading, with no request, no
+// log line and no count toward the breaker: blank screens between failures
+// do not open the circuit, and a failure after them is still only the
+// first in a row.
+func TestChainSkipsAScreenThePrimarySkips(t *testing.T) {
+	jev := &skipsBlank{stub{err: errors.New("offline")}}
+	var lines []string
+	c := chain.New(jev, &stub{obs: fixtureDraft}, 0.85, chain.WithLog(func(l string) error { lines = append(lines, l); return nil }))
+	for i := range 5 {
+		obs, err := c.Observe(context.Background(), claudeScreen, strings.Repeat(" ", i+1))
+		if err != nil || obs.Source != "fixture" || !strings.HasPrefix(obs.Reason, "jev: no terminal text to observe; not asked") {
+			t.Fatalf("blank screen %d: %+v, %v", i, obs, err)
+		}
+	}
+	if jev.calls != 0 || len(lines) != 0 {
+		t.Fatalf("%d requests, log %q for blank screens", jev.calls, lines)
+	}
+	for _, pane := range []string{"a", "b"} {
+		if _, err := c.Observe(context.Background(), claudeScreen, pane); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if jev.calls != 2 || len(lines) != 2 || strings.Contains(strings.Join(lines, "\n"), "breaker open") {
+		t.Fatalf("%d requests, log %q: want two failed requests and a closed circuit", jev.calls, lines)
+	}
+}

@@ -31,10 +31,23 @@ type Observer struct {
 // New returns the Jev observer over client.
 func New(client *notice.Client) screen.Observer { return &Observer{client: client} }
 
+// blankReason is the Reason of the Observation for a screen with no text.
+const blankReason = "jev: no terminal text to observe; not asked"
+
+// Skips reports whether a pane has no text to send Jev once prepared (only
+// blank lines and escape sequences): such a screen is not asked about.
+func (o *Observer) Skips(pane string) bool { return Prepare(pane, "") == "" }
+
 // Observe asks Jev about one pane snapshot. The deadline is the caller's,
 // capped at notice.Timeout; nothing is retried. A failed request or an
-// answer that does not validate is an error, never an Observation.
+// answer that does not validate is an error, never an Observation. A screen
+// it Skips is no request and no error: an Observation that knows nothing,
+// at confidence 0.
 func (o *Observer) Observe(ctx context.Context, _ harness.ScreenProfile, pane string) (screen.Observation, error) {
+	if o.Skips(pane) {
+		return screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown,
+			Dialog: screen.DialogUnknown, Highlight: -1, Source: Source, Reason: blankReason}, nil
+	}
 	ctx, cancel := context.WithTimeout(ctx, notice.Timeout)
 	defer cancel()
 	data, err := o.client.Ask(ctx, pane, func(redacted string) ([]byte, error) {

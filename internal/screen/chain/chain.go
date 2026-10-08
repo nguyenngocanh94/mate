@@ -112,8 +112,11 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 // it is not asked at all for BreakerCooldown (breaker.go): the fallback's
 // reading is returned whole, Reason "jev: circuit open", even for a screen
 // whose earlier answer is still in memory - a cache hit costs no request,
-// but an open circuit answers from the fixture alone. The call is
-// synchronous, so an answer always belongs to the snapshot that was hashed:
+// but an open circuit answers from the fixture alone. A screen the primary
+// skips (a skipper with no text to send) is not asked, not counted by the
+// breaker and not logged: the fallback's reading is returned whole. The
+// call is synchronous, so an answer always belongs to the snapshot that was
+// hashed:
 // a pane that changes while Jev is asked is a new snapshot on the caller's
 // next read, never this answer's. The answer can be up to Jev's deadline old
 // when it returns, so a caller that acts on it (send before typing, settle
@@ -122,6 +125,9 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 	fix, err := c.fallback.Observe(ctx, profile, pane)
 	if err != nil {
 		return fix, err
+	}
+	if s, ok := c.primary.(skipper); ok && s.Skips(pane) {
+		return withReason(fix, "jev: no terminal text to observe; not asked"), nil
 	}
 	ask, trial := c.admit()
 	if !ask {
@@ -151,6 +157,12 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 		}
 	}
 	return obs, nil
+}
+
+// skipper is a primary that can say, without a request, that a screen has
+// nothing to ask it about (jev.Observer.Skips).
+type skipper interface {
+	Skips(pane string) bool
 }
 
 // decide applies Observe's rules to one pair of readings. It names the

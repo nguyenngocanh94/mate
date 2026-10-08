@@ -222,8 +222,8 @@ type Observation struct {
 	// Evidence is the line the classifier recognised, carried through so
 	// the health column can show what it was read from.
 	Evidence string
-	// Source names the observer that read the pane ("fixture", "jev",
-	// "chain"). Only meaningful when AgentFound is true.
+	// Source names the observer that read the pane ("fixture", "jev").
+	// Only meaningful when AgentFound is true.
 	Source string
 }
 

@@ -224,8 +224,8 @@ func TestObserveMapsOneAnswer(t *testing.T) {
 	}
 }
 
-// A request that fails, an answer that does not validate and a screen with
-// nothing to send are errors, never an Observation; nothing is retried.
+// A request that fails and an answer that does not validate are errors,
+// never an Observation; nothing is retried.
 func TestObserveFailsWithoutObserving(t *testing.T) {
 	good := answer(t, map[Axis]string{AxisComposer: "empty", AxisDialog: "none", AxisNotice: "none"},
 		map[Axis]float64{AxisComposer: 1, AxisDialog: 1, AxisNotice: 1})
@@ -237,7 +237,6 @@ func TestObserveFailsWithoutObserving(t *testing.T) {
 		"transport error": {func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") }, "› "},
 		"other model":     {respond(200, []byte(strings.Replace(string(good), notice.Model, "jev-latest", 1))), "› "},
 		"not JSON":        {respond(200, []byte("{")), "› "},
-		"empty screen":    {respond(200, good), "\x1b[0m  \n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := 0
@@ -250,6 +249,24 @@ func TestObserveFailsWithoutObserving(t *testing.T) {
 				t.Fatalf("%d requests: retried", calls)
 			}
 		})
+	}
+}
+
+// A screen with no text to send is skipped: no request and no error, an
+// Observation that knows nothing at confidence 0.
+func TestObserveSkipsABlankScreen(t *testing.T) {
+	calls := 0
+	rt := roundTrip(func(r *http.Request) (*http.Response, error) { calls++; return nil, errors.New("asked") })
+	o := New(notice.New("k").WithTransport(rt))
+	if !o.(*Observer).Skips("\x1b[0m  \n") {
+		t.Fatal("a blank screen is not skipped")
+	}
+	obs, err := o.Observe(context.Background(), nil, "\x1b[0m  \n")
+	if err != nil || calls != 0 {
+		t.Fatalf("observed %+v, %v after %d requests; want no request and no error", obs, err, calls)
+	}
+	if obs.Confidence != 0 || obs.Composer != screen.ComposerUnknown || obs.Dialog != screen.DialogUnknown || obs.Source != Source {
+		t.Fatalf("observed %+v, want nothing known", obs)
 	}
 }
 
