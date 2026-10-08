@@ -12,6 +12,7 @@ const (
 	workspaceDocName  = "WORKSPACE.md"
 	pricingFileName   = "pricing.yaml"
 	envFileName       = ".env"
+	jevLogName        = "jev.log"
 	projectsDirName   = "projects"
 	projectFileName   = "project.yaml"
 	projectDocName    = "PROJECT.md"
@@ -62,6 +63,11 @@ func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pr
 // (docs/mvp.md section 3): `KEY=VALUE` lines that LoadEnv reads. Optional;
 // it holds switches and paths, never a secret itself.
 func (w *Workspace) EnvFile() string { return filepath.Join(w.StateDir(), envFileName) }
+
+// JevLog is `<root>/.mate/jev.log`: one line per request the Jev observer
+// chain sent (internal/screen/chain), only when `.mate/.env` sets
+// MATE_JEV=observer. It never holds screen text or a key.
+func (w *Workspace) JevLog() string { return filepath.Join(w.StateDir(), jevLogName) }
 
 // ProjectsDir is `<root>/.mate/projects`.
 func (w *Workspace) ProjectsDir() string { return filepath.Join(w.StateDir(), projectsDirName) }

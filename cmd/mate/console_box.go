@@ -148,7 +148,7 @@ func boxReplyAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, r
 	if err != nil {
 		return "", err
 	}
-	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime, Harnesses: deps.Harnesses}, handle, kind, text, send.Options{})
+	report, err := send.Send(ctx, send.Deps{Runtime: deps.Runtime, Harnesses: deps.Harnesses, Observer: deps.Observer}, handle, kind, text, send.Options{})
 	if err != nil {
 		return "", err
 	}

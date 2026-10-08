@@ -40,6 +40,10 @@ Sheet ghi thời điểm capture và confidence từ model. Confidence không ph
 - Không ghi màn hình, response hoặc key vào state/log của mate. Result chỉ nằm trong sheet hiện tại. Không cache, không background polling, không ghi nhãn vào timeline/inbox.
 - Jev không tham gia composer classifier, sender, receipts, incidents, quota dispatch hoặc task state. Nó không tự nhấn Enter, cấp quyền hay đóng dialog. **Bản thử này chưa sửa lỗi probe hiện tại.**
 
+## Bộ quan sát: `MATE_JEV=observer`
+
+Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), `MATE_JEV=observer` trong `.mate/.env` (cùng `MATE_JEV_API_KEY_FILE`) bật thêm bộ quan sát: **pane của Mate và Crew đi ra TypeSafe mỗi lần màn hình đổi** (và mỗi phút một lần cho màn hình đứng yên), từ observer của console, `mate send`, `mate state` và bước settle khi start, không chỉ khi người dùng chọn action. Nội dung gửi đi giống action ở trên (40 dòng cuối, 8 KiB, che key và credential theo pattern), thêm đánh dấu chữ mờ. Jev hỏi trước, fixture classifier là fallback: Jev lỗi hay confidence dưới `MATE_JEV_THRESHOLD` (mặc định `0.85`, chỉ nhận số trong `[0, 1]`) thì dùng nguyên quan sát của fixture; Jev nói composer trống mà fixture chắc có draft hay đang bận thì fixture thắng. Enter vẫn chỉ đi sau khi so chuỗi trực tiếp, phím dialog chỉ sau khi fixture xác nhận highlight. Mỗi request ghi một dòng vào `.mate/jev.log` (thời điểm, harness, 12 ký tự hash màn hình, latency, nguồn được dùng, nhãn Jev, lý do fallback; không có nội dung màn hình hay key); `go run ./scripts/jeveval -log <workspace>/.mate/jev.log` in số request, latency p50/p95 và số lần fallback. Các mục "Dữ liệu và giới hạn" ở trên mô tả `MATE_JEV=on`, vẫn giữ nguyên nghĩa: chỉ action notice.
+
 ## Phương án tiến tới probe tổng quát
 
 1. Thu corpus có gán nhãn từ nhiều phiên bản harness, kích thước terminal, warning, dialog, history và bản dịch; bổ sung negative cases và chuỗi frame theo thời gian.

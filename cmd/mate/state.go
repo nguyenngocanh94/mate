@@ -49,7 +49,7 @@ func cmdState(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	result, err := stateOfCrew(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), fs.Arg(1))
+	result, err := stateOfCrew(context.Background(), w, liveDeps(w, stderr), fs.Arg(0), fs.Arg(1))
 	if err != nil {
 		return err
 	}

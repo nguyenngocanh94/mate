@@ -84,7 +84,7 @@ func cmdReview(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	req := spawn.SpawnCrewRequest{Project: project, Crew: *id, Repo: fp["repo"], Harness: h, Model: m, Effort: e, Scout: true, Task: "Review " + crew + " at " + fp["head"], BriefText: reviewBrief(w, project, crew, fp)}
-	result, err := spawn.SpawnCrew(ctx, w, spawn.LiveDeps(harnesses), req)
+	result, err := spawn.SpawnCrew(ctx, w, liveDeps(w, stderr), req)
 	if err != nil {
 		return err
 	}

@@ -103,7 +103,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	if warn := quotaWarning(req.Harness); warn != "" {
 		fmt.Fprintf(stderr, "warning: %s\n", warn)
 	}
-	res, err := spawn.SpawnCrew(context.Background(), w, spawn.LiveDeps(harnesses), req)
+	res, err := spawn.SpawnCrew(context.Background(), w, liveDeps(w, stderr), req)
 	if errors.Is(err, spawn.ErrRepoRefused) {
 		// Which repo a crew works in is the caller's argument to get right,
 		// so it exits 2 like any other bad argument.
@@ -287,7 +287,7 @@ func cmdCrewRelaunch(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	project, crew := fs.Arg(0), fs.Arg(1)
-	res, err := spawn.RelaunchCrew(context.Background(), w, spawn.LiveDeps(harnesses), project, crew, *noteFlag)
+	res, err := spawn.RelaunchCrew(context.Background(), w, liveDeps(w, stderr), project, crew, *noteFlag)
 	if err != nil {
 		return err
 	}

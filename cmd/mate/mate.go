@@ -66,7 +66,7 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := spawn.StartMate(context.Background(), w, spawn.LiveDeps(harnesses), req)
+	res, err := spawn.StartMate(context.Background(), w, liveDeps(w, stderr), req)
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func cmdMateRefresh(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	changed, err := contextRefresh(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), false)
+	changed, err := contextRefresh(context.Background(), w, liveDeps(w, stderr), fs.Arg(0), false)
 	if err != nil {
 		return err
 	}

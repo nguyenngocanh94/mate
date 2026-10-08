@@ -3,6 +3,7 @@
 // PR 0 gate (docs/plans/jev-observer-2026-10-08.md, section 5).
 //
 //	go run ./scripts/jeveval [-cassette dir] [-replay] [-list]
+//	go run ./scripts/jeveval -log <workspace>/.mate/jev.log
 //
 // The key is read from the file MATE_JEV_API_KEY_FILE names, else
 // ~/.config/mate/jev-api-key. Nothing but the corpus is sent, one request
@@ -12,6 +13,9 @@
 // -cassette dir records each response as dir/<sha256 of request>.json and
 // the run as dir/manifest.json; -replay answers from that cassette instead
 // of the network. -list prints the corpus and its labels without calling.
+// -log reads the observer chain's log instead (internal/screen/chain) and
+// prints the numbers a day with MATE_JEV=observer is measured by: requests,
+// latency p50/p95 and how many fell back to the fixture observer.
 package main
 
 import (
@@ -29,6 +33,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/notice"
+	"github.com/nguyenngocanh94/mate/internal/screen/chain"
 	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 )
 
@@ -51,8 +56,15 @@ func main() {
 	cassette := flag.String("cassette", "", "record responses into (or, with -replay, read them from) this directory")
 	replay := flag.Bool("replay", false, "answer from -cassette instead of calling Jev")
 	list := flag.Bool("list", false, "print the corpus and its deterministic labels; call nothing")
+	logFile := flag.String("log", "", "summarise this .mate/jev.log; call nothing")
 	flag.Parse()
-	if err := run(os.Stdout, *cassette, *replay, *list); err != nil {
+	var err error
+	if *logFile != "" {
+		err = summarizeLog(os.Stdout, *logFile)
+	} else {
+		err = run(os.Stdout, *cassette, *replay, *list)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "jeveval:", err)
 		os.Exit(1)
 	}
@@ -176,6 +188,36 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 		}
 		slices.Sort(stale)
 		drift(w, notRecorded, stale)
+	}
+	return nil
+}
+
+// summarizeLog prints what one observer chain log says.
+func summarizeLog(w io.Writer, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	s, err := chain.Summarize(f)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "- Jev requests: %d.\n", s.Calls)
+	fmt.Fprintf(w, "- Latency: p50 %d ms, p95 %d ms.\n", s.P50.Milliseconds(), s.P95.Milliseconds())
+	fmt.Fprintf(w, "- Fallbacks to the fixture observer: %d", s.Fallbacks)
+	if s.Fallbacks > 0 {
+		var why []string
+		for _, k := range []string{chain.FallbackThreshold, chain.FallbackError, chain.FallbackSaferSide} {
+			if s.ByFallback[k] > 0 {
+				why = append(why, fmt.Sprintf("%s %d", k, s.ByFallback[k]))
+			}
+		}
+		fmt.Fprintf(w, " (%s)", strings.Join(why, ", "))
+	}
+	fmt.Fprintln(w, ".")
+	if s.Malformed > 0 {
+		fmt.Fprintf(w, "- Lines not read: %d.\n", s.Malformed)
 	}
 	return nil
 }

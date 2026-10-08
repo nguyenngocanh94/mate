@@ -137,3 +137,22 @@ func TestReplayListsScreensNotRecorded(t *testing.T) {
 		t.Fatal("no report")
 	}
 }
+
+// -log prints the three numbers a day with the observer on is measured by.
+func TestSummarizeLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "jev.log")
+	log := "2026-10-08T09:00:00Z claude 0123456789ab 200 jev composer=empty dialog=none conf=0.91\n" +
+		"2026-10-08T09:00:05Z codex 0123456789ab 300 fixture composer=busy dialog=none conf=0.62 fallback=below-threshold\n" +
+		"2026-10-08T09:00:09Z codex 0123456789ab 8000 fixture composer=- dialog=- conf=0.00 fallback=error\n"
+	if err := os.WriteFile(path, []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := summarizeLog(&out, path); err != nil {
+		t.Fatal(err)
+	}
+	want := "- Jev requests: 3.\n- Latency: p50 300 ms, p95 8000 ms.\n- Fallbacks to the fixture observer: 2 (below-threshold 1, error 1).\n"
+	if out.String() != want {
+		t.Fatalf("got\n%s\nwant\n%s", out.String(), want)
+	}
+}

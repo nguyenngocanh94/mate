@@ -23,23 +23,53 @@ type noticeClassifier interface {
 }
 
 // The workspace's `.mate/.env` opts this console into remote classification:
-// `MATE_JEV=on` turns the action on for this workspace only, and
-// `MATE_JEV_API_KEY_FILE` names a key file, `~/` or relative to the
-// workspace root. The key is read here and stays in this client; no key is
-// added to spawned agents' environments. The process environment is not
-// consulted, so one workspace's switch never reaches another's console.
+// `MATE_JEV=on` turns the action on for this workspace only (and so does
+// `MATE_JEV=observer`, which also observes every pane through Jev, see
+// jev_observer.go), and `MATE_JEV_API_KEY_FILE` names a key file, `~/` or
+// relative to the workspace root. The key is read here and stays in this
+// client; no key is added to spawned agents' environments. The process
+// environment is not consulted, so one workspace's switch never reaches
+// another's console.
 func consoleNoticeClient(ws *store.Workspace) (*notice.Client, error) {
+	env, mode, err := jevSettings(ws)
+	if err != nil || mode == jevOff {
+		return nil, err
+	}
+	return jevClient(ws, env)
+}
+
+// jevMode is what `MATE_JEV` turns on.
+type jevMode int
+
+const (
+	jevOff jevMode = iota
+	// jevNotice is the console's Explain notice action alone.
+	jevNotice
+	// jevObserver is that action and the observer chain.
+	jevObserver
+)
+
+// jevSettings reads `.mate/.env` and its MATE_JEV switch.
+func jevSettings(ws *store.Workspace) (map[string]string, jevMode, error) {
 	env, err := ws.LoadEnv()
 	if err != nil {
-		return nil, fmt.Errorf("Jev disabled: %w", err)
+		return nil, jevOff, fmt.Errorf("Jev disabled: %w", err)
+	}
+	if strings.EqualFold(strings.TrimSpace(env["MATE_JEV"]), "observer") {
+		return env, jevObserver, nil
 	}
 	on, err := envSwitch(env["MATE_JEV"])
 	if err != nil {
-		return nil, fmt.Errorf("Jev disabled: MATE_JEV %w", err)
+		return nil, jevOff, errors.New("Jev disabled: MATE_JEV must be on, observer or off")
 	}
-	if !on {
-		return nil, nil
+	if on {
+		return env, jevNotice, nil
 	}
+	return env, jevOff, nil
+}
+
+// jevClient is the Jev client over the key file `.mate/.env` names.
+func jevClient(ws *store.Workspace, env map[string]string) (*notice.Client, error) {
 	path := env["MATE_JEV_API_KEY_FILE"]
 	if path == "" {
 		return nil, errors.New("Jev disabled: MATE_JEV_API_KEY_FILE is not set in .mate/.env")
