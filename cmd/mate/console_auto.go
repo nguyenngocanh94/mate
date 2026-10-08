@@ -82,6 +82,7 @@ func consoleOutbox(ws *store.Workspace, deps spawn.Deps) *outbox.Sender {
 		Runtime:   deps.Runtime,
 		Handle:    consoleMateHandle(ws, deps),
 		Harnesses: deps.Harnesses,
+		Observer:  deps.Observer,
 	}
 	if deps.Now != nil {
 		od.Clock = clockFunc(deps.Now)

@@ -16,6 +16,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	screenfixture "github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -343,5 +345,147 @@ func TestStrictStowIgnoresMateMessagesToCrews(t *testing.T) {
 	}
 	if res.Stowed {
 		t.Fatal("a crew message is not a Stop hook")
+	}
+}
+
+// The stow's own read of the Mate's composer goes through Deps.Observer: an
+// observer that says busy refuses a stow that needs an empty composer, on a
+// pane that shows one.
+func TestStowReadsThePaneThroughTheObserver(t *testing.T) {
+	f := newFixture(t)
+	observer := &seesBusy{}
+	d := f.deps()
+	d.Observer = observer
+	s := outbox.New(f.ws, d)
+	res, err := s.Stow(context.Background(), project, outbox.StowOptions{RequireEmpty: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome() != "not stowed: the Mate is mid-turn" || observer.calls != 1 {
+		t.Fatalf("result %q after %d observations, want the observer's busy", res.Outcome(), observer.calls)
+	}
+	if len(f.outboxItems()) != 0 || len(f.rt.SentText) != 0 {
+		t.Fatal("a refused stow queued or typed something")
+	}
+}
+
+// countingObserver reads every pane as the fixture observer does, and
+// counts the screens it was asked about.
+type countingObserver struct{ screens []string }
+
+func (o *countingObserver) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
+	o.screens = append(o.screens, pane)
+	return screenfixture.New().Observe(ctx, profile, pane)
+}
+
+// The stow's wait asks the observer only about a screen it has not read:
+// a Mate busy on one unchanged screen for twenty polls costs one
+// observation, and its composer back to empty one more, however many looks
+// the wait takes.
+func TestStowObservesOnlyWhenTheScreenChanges(t *testing.T) {
+	f := newFixture(t)
+	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	const codexBusy = "• Working (3s • esc to interrupt)\n\n› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	f.rt.SetReadOutput(f.handle, codexEmpty)
+	f.rt.OnSendText = func(h runtime.AgentHandle, _ string) { f.rt.SetReadOutput(h, codexBusy) }
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(n int) {
+		if n == 20 {
+			f.rt.SetReadOutput(f.handle, codexEmpty)
+		}
+	}}
+	observer := &countingObserver{}
+	d := f.deps()
+	d.Sleeper = sleeper
+	d.Observer = observer
+	d.Handle = func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
+		return f.handle, codex.KindCodex, nil
+	}
+	res, err := outbox.New(f.ws, d).Stow(context.Background(), project, outbox.StowOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Stowed || sleeper.n < 21 {
+		t.Fatalf("result %+v after %d sleeps, want stowed once the composer was empty again", res, sleeper.n)
+	}
+	// The stow's first look (empty), the send's own look before typing
+	// (empty), then the busy screen once and the empty screen once.
+	want := []string{codexEmpty, codexEmpty, codexBusy, codexEmpty}
+	if fmt.Sprint(observer.screens) != fmt.Sprint(want) {
+		t.Fatalf("observed %d screens %q, want %d: %q", len(observer.screens), observer.screens, len(want), want)
+	}
+}
+
+// overrides reads every pane as the fixture observer does, except the
+// screens it names, which it reads as it is told.
+type overrides struct {
+	says  map[string]screen.Observation
+	asked map[string]int
+}
+
+func (o *overrides) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
+	if o.asked == nil {
+		o.asked = map[string]int{}
+	}
+	o.asked[pane]++
+	if obs, ok := o.says[pane]; ok {
+		return obs, nil
+	}
+	return screenfixture.New().Observe(ctx, profile, pane)
+}
+
+// The stow's receipt is the fixture's: an observer that calls empty a
+// screen the fixture cannot read, look after look, never ends the wait.
+func TestStowCountsOnlyTheFixturesEmpty(t *testing.T) {
+	f := newFixture(t)
+	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	const unnamed = "a screen nobody measured\n"
+	f.rt.SetReadOutput(f.handle, codexEmpty)
+	// Once the line is in, the pane shows a screen the fixture cannot name.
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(int) {
+		if items := f.outboxItems(); len(items) == 1 && items[0].State == store.OutboxSent {
+			f.rt.SetReadOutput(f.handle, unnamed)
+		}
+	}}
+	observer := &overrides{says: map[string]screen.Observation{unnamed: {Composer: screen.ComposerEmpty,
+		Deterministic: screen.ComposerUnknown, Dialog: screen.DialogNone, Highlight: -1, Confidence: 0.99, Source: "jev"}}}
+	d := f.deps()
+	d.Sleeper = sleeper
+	d.Observer = observer
+	d.Handle = func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
+		return f.handle, codex.KindCodex, nil
+	}
+	res, err := outbox.New(f.ws, d).Stow(context.Background(), project, outbox.StowOptions{Ceiling: 30 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Stowed || !strings.HasPrefix(res.Outcome(), "not stowed: the Mate had not finished its stow turn") {
+		t.Fatalf("result %+v (%q), want the wait to run out: only the fixture's empty counts", res, res.Outcome())
+	}
+	if observer.asked[unnamed] != 1 || sleeper.n < 3 {
+		t.Fatalf("asked %v after %d sleeps, want the unnamed screen read once and looked at more than twice", observer.asked, sleeper.n)
+	}
+}
+
+// A draft the fixture reads is held for the captain whatever the observer
+// adds: Jev calling the pane busy over it does not let the stow type.
+func TestStowHoldsTheFixturesDraftWhatever(t *testing.T) {
+	f := newFixture(t)
+	draft := claudeScreen("half a thought")
+	f.rt.SetReadOutput(f.handle, draft)
+	observer := &overrides{says: map[string]screen.Observation{draft: {Composer: screen.ComposerBusy,
+		Deterministic: screen.ComposerDraft, Draft: "half a thought", Dialog: screen.DialogNone, Highlight: -1,
+		Confidence: 0.99, Source: "jev"}}}
+	d := f.deps()
+	d.Sleeper = &tickSleeper{clock: f.clock}
+	d.Observer = observer
+	res, err := outbox.New(f.ws, d).Stow(context.Background(), project, outbox.StowOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Held || res.Pending != "half a thought" || res.Outcome() != "not stowed: the composer holds unsent text" {
+		t.Fatalf("result %+v, want the fixture's draft held", res)
+	}
+	if len(f.outboxItems()) != 0 || len(f.rt.SentText) != 0 {
+		t.Fatal("a held stow queued or typed something")
 	}
 }

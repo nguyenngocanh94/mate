@@ -36,7 +36,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 5. Hai chế độ giao tiếp: tự động (mặc định, từ M18) và giám sát, xem mục 5.
 6. Persistence cho giao tiếp và trạng thái là file phẳng trong `.mate/`, không SQLite. Chỉ console sửa state; Crew chỉ append vào `.status`. Từ M5 có thêm `.mate/mate.db` (SQLite thuần Go) nhưng chỉ là kho dẫn xuất cho timeline, xây lại được từ file và transcript bằng `mate reindex`; mất DB không mất việc.
 7. Console TUI copy từ `internal/ui/console` của v1, giữ stream mode nhúng pane Mate.
-8. Trạng thái agent của Herdr (`idle/blocked/done`) là screen scraping, chỉ dùng làm tín hiệu phụ, không bao giờ dùng để kết luận task xong.
+8. Trạng thái agent của Herdr (`idle/blocked/done`) là screen scraping, chỉ dùng làm tín hiệu phụ, không bao giờ dùng để kết luận task xong. Pane cũng chỉ là tín hiệu, đi qua observer (`internal/screen`: `fixture`, hoặc `jev` trước `fixture` khi workspace đặt `MATE_JEV=on` cùng key Jev); bằng chứng một dòng đã gửi vẫn là hook echo trong `sent.log`, không phải một Observation.
 9. Token monitor làm sau MVP, nhưng `.meta` ghi `transcript=` và `session_id=` từ ngày đầu.
 10. Tên binary và CLI là `mate`, thư mục state `.mate/`, prefix biến môi trường `MATE_`.
 
@@ -169,7 +169,7 @@ Quy tắc:
 
 - Crew không bao giờ tự nói `blocked`, `finished`, `failed`, `done`. Thiếu key, thiếu quyền, phân vân hướng đi là `needs-decision`, vì crew còn hỏi được. Không hoàn thành được là `wait-mate: không làm được vì X`, Mate quyết `failed` hay gửi thêm một dòng cho làm tiếp.
 - Trạng thái hiển thị của một crew suy ra theo đúng thứ tự: `.meta` có `state=finished|failed` thì lấy nó; không thì có incident mở trong `incidents.log` thì `blocked`; không thì verb cuối trong `.status`; không có dòng nào thì `spawned`. Không còn `reserved`, `stopped`, `parked`, `done`, `unknown` như trạng thái.
-- Bên cạnh trạng thái luôn có một cột sức khỏe do quan sát, không phải trạng thái: agent còn trong Herdr không, composer bận hay rảnh, pane đứng yên bao lâu. `mate state` in `state: <trạng thái> · health: <quan sát>`. Herdr `agent_status` không được dùng cho cả hai cột (quyết định 8).
+- Bên cạnh trạng thái luôn có một cột sức khỏe do quan sát, không phải trạng thái: agent còn trong Herdr không, composer bận hay rảnh, pane đứng yên bao lâu. `mate state` in `state: <trạng thái> · health: <quan sát> · via <observer>`; `via` là observer đã đọc pane (`internal/screen`, mặc định `fixture`), không có khi không đọc pane nào. Herdr `agent_status` không được dùng cho cả hai cột (quyết định 8).
 - Inbox: `needs-decision` chưa ai trả lời, và incident đang mở. Luật rời inbox giữ nguyên (dòng status mới của cùng crew, hoặc `sent.log` có dòng tới `crew:<id>` sau câu hỏi); incident rời inbox khi observer ghi dòng `resolved` cho nó. Vì observer không ghi vào `.status`, một incident không bao giờ làm câu hỏi của crew rời inbox.
 - Các hàng crew mặc định của console và `crew list` hiện `spawned`, `working`, `needs-decision`, `blocked`. Console có nhóm `Handed back` thu gọn cho `wait-mate`; `crew list --all` hiện cả `wait-mate` và đã đóng. `wait-mate` vẫn là task mở, chỉ `crew stop` mới đóng nó.
 - `crew stop` từ chối trước khi giết agent nếu branch chưa landed vào default branch và không có `--discard`. Không còn kết cục "agent đã chết, worktree giữ lại". Scout có branch không commit gì nên luôn sạch.
@@ -452,7 +452,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   `claudeBusy` rơi về các seed chung, seed `esc to interrupt` khớp dòng trích đó, và digest bị từ chối `agent mate-blog is mid-turn` suốt năm phút tới khi incident `wedged` mở; crew nằm ở `wait-mate` còn test hết giờ.
   Đó là lý do lần 1 và 3 xanh còn lần 2 và 4 đỏ với cùng một bộ phân loại: hỏng hay không tuỳ tool call cuối của Mate có tình cờ in pane của crew đang bận hay không.
   Sửa trong `internal/send`: Claude chỉ bận theo dấu hiệu của chính nó - spinner vẽ ở cột 0, hoặc placeholder hàng đợi - và không dùng seed chung nữa, vì Claude không tự vẽ seed nào (2.1.274 và 2.1.281) còn mọi thứ nó trích đều thụt lề dưới `⏺`/`⎿`.
-  Capture nằm ở `internal/send/testdata/screens/claude_idle_quoting_codex_busy.ansi`, và test cũng giữ chiều ngược lại: spinner của chính pane vẫn là bận.
+  Capture nằm ở `internal/screen/fixture/testdata/screens/claude_idle_quoting_codex_busy.ansi`, và test cũng giữ chiều ngược lại: spinner của chính pane vẫn là bận.
   Bài học chung: bộ phân loại của một harness chỉ được tin dấu hiệu mà harness đó tự vẽ, vì pane của Mate là nơi mọi harness khác được trích ra.
 - Lần `crew stop` thứ hai trên một crew đã đóng không được viết lại trạng thái cuối.
   Đo 2026-09-24 (task 34): mọi crew đã merge trong acceptance kết thúc `.meta` bằng `state=failed`, vì cleanup của test gọi `StopCrew(..., discard=true)` trên mọi crew `ListCrews` trả về, kể cả crew đã đóng, và `StopCrew` ghi lại meta như một lần dừng mới.
@@ -581,6 +581,10 @@ internal/query/          kiểu DTO console cần, backend mới điền
 internal/store/          đọc ghi .mate/, khoá append, layout, ranh giới đường dẫn
 internal/box/            gộp status + sent.log + incident thành view
 internal/send/           gửi một dòng vào pane agent qua Herdr, kiểm chứng composer
+internal/screen/         Observation và Observer: quan sát cấu trúc của một pane, không verdict
+internal/screen/fixture/ observer tất định bọc ScreenProfile của harness; mặc định trừ khi `MATE_JEV=on`
+internal/screen/jev/     observer qua Jev (TypeSafe): prompt ghim, cassette cho unit test
+internal/screen/chain/   Jev trước, fixture khi Jev không chắc; dedup 60 giây, breaker, `.mate/jev.log`
 internal/watch/          observer và triage
 internal/autopilot/      daemon chế độ tự động: digest 90 giây, xếp vào outbox của Mate
 internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất vào composer Mate, `wedged`
@@ -1174,4 +1178,4 @@ Captain yêu cầu 2026-10-03: trang Task cần một card cho thấy các bư�
 
 ### Thử nghiệm: Jev notice advisor
 
-Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
+Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Action này chỉ hiển thị gợi ý có thời điểm capture; nó không đổi composer, task state, incident, send hay receipt, và không gọi API khi refresh. Lỗi cấu hình/API của action không ảnh hưởng observer và sender. Bộ quan sát pane bên dưới là đường riêng, có gọi nền và đi vào sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Từ 2026-10-08, workspace đặt `MATE_JEV=on` (hoặc `observer`) cùng key thì Jev còn là bộ quan sát pane qua `internal/screen/chain` (quyết định 8: tín hiệu, không phải bằng chứng); chỉ có key, `MATE_JEV=fixture` hay `off` thì không. Mặc định chuyển sang chain sau khi evidence của lần chạy thật một ngày đã được commit. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).

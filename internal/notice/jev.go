@@ -78,26 +78,9 @@ func (c *Client) Classify(ctx context.Context, screen string) (Result, error) {
 	if err != nil {
 		return Result{}, errors.New("cannot encode Jev request")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	data, err := c.post(ctx, body)
 	if err != nil {
-		return Result{}, errors.New("cannot build Jev request")
-	}
-	req.Header.Set("Authorization", "Bearer "+c.key)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return Result{}, ctx.Err()
-		}
-		return Result{}, errors.New("Jev request failed or timed out; retry manually")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return Result{}, fmt.Errorf("Jev unavailable (HTTP %d); retry manually", resp.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 65537))
-	if err != nil || len(data) > 65536 {
-		return Result{}, errors.New("invalid Jev response size")
+		return Result{}, err
 	}
 	var response struct {
 		Model   string `json:"model"`
@@ -131,13 +114,77 @@ func (c *Client) Classify(ctx context.Context, screen string) (Result, error) {
 		}
 		sum += p
 	}
-	if math.Abs(sum-1) > .001 || response.Usage.Input < 0 || response.Usage.Output < 0 {
+	// The API rounds each probability to two decimals, so their sum drifts
+	// from one by up to half a cent per label; anything further is not a
+	// distribution (docs/evidence/jev-observer-2026-10-08.md: 6 of 90
+	// answers summed to 0.99).
+	if math.Abs(sum-1) > roundingTolerance(len(criteria)) || response.Usage.Input < 0 || response.Usage.Output < 0 {
 		return Result{}, invalid
 	}
 	return Result{Label: a.Choice, Confidence: *a.Confidence, InputTokens: response.Usage.Input, OutputTokens: response.Usage.Output}, nil
 }
 
+// Ask posts one request whose body build makes from screen, with this
+// client's key already removed from the screen, over the same pinned
+// endpoint, timeout, no-redirect and no-retry rules as Classify. It returns
+// the response body, bounded; validating it, model included, is the
+// caller's. It is how another question set (internal/screen/jev) reaches
+// Jev without a second HTTP client.
+func (c *Client) Ask(ctx context.Context, screen string, build func(screen string) ([]byte, error)) ([]byte, error) {
+	if strings.TrimSpace(c.key) == "" {
+		return nil, errors.New("Jev API key is missing")
+	}
+	body, err := build(strings.ReplaceAll(screen, c.key, "[redacted]"))
+	if err != nil {
+		return nil, err
+	}
+	return c.post(ctx, body)
+}
+
+// WithTransport is the same client sending through rt: the endpoint,
+// timeout and redirect rule do not change. Tests answer from a recording
+// with it instead of the network.
+func (c *Client) WithTransport(rt http.RoundTripper) *Client {
+	out := *c
+	h := *c.http
+	h.Transport = rt
+	out.http = &h
+	return &out
+}
+
+// post sends one request body and returns the response body: no retry,
+// no redirect, the caller's deadline under the client's timeout. No error
+// echoes the key or the response.
+func (c *Client) post(ctx context.Context, body []byte) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.New("cannot build Jev request")
+	}
+	req.Header.Set("Authorization", "Bearer "+c.key)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, errors.New("Jev request failed or timed out; retry manually")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Jev unavailable (HTTP %d); retry manually", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 65537))
+	if err != nil || len(data) > 65536 {
+		return nil, errors.New("invalid Jev response size")
+	}
+	return data, nil
+}
+
 func probability(p float64) bool { return !math.IsNaN(p) && !math.IsInf(p, 0) && p >= 0 && p <= 1 }
+
+// roundingTolerance is how far n probabilities, each rounded to two
+// decimals, may sum away from one.
+func roundingTolerance(n int) float64 { return 0.005*float64(n) + 1e-9 }
 
 var credentials = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`),

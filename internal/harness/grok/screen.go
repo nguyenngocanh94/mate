@@ -19,6 +19,9 @@ import (
 // ellipsis, and the privacy banner above the box takes no keys.
 type grokScreen struct{}
 
+// Kind implements harness.ScreenProfile.
+func (grokScreen) Kind() harness.Kind { return KindGrok }
+
 // ReadSource implements ScreenProfile.
 func (grokScreen) ReadSource() harness.ReadSource { return harness.ReadVisible }
 

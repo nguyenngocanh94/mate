@@ -260,6 +260,8 @@ Detail mới chứa source, observed-at, reason và delivery ID để debug; kh�
 | 5 | Watcher/health/incidents và recovery startup/stow; cập nhật spec/manual/UI | PR2–4 | Unknown không tự blocked/failed; tiếp tục phiên chờ không respawn; stow không xác nhận khi chỉ im lặng. |
 | 6 | Shadow comparison, migration và live acceptance | PR0–5 | Bật theo capability sau evidence; không có duplicate/lost delivery trong kịch bản lỗi; UI nói rõ chế độ degraded. |
 
+2026-10-08: phần "observation types" của PR 1 (tách quan sát khỏi policy) đã làm trong PR 1 của [jev-observer](jev-observer-2026-10-08.md): `internal/screen` (`Observation`, `Observer`) và observer `fixture`; `send`, `watch` và startup settle đọc pane qua `Observer`, policy ở caller. PR 1 ở đây không làm riêng phần đó nữa.
+
 Nếu PR0 không chứng minh được Accepted cho một harness: vẫn triển khai guard, journal và observation; harness đó không bật tự động settle. Ghi limitation cụ thể và chọn bổ sung integration native trong một đề xuất riêng, không sửa semantics receipt để có test xanh.
 
 ## 10. Ma trận kiểm chứng

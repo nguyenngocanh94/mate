@@ -10,6 +10,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	scr "github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
 // Startup-prompt settlement, ported from v1's ADR 0028. Measured 2026-09-14
@@ -21,7 +23,8 @@ import (
 //
 // This step runs between StartAgent and the readiness wait: it reads the
 // pane, answers each recognised dialog once (select, re-read, verify the
-// highlight is on the option mate means to confirm, only then confirm),
+// highlight is on the option mate means to confirm, read once more to see it
+// is still there, only then confirm),
 // and refuses - with no key pressed - anything it cannot name.
 //
 // Codex draws a sequence, not a single modal: measured 2026-09-18 with
@@ -121,11 +124,16 @@ var startupDialogs = map[harness.StartupScreen]string{
 // when a select press does not move the highlight onto the accept option, or
 // when the dialog is still on screen after the confirm press.
 //
+// observer reads every snapshot: the dialog on screen is its Observation's
+// Startup, and a dialog is confirmed only when its Highlight is the option
+// the harness's StartupAnswer confirms. The keys themselves are always the
+// profile's measured StartupAnswer.
+//
 // trusted names the hooks mate itself installed for this launch (a Codex
 // Mate's SessionStart hook). Codex's hook review is walked, and those hooks
 // trusted, only when every hook the review lists is one of them; with none,
 // the review is refused at once.
-func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
+func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, observer scr.Observer, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
 	if sleep == nil {
 		sleep = sleepCtx
 	}
@@ -138,7 +146,11 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err != nil {
 			return settled, err
 		}
-		class := screens.ClassifyStartup(screen)
+		observed, err := observer.Observe(scr.WithCaller(ctx, scr.CallerSettle), screens, screen)
+		if err != nil {
+			return settled, err
+		}
+		class := observed.Startup
 		if class == harness.StartupScreenReady {
 			return settled, nil
 		}
@@ -178,7 +190,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 				return settled, startupRefusal(handle, kind, screen,
 					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; mate stops answering rather than press keys in a loop", kind, startupMaxDialogs))
 			}
-			presses, err := answerStartupDialog(ctx, rt, handle, kind, screens, class, what, sleep)
+			presses, err := answerStartupDialog(ctx, rt, handle, kind, screens, observer, class, what, sleep)
 			settled.Presses = append(settled.Presses, presses...)
 			if err != nil {
 				return settled, err
@@ -187,12 +199,21 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 			// dialog or the composer.
 		} else if time.Now().After(deadline) {
 			return settled, startupRefusal(handle, kind, screen,
-				fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not a measured startup dialog; mate refuses to press keys into a screen it cannot name", kind, budget.Round(time.Millisecond)))
+				fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not a measured startup dialog; mate refuses to press keys into a screen it cannot name%s", kind, budget.Round(time.Millisecond), jevSays(observed)))
 		}
 		if err := sleep(ctx, startupPollInterval); err != nil {
 			return settled, err
 		}
 	}
+}
+
+// jevSays is what Jev named the dialog on a screen the harness profile
+// could not, for the refusal: Jev's word is reported, never acted on.
+func jevSays(observed scr.Observation) string {
+	if observed.Source != "jev" || observed.Dialog == scr.DialogNone {
+		return ""
+	}
+	return " · jev says " + string(observed.Dialog)
 }
 
 // answerStartupDialog performs one dialog's measured sequence for one
@@ -202,7 +223,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 // and Codex's update highlight opens on "1. Update now", so this order is the
 // difference between settling the pane and killing the agent or starting a
 // package install under it.
-func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
+func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, observer scr.Observer, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
 	answer, err := screens.StartupAnswer(dialog)
 	if err != nil {
 		return nil, err
@@ -231,9 +252,28 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 			return presses, err
 		}
 	}
-	if !screens.StartupTargetSelected(dialog, screen) {
+	observed, err := observer.Observe(scr.WithCaller(ctx, scr.CallerSettle), screens, screen)
+	if err != nil {
+		return presses, err
+	}
+	if observed.Startup != dialog {
+		return presses, startupRefusal(handle, kind, screen,
+			fmt.Sprintf("%s %s: after pressing %s the screen reads as %s, not the %s; refusing to confirm a selection on a dialog mate did not mean to answer", kind, what, strings.Join(answer.SelectKeys, ", "), observed.Startup, what))
+	}
+	if observed.Highlight != answer.Target {
 		return presses, startupRefusal(handle, kind, screen,
 			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
+	}
+	// The observer can take seconds to answer. The confirm key goes only
+	// while a fresh read, classified by the harness profile itself, still
+	// shows this dialog with the highlight on the option mate confirms.
+	again, err := rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
+	if err != nil {
+		return presses, err
+	}
+	if plain := fixture.StripSGR(again); screens.ClassifyStartup(plain) != dialog || !screens.StartupTargetSelected(dialog, plain) {
+		return presses, startupRefusal(handle, kind, again,
+			fmt.Sprintf("%s %s: the screen changed before the confirm key and the highlight is no longer seen on %q; refusing to confirm", kind, what, answer.TargetLabel))
 	}
 	if err := rt.SendKeys(ctx, handle, []string{answer.ConfirmKey}); err != nil {
 		return presses, err

@@ -66,7 +66,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// adapter and the agent-name registry it shares, so a Mate started from
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
-	deps := liveDeps()
+	deps := baseDeps()
 	// Point the runtime at the `herdr` findTool resolves - the one the stage
 	// column runs by absolute path, which can be in ~/.local/bin when the
 	// Console's PATH cannot reach it. Without this, a session check would
@@ -75,6 +75,11 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	if rt, ok := deps.Runtime.(*runtime.Herdr); ok {
 		rt.Binary = findTool(os.Getenv, "herdr")
 	}
+	// One observer for the whole run too, so the observer chain's one
+	// minute memory of what Jev said is shared by the health column, the
+	// sends and the settles of this console. Nil is the fixture observer.
+	var observerErr error
+	deps.Observer, observerErr = configuredObserver(ws)
 
 	// The observer of mvp.md section 4b runs for as long as the workspace is
 	// open, and only then: it lives in this process, so quitting the console
@@ -181,6 +186,9 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	noticeClient, noticeErr := consoleNoticeClient(ws)
 	if noticeErr != nil {
 		addNotice(noticeErr.Error())
+	}
+	if observerErr != nil && (noticeErr == nil || observerErr.Error() != noticeErr.Error()) {
+		addNotice(observerErr.Error())
 	}
 	action := consoleAction(ws, deps)
 	if noticeClient != nil {

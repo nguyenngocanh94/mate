@@ -60,6 +60,9 @@ type StartupDialogAnswer struct {
 	ConfirmKey string
 	// TargetLabel is the option this answer selects, as drawn, for messages.
 	TargetLabel string
+	// Target is TargetLabel's index among the dialog's options, top to
+	// bottom from 0: the highlight position at which ConfirmKey accepts.
+	Target int
 }
 
 // DialogOption is one option label as the dialog draws it. prefix is set for a
@@ -112,6 +115,7 @@ func (d StartupDialog) answer() StartupDialogAnswer {
 		SelectKeys:  append([]string(nil), d.SelectKeys...),
 		ConfirmKey:  "enter",
 		TargetLabel: d.TargetLabel,
+		Target:      d.Target,
 	}
 }
 

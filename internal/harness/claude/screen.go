@@ -10,6 +10,9 @@ import (
 // claudeScreen is Claude Code's ScreenProfile.
 type claudeScreen struct{}
 
+// Kind implements harness.ScreenProfile.
+func (claudeScreen) Kind() harness.Kind { return KindClaude }
+
 // ReadSource implements ScreenProfile.
 func (claudeScreen) ReadSource() harness.ReadSource { return harness.ReadRecentUnwrapped }
 

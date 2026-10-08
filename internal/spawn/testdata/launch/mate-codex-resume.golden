@@ -165,8 +165,8 @@ CODEX_HOME={{CODEX_HOME}}
 (rendered asset) sha256=79c841305b6719539a799cd62cf4d7e848e4fbfa99e0e1167418c265fef89e7a
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/harness-adapters/SKILL.md ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/mate-commands/SKILL.md mode=-rw-r--r-- bytes=28604 ---
-(rendered asset) sha256=6d7cd699537ca52e3e0a38ea7b4494d47dfb9606c3ce676bc78d8e3a9ad3b891
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/mate-commands/SKILL.md mode=-rw-r--r-- bytes=28853 ---
+(rendered asset) sha256=57f04d49c212bb7d28c1155b7cb18fac553a04dd6a31cedd214bb65b871ffd22
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/mate-commands/SKILL.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/project-memory/SKILL.md mode=-rw-r--r-- bytes=7292 ---

@@ -6,10 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
+	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -486,4 +489,40 @@ func TestConsoleBoxActionsRefuseAStoppedAgent(t *testing.T) {
 	if sent := sentLines(t, f.ws); len(sent) != 0 {
 		t.Fatalf("a refused action wrote %+v to sent.log", sent)
 	}
+}
+
+// A dialog over the Mate's pane and a pane that moved while it was read are
+// refusals like the other three: nothing typed, the line queued, and the
+// outcome says why in a few words rather than failing the action.
+func TestConsoleBoxQueuesBehindTheTwoNewRefusals(t *testing.T) {
+	for _, err := range []error{send.ErrDialogOpen, send.ErrPaneChanged} {
+		coded := observability.WrapError(observability.CodeStateConflict, "a send refusal", err)
+		if !boxSendRefusal(coded) {
+			t.Errorf("%v is not a box refusal", err)
+		}
+		if reason := refusalReason(coded); reason == coded.Error() {
+			t.Errorf("%v has no short reason", err)
+		}
+	}
+
+	f := newBoxFixture(t)
+	f.deps.Observer = dialogObserver{}
+	out, err := consoleAction(f.ws, f.deps)(context.Background(), f.resolveRequest(t))
+	if err != nil {
+		t.Fatalf("resolve under a dialog: %v", err)
+	}
+	if !strings.Contains(out, "queued for the Mate (a dialog is open over its pane)") {
+		t.Errorf("outcome = %q, want it queued behind the dialog", out)
+	}
+	if typed := f.mateTyped(); len(typed) != 0 {
+		t.Fatalf("typed %q under a dialog", typed)
+	}
+}
+
+// dialogObserver reads every pane as a trust dialog, as Jev might.
+type dialogObserver struct{}
+
+func (dialogObserver) Observe(context.Context, harness.ScreenProfile, string) (screen.Observation, error) {
+	return screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Dialog: screen.DialogTrust,
+		Highlight: -1, Confidence: 0.99, Source: "jev"}, nil
 }

@@ -104,7 +104,7 @@ func cmdBriefAppend(args []string, stdin io.Reader, stdout, stderr io.Writer) er
 	if err != nil {
 		return err
 	}
-	res, err := briefAppend(context.Background(), w, liveDeps(), fs.Arg(0), fs.Arg(1), words, source, time.Now())
+	res, err := briefAppend(context.Background(), w, liveDeps(w, stderr), fs.Arg(0), fs.Arg(1), words, source, time.Now())
 	if res.Appended {
 		fmt.Fprintf(stdout, "appended the captain's words to %s %s\n", res.BriefPath, res.Added)
 	}

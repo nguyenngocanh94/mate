@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/tool"
 	toolcatalog "github.com/nguyenngocanh94/mate/internal/tool/catalog"
 )
@@ -34,12 +33,4 @@ func toolBindings(r tool.Registry) []query.ToolBinding {
 		out = append(out, query.ToolBinding{Key: b.Key, Label: b.Label, Scope: string(b.Scope), Role: b.Role, Tool: string(b.Tool)})
 	}
 	return out
-}
-
-// liveDeps is spawn.LiveDeps with this binary's tools, so a Mate's manual
-// installs their skills beside its own.
-func liveDeps() spawn.Deps {
-	deps := spawn.LiveDeps(harnesses)
-	deps.Tools = tools
-	return deps
 }

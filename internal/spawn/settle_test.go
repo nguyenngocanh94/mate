@@ -12,6 +12,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	scr "github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
@@ -448,5 +450,197 @@ func TestStartMateRefusesAnUpdateDialogItAlreadyAnswered(t *testing.T) {
 	}
 	if strings.Join(pane.sent(), ",") != "down,down,enter" {
 		t.Fatalf("presses = %v, want the one answer and nothing after it", pane.sent())
+	}
+}
+
+// highlightUnseen is the fixture observer with the dialog highlight
+// withheld: it names the same dialog but never sees the highlight on the
+// option mate would confirm.
+type highlightUnseen struct{ calls int }
+
+func (o *highlightUnseen) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Highlight = -1
+	return obs, err
+}
+
+// The settle reads the dialog and its highlight through the Observer: with
+// the highlight withheld it refuses to confirm the Claude trust dialog even
+// on the capture where the accept option is selected, and presses only the
+// select key from the profile's measured answer.
+func TestStartMateConfirmsOnlyTheHighlightTheObserverSees(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	observer := &highlightUnseen{}
+	deps.Observer = observer
+	rt.NextStartupScreen = screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) {
+		if keys[0] == "down" {
+			rt.SetReadOutput(handle, accepted)
+		}
+	}
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the highlight is not on") {
+		t.Fatalf("err = %v, want a refusal to confirm a highlight the observer did not see", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+	if observer.calls != 2 {
+		t.Fatalf("observer read %d screens, want the dialog and the re-read after the select press", observer.calls)
+	}
+}
+
+// dialogChanges is the fixture observer that, after its first reading,
+// reports a different dialog from the one the settle began answering.
+type dialogChanges struct{ calls int }
+
+func (o *dialogChanges) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	if o.calls > 1 {
+		obs.Startup = harness.StartupScreenUpdateDialog
+	}
+	return obs, err
+}
+
+// When the re-read after the select press reads as a different dialog, the
+// refusal says so rather than blaming the highlight.
+func TestStartMateRefusesWhenTheDialogChangesUnderTheSelectPress(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = &dialogChanges{}
+	rt.NextStartupScreen = screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) { rt.SetReadOutput(handle, accepted) }
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the screen reads as update_dialog, not the trust dialog") {
+		t.Fatalf("err = %v, want a refusal naming the dialog the observer saw", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+}
+
+// jevNamesADialog is the chain's reading of a screen the profile does not
+// recognise when Jev, sure of itself, names a dialog on it: Jev's Dialog,
+// the fixture's Startup and no highlight.
+type jevNamesADialog struct{}
+
+func (jevNamesADialog) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Dialog, obs.Highlight, obs.Confidence, obs.Source = scr.DialogHooksReview, -1, 0.95, "jev"
+	return obs, err
+}
+
+// Jev naming a dialog the harness profile does not recognise presses
+// nothing: the settle refuses as for any unrecognised screen, and says
+// what Jev saw.
+func TestStartMateRefusesAScreenOnlyJevNames(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = jevNamesADialog{}
+	rt.NextStartupScreen = "welcome to something nobody measured\nplease choose:\n  a) yes\n  b) no\n"
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "startup screen not recognised") || !strings.Contains(err.Error(), "· jev says hooks-review") {
+		t.Fatalf("err = %v, want the unrecognised-screen refusal naming Jev's dialog", err)
+	}
+	if len(rt.SentKeys) != 0 {
+		t.Fatalf("keys %v were pressed into a screen only Jev named", rt.SentKeys)
+	}
+}
+
+// jevSeesNoDialog is the chain's reading when Jev, sure of itself, sees no
+// dialog on a screen the profile does not recognise.
+type jevSeesNoDialog struct{}
+
+func (jevSeesNoDialog) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Dialog, obs.Confidence, obs.Source = scr.DialogNone, 0.95, "jev"
+	return obs, err
+}
+
+// Jev seeing no dialog adds nothing to the refusal: "jev says none" names
+// no dialog.
+func TestStartMateRefusalNamesNoDialogJevDidNotSee(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = jevSeesNoDialog{}
+	rt.NextStartupScreen = "welcome to something nobody measured\nplease choose:\n  a) yes\n  b) no\n"
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "startup screen not recognised") || strings.Contains(err.Error(), "jev says") {
+		t.Fatalf("err = %v, want the plain unrecognised-screen refusal", err)
+	}
+}
+
+// highlightSlipsBack is the fixture observer over a pane whose highlight
+// returns to the dialog's default while the select press's re-read is being
+// observed: the observer saw the accept option, the pane no longer shows it.
+type highlightSlipsBack struct {
+	rt     *runtime.Fake
+	back   string
+	handle runtime.AgentHandle
+	calls  int
+}
+
+func (o *highlightSlipsBack) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	if o.calls == 2 {
+		o.rt.SetReadOutput(o.handle, o.back)
+	}
+	return obs, err
+}
+
+// The confirm key goes only while a fresh read still shows the highlight
+// the observer saw: a pane that moved while the observer read it is
+// refused, with only the select press sent.
+func TestStartMateRereadsTheHighlightBeforeTheConfirmKey(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	dialog := screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	observer := &highlightSlipsBack{rt: rt, back: dialog}
+	deps.Observer = observer
+	rt.NextStartupScreen = dialog
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) {
+		observer.handle = handle
+		if keys[0] == "down" {
+			rt.SetReadOutput(handle, accepted)
+		}
+	}
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the screen changed before the confirm key") {
+		t.Fatalf("err = %v, want a refusal for a highlight that moved before the confirm key", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+	if observer.calls != 2 {
+		t.Fatalf("observer read %d screens, want the dialog and the re-read after the select press", observer.calls)
 	}
 }

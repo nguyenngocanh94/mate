@@ -443,7 +443,7 @@ func relaunchInTab(ctx context.Context, w *store.Workspace, deps Deps, saga *cre
 		return RelaunchResult{}, err
 	}
 	saga.startedAgent = true
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.startupPromptTimeout(), deps.sleep())
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.observer(), deps.startupPromptTimeout(), deps.sleep())
 	if err != nil {
 		return RelaunchResult{}, err
 	}

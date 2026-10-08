@@ -1,8 +1,8 @@
 # Pane captures are byte-for-byte records of what a harness drew, escape
 # sequences and CRLF line endings included. Normalising their line endings
-# would rewrite the measurement: internal/send's composer classifier reads
+# would rewrite the measurement: internal/screen/fixture's composer classifier reads
 # these files as the terminal handed them over.
-internal/send/testdata/screens/** -text
+internal/screen/fixture/testdata/screens/** -text
 internal/harness/testdata/** -text
 docs/evidence/pi-contract-2026-10-01/screens/** -text
 internal/harness/pi/testdata/** -text

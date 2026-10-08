@@ -483,19 +483,31 @@ func attentionWhy(c query.CrewNode) string {
 	return strings.TrimPrefix(why, "crew "+c.CrewID+" ")
 }
 
-// healthLine is what the observer last saw in the crew's pane.
+// healthLine is what the observer last saw in the crew's pane, followed by
+// ` · via jev` when Jev's answer is in that reading, as `mate state` says
+// it. The fixture's reading, the default, is not named.
 func (m Model) healthLine(h query.CrewHealth) gline {
 	if !h.AgentPresent {
 		return gl().add("agent gone", tRed)
 	}
+	var line gline
 	switch h.Composer {
 	case query.ComposerBusy:
-		return gl().add("busy "+age(h.ComposerFor), tFg)
+		line = gl().add("busy "+age(h.ComposerFor), tFg)
 	case query.ComposerUnknown:
-		return gl().add("unclear", tDim)
+		line = gl().add("unclear", tDim)
+	default:
+		line = gl().add("idle "+age(h.QuietFor), tFg)
 	}
-	return gl().add("idle "+age(h.QuietFor), tFg)
+	if h.Source == jevSource {
+		line = line.add(" · via "+h.Source, tDim)
+	}
+	return line
 }
+
+// jevSource is the Source of a reading Jev's answer is in
+// (internal/screen/jev; this package imports neither).
+const jevSource = "jev"
 
 // ---------- the Completed group ----------
 

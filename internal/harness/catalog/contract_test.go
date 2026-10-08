@@ -63,8 +63,8 @@ func TestContractCapabilitiesDeclared(t *testing.T) {
 	})
 }
 
-// The required part of the contract is there, and the kind a profile
-// reports is the kind it is registered under.
+// The required part of the contract is there, and the kind a profile and
+// its screen profile report is the kind it is registered under.
 func TestContractRequiredParts(t *testing.T) {
 	eachProfile(t, func(t *testing.T, p harness.Profile) {
 		reg := catalog.Default()
@@ -80,6 +80,9 @@ func TestContractRequiredParts(t *testing.T) {
 		}
 		if p.Screen() == nil {
 			t.Fatal("Screen() is nil")
+		}
+		if k := p.Screen().Kind(); k != p.Kind() {
+			t.Errorf("Screen().Kind() = %q, want the profile's own kind %q", k, p.Kind())
 		}
 	})
 }

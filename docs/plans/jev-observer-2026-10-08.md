@@ -1,7 +1,7 @@
 # Phương án Jev làm bộ quan sát trạng thái agent
 
 - Ngày: 2026-10-08.
-- Trạng thái: nháp, chờ captain duyệt. Chưa có PR nào.
+- Trạng thái: đã làm trên nhánh `feat/jev-observer`, chưa merge; chờ captain xác nhận việc vượt gate PR 0 và lần chạy thật một ngày. Commit theo PR: PR 0 `039420e`, `b47bb8d`, `180ac70`; PR 1 `0bf8fbe`..`7fb1136`; PR 2 `f952b3a`..`5e2b1e8`; PR 3 `7e8dc1b`..`30b9f94`; vòng sửa sau review cuối tiếp theo `30b9f94`.
 - Baseline đo: `517f425` trên `main`; Jev `jev-1.13.0` qua TypeSafe; bản thử `internal/notice` (174 dòng) và evidence [jev-notices-2026-09-27](../evidence/jev-notices-2026-09-27.md); hướng dẫn [jev-notices.md](../jev-notices.md).
 - Liên quan: [registry harness](harness-registry-2026-09-30.md) mục 3.2 (`ScreenProfile`), [probe TUI](tui-probe-redesign-2026-09-27.md) mục 5 và 6 (tách quan sát khỏi policy). Phương án này là một implementation của chỗ hai phương án đó đã đặt.
 - Spec cần cập nhật: [MVP](../mvp.md) quyết định 8 (tín hiệu phụ), mục 4 (đọc crew), mục 7 (số đo), mục 10.
@@ -79,7 +79,7 @@ Bảng ánh xạ Observation sang hành động nằm trong code, có test, khô
 | Dialog Unknown, hoặc Confidence dưới ngưỡng ở cả hai nguồn | từ chối | health `unknown`, không mở incident | từ chối, `startup screen not recognised` kèm nhãn Jev nếu có |
 | Notice quota_exhausted | từ chối | vào inbox như `budget` | không đổi |
 
-`send.Send` sau khi gõ text vẫn đọc lại và đòi composer chứa đúng text đã gõ trước khi Enter; bước này không hỏi Jev, so chuỗi trực tiếp. Settle vẫn một phím một lần, đọc lại, và chỉ Enter khi `Highlight` ở option mà `StartupAnswer` xác nhận. Bằng chứng gửi thành công vẫn là hook echo trong `sent.log`.
+`send.Send` sau khi gõ text vẫn đọc lại và đòi composer chứa đúng text đã gõ trước khi Enter; bước này không hỏi Jev, so chuỗi trực tiếp. (Sửa 2026-10-08: bước đọc lại này chỉ chặn các lần Enter thử lại và gửi tiếp `ResumePending`, không chặn Enter đầu tiên. PR 3 từng thêm nó trước Enter đầu tiên khi Observation có `Source` là `jev`; vòng sửa sau review cuối bỏ bước đó, vì trên trục composer Jev chỉ được phủ quyết, không được mở: chain chỉ nói `Empty` khi `Observation.Deterministic` (đọc của fixture) là `Empty`, nên `send` chỉ gõ vào composer fixture đọc là rỗng và Enter đầu tiên giữ đúng như trước nhánh. Thay vào đó `send` đọc lại pane ngay sau `Observe`, và nếu pane đã khác snapshot vừa quan sát thì từ chối, không gõ gì, để người gọi thử lại.) Settle vẫn một phím một lần, đọc lại, và chỉ Enter khi `Highlight` ở option mà `StartupAnswer` xác nhận. Bằng chứng gửi thành công vẫn là hook echo trong `sent.log`.
 
 ### 4.3. Khi nào gọi Jev
 
@@ -121,7 +121,7 @@ Unit cho policy mục 4.2: mọi hàng của bảng có một case; `chain` fall
 | 0 | Eval: script chạy Jev trên corpus, evidence, quyết định đi tiếp | Evidence có bảng đầy đủ; captain ký đi tiếp hoặc dừng |
 | 1 | `internal/screen` với `Observation`, `fixture` bọc `ScreenProfile`; `send`, `watch`, settle nhận `Observer` thay vì gọi profile trực tiếp; mặc định `fixture` | Mọi capture phân loại như cũ; golden console không đổi; không gọi mạng |
 | 2 | `screen/jev` từ `notice.Client`, cassette, `chain`, ngưỡng, dedup, huỷ theo hash; bật bằng `MATE_JEV=observer` trong `.mate/.env`; `· via jev` trên health | Unit từ cassette; bật trên workspace thật một ngày, evidence ghi số lần gọi, latency p50/p95, số lần fallback |
-| 3 | Mặc định `chain` khi có key; `docs/jev-notices.md` và spec; `mate state` in nguồn | Spec quyết định 8 sửa: pane là tín hiệu qua Jev, hook vẫn là bằng chứng |
+| 3 | Mặc định `chain` khi có key; `docs/jev-notices.md` và spec; `mate state` in nguồn | Spec quyết định 8 sửa: pane là tín hiệu qua Jev, hook vẫn là bằng chứng. (Sửa 2026-10-08: mặc định chưa chuyển; chỉ có key thì vẫn là action notice với fixture, chain bật bằng `MATE_JEV=on` hoặc `observer`. Mặc định chuyển sang chain sau khi evidence của lần chạy thật một ngày đã được commit.) |
 
 Quan hệ: PR 1 trùng chỗ với probe-TUI PR 1 (tách quan sát khỏi policy). Phương án này *là* bước đó, nên probe-TUI PR 1 không làm riêng nữa; ghi vào `tui-probe-redesign` khi mở PR 1.
 
@@ -149,3 +149,8 @@ Quan hệ: PR 1 trùng chỗ với probe-TUI PR 1 (tách quan sát khỏi policy
 - Một bản harness mới (lần tới Claude Code hoặc Codex tự cập nhật) không làm crew chết ở settle: evidence ghi lại lần đầu điều đó xảy ra sau khi bật.
 - Không hành động không đảo ngược nào có đường đi từ Observation của Jev mà không qua so chuỗi hoặc xác nhận highlight; test ratchet đếm call site của `Observe` trong `send` và `spawn` và kiểm từng chỗ có bước kiểm chứng sau nó.
 - `mate state` và console nói rõ nguồn của mỗi quan sát.
+
+Chưa làm (ghi 2026-10-08, sau review cuối nhánh `feat/jev-observer`):
+
+- Trục Notice chưa nối vào `send` hay `watch`: Observation mang nhãn notice của Jev, nhưng không policy nào đọc nó.
+- Settle vẫn chỉ trả về khi fixture đọc ra màn hình sẵn sàng (`Startup` là `Ready`), nên một bản harness mới đổi màn hình sẵn sàng vẫn làm settle kẹt; Jev chỉ thêm tên dialog nó thấy vào lời từ chối. Tiêu chí thứ hai ở trên vì thế chưa đạt bằng nhánh này.

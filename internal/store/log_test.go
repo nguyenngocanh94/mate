@@ -322,3 +322,34 @@ func TestStoreLogsRejectBadNames(t *testing.T) {
 		t.Fatal("ReadStatus with an invalid crew id succeeded")
 	}
 }
+
+// The Jev log is appended line by line under the workspace's state
+// directory, one line per call however many writers.
+func TestStoreAppendJevLog(t *testing.T) {
+	w := newProjectWorkspace(t)
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := w.AppendJevLog(fmt.Sprintf("2026-10-08T09:00:00Z claude 0123456789ab %d jev composer=empty dialog=none conf=0.90", i)); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if err := w.AppendJevLog("two\nlines"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(w.JevLog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	if len(lines) != 21 || lines[20] != "two lines" {
+		t.Fatalf("jev.log = %q", data)
+	}
+	if w.JevLog() != w.StateDir()+"/jev.log" {
+		t.Fatalf("JevLog = %s", w.JevLog())
+	}
+}

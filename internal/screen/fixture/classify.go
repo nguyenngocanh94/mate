@@ -1,4 +1,4 @@
-package send
+package fixture
 
 import (
 	"strconv"
@@ -6,44 +6,19 @@ import (
 	"unicode"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 )
-
-// ComposerState names what a harness pane is showing, as far as typing one
-// line into it is concerned. Four values, because the three a caller may not
-// type into are genuinely different and the caller answers them differently:
-// Busy waits, Pending belongs to whoever typed it, and Unknown is a screen
-// mate cannot read at all.
-type ComposerState string
-
-const (
-	// StateEmpty is the harness composer drawn with nothing in it (or only
-	// its placeholder). It is the one state a line may be typed into.
-	StateEmpty ComposerState = "empty"
-	// StatePending is the composer drawn with text after the prompt glyph:
-	// a human mid-typing, or an earlier send whose Enter was swallowed.
-	// Typing here concatenates two messages into one (docs/mvp.md section 7).
-	StatePending ComposerState = "pending"
-	// StateBusy is the harness's own mid-turn signature on screen. The
-	// composer may look empty underneath it; a line typed now is queued or
-	// dropped rather than answered.
-	StateBusy ComposerState = "busy"
-	// StateUnknown is any screen with no recognised composer: a trust or
-	// model dialog, a scrolled transcript, a harness still drawing itself.
-	StateUnknown ComposerState = "unknown"
-)
-
-func (s ComposerState) String() string { return string(s) }
 
 // Classification is what ClassifyComposer saw and the line it saw it on.
 // Evidence is quoted back in errors and logs so a refusal names the screen
 // text it was decided from rather than asserting a verdict.
 type Classification struct {
-	State ComposerState
+	State screen.ComposerState
 	// Evidence is the trimmed screen line the verdict was read from. It is
-	// empty only when no line supported any verdict (StateUnknown).
+	// empty only when no line supported any verdict (ComposerUnknown).
 	Evidence string
 	// Pending is the text sitting after the prompt glyph. It is set only
-	// for StatePending, and is what a caller shows the user whose
+	// for ComposerDraft, and is what a caller shows the user whose
 	// half-typed line the send refused to overwrite.
 	Pending string
 }
@@ -54,7 +29,7 @@ type Classification struct {
 // a dialog that puts the highlight glyph on an option must never be read as
 // a composer holding that option's text.
 //
-// screen may carry the harness's own SGR attributes
+// pane may carry the harness's own SGR attributes
 // (runtime.Adapter.ReadAgentStyled) or be the plain rendering of the same
 // snapshot. Every rule below reads the plain text; the attributes decide one
 // question and only one - whether text in the composer is the harness's own
@@ -66,37 +41,37 @@ type Classification struct {
 // looks like are the harness's (harness.ScreenProfile, measured against the
 // captures in testdata/screens); the order they are asked in, and the faint
 // question, are this package's.
-func ClassifyComposer(profile harness.ScreenProfile, screen string) Classification {
-	plain := StripSGR(screen)
+func ClassifyComposer(profile harness.ScreenProfile, pane string) Classification {
+	plain := StripSGR(pane)
 	// A recognised startup dialog is never a composer, whatever its lines
 	// look like. Reusing the startup classifier keeps one definition of the
 	// trust dialog's shape (internal/harness/startup_prompt.go).
 	if profile.ClassifyStartup(plain) == harness.StartupScreenTrustDialog {
-		return Classification{State: StateUnknown, Evidence: "harness directory-trust dialog"}
+		return Classification{State: screen.ComposerUnknown, Evidence: "harness directory-trust dialog"}
 	}
 
 	lines := strings.Split(plain, "\n")
 	if evidence, ok := profile.Busy(lines); ok {
-		return Classification{State: StateBusy, Evidence: evidence}
+		return Classification{State: screen.ComposerBusy, Evidence: evidence}
 	}
 	content, ok := profile.Composer(lines)
 	if !ok {
-		return Classification{State: StateUnknown}
+		return Classification{State: screen.ComposerUnknown}
 	}
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
-		return Classification{State: StateEmpty, Evidence: composerEvidence(profile, "")}
+		return Classification{State: screen.ComposerEmpty, Evidence: composerEvidence(profile, "")}
 	}
 	for _, placeholder := range profile.ComposerPlaceholders() {
 		if trimmed == placeholder {
-			return Classification{State: StateEmpty, Evidence: composerEvidence(profile, trimmed)}
+			return Classification{State: screen.ComposerEmpty, Evidence: composerEvidence(profile, trimmed)}
 		}
 	}
-	if faintPlaceholder(screen, trimmed) {
-		return Classification{State: StateEmpty, Evidence: composerEvidence(profile, trimmed) + " (faint)"}
+	if faintPlaceholder(pane, trimmed) {
+		return Classification{State: screen.ComposerEmpty, Evidence: composerEvidence(profile, trimmed) + " (faint)"}
 	}
 	return Classification{
-		State:    StatePending,
+		State:    screen.ComposerDraft,
 		Evidence: composerEvidence(profile, trimmed),
 		Pending:  trimmed,
 	}
@@ -262,9 +237,4 @@ func composerEvidence(profile harness.ScreenProfile, content string) string {
 		return glyph
 	}
 	return glyph + " " + content
-}
-
-// ScreenTail returns the last n lines of a screen, for error details.
-func ScreenTail(screen string, n int) string {
-	return harness.StartupScreenTail(screen, n)
 }

@@ -477,7 +477,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		return CrewResult{}, err
 	}
 	saga.startedAgent = true
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.startupPromptTimeout(), deps.sleep())
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, plan.profile, deps.observer(), deps.startupPromptTimeout(), deps.sleep())
 	if err != nil {
 		return CrewResult{}, err
 	}

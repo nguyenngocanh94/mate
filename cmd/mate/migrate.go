@@ -44,7 +44,7 @@ func cmdMigrate(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	live := liveDeps()
+	live := baseDeps()
 	spec, err := spawn.SessionSpec(live, w)
 	if err != nil {
 		return err

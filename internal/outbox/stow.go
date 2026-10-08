@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -111,16 +113,21 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		return done(StowResult{Reason: "the Mate was not running", Detail: oneLine(err)})
 	}
 	out.Agent = handle.Name
-	before, err := s.composer(ctx, handle, kind)
+	// One stow reads the pane every poll for up to the ceiling; a pane
+	// that has not changed keeps its last reading.
+	look := &stowLook{}
+	before, err := s.composer(ctx, handle, kind, look)
 	if err != nil {
 		return done(StowResult{Reason: "its pane could not be read (" + oneLine(err) + ")"})
 	}
-	switch before.State {
-	case send.StatePending:
-		return done(StowResult{Held: true, Pending: before.Pending, Reason: "the composer holds unsent text"})
-	case send.StateUnknown:
+	// Held is the fixture's draft (Deterministic), which no other reading
+	// can hide, or a draft Jev vetoed an empty composer with.
+	switch {
+	case before.Deterministic == send.StatePending || before.Composer == send.StatePending:
+		return done(StowResult{Held: true, Pending: before.Draft, Reason: "the composer holds unsent text"})
+	case before.Composer == send.StateUnknown:
 		return done(StowResult{Reason: "its pane shows no composer to type into"})
-	case send.StateBusy:
+	case before.Composer == send.StateBusy:
 		if opts.RequireEmpty {
 			return done(StowResult{Reason: "the Mate is mid-turn"})
 		}
@@ -190,14 +197,15 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 	// does not fire every turn (section 7), a transcript can be unknown,
 	// and a harness can declare no evidence at all (plan section 3.7), so
 	// the composer remains the fallback: busy after the line, then empty on
-	// two looks in a row.
+	// two looks in a row. Empty is the fixture's reading (empty): Jev may
+	// keep a stow waiting, never end one.
 	evidence := s.turnEnd(kind)
 	sawBusy, empties, since := false, 0, 0
 	for ; ; since++ {
 		if evidence != nil && evidence.EndsInTranscript() {
 			if transcript := s.mateTranscript(project); transcript != "" {
 				if data, err := os.ReadFile(transcript); err == nil && evidence.TranscriptTurnEnded(data, item.SentAt) {
-					if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
+					if c, err := s.composer(ctx, handle, kind, look); err == nil && empty(c) {
 						return done(StowResult{Stowed: true})
 					}
 				}
@@ -217,18 +225,18 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 				return out, err
 			}
 			if ended {
-				if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
+				if c, err := s.composer(ctx, handle, kind, look); err == nil && empty(c) {
 					return done(StowResult{Stowed: true})
 				}
 			}
 		}
-		c, err := s.composer(ctx, handle, kind)
+		c, err := s.composer(ctx, handle, kind, look)
 		switch {
 		case err != nil:
 			empties = 0
-		case c.State == send.StateBusy:
+		case c.Composer == send.StateBusy:
 			sawBusy, empties = true, 0
-		case !opts.RequireCompletion && c.State == send.StateEmpty && (sawBusy || since >= quietPolls || s.deps.now().Sub(item.SentAt) >= stowQuiet):
+		case !opts.RequireCompletion && empty(c) && (sawBusy || since >= quietPolls || s.deps.now().Sub(item.SentAt) >= stowQuiet):
 			empties++
 			if empties >= 2 {
 				return done(StowResult{Stowed: true})
@@ -257,18 +265,50 @@ func Span(d time.Duration) string {
 	return d.Round(time.Second).String()
 }
 
-// composer classifies the Mate's composer from one styled read.
-func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind) (send.Classification, error) {
+// stowLook is one stow's last reading of the Mate's pane and the hash of
+// the snapshot it was read from.
+type stowLook struct {
+	read bool
+	hash [sha256.Size]byte
+	obs  screen.Observation
+}
+
+// empty is a composer the stow may count toward its receipt: empty as the
+// fixture's deterministic classifier reads it, which no other observer can
+// make it, and not vetoed by one.
+func empty(obs screen.Observation) bool {
+	return obs.Deterministic == send.StateEmpty && obs.Composer == send.StateEmpty
+}
+
+// composer reads the Mate's composer from one styled read, through
+// Deps.Observer as a delivery does. The observer is asked only about a
+// snapshot that differs from the last one look holds, as watch asks: the
+// stow's wait polls every couple of seconds for minutes, and a Mate whose
+// pane redraws nothing must not cost an observer call each time
+// (docs/plans/jev-observer-2026-10-08.md section 4.3). A snapshot the
+// observer could not read leaves look as it was, so it is asked about
+// again.
+func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind, look *stowLook) (screen.Observation, error) {
+	unknown := screen.Observation{Composer: send.StateUnknown, Deterministic: send.StateUnknown}
 	profile, err := s.deps.Harnesses.Lookup(kind)
 	if err != nil {
-		return send.Classification{State: send.StateUnknown}, err
+		return unknown, err
 	}
 	screens := profile.Screen()
-	screen, err := s.deps.Runtime.ReadAgentStyled(ctx, handle, screens.ReadSource(), send.DefaultLines)
+	pane, err := s.deps.Runtime.ReadAgentStyled(ctx, handle, screens.ReadSource(), send.DefaultLines)
 	if err != nil {
-		return send.Classification{}, err
+		return unknown, err
 	}
-	return send.ClassifyComposer(screens, screen), nil
+	hash := sha256.Sum256([]byte(pane))
+	if look.read && look.hash == hash {
+		return look.obs, nil
+	}
+	observed, err := s.deps.observer().Observe(screen.WithCaller(ctx, screen.CallerStow), screens, pane)
+	if err != nil {
+		return unknown, err
+	}
+	look.read, look.hash, look.obs = true, hash, observed
+	return observed, nil
 }
 
 // answeredAfter reports whether sent.log has a line from the Mate after

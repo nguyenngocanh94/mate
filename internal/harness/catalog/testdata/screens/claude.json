@@ -1,12 +1,12 @@
 {
   "captures": [
-    {"file": "../../../../send/testdata/screens/claude_empty.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "empty"},
-    {"file": "../../../../send/testdata/screens/claude_startup_splash.txt", "version": "claude-code 2.1.278", "pane": "65x33", "source": "recent-unwrapped", "want": "empty"},
-    {"file": "../../../../send/testdata/screens/claude_startup_splash_80x24.txt", "version": "claude-code 2.1.278", "pane": "80x24", "source": "recent-unwrapped", "want": "empty"},
-    {"file": "../../../../send/testdata/screens/claude_busy.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "busy"},
-    {"file": "../../../../send/testdata/screens/claude_busy_queued.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "busy"},
-    {"file": "../../../../send/testdata/screens/claude_pending.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "draft"},
-    {"file": "../../../../send/testdata/screens/claude_startup_splash_pending.txt", "version": "claude-code 2.1.278", "pane": "65x33", "source": "recent-unwrapped", "want": "draft"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_empty.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_startup_splash.txt", "version": "claude-code 2.1.278", "pane": "65x33", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_startup_splash_80x24.txt", "version": "claude-code 2.1.278", "pane": "80x24", "source": "recent-unwrapped", "want": "empty"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_busy.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "busy"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_busy_queued.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "busy"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_pending.txt", "version": "claude-code 2.1.274", "pane": "unrecorded", "source": "recent-unwrapped", "want": "draft"},
+    {"file": "../../../../screen/fixture/testdata/screens/claude_startup_splash_pending.txt", "version": "claude-code 2.1.278", "pane": "65x33", "source": "recent-unwrapped", "want": "draft"},
     {"file": "../../../claude/testdata/startup/claude-2.1.270-trust-dialog.txt", "version": "claude-code 2.1.270", "pane": "unrecorded", "source": "recent-unwrapped", "want": "trust_dialog"},
     {"file": "../../../claude/testdata/startup/claude-2.1.270-ready.txt", "version": "claude-code 2.1.270", "pane": "unrecorded", "source": "recent-unwrapped", "want": "ready"},
     {"file": "../../../claude/testdata/startup/claude-2.1.282-ready.txt", "version": "claude-code 2.1.282", "pane": "unrecorded", "source": "recent-unwrapped", "want": "ready"}
