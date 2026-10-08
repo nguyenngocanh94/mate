@@ -22,7 +22,8 @@ import (
 
 // scripted is a send.Runtime whose pane shows a different screen at each
 // step. Screens are consumed one per ReadAgent, which is exactly how a send
-// observes a pane: once to decide, then once after every enter.
+// observes a pane: once to decide, once more to see the pane held still
+// while it was observed, then once after every enter.
 type scripted struct {
 	screens []string
 	reads   int
@@ -220,7 +221,7 @@ func TestSendRefusesABusyPaneUnlessTheCallerQueues(t *testing.T) {
 		t.Fatalf("err code = %v, want target_blocked", err)
 	}
 
-	queued := &scripted{screens: []string{claudeBusyScreen(), claudeScreen("")}}
+	queued := &scripted{screens: []string{claudeBusyScreen(), claudeBusyScreen(), claudeScreen("")}}
 	qdeps, _ := testDeps(queued)
 	report, err := send.Send(context.Background(), qdeps, target(), claude.KindClaude, "say PONG", send.Options{QueueWhileBusy: true})
 	if err != nil {
@@ -533,8 +534,8 @@ func TestSendChecksTheLineBeforeTheFirstEnterWhenOnlyJevRead(t *testing.T) {
 		if len(rt.keys) != 1 || report.Presses != 1 || !report.Delivered() {
 			t.Fatalf("keys %v, report %+v: want one Enter and delivery", rt.keys, report)
 		}
-		if len(rt.lines) != 3 {
-			t.Fatalf("%d reads, want 3: before typing, after the settle, after the Enter", len(rt.lines))
+		if len(rt.lines) != 4 {
+			t.Fatalf("%d reads, want 4: before typing, again, after the settle, after the Enter", len(rt.lines))
 		}
 	})
 
@@ -568,10 +569,33 @@ func TestSendChecksTheLineBeforeTheFirstEnterWhenOnlyJevRead(t *testing.T) {
 		}
 		// The first Enter follows the settle unread, and the read after it
 		// still shows the line, so a second Enter submits it.
-		if len(rt.lines) != 3 || report.Presses != 2 || !report.Delivered() {
-			t.Fatalf("%d reads, report %+v: want 3 reads, the first Enter unchecked as before", len(rt.lines), report)
+		if len(rt.lines) != 4 || report.Presses != 2 || !report.Delivered() {
+			t.Fatalf("%d reads, report %+v: want 4 reads, the first Enter unchecked as before", len(rt.lines), report)
 		}
 	})
+}
+
+// An observer can take seconds to answer: a pane that shows something else
+// by then is refused with nothing typed, and the refusal says the send may
+// be tried again.
+func TestSendRefusesAPaneThatChangedWhileItWasObserved(t *testing.T) {
+	t.Parallel()
+	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("a human started typing")}}
+	deps, _ := testDeps(rt)
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+	if !errors.Is(err, send.ErrPaneChanged) || !strings.Contains(err.Error(), "pane changed while it was being read; nothing typed") {
+		t.Fatalf("err = %v, want ErrPaneChanged", err)
+	}
+	var coded *observability.Error
+	if !errors.As(err, &coded) || coded.Code != observability.CodeStateConflict {
+		t.Fatalf("err code = %v, want state_conflict", err)
+	}
+	if len(rt.typed) != 0 || len(rt.keys) != 0 || report.Typed {
+		t.Fatalf("typed %#v, keys %v after the pane changed", rt.typed, rt.keys)
+	}
+	if len(rt.lines) != 2 {
+		t.Fatalf("%d reads, want the observed one and the one after it", len(rt.lines))
+	}
 }
 
 // ComposerLabel keeps the word mate has always printed for the draft state.

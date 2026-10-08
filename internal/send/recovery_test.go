@@ -13,7 +13,7 @@ import (
 )
 
 func TestUnknownAfterEnterIsNotDelivered(t *testing.T) {
-	rt := &scripted{screens: []string{claudeScreen(""), "unrecognised dialog"}}
+	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen(""), "unrecognised dialog"}}
 	deps, _ := testDeps(rt)
 	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "hello", send.Options{})
 	if err == nil || report.Delivered() || len(rt.keys) != 1 {
@@ -31,7 +31,7 @@ func TestBusyBeforeAndAfterEnterIsNotConfirmation(t *testing.T) {
 }
 
 func TestRetryNeverSubmitsEditedComposer(t *testing.T) {
-	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("hello changed by human")}}
+	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen(""), claudeScreen("hello changed by human")}}
 	deps, _ := testDeps(rt)
 	_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "hello", send.Options{})
 	if err == nil || len(rt.keys) != 1 {

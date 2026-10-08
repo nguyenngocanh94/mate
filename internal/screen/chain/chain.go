@@ -115,7 +115,9 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 // but an open circuit answers from the fixture alone. The call is
 // synchronous, so an answer always belongs to the snapshot that was hashed:
 // a pane that changes while Jev is asked is a new snapshot on the caller's
-// next read, never this answer's.
+// next read, never this answer's. The answer can be up to Jev's deadline old
+// when it returns, so a caller that acts on it (send before typing, settle
+// before the confirm key) reads the pane again first.
 func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
 	fix, err := c.fallback.Observe(ctx, profile, pane)
 	if err != nil {

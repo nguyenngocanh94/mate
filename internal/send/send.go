@@ -86,6 +86,9 @@ var (
 	// ErrSubmissionUnconfirmed means input may have arrived, but neither a
 	// cleared composer nor an idle-to-busy transition proves submission.
 	ErrSubmissionUnconfirmed = errors.New("submission unconfirmed; do not retype")
+	// ErrPaneChanged is a pane that showed something else by the time the
+	// observer had read it. Nothing was typed, and the send may be retried.
+	ErrPaneChanged = errors.New("pane changed while it was being read")
 )
 
 // Runtime is the slice of runtime.Adapter a send needs. It is narrow on
@@ -275,6 +278,19 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	before := Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}
 	report.Before = before
 	report.Steps = append(report.Steps, Step{What: "classify", State: before.State, Evidence: before.Evidence})
+	// An observer can take up to its deadline to answer (Jev's is
+	// notice.Timeout), so the Observation may be of a pane that has since
+	// moved on. The pane is read again, and anything but the snapshot that
+	// was observed is refused before a byte is typed; the caller may retry.
+	again, err := deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
+	if err != nil {
+		return report, err
+	}
+	if again != screen {
+		return report, sendError(observability.CodeStateConflict, ErrPaneChanged,
+			"pane changed while it was being read; nothing typed",
+			map[string]any{"screen_tail": ScreenTail(StripSGR(again), tailLines)})
+	}
 	if opts.ResumePending && (before.State != StatePending || !pendingMatches(screens, screen, payload)) {
 		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
 			"recorded send no longer matches the whole pending composer; inspect the pane, do not retype",

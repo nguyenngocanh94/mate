@@ -11,6 +11,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
 // Startup-prompt settlement, ported from v1's ADR 0028. Measured 2026-09-14
@@ -22,7 +23,8 @@ import (
 //
 // This step runs between StartAgent and the readiness wait: it reads the
 // pane, answers each recognised dialog once (select, re-read, verify the
-// highlight is on the option mate means to confirm, only then confirm),
+// highlight is on the option mate means to confirm, read once more to see it
+// is still there, only then confirm),
 // and refuses - with no key pressed - anything it cannot name.
 //
 // Codex draws a sequence, not a single modal: measured 2026-09-18 with
@@ -261,6 +263,17 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 	if observed.Highlight != answer.Target {
 		return presses, startupRefusal(handle, kind, screen,
 			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
+	}
+	// The observer can take seconds to answer. The confirm key goes only
+	// while a fresh read, classified by the harness profile itself, still
+	// shows this dialog with the highlight on the option mate confirms.
+	again, err := rt.ReadAgent(ctx, handle, screens.ReadSource(), startupScreenLines)
+	if err != nil {
+		return presses, err
+	}
+	if plain := fixture.StripSGR(again); screens.ClassifyStartup(plain) != dialog || !screens.StartupTargetSelected(dialog, plain) {
+		return presses, startupRefusal(handle, kind, again,
+			fmt.Sprintf("%s %s: the screen changed before the confirm key and the highlight is no longer seen on %q; refusing to confirm", kind, what, answer.TargetLabel))
 	}
 	if err := rt.SendKeys(ctx, handle, []string{answer.ConfirmKey}); err != nil {
 		return presses, err

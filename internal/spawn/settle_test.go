@@ -590,3 +590,57 @@ func TestStartMateRefusalNamesNoDialogJevDidNotSee(t *testing.T) {
 		t.Fatalf("err = %v, want the plain unrecognised-screen refusal", err)
 	}
 }
+
+// highlightSlipsBack is the fixture observer over a pane whose highlight
+// returns to the dialog's default while the select press's re-read is being
+// observed: the observer saw the accept option, the pane no longer shows it.
+type highlightSlipsBack struct {
+	rt     *runtime.Fake
+	back   string
+	handle runtime.AgentHandle
+	calls  int
+}
+
+func (o *highlightSlipsBack) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	if o.calls == 2 {
+		o.rt.SetReadOutput(o.handle, o.back)
+	}
+	return obs, err
+}
+
+// The confirm key goes only while a fresh read still shows the highlight
+// the observer saw: a pane that moved while the observer read it is
+// refused, with only the select press sent.
+func TestStartMateRereadsTheHighlightBeforeTheConfirmKey(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	dialog := screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	observer := &highlightSlipsBack{rt: rt, back: dialog}
+	deps.Observer = observer
+	rt.NextStartupScreen = dialog
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) {
+		observer.handle = handle
+		if keys[0] == "down" {
+			rt.SetReadOutput(handle, accepted)
+		}
+	}
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the screen changed before the confirm key") {
+		t.Fatalf("err = %v, want a refusal for a highlight that moved before the confirm key", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+	if observer.calls != 2 {
+		t.Fatalf("observer read %d screens, want the dialog and the re-read after the select press", observer.calls)
+	}
+}
