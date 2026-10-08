@@ -151,7 +151,7 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 	if c.appendLine != nil {
 		_ = c.appendLine(LogLine{Time: start, Kind: key.kind, Hash: fmt.Sprintf("%x", key.hash[:6]), Latency: latency,
 			Source: obs.Source, Composer: primary.Composer, Dialog: primary.Dialog, Confidence: primary.Confidence,
-			Caller: screen.CallerOf(ctx), Used: used(fallback), Fallback: fallback}.String())
+			Fixture: fix.Composer, Caller: screen.CallerOf(ctx), Used: used(fallback), Fallback: fallback}.String())
 		if event != "" {
 			_ = c.appendLine(BreakerLine(c.now(), event))
 		}

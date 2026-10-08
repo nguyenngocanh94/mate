@@ -139,11 +139,12 @@ func TestReplayListsScreensNotRecorded(t *testing.T) {
 }
 
 // -log prints the numbers a day with the observer on is measured by,
-// including how many answers were used and who asked.
+// including how often Jev's composer disagreed with the fixture's, how many
+// answers were used and who asked.
 func TestSummarizeLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jev.log")
-	log := "2026-10-08T09:00:00Z claude 0123456789ab 200 jev composer=empty dialog=none conf=0.91 caller=watch used=yes\n" +
-		"2026-10-08T09:00:05Z codex 0123456789ab 300 fixture composer=busy dialog=none conf=0.62 caller=send used=no fallback=below-threshold\n" +
+	log := "2026-10-08T09:00:00Z claude 0123456789ab 200 jev composer=empty dialog=none conf=0.91 fixture=empty caller=watch used=yes\n" +
+		"2026-10-08T09:00:05Z codex 0123456789ab 300 fixture composer=busy dialog=none conf=0.62 fixture=empty caller=send used=no fallback=below-threshold\n" +
 		"2026-10-08T09:00:09Z codex 0123456789ab 8000 fixture composer=- dialog=- conf=0.00 caller=watch used=no fallback=error\n" +
 		"2026-10-08T09:00:17Z breaker open\n" +
 		"2026-10-08T09:01:17Z breaker closed\n"
@@ -155,6 +156,7 @@ func TestSummarizeLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "- Jev requests: 3.\n- Latency: p50 300 ms, p95 8000 ms.\n- Fallbacks to the fixture observer: 2 (below-threshold 1, error 1).\n" +
+		"- Jev disagreed with fixture on composer: 1.\n" +
 		"- Answers used: 1; unused: 2 (requests by caller: send 1, watch 2).\n" +
 		"- Circuit opened: 1 (Jev not asked for 1m0s after each).\n"
 	if out.String() != want {

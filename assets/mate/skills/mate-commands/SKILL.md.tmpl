@@ -196,6 +196,8 @@ A send refuses rather than guessing, and each refusal is a different situation:
 - `agent ... is mid-turn (...); nothing was typed` - the Crew is working. Wait, or re-send with `--queue` if the line must sit behind the current turn.
 - `agent ... has unsubmitted text in its composer ("...")` - somebody, probably the captain, is typing there. Do not fight for the composer; leave it and say so.
 - `agent ... is showing a screen mate cannot name; nothing was typed` - a dialog or an unstarted harness. `mate peek` and handle it as section 11 says.
+- `a dialog is open: <kind>; nothing typed` - a dialog sits over the composer. `mate peek` and handle it as section 11 says.
+- `pane changed while it was being read; nothing typed` - the pane moved while it was being read. Send the same line again.
 - `typed into ... but N enter(s) did not submit it` - the line is sitting in the composer. Peek before doing anything else; never retype it blindly.
 
 One line per send.

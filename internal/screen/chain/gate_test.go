@@ -127,7 +127,7 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackDialog+")", counts["fixture ("+chain.FallbackDialog+")"])
 	t.Logf("  %-28s %3d", "  of which jev said none", jevMissedDialog)
 	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackError+")", counts["fixture ("+chain.FallbackError+")"])
-	t.Logf("  %-28s %3d", "  of which jev vetoed empty", vetoed)
+	t.Logf("  %-28s %3d", "jev vetoed an empty composer", vetoed)
 	t.Logf("  %-28s %3d", "dangerous", len(dangerous))
 	if chained != 78 || noHarness != 12 {
 		t.Fatalf("%d harness screens and %d without a harness, want the corpus's 78 and 12", chained, noHarness)

@@ -127,6 +127,10 @@ func refusalReason(err error) string {
 		return "its pane shows no composer"
 	case errors.Is(err, send.ErrEnterSwallowed):
 		return "enter did not submit it"
+	case errors.Is(err, send.ErrDialogOpen):
+		return "a dialog is open over its pane"
+	case errors.Is(err, send.ErrPaneChanged):
+		return "its pane changed while it was read"
 	}
 	return err.Error()
 }
@@ -331,12 +335,14 @@ func mateNotRecorded(err error) bool {
 // submitting it.
 const clearComposerKey = "ctrl+u"
 
-// boxSendRefusal reports whether an error is one of internal/send's three
-// "nothing was typed" refusals. The console shows all three the same way -
+// boxSendRefusal reports whether an error is one of internal/send's five
+// "nothing was typed" refusals. The console shows all five the same way -
 // the reason on the outcome line and nothing else done - so this exists for
 // the tests that have to tell a refusal from a transport failure.
 func boxSendRefusal(err error) bool {
 	return errors.Is(err, send.ErrComposerPending) ||
 		errors.Is(err, send.ErrAgentBusy) ||
-		errors.Is(err, send.ErrComposerUnknown)
+		errors.Is(err, send.ErrComposerUnknown) ||
+		errors.Is(err, send.ErrDialogOpen) ||
+		errors.Is(err, send.ErrPaneChanged)
 }
