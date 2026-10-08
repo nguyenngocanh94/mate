@@ -121,8 +121,8 @@ worktree=.worktrees/shop-k3
 (empty)
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.status ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7631 ---
-(rendered asset) sha256=505770feff408f56e5e65ed30a966e9e28210c19c1a92765f3fa7c1425dabd55
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7641 ---
+(rendered asset) sha256=a30858968720ea3774e1e2ece122cc7ffb3ec195ac635b670c9574cc3cc97ebc
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2391 ---
@@ -211,16 +211,16 @@ worktree=.worktrees/shop-k3
 }
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json ---
 
---- created {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md mode=-rw-r--r-- bytes=7631 ---
-(rendered asset) sha256=505770feff408f56e5e65ed30a966e9e28210c19c1a92765f3fa7c1425dabd55
+--- created {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md mode=-rw-r--r-- bytes=7641 ---
+(rendered asset) sha256=a30858968720ea3774e1e2ece122cc7ffb3ec195ac635b670c9574cc3cc97ebc
 --- end {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md ---
 
 --- created {{WORKSPACE}}/.worktrees/shop-k3/README.md mode=-rw-r--r-- bytes=5 ---
 shop
 --- end {{WORKSPACE}}/.worktrees/shop-k3/README.md ---
 
---- appended to {{WORKSPACE}}/shop/.git/info/exclude mode=-rw-r--r-- bytes=76 ---
+--- appended to {{WORKSPACE}}/shop/shop/.git/info/exclude mode=-rw-r--r-- bytes=76 ---
 
 # mate generated crew context (local, never committed)
 /AGENTS.override.md
---- end {{WORKSPACE}}/shop/.git/info/exclude ---
+--- end {{WORKSPACE}}/shop/shop/.git/info/exclude ---

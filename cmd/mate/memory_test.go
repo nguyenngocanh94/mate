@@ -158,7 +158,7 @@ func writeMemoryFiles(t *testing.T, w *store.Workspace, mem, project string) {
 
 func TestMemoryCheckCLIPassesAndPrintsTheBudget(t *testing.T) {
 	w := liveCrewWorkspace(t, "shop")
-	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop"), "rev-parse", "--short", "main"))
+	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop/shop"), "rev-parse", "--short", "main"))
 	today := time.Now().Format(memory.DateLayout)
 	mem := "# Memory\n" + memory.HeaderPointer + "\n\n## Captain\n- p (captain, 2026-09-17)\n\n## Lessons\n- l (captain) <!--a:" + today + "-->\n"
 	doc := "# shop\n\n## Layout and state\n- One commit. (mate project facts, main@" + head + ", " + today + ")\n"
@@ -240,7 +240,7 @@ func TestMemoryCheckCLIReportsEveryRule(t *testing.T) {
 // never a problem; the head's own anchor is silent.
 func TestMemoryCheckWarnsOnAnchorsOlderThanHead(t *testing.T) {
 	w := liveCrewWorkspace(t, "shop")
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	first := strings.TrimSpace(gitOut(t, repo, "rev-parse", "--short", "main"))
 	runGitOrFatal(t, repo, "commit", "--allow-empty", "-m", "two")
 	runGitOrFatal(t, repo, "commit", "--allow-empty", "-m", "three")
@@ -289,7 +289,7 @@ func TestMemoryCheckWarnsOnAnchorsOlderThanHead(t *testing.T) {
 // a bare anchor no longer says which repo it is about and is a problem.
 func TestMemoryCheckTwoReposComparesEachAnchorWithItsOwnRepo(t *testing.T) {
 	w := twoRepoWorkspace(t)
-	shop := w.RepoDir("shop")
+	shop := w.RepoDir("shop/shop")
 	first := strings.TrimSpace(gitOut(t, shop, "rev-parse", "--short", "main"))
 	runGitOrFatal(t, shop, "commit", "--allow-empty", "-m", "two")
 	head := strings.TrimSpace(gitOut(t, shop, "rev-parse", "--short", "main"))

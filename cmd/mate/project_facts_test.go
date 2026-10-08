@@ -29,7 +29,7 @@ func noRepoWorkspace(t *testing.T) *store.Workspace {
 func twoRepoWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
 	w := liveCrewWorkspace(t, "shop")
-	api := filepath.Join(w.Root(), "api")
+	api := filepath.Join(w.ProjectHome("shop"), "api")
 	runGitOrFatal(t, w.Root(), "init", "-q", "-b", "develop", api)
 	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api", Path: api, DefaultBranch: "develop"}); err != nil {
 		t.Fatalf("AddRepo: %v", err)
@@ -62,13 +62,13 @@ func TestProjectFactsNoRepo(t *testing.T) {
 // spells out the anchor a fact recorded now carries.
 func TestProjectFactsOneRepo(t *testing.T) {
 	w := liveCrewWorkspace(t, "shop")
-	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop"), "rev-parse", "--short", "main"))
+	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop/shop"), "rev-parse", "--short", "main"))
 	code, out, errw := projectFactsCLI(t, w)
 	if code != 0 {
 		t.Fatalf("exit %d\n%s%s", code, out, errw)
 	}
 	want := strings.Join([]string{
-		"shop: repo shop at " + w.RepoDir("shop") + ", default branch main",
+		"shop: repo shop at " + w.RepoDir("shop/shop") + ", default branch main",
 		"commits: 1 on main",
 		"head: " + head + " (anchor shop:main@" + head + ")",
 		"tree: empty",
@@ -84,7 +84,7 @@ func TestProjectFactsOneRepo(t *testing.T) {
 // separated by one blank line, each with its own branch and anchor.
 func TestProjectFactsTwoRepos(t *testing.T) {
 	w := twoRepoWorkspace(t)
-	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop"), "rev-parse", "--short", "main"))
+	head := strings.TrimSpace(gitOut(t, w.RepoDir("shop/shop"), "rev-parse", "--short", "main"))
 	code, out, errw := projectFactsCLI(t, w)
 	if code != 0 {
 		t.Fatalf("exit %d\n%s%s", code, out, errw)
@@ -93,11 +93,11 @@ func TestProjectFactsTwoRepos(t *testing.T) {
 	if len(blocks) != 2 {
 		t.Fatalf("want two blocks separated by a blank line:\n%s", out)
 	}
-	if !strings.HasPrefix(blocks[0], "shop: repo shop at "+w.RepoDir("shop")+", default branch main\ncommits: 1 on main\nhead: "+head+" (anchor shop:main@"+head+")\n") {
+	if !strings.HasPrefix(blocks[0], "shop: repo shop at "+w.RepoDir("shop/shop")+", default branch main\ncommits: 1 on main\nhead: "+head+" (anchor shop:main@"+head+")\n") {
 		t.Errorf("first block is not repo shop's:\n%s", blocks[0])
 	}
 	wantAPI := strings.Join([]string{
-		"shop: repo api at " + w.RepoDir("api") + ", default branch develop",
+		"shop: repo api at " + w.RepoDir("shop/api") + ", default branch develop",
 		"commits: 0 (develop has no commit yet)",
 		"head: none (anchor api:develop@none)",
 		"tree: empty",

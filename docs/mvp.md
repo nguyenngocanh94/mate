@@ -17,12 +17,13 @@ Mate là một harness interactive (Claude Code, Codex, pi, Grok) chạy trong m
 Người dùng nói chuyện với Mate bằng cách gõ vào pane đó, xem qua stream mode của console.
 Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` hoặc spawn Crew.
 
-### Task management: Beads + Beads Viewer (2026-10-07)
+### Task management: Beads + Beads Viewer (2026-10-07; là một công cụ từ 2026-10-08)
 
-- Beads (`bd`) là nguồn dữ liệu duy nhất cho epic/task, hierarchy, dependency, priority và trạng thái `open`, `in_progress`, `blocked`, `deferred`, `closed`. Một tracker tại `.mate/projects/<p>/.beads/` cho mọi repo của project; project không cần repo git.
-- `t` trong Console mở/reuse tab Tasks chạy Beads Viewer (`bv`), cùng cơ chế tab như code/report viewer; dùng được khi chưa có Mate, Crew hay Fresh. `mate tasks <project>` mở cùng viewer độc lập. Viewer có list/detail, tree, Kanban và dependency graph; tạo/sửa/claim/close qua CLI Beads, không sửa trực tiếp export của viewer.
-- `mate beads <project> [--workspace <dir>] -- <bd arguments>` chọn đúng tracker, khởi tạo khi cần (`--skip-agents --skip-hooks`), khoá theo project cho embedded Dolt và export atomic sau mỗi lệnh (kể cả lỗi có thể đã ghi một phần). `mate tasks <project> --init|--list|--json` khởi tạo/đọc; `mate task-triage <project>` chạy robot triage cho agent.
-- `.beads/issues.jsonl` là projection cho viewer, không phải nguồn dữ liệu hoặc bản backup Dolt. `bv` tự reload khi CLI đổi export; Ctrl+r/F5 refresh khi dùng `bd` trực tiếp. Skill `task-management` hướng dẫn Mate dùng wrapper và Beads để chọn ready work, claim, ghi dependency, liên kết Crew và chấp nhận giao hàng. Recall đọc tối đa 10 active/blocked và 10 ready qua `bd`, timeout 3s; không khởi tạo tracker chỉ vì recall.
+- Beads (`bd`) giữ task của project: epic/task, hierarchy, dependency, priority và trạng thái `open`, `in_progress`, `blocked`, `deferred`, `closed`. Một tracker tại `<workspace>/<project>/.beads/` cho mọi repo của project, trong thư mục project, không trong `.mate`. Project không có repo vẫn có thư mục, nên vẫn có task. Dữ liệu là của Beads, không phải state của mate: xoá `.mate/` không xoá task.
+- Mate chỉ gắn phím và bọc lệnh. Beads là một profile của registry công cụ (`internal/tool/beads`, M20); lõi không biết epic hay task. `t` trên hàng project mở/reuse tab Tasks chạy `bv --db <workspace>/<project>/.beads` với cùng biến môi trường như `bd` (viewer trả về một `tool.Invocation`: binary, args, thư mục, env), cùng cơ chế tab như report viewer; project chưa có tracker thì console khởi tạo trước (`Data.Init`). Viewer có list/detail, tree, Kanban và dependency graph; tạo/sửa/claim/close qua CLI Beads, không sửa trực tiếp export của viewer.
+- `mate tool beads <project> [--workspace <dir>] -- <bd arguments>` chạy `bd` trong tracker của project với args nguyên vẹn, khởi tạo khi cần (`--skip-agents --skip-hooks`), khoá theo project cho embedded Dolt và export atomic sau mỗi lệnh (kể cả lỗi có thể đã ghi một phần). Khoá là `.mate/projects/<p>/locks/beads.lock`, file rỗng: dấu vết duy nhất của công cụ trong `.mate`. Không có `--` thì mọi cờ là của mate: `mate tool <name> <project> --init` khởi tạo dữ liệu của công cụ (hoặc refresh export) và in thư mục; riêng Beads, `--list`/`--json` liệt kê mọi issue, `--triage` chạy `bv --robot-triage --brief`, không cờ thì mở viewer ngay trong terminal. Alias `mate beads`, `mate tasks` và `mate task-triage` đã bỏ (PR 6).
+- `.beads/issues.jsonl` là projection cho viewer, không phải nguồn dữ liệu hoặc bản backup Dolt. `bv` tự reload khi CLI đổi export; Ctrl+r/F5 refresh khi dùng `bd` trực tiếp. Skill `task-management` do profile Beads khai báo, registry sinh ra cạnh skill của mate; manual và các skill khác chỉ trỏ tới "the task tool's skill, if one is installed". Recall in khối `== Tool: Beads ==`: tối đa 10 active/blocked và 10 ready qua `bd`, deadline 3s; lỗi thì một dòng `Beads: unreadable (…; run mate tool beads <p> -- ready)`; không khởi tạo tracker chỉ vì recall.
+- Tracker cũ ở `.mate/projects/<p>/.beads/` (trước layout 2) không bao giờ bị dời, kể cả bởi `mate migrate`: khi tracker mới chưa có, `mate tool beads` và `t` từ chối và chỉ đường `mv` sang `<workspace>/<p>/.beads/`, hoặc `mate tool beads <p> --init` để bắt đầu trống. Workspace layout cũ bị từ chối với câu `this workspace has the old layout (repos beside .mate); run mate migrate first`.
 - Crew bàn giao `wait-mate` không close Beads task. Mate/người dùng chỉ close sau khi ship landed hoặc captain chấp nhận scout. `backlog.md` giữ cam kết/câu hỏi/ghi chú Crew; epic/task thuộc Beads.
 - Thay bản task manager tự viết chưa phát hành; bỏ `tasks.yaml`, `mate epic`, `mate task` và TUI CRUD riêng. Workspace thật chưa có dữ liệu bản thử. Nếu gặp `tasks.yaml` cũ, từ chối khởi tạo tracker trống và giữ file để chuyển dữ liệu có kiểm tra. Cài đặt, contract phiên bản và cách dùng: [beads.md](beads.md).
 
@@ -43,23 +44,31 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 
 ```text
 <workspace>/
-├── shop/                                 repo git thật, Mate không cwd vào đây
-├── blog/
+├── shop/                                 thư mục project, của người dùng; Mate không cwd vào đây
+│   ├── backend/                          repo git thật
+│   ├── web/                              repo git thật
+│   └── .beads/                           tracker Beads của project: dữ liệu của công cụ, không phải state của mate
+├── notes/                                project chưa có repo: vẫn có thư mục
 ├── .worktrees/
 │   └── shop-k3/                          git worktree của crew k3, branch mate/k3
 └── .mate/
-    ├── workspace.yaml                    projects, herdr session name, defaults
+    ├── workspace.yaml                    layout: 2, projects, herdr session name, defaults
     ├── WORKSPACE.md                      quy tắc của người dùng cho mọi Mate
     ├── CREW.md                           quy tắc của người dùng cho mọi Crew, nối cuối mọi brief (M7)
     ├── pricing.yaml                      bảng giá token, dùng sau
     ├── .env                              cấu hình riêng máy này, KEY=VALUE (MATE_JEV, MATE_JEV_API_KEY_FILE); tuỳ chọn
+    ├── migrate.log                       `mate migrate`: mỗi lần rename và mỗi repo dời xong, append-only
+    ├── migrate.lock                      flock của `mate migrate`
     └── projects/
+        ├── notes/                        state của project `notes`, cùng hình với `shop/`
         └── shop/
             ├── project.yaml              repos (name, path, default_branch), mode, yolo
             ├── PROJECT.md                bối cảnh project
             ├── CREW.md                   quy tắc của người dùng cho Crew của project này (M7)
             ├── sent.log                  mọi dòng gửi vào pane Mate và pane Crew
             ├── incidents.log             observer ghi: mở/đóng incident theo crew (task 18)
+            ├── locks/
+            │   └── beads.lock            flock của `mate tool beads`; file rỗng, dấu vết duy nhất của công cụ trong `.mate`
             ├── mate/                     cwd của Mate
             │   ├── AGENTS.md             operating manual, app sinh lại mỗi lần start
             │   ├── CLAUDE.md             `@AGENTS.md`
@@ -87,12 +96,15 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 
 Quy ước:
 
-- Repo nằm ngang hàng với `.mate/`, không bắt buộc nằm trong thư mục con nào.
+- Project là một thư mục thật `<workspace>/<project>/`, tên bằng tên project (2026-10-08). Mọi repo của project nằm dưới thư mục đó, con trực tiếp hay lồng sâu (`shop/services/api`); `repos[].path` vẫn tương đối gốc workspace và store từ chối path ngoài thư mục project. `mate project add <p>` tạo thư mục nếu chưa có; `mate project repo add <p> <url>` clone vào `<p>/<tên>`. `.mate/projects/<p>/` vẫn là state của mate.
+- `workspace.yaml` ghi `layout: 2`; thiếu `layout:` là 1, layout cũ với repo ngang hàng `.mate/`. Mọi lệnh trừ `mate migrate`, `mate crew stop` và `mate mate stop` từ chối workspace layout cũ ngay khi mở (`store.Open`) với câu `this workspace has the old layout (repos beside .mate); run mate migrate first`; chỉ `mate migrate` và hai lệnh stop mà lời từ chối của nó chỉ tới (`store.OpenForMigrate`) còn đọc layout cũ; hai lệnh stop không ghi đường dẫn repo nào.
 - Một project có từ không tới nhiều repo; một repo thuộc tối đa một project (M9).
 - Worktree gom ở `.worktrees/<project>-<crew>/`. Codex vẫn hỏi trust cho worktree mới (đo 2026-09-17), nên spawn luôn chạy settle step.
 - `.meta` là `key=value` mỗi dòng một khoá. `.status` là text thuần `state: một dòng`.
 - Xoá `.mate/` là xoá toàn bộ state của app. `crews/<id>/` giữ mãi sau teardown, chỉ người dùng xoá tay.
 - Mọi đường dẫn ghi ra phải nằm trong workspace; symlink trỏ ra ngoài bị từ chối.
+
+Chuyển layout cũ: `mate migrate [<workspace>] [--dry-run]` dời mỗi repo nằm ngoài thư mục project vào `<project>/<basename>` bằng một lần rename, gắn lại worktree và đổi tiền tố đường dẫn trong brief của crew đã đóng, gắn lại mọi linked worktree khác mà repo ghi trong `.git/worktrees/*/gitdir` (worktree captain tự tạo; cái nào không gắn lại được thành một dòng `warning:` có đường dẫn), ghi `project.yaml`, tạo thư mục cho mọi project (cả project chưa có repo) rồi ghi `layout: 2`; repo trùng tên project (`shop/` của project `shop`) được dời tạm sang `shop.migrating-<nonce>` rồi vào `shop/shop`. Lệnh kiểm mọi điều kiện của mọi project trước khi dời (`.mate/migrate.lock`, không crew mở trên repo sẽ dời, Mate của project không chạy theo Herdr, đích chưa tồn tại; working tree bẩn chỉ được ghi nhận), một điều hỏng thì không dời gì và in mọi lý do, và không bao giờ xoá hay dời ngược. Mỗi lần rename ghi vào `.mate/migrate.log`, nên lần chạy sau một lần hỏng giữa chừng làm tiếp từ chỗ dừng; lệnh là của captain (Mate hay Crew gọi bị từ chối) và console không tự chạy nó. `mate migrate` sửa link của một workspace đã bị dời (`root:` ghi trong `workspace.yaml` khác root hiện tại: `recovery.RepairLinks`, gồm root, owner marker và brief) trước khi dời repo; sửa root hay owner hỏng thì từ chối, sửa khác hỏng (gắn lại worktree, hook) là một dòng `warning:`; `--dry-run` chỉ báo `recorded root <old> differs from <new>: migrate will repair links first`; trên layout 2 console vẫn làm việc sửa đó như trước.
 
 ## 4. Giao tiếp
 
@@ -585,6 +597,11 @@ internal/harness/pi/     mọi thứ riêng pi, chỉ vai Crew: profile, launch,
 internal/harness/catalog/ danh sách harness biên dịch sẵn, harness mặc định theo vai, và suite hợp đồng; chỉ binary import
 internal/harness/harnesstest/ fixture dùng chung cho test của các package harness
 internal/process/        copy v1
+internal/capability/     từ vựng capability chung của hai registry (Cap, Evidence, Check)
+internal/tool/           hợp đồng công cụ ngoài (Profile, Viewer, Command, Recall, Skill, Data, Registry); không import package con, không import store
+internal/tool/fresh/     Fresh: viewer report, phím `e` trên hàng crew
+internal/tool/beads/     Beads: tracker trong thư mục project, `bd`/`bv`, recall, skill `task-management`
+internal/tool/catalog/   danh sách công cụ biên dịch sẵn và suite hợp đồng; chỉ binary import
 assets/                  AGENTS.md của Mate, brief.md, skills, hook scripts
 ```
 
@@ -1107,6 +1124,21 @@ Quyết định:
 | 80 | Bỏ `mode`/`yolo` khỏi `store`, CLI, recall; `crew spawn --deliver local|pr` (kiểm tra `gh`/`origin` của repo), meta `delivery=`, brief rẽ theo crew; `mate merge` đi theo `pr_url`, Mate cần `--review`. | Unit: `project.yaml` cũ có `mode`/`yolo` vẫn đọc được và không ghi lại; `--deliver pr` bị từ chối khi `gh` chưa đăng nhập hoặc `origin` không phải GitHub; Mate merge không `--review` bị từ chối, có `--review` pass thì merge; crew có `pr_url` thì đi `gh pr merge`; golden brief ship `local` và `pr`. Đã xong 2026-10-08: `store.ProjectConfig` bỏ `Mode`/`Yolo` (đọc vào `projectFile.LegacyMode/LegacyYolo`, không ghi lại); `store.ModeLocalOnly/ModeGitHub` bỏ; `crewstate.MetaDelivery`, `DeliveryLocal`, `DeliveryPR`; `SpawnCrewRequest.Delivery` (scout chỉ nhận `local`; `pr` gọi `github.CheckRepos` cho đúng repo trước khi tạo gì); `CrewResult.Delivery` và dòng spawn ghi `delivers a pull request`; `BriefParams.GitHub` thành `PR`. `MergeCrew`: Crew bị từ chối, Mate không có `ReviewedCommit` bị từ chối (`the Mate merges only reviewed work`), captain không bị chặn; đi `gh pr merge` khi `delivery=pr` hoặc có `pr_url`. `mate project mode` và `project yolo` còn tên trong dispatch nhưng trả usage error chỉ sang `--deliver` và `--review`; `project add` bỏ `--mode`/`--yolo`; `project list` bỏ cột MODE/YOLO. Unit ở `internal/spawn` (`TestSpawnCrewDeliverPR*`, `TestSpawnCrewDeliversLocallyByDefault`, `TestMergeCrewRefusesAnUnreviewedMateMerge`, `TestMergeCrewLetsTheMateMergeReviewedWork`, `TestGitHubMerge*`), `internal/store` (`TestProjectDropsRemovedModeAndYolo`) và `cmd/mate`. Live test `TestLiveMateMergesUnderYolo` thành `TestLiveMateMergesReviewedWork`; `TestLiveAcceptanceTwoProjects` dùng `remember --captain` cho project mà captain tự merge. Không chạy test live. |
 | 81 | `prwatch.Sweep` từ `.status`, chạy ở recovery và tick của daemon; `mate pr watch` chạy lại cho PR `closed`. | Unit: crew ghi `wait-mate: PR open <url>` không có `pr_url` thì Sweep ghi meta và bật đúng một watcher; watcher sống thì không bật thêm; `merged`/`closed` thì không bật; tái hiện hellovietnam (status có URL, PR đã merge) dẫn tới đúng một dòng `pr-merged` cho Mate. Đã xong 2026-10-08: `internal/prwatch/sweep.go` (`LatestURL` chỉ đọc dòng `pr-open:`/`wait-mate:`, URL mới hơn trong status thay `pr_url` cũ); `recovery.RestartWatchers` gọi `Sweep`; `autopilot.Deps.Sweep` chạy đầu mỗi tick ở cả auto lẫn manual, console nối `prwatch.Sweep`. `mate pr watch` chỉ bỏ qua PR `merged`. Dòng `pr-closed` của watcher bảo Mate tìm lý do rồi cho sửa hoặc báo captain. Unit: `TestSweepWakesTheMateForAPullRequestOnlyTheStatusNames` (tái hiện hellovietnam), `TestSweepStartsNothingTwice`, `TestSweepLeavesEndedPullRequestsAndClosedCrewsAlone`, `TestSweepFollowsANewerPullRequest`, `TestLatestURLReadsHandBackLinesOnly`, `TestEveryTickSweepsInBothModes`, `TestPRWatchOfAClosedPullRequestWatchesAgain`. Lệch spec: không có console và crew không chạy `pr watch` thì vẫn không ai theo dõi cho tới khi console mở hoặc Mate tự chạy `pr watch` (skill nói khi nào). Không chạy test live. |
 | 82 | Manual và skill của Mate, brief của crew: bỏ nhánh mode/yolo, nới quyền như trên, sửa bốn chỗ mâu thuẫn. | Golden manual, skill và brief cập nhật; không còn chữ `yolo`, `local-only` hay `{{if .GitHub}}` trong `assets/`. Đã xong 2026-10-08: manual (rule 3 "land work once an independent review passes", bootstrap bước 5 tự dispatch scout onboarding, bước 6 "Pick up ready work", mục 9 chọn delivery khi spawn và tự merge trừ khi memory `## Captain` nói captain merge, mục 12 `--discard` cần lời captain); skill `review-delivery`, `mate-commands`, `event-handling`, `task-intake` (khi nào chọn `pr`), `brief-writing`, `task-management`, `decision-authority`, `crew-spawn`, `diagnostic-reasoning`, `token-review`; brief crew rẽ theo `.PR`. Golden `*-github` bỏ, thêm `brief-ship-pr.md.golden`. Không chạy test live: chưa có bằng chứng một Mate thật dùng quyền mới đúng cách. |
+
+### M20. Thư mục project và registry công cụ
+
+Kế hoạch: `docs/plans/workspace-layout-and-tools-2026-10-08.md` (mục 7 là bảng PR). Project thành một thư mục thật `<workspace>/<project>/` chứa mọi repo của nó (mục 3), và các công cụ ngoài (Fresh, Beads) thành profile trong một registry như harness.
+
+| # | Task | Xong khi |
+| --- | --- | --- |
+| 83 | PR 0: test đặc tả: golden `project.yaml`, `workspace.yaml`, argv `fresh`/`bv`/`bd`, output `recall` phần Beads; ratchet tên công cụ ghi con số đầu. | `make check` xanh; ratchet có số. Đã xong 2026-10-08. |
+| 84 | PR 1: `internal/capability` tách từ `harness.Cap`; hợp đồng `internal/tool`, `Registry`, `catalog` rỗng; `query.Tools`; console đọc phím từ snapshot. | Golden console không đổi; harness không đổi hành vi. Đã xong 2026-10-08. |
+| 85 | PR 2: Fresh thành profile; console bỏ `findTool("fresh")` và role `review` cứng. | Ratchet không còn `"fresh"` ngoài `internal/tool/fresh`; `e` hoạt động như cũ. Đã xong 2026-10-08. |
+| 86 | PR 3: layout 2: luật `normaliseRepos`, `project add` tạo thư mục, clone vào thư mục project, `layout:` trong `workspace.yaml`, status line layout cũ, `crew spawn` từ chối trên layout cũ. | Test 6, 7, 11 của plan; workspace mới tạo đúng cây mục 3. Đã xong 2026-10-08. |
+| 87 | PR 4: `mate migrate`. | Test 8, 9, 10 của plan trên repo git thật; chạy tay trên bản sao workspace `hellovietnam`, evidence ghi số repo dời và thời gian. Code xong 2026-10-08: `internal/migrate` (`Plan`, `DryRun`, `Run`), `cmd/mate/migrate.go`, `store.LockMigrate`/`MigrateLocked`/`AppendMigrateLog`/`ReadMigrateLog`/`WriteCrewBrief`/`SetLayoutProjectDirs`, `recovery.ReplacePrefix` (`ReplaceRoot` thành wrapper), `gitx.HasGitDir`. Crew mở và Mate chạy đọc qua `query.LoadLive` với `query.ReadLiveness`. `migrate.log` ghi thêm cột thứ năm `renamed` hoặc `staged <path>` cho từng lần rename, để lần chạy sau biết repo đã rename mà brief hay dòng kết thúc chưa ghi; dòng kết thúc giữ đúng bốn cột. Unit: dời hai repo (working tree bẩn còn nguyên, `git worktree list` hợp lệ, `project.yaml`, brief, chạy lần hai `nothing to do`, dry-run không đổi byte nào), repo trùng tên project, từ chối khi crew mở, Mate chạy, Herdr không hỏi được, đích đã có, hai project mà một bị từ chối, khoá, hỏng sau rename, hỏng sau `project.yaml`, hỏng ở rename thứ hai của ca trùng tên. `TestLiveMigrateThenSpawn` đã viết, chưa chạy. Chưa chạy tay trên bản sao `hellovietnam`. |
+| 88 | PR 5: Beads thành profile ở `internal/tool/beads`; xoá `internal/beads`, `store/beads.go`, `.beads.lock`; `mate tool`; recall qua registry; skill sinh từ registry. | Ratchet bằng 0; diff của `cmd/mate` chỉ là nối dây; `mate beads` cũ vẫn chạy như alias. Code xong 2026-10-08: `internal/tool/beads` (Data, Command, Viewer, Recall, Skill, đều verified trên bd 1.3.1 + bv 0.25.2), `store.LockTool` (`.mate/projects/<p>/locks/<tool>.lock`), `mate tool`, recall khối `== Tool: <Title> ==` deadline 3s, console bỏ cột tasks cố định (`t` đi qua `Snapshot.Tools`), registry từ chối role `stage`, skill `task-management` sinh từ registry (`spawn.Deps.Tools`, `mateassets.ToolSkillsFrom`). Ratchet 0. Unit dùng fake Runner hoặc `bd` giả trên PATH. Đã smoke thủ công với `bd 1.3.1` và `bv 0.25.2`; chưa có `TestLive*` và chưa thử tab console `t` trong host thật. |
+| 89 | PR 6: dọn: bỏ alias `mate beads` và `mate tasks`; bỏ nhánh đọc `layout: 1`. | Không còn đường code cho layout cũ. Code xong 2026-10-08: `mate beads`, `mate tasks`, `mate task-triage` bỏ (cờ của mate đứng trước `--`: `mate tool <name> <p> --init`, `mate tool beads <p> --list|--json|--triage`); `store.Open` từ chối layout cũ, chỉ `store.OpenForMigrate` của `mate migrate` còn đọc nó; console bỏ notice layout cũ; các nhánh `LayoutOld()` ở `AddRepo`, `AddProject`, `SpawnCrew`, `project repo add`, `mate tool` và `t` bỏ. |
+| 90 | Tiêu chí mục 10 của plan: công cụ thứ ba chỉ là một package cộng một dòng catalog. | Đạt cho phím console: console chuyển mọi phím mà `Snapshot.Tools` gắn và console không giữ (`tool.ConsoleKeys`, registry từ chối với `tool.ErrReservedKey`), dòng gợi ý và bảng phím lấy từ binding. Chưa đạt cho chế độ CLI: ánh xạ `mate tool beads <p> --list|--json|--triage` sang argv `bd`/`bv` còn ở `cmd/mate/tasks.go`; ratchet thấy các literal đó (`"beads"`, `--no-pager`, `--robot-triage`, `tasks.yaml`) và chỉ cho phép qua allowlist ghi rõ là kiến thức Beads còn trong lõi. |
 
 ### Token review: task nào tốn, vì sao, sửa harness của project ở đâu
 

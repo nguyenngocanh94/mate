@@ -41,7 +41,7 @@ func TestSpawnCrewRefusesAMalformedBriefBeforeCreatingAnything(t *testing.T) {
 			t.Errorf("%s exists after a refused brief (%v)", path, statErr)
 		}
 	}
-	if exists, _ := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3"); exists {
+	if exists, _ := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), "mate/k3"); exists {
 		t.Error("branch mate/k3 exists after a refused brief")
 	}
 	if len(rt.Tabs) != 0 {

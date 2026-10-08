@@ -66,7 +66,9 @@ type BudgetConfig struct {
 // AddProject registers a project: it normalises its repos (possibly none),
 // refuses a repo another project owns, creates `projects/<name>/` with the
 // `mate/` and `crews/` directories, writes project.yaml and appends the
-// project to workspace.yaml.
+// project to workspace.yaml. Before any of that is written it makes the
+// project's own directory, ProjectHome, if it is not there yet: the user's
+// directory, where its repos live, kept as it is when it exists.
 func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if err := ValidateProjectName(name); err != nil {
 		return err
@@ -74,14 +76,14 @@ func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if _, ok := w.Project(name); ok {
 		return fmt.Errorf("%w: %s", ErrProjectExists, name)
 	}
-	normalised, err := w.normaliseProject(cfg)
+	normalised, err := w.normaliseProject(name, cfg)
 	if err != nil {
 		return err
 	}
 	if err := w.checkReposUnclaimed(name, normalised.Repos); err != nil {
 		return err
 	}
-	for _, dir := range []string{w.ProjectDir(name), w.MateDir(name), w.CrewsDir(name)} {
+	for _, dir := range []string{w.ProjectHome(name), w.ProjectDir(name), w.MateDir(name), w.CrewsDir(name)} {
 		if err := w.mkdirAll(dir); err != nil {
 			return err
 		}
@@ -187,7 +189,7 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 	if err := ValidateProjectName(name); err != nil {
 		return err
 	}
-	normalised, err := w.normaliseProject(cfg)
+	normalised, err := w.normaliseProject(name, cfg)
 	if err != nil {
 		return err
 	}
@@ -200,8 +202,8 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 
 // normaliseProject fills the defaults and checks the repos per
 // normaliseRepos.
-func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
-	repos, err := w.normaliseRepos(cfg.Repos)
+func (w *Workspace) normaliseProject(project string, cfg ProjectConfig) (ProjectConfig, error) {
+	repos, err := w.normaliseRepos(project, cfg.Repos)
 	if err != nil {
 		return ProjectConfig{}, err
 	}

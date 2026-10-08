@@ -1,0 +1,9 @@
+version: 1
+layout: 2
+session: {{SESSION}}
+root: {{WORKSPACE}}
+defaults:
+    mate_harness: claude
+    crew_harness: codex
+projects:
+    - name: shop

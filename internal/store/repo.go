@@ -21,6 +21,21 @@ var ErrRepoExists = errors.New("store: repo already registered")
 // the caller has to say which one.
 var ErrAmbiguousRepo = errors.New("store: project has several repos")
 
+// ErrRepoOutsideProject is matched (errors.Is) by the refusal of a repo path
+// that is not under its project's directory, ProjectHome (docs/mvp.md
+// section 3, layout 2).
+var ErrRepoOutsideProject = errors.New("store: repo is outside its project directory")
+
+// repoOutsideProjectError is that refusal: its text names the repo, the
+// directory it must move under, and the command for an old workspace.
+type repoOutsideProjectError struct{ repo, home string }
+
+func (e *repoOutsideProjectError) Error() string {
+	return fmt.Sprintf("repo %s must live under %s; move it there, or run mate migrate on an old workspace", e.repo, e.home)
+}
+
+func (e *repoOutsideProjectError) Is(target error) bool { return target == ErrRepoOutsideProject }
+
 // ErrRepoInUse is returned by RemoveRepo while an open crew works in the repo.
 var ErrRepoInUse = errors.New("store: repo has open crews")
 
@@ -125,9 +140,11 @@ func DefaultRepoName(repoPath string) string {
 }
 
 // normaliseRepos fills each repo's defaults and checks the list: every path
-// inside the workspace and outside `.mate/`, names valid and unique, and no
-// path registered twice.
-func (w *Workspace) normaliseRepos(repos []RepoConfig) ([]RepoConfig, error) {
+// inside the workspace and outside `.mate/`, under the project's directory
+// (ProjectHome) on layout 2, names valid and unique, and no path registered
+// twice. A workspace still on the old layout, which only `mate migrate`
+// opens, keeps the old rule, so migrate can rewrite its project.yaml files.
+func (w *Workspace) normaliseRepos(project string, repos []RepoConfig) ([]RepoConfig, error) {
 	out := make([]RepoConfig, 0, len(repos))
 	names := map[string]bool{}
 	paths := map[string]string{}
@@ -135,6 +152,9 @@ func (w *Workspace) normaliseRepos(repos []RepoConfig) ([]RepoConfig, error) {
 		rel, err := w.RelRepo(r.Path)
 		if err != nil {
 			return nil, err
+		}
+		if !w.LayoutOld() && !strings.HasPrefix(rel, project+"/") {
+			return nil, &repoOutsideProjectError{repo: rel, home: w.ProjectHome(project)}
 		}
 		r.Path = rel
 		if r.Name == "" {
@@ -184,23 +204,42 @@ func (w *Workspace) checkReposUnclaimed(project string, repos []RepoConfig) erro
 // AddRepo registers one more repo in an existing project and returns it as
 // stored. An empty Name is derived from the path (DefaultRepoName).
 func (w *Workspace) AddRepo(project string, repo RepoConfig) (RepoConfig, error) {
-	cfg, err := w.LoadProject(project)
+	cfg, added, err := w.addRepoPlan(project, repo)
 	if err != nil {
 		return RepoConfig{}, err
 	}
-	repos, err := w.normaliseRepos(append(append([]RepoConfig(nil), cfg.Repos...), repo))
-	if err != nil {
-		return RepoConfig{}, err
-	}
-	added := repos[len(repos)-1]
-	if err := w.checkReposUnclaimed(project, []RepoConfig{added}); err != nil {
-		return RepoConfig{}, err
-	}
-	cfg.Repos = repos
 	if err := w.SaveProject(project, cfg); err != nil {
 		return RepoConfig{}, err
 	}
 	return added, nil
+}
+
+// CheckAddRepo is every refusal AddRepo would make, the repo outside the
+// project's directory among them, with nothing written. A caller that
+// changes the repo itself before AddRepo (an empty first commit) asks it
+// first, so a refused repo is left as it was.
+func (w *Workspace) CheckAddRepo(project string, repo RepoConfig) error {
+	_, _, err := w.addRepoPlan(project, repo)
+	return err
+}
+
+// addRepoPlan is project.yaml with repo added, and repo as it would be
+// stored, or why AddRepo refuses it.
+func (w *Workspace) addRepoPlan(project string, repo RepoConfig) (ProjectConfig, RepoConfig, error) {
+	cfg, err := w.LoadProject(project)
+	if err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	repos, err := w.normaliseRepos(project, append(append([]RepoConfig(nil), cfg.Repos...), repo))
+	if err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	added := repos[len(repos)-1]
+	if err := w.checkReposUnclaimed(project, []RepoConfig{added}); err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	cfg.Repos = repos
+	return cfg, added, nil
 }
 
 // RemoveRepo drops a repo from a project. The repository directory is never

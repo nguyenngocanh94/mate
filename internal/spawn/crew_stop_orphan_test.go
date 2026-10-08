@@ -39,7 +39,7 @@ func spawnOrphanCrew(t *testing.T) (deps spawn.Deps, worktree, repo string, stop
 	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
 	}
-	repo = w.RepoDir("shop")
+	repo = w.RepoDir("shop/shop")
 	return deps, res.Worktree, repo, func(discard bool) (spawn.StopResult, error) {
 		return spawn.StopCrew(context.Background(), w, deps, "shop", "k3", discard)
 	}

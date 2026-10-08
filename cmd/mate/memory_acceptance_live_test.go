@@ -98,7 +98,7 @@ func memoryAcceptance(t *testing.T, kind harness.Kind, fresh bool) {
 	if w, err = store.Open(root); err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
-	repo := filepath.Join(w.Root(), memoryProject)
+	repo := filepath.Join(w.ProjectHome(memoryProject), memoryProject)
 	writeRepo(t, repo, memorySite)
 	if err := run([]string{"project", "add", memoryProject, repo, "--workspace", root}, os.Stdout, os.Stderr); err != nil {
 		t.Fatalf("project add: %v", err)

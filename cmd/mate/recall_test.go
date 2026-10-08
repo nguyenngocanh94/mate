@@ -26,7 +26,7 @@ import (
 func recallFixture(t *testing.T) (*store.Workspace, time.Time, string) {
 	t.Helper()
 	w, now := backlogFixtureWorkspace(t)
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	first := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "--short", "HEAD"))
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# shop\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -333,7 +333,7 @@ func TestRecallNoRepo(t *testing.T) {
 // about each anchor against its own repo's head.
 func TestRecallTwoRepos(t *testing.T) {
 	w := twoRepoWorkspace(t)
-	shop := w.RepoDir("shop")
+	shop := w.RepoDir("shop/shop")
 	first := strings.TrimSpace(gitOutput(t, shop, "rev-parse", "--short", "main"))
 	runGitOrFatal(t, shop, "commit", "--allow-empty", "-m", "two")
 	head := strings.TrimSpace(gitOutput(t, shop, "rev-parse", "--short", "main"))
@@ -341,7 +341,7 @@ func TestRecallTwoRepos(t *testing.T) {
 	out := recallText(t, w, time.Now(), recallOptions{})
 	mustOrder(t, recallPartBody(t, out, 2),
 		"shop: repo shop at "+shop+", default branch main", "head: "+head+" (anchor shop:main@"+head+")",
-		"\n\nshop: repo api at "+w.RepoDir("api")+", default branch develop", "head: none (anchor api:develop@none)")
+		"\n\nshop: repo api at "+w.RepoDir("shop/api")+", default branch develop", "head: none (anchor api:develop@none)")
 	part3 := recallPartBody(t, out, 3)
 	if !strings.Contains(part3, "warning: PROJECT.md line 4 is anchored at shop:main@"+first+", and shop:main has 1 newer commit(s)") {
 		t.Errorf("part 3 lacks the stale shop anchor:\n%s", part3)

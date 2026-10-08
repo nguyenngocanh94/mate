@@ -1,0 +1,16 @@
+== fresh in XDG_BIN_HOME, not on PATH
+editor: {{XDG_BIN_HOME}}/fresh
+review tab: true
+
+== no report.md
+argv: ["{{XDG_BIN_HOME}}/fresh" "{{WORKSPACE}}/.mate/projects/shop/crews/k3"]
+dir:  {{WORKSPACE}}/.mate/projects/shop/crews/k3
+env:  ["PATH=/usr/bin:/bin"]
+
+== report.md
+argv: ["{{XDG_BIN_HOME}}/fresh" "{{WORKSPACE}}/.mate/projects/shop/crews/k3/report.md"]
+dir:  {{WORKSPACE}}/.mate/projects/shop/crews/k3
+env:  ["PATH=/usr/bin:/bin"]
+
+== fresh not installed
+error: a crew's report needs the Fresh editor: brew install fresh-editor

@@ -27,7 +27,7 @@ import (
 func crewWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	w := newWorkspace(t, project)
-	repo := w.RepoDir(project)
+	repo := w.RepoDir(project + "/" + project)
 	git(t, repo, "config", "user.email", "crew-test@example.com")
 	git(t, repo, "config", "user.name", "crew test")
 	git(t, repo, "symbolic-ref", "HEAD", "refs/heads/main")
@@ -95,8 +95,8 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		t.Fatalf("worktree branch = %q, want mate/k3", got)
 	}
 	top := strings.TrimSpace(git(t, res.Worktree, "rev-parse", "--show-toplevel"))
-	if !gitx.SamePath(top, res.Worktree) || gitx.SamePath(top, w.RepoDir("shop")) {
-		t.Fatalf("worktree top level %q is not an isolated worktree of %q", top, w.RepoDir("shop"))
+	if !gitx.SamePath(top, res.Worktree) || gitx.SamePath(top, w.RepoDir("shop/shop")) {
+		t.Fatalf("worktree top level %q is not an isolated worktree of %q", top, w.RepoDir("shop/shop"))
 	}
 
 	// The brief is the rendered template with the caller's task in it.
@@ -107,7 +107,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 	for _, want := range []string{
 		"Add a healthcheck endpoint.\nKeep it small.",
 		res.Worktree,
-		w.RepoDir("shop"),
+		w.RepoDir("shop/shop"),
 		"mate/k3",
 		"$MATE_STATUS",
 	} {
@@ -256,7 +256,7 @@ func TestSpawnCrewRefusesADuplicateIDWhileTheAgentIsLive(t *testing.T) {
 		t.Fatalf("error = %v, want it to say the crew is already running", err)
 	}
 	// Nothing of the second attempt reached git or Herdr.
-	if got := strings.TrimSpace(git(t, w.RepoDir("shop"), "worktree", "list")); strings.Count(got, "\n") != 1 {
+	if got := strings.TrimSpace(git(t, w.RepoDir("shop/shop"), "worktree", "list")); strings.Count(got, "\n") != 1 {
 		t.Fatalf("worktree list changed:\n%s", got)
 	}
 	brief, err := os.ReadFile(w.CrewBrief("shop", "k3"))
@@ -272,7 +272,7 @@ func TestSpawnCrewRefusesAnExistingBranchBeforeCreatingAnything(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	git(t, w.RepoDir("shop"), "branch", "mate/k3")
+	git(t, w.RepoDir("shop/shop"), "branch", "mate/k3")
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
@@ -353,14 +353,14 @@ func TestSpawnCrewCompensatesAfterTheTabExists(t *testing.T) {
 	if _, statErr := os.Stat(w.WorktreeDir("shop", "k3")); !os.IsNotExist(statErr) {
 		t.Fatalf("the worktree survived compensation: %v", statErr)
 	}
-	exists, branchErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
+	exists, branchErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), "mate/k3")
 	if branchErr != nil {
 		t.Fatal(branchErr)
 	}
 	if exists {
 		t.Fatal("branch mate/k3 survived compensation")
 	}
-	if listed := git(t, w.RepoDir("shop"), "worktree", "list"); strings.Contains(listed, "shop-k3") {
+	if listed := git(t, w.RepoDir("shop/shop"), "worktree", "list"); strings.Contains(listed, "shop-k3") {
 		t.Fatalf("git still lists the crew worktree:\n%s", listed)
 	}
 	meta, metaErr := w.ReadCrewMeta("shop", "k3")
@@ -407,7 +407,7 @@ func TestSpawnCrewRefusesATangledWorktree(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	deps.Git = gitx.Git{Runner: &tangledGit{repo: repo, worktree: w.WorktreeDir("shop", "k3")}}
 
 	_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
@@ -627,7 +627,7 @@ func TestStopCrewTearsDownCleanlyWhenLanded(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatalf("the worktree survived a clean teardown: %v", statErr)
 	}
-	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
+	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), "mate/k3")
 	if err != nil || exists {
 		t.Fatalf("the branch survived a clean teardown: %v, %v", exists, err)
 	}
@@ -683,7 +683,7 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); statErr != nil {
 		t.Fatalf("a refused stop must keep the worktree: %v", statErr)
 	}
-	exists, existsErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
+	exists, existsErr := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), "mate/k3")
 	if existsErr != nil || !exists {
 		t.Fatalf("a refused stop must keep the branch: %v, %v", exists, existsErr)
 	}
@@ -725,7 +725,7 @@ func TestStopCrewRefusesWhenTheBranchIsAhead(t *testing.T) {
 	if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
 		t.Fatal("--discard must remove the worktree")
 	}
-	exists, existsErr = gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), "mate/k3")
+	exists, existsErr = gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), "mate/k3")
 	if existsErr != nil || exists {
 		t.Fatal("--discard must remove the branch")
 	}
@@ -880,7 +880,7 @@ func (s *silentPrompt) PromptAgent(_ context.Context, _ runtime.AgentHandle, _ s
 // push its branch, open a pull request and watch it, and records the choice.
 func TestSpawnCrewDeliverPRRendersThePullRequestBrief(t *testing.T) {
 	w := crewWorkspace(t, "shop")
-	git(t, w.RepoDir("shop"), "remote", "add", "origin", "git@github.com:acme/shop.git")
+	git(t, w.RepoDir("shop/shop"), "remote", "add", "origin", "git@github.com:acme/shop.git")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	deps.GitHub = github.Client{Runner: &ghScript{}}
@@ -949,7 +949,7 @@ func TestSpawnCrewDeliverPRRefusals(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			w := crewWorkspace(t, "shop")
 			if tc.origin != "" {
-				git(t, w.RepoDir("shop"), "remote", "add", "origin", tc.origin)
+				git(t, w.RepoDir("shop/shop"), "remote", "add", "origin", tc.origin)
 			}
 			deps := fakeDeps(t, runtime.NewFake())
 			deps.GitHub = github.Client{Runner: &ghScript{}}
@@ -997,7 +997,7 @@ func TestStopCrewTakesAMergedPullRequestAsLanded(t *testing.T) {
 			commitInWorktree(t, res.Worktree, "new.txt", "squashed on GitHub\n")
 			// The squash: default gets a commit of its own with the same
 			// content, so the crew's branch is no ancestor of it.
-			repo := w.RepoDir("shop")
+			repo := w.RepoDir("shop/shop")
 			if err := os.WriteFile(filepath.Join(repo, "new.txt"), []byte("squashed on GitHub\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}

@@ -481,6 +481,7 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		MatevBin:         binary,
 		MateDir:          mateDir,
 		CrewsDir:         w.CrewsDir(project),
+		ToolSkills:       mateassets.ToolSkillsFrom(deps.Tools),
 	})
 }
 

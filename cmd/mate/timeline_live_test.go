@@ -52,7 +52,7 @@ func TestLiveTimelineExplainsTheAcceptance(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 
-	shop := filepath.Join(w.Root(), "shop")
+	shop := filepath.Join(w.ProjectHome("shop"), "shop")
 	writeRepo(t, shop, map[string]string{
 		"README.md":                   "# shop\n\nA tiny shop.\n",
 		"pages/checkout-classic.html": "<h1>Classic checkout</h1>\n",

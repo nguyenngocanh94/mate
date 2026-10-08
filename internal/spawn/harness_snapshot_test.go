@@ -18,11 +18,11 @@ import (
 func TestCrewHarnessSnapshotSurvivesLaterInstructionChanges(t *testing.T) {
 	w := crewWorkspace(t, "shop")
 	instructions := []byte("Run the focused package test before the full suite.\n")
-	if err := os.WriteFile(filepath.Join(w.RepoDir("shop"), "AGENTS.md"), instructions, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(w.RepoDir("shop/shop"), "AGENTS.md"), instructions, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	git(t, w.RepoDir("shop"), "add", "AGENTS.md")
-	git(t, w.RepoDir("shop"), "commit", "-m", "Add crew instructions")
+	git(t, w.RepoDir("shop/shop"), "add", "AGENTS.md")
+	git(t, w.RepoDir("shop/shop"), "commit", "-m", "Add crew instructions")
 	res, err := spawn.SpawnCrew(context.Background(), w, fakeDeps(t, runtime.NewFake()), spawn.SpawnCrewRequest{
 		Project: "shop", Crew: "snapshot", Harness: codex.KindCodex, Model: "gpt-5.5", Effort: harness.EffortHigh,
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),

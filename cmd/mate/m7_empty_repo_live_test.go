@@ -60,7 +60,7 @@ func TestLiveM7EmptyRepoDoesNotGuess(t *testing.T) {
 
 	// The real situation: one empty initial commit, nothing else, and the
 	// PROJECT.md `mate project add` writes - headings with nothing under them.
-	shop := filepath.Join(w.Root(), "shop")
+	shop := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(shop, 0o755); err != nil {
 		t.Fatal(err)
 	}

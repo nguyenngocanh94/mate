@@ -185,8 +185,8 @@ func TestBriefAppendUsage(t *testing.T) {
 
 func TestProjectFactsCLI(t *testing.T) {
 	ws := t.TempDir()
-	empty := filepath.Join(ws, "shop")
-	full := filepath.Join(ws, "blog")
+	empty := filepath.Join(ws, "shop", "shop")
+	full := filepath.Join(ws, "blog", "blog")
 	if err := os.MkdirAll(empty, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestProjectFactsCLI(t *testing.T) {
 		t.Fatalf("init: %s", errw.String())
 	}
 	for _, name := range []string{"shop", "blog"} {
-		if code := mainRun([]string{"project", "add", "--workspace", ws, name, filepath.Join(ws, name)}, &out, &errw); code != 0 {
+		if code := mainRun([]string{"project", "add", "--workspace", ws, name, filepath.Join(ws, name, name)}, &out, &errw); code != 0 {
 			t.Fatalf("add %s: %s", name, errw.String())
 		}
 	}
@@ -222,7 +222,7 @@ func TestProjectFactsCLI(t *testing.T) {
 		t.Fatalf("facts blog: %s", errw.String())
 	}
 	got := out.String()
-	head := strings.TrimSpace(gitOut(t, filepath.Join(ws, "blog"), "rev-parse", "--short", "main"))
+	head := strings.TrimSpace(gitOut(t, full, "rev-parse", "--short", "main"))
 	if !strings.Contains(got, "commits: 2 on main\nhead: "+head+" (anchor blog:main@"+head+")\ntree: 1 file(s)\ntop level: go.mod\nbuild/test files: go.mod\n") {
 		t.Fatalf("populated repo facts:\n%s", got)
 	}

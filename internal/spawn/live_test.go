@@ -80,7 +80,7 @@ func TestLiveSpawnStartMateClaude(t *testing.T) {
 		t.Fatalf("workspace session = %q, want the lab session %q", w.Session(), session)
 	}
 
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
