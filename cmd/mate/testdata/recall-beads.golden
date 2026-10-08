@@ -9,3 +9,7 @@ Beads work (up to 10 active/blocked and 10 ready; mate tool beads shop --list):
 == Tool: Beads ==
 Beads: unreadable (bd: exit status 3: database is locked; run mate tool beads shop -- ready)
 
+== tracker in the old place
+== Tool: Beads ==
+Beads: unreadable (Beads data from before layout 2 sits at {{WORKSPACE}}/.mate/projects/shop/.beads; move it to {{WORKSPACE}}/shop/.beads by hand (mv), or run mate tool beads shop --init to start empty)
+

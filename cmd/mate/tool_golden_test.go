@@ -89,7 +89,7 @@ func TestReviewFreshArgvGolden(t *testing.T) {
 
 // TestRecallBeadsGolden pins the Beads part of `mate recall`
 // (recallTools over the binary's registry): two active issues and one
-// ready one, and an unreadable tracker. The tool runs with the real runner
+// ready one, an unreadable tracker, and a tracker left in the old place. The tool runs with the real runner
 // (runTool), which execs `bd`, so the fake is a bd on PATH, as in
 // TestToolCLISeparatesMateAndUpstreamFlags. It answers only the exact argv
 // Beads' Recall sends; any other argv fails, and the golden shows it.
@@ -128,6 +128,15 @@ func TestRecallBeadsGolden(t *testing.T) {
 		recallTools(w, "shop", tools, &out)
 		fmt.Fprintf(&got, "== %s\n%s\n", tc.name, out.String())
 	}
+	// A tracker left at `.mate/projects/<p>/.beads` after mate migrate:
+	// Beads cannot see it, and recall says where it is.
+	w, _ := consoleFixture(t, "shop")
+	if err := os.MkdirAll(filepath.Join(w.ProjectDir("shop"), ".beads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	recallTools(w, "shop", tools, &out)
+	fmt.Fprintf(&got, "== tracker in the old place\n%s\n", placeholders(map[string]string{w.Root(): "{{WORKSPACE}}"})(out.String()))
 	checkToolGolden(t, "recall-beads.golden", got.String())
 }
 
