@@ -778,7 +778,7 @@ func (o *slowObserver) Observe(ctx context.Context, _ harness.ScreenProfile, pan
 	o.asked <- pane
 	select {
 	case <-o.release:
-		return screen.Observation{Composer: o.says[pane], Source: "test"}, nil
+		return screen.Observation{Composer: o.says[pane], Source: "jev"}, nil
 	case <-ctx.Done():
 		return screen.Observation{}, ctx.Err()
 	}
@@ -827,11 +827,16 @@ func (f *fixture) pollUnblocked() {
 
 func (f *fixture) composer() send.ComposerState {
 	f.t.Helper()
+	return f.reading().Composer
+}
+
+func (f *fixture) reading() watch.Health {
+	f.t.Helper()
 	h, ok := f.health("k3")
 	if !ok {
 		f.t.Fatal("no health for k3")
 	}
-	return h.Composer
+	return h
 }
 
 func newSlowFixture(t *testing.T, says map[string]screen.ComposerState) (*fixture, *slowObserver) {
@@ -879,46 +884,76 @@ func TestWatchObservesInTheBackground(t *testing.T) {
 	}
 }
 
-// An answer about a screen the pane has left is dropped, and the screen the
-// pane shows now is asked about next: the health column never shows a
-// reading of a screen that is gone.
+// A pane that changes every poll, as a busy one does, is read by the
+// fixture in the round: the column follows the pane, never the reading of
+// a screen that is gone. An answer for a screen the pane has left is
+// dropped, and the screen the pane shows now is asked about next.
 func TestWatchDropsAnAnswerForAScreenThatIsGone(t *testing.T) {
 	const later = "• Working (9s • esc to interrupt)\n› Ask Codex to do anything\n\n  model · cwd\n"
 	f, slow := newSlowFixture(t, map[string]screen.ComposerState{
 		codexIdleScreen: screen.ComposerEmpty,
 		codexBusyScreen: screen.ComposerDraft, // never shown: the pane moved on before it was used
-		later:           screen.ComposerBusy,
+		later:           screen.ComposerUnknown,
 	})
 	f.pollUnblocked()
 	slow.next(t)
 	slow.answer(t, f.w)
 	f.pollUnblocked()
-	if got := f.composer(); got != send.StateEmpty {
-		t.Fatalf("composer %q, want the observer's empty", got)
+	if h := f.reading(); h.Composer != send.StateEmpty || h.Source != "jev" {
+		t.Fatalf("health %+v, want Jev's empty", h)
 	}
 
 	f.setScreen(codexBusyScreen)
 	f.pollUnblocked()
+	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" {
+		t.Fatalf("pane changed: %+v, want the fixture's busy, not the reading of the screen before", h)
+	}
 	if pane := slow.next(t); pane != codexBusyScreen {
 		t.Fatalf("asked about %q", pane)
 	}
 	f.setScreen(later)
 	f.pollUnblocked()
-	if got := f.composer(); got != send.StateEmpty {
-		t.Fatalf("while asked: composer %q, want the last reading kept", got)
+	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" {
+		t.Fatalf("changed again while asked: %+v, want the fixture's busy", h)
 	}
 
 	slow.answer(t, f.w)
 	f.pollUnblocked()
-	if got := f.composer(); got != send.StateEmpty {
-		t.Fatalf("composer %q: the answer for a screen that is gone was used", got)
+	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" {
+		t.Fatalf("health %+v: want the fixture's busy, the answer for a screen that is gone dropped", h)
 	}
 	if pane := slow.next(t); pane != later {
 		t.Fatalf("asked about %q, want the screen the pane shows now", pane)
 	}
+}
+
+// Once the pane holds still, the observer's answer for the screen on it
+// replaces the fixture's interim reading, and stands while the pane does.
+func TestWatchUsesTheAnswerOnceThePaneHoldsStill(t *testing.T) {
+	f, slow := newSlowFixture(t, map[string]screen.ComposerState{
+		codexIdleScreen: screen.ComposerEmpty,
+		codexBusyScreen: screen.ComposerUnknown,
+	})
+	f.pollUnblocked()
+	slow.next(t)
 	slow.answer(t, f.w)
 	f.pollUnblocked()
-	if got := f.composer(); got != send.StateBusy {
-		t.Fatalf("composer %q, want the answer for the screen on the pane", got)
+
+	f.setScreen(codexBusyScreen)
+	f.pollUnblocked()
+	slow.next(t)
+	f.pollUnblocked()
+	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" {
+		t.Fatalf("still pane, answer pending: %+v, want the fixture's busy", h)
+	}
+
+	slow.answer(t, f.w)
+	f.pollUnblocked()
+	if h := f.reading(); h.Composer != send.StateUnknown || h.Source != "jev" {
+		t.Fatalf("after the matching answer: %+v, want Jev's reading", h)
+	}
+	f.pollUnblocked()
+	if h := f.reading(); h.Composer != send.StateUnknown || h.Source != "jev" || len(slow.asked) != 0 {
+		t.Fatalf("still pane: %+v, %d new asks; want Jev's reading kept and no call", h, len(slow.asked))
 	}
 }

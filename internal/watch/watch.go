@@ -234,6 +234,8 @@ type observation struct {
 	// observed is the hash of the snapshot composer was read from, empty
 	// before the observer has read one.
 	observed string
+	// reading is the observer's reading of the snapshot observed names.
+	reading reading
 	// asking is the observer call in flight for this crew, nil when none
 	// (observe.go).
 	asking *asking
@@ -454,10 +456,11 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	// A screen the observer could not read is not a reading: the round ends
 	// without a verdict, as for a pane that could not be read, and the next
 	// round asks again.
-	composer, err := w.composer(ctx, obs, screens, screen, hash)
+	read, err := w.composer(ctx, obs, screens, screen, hash)
 	if err != nil {
 		return err
 	}
+	composer := read.composer
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer
 		obs.composerSince = now
@@ -485,6 +488,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	results[ref] = Health{
 		AgentPresent: true,
 		Composer:     composer,
+		Source:       read.source,
 		QuietFor:     quiet,
 		ComposerFor:  now.Sub(obs.composerSince),
 		ObservedAt:   now,

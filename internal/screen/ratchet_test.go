@@ -24,11 +24,13 @@ import (
 // check that guards the new site, never a row without one.
 //
 // verifier is source text that must follow the call in the same function.
-// When the call is in a helper that returns the reading (via names its
-// caller), the verifier must follow every call to the helper in that
-// caller instead.
+// When the call is in a helper that returns the reading, via names every
+// function of the package that calls the helper, each with the verifier
+// that must follow every one of its calls to it; a caller via does not name
+// fails the test.
 var observeSites = []struct {
-	file, fn, via, verifier string
+	file, fn, verifier string
+	via                map[string]string
 }{
 	// The line is typed only into a composer the observer read. When only
 	// Jev read it, the first Enter goes only while a fresh read shows the
@@ -44,7 +46,7 @@ var observeSites = []struct {
 	// The stow line itself goes through send.Send; the restart after it
 	// waits for the turn's end, and on the composer alone only after two
 	// empty looks in a row.
-	{file: "outbox/stow.go", fn: "composer", via: "Stow", verifier: "empties >= 2"},
+	{file: "outbox/stow.go", fn: "composer", via: map[string]string{"Stow": "empties >= 2"}},
 }
 
 // observeCall is one Observe call: the function it is in and its offset.
@@ -97,7 +99,7 @@ func TestEveryObserveCallSiteHasItsVerifier(t *testing.T) {
 
 	for _, site := range observeSites {
 		f := files[site.file]
-		if site.via == "" {
+		if site.via == nil {
 			for _, c := range calls {
 				if c.file == site.file && c.fn == site.fn {
 					f.mustFollow(t, site.fn, c.offset, site.verifier)
@@ -105,20 +107,32 @@ func TestEveryObserveCallSiteHasItsVerifier(t *testing.T) {
 			}
 			continue
 		}
-		caller := f.funcs[site.via]
-		if caller == nil {
-			t.Fatalf("%s: no function %s calls %s", site.file, site.via, site.fn)
-		}
-		n := 0
-		ast.Inspect(caller.Body, func(node ast.Node) bool {
-			if call, ok := node.(*ast.CallExpr); ok && callsNamed(call, site.fn) {
-				n++
-				f.mustFollow(t, site.via, f.fset.Position(call.Pos()).Offset, site.verifier)
+		// Every function of the helper's package that calls it.
+		pkg := strings.Split(site.file, "/")[0] + "/"
+		callers := map[string]bool{}
+		for rel, pf := range files {
+			if !strings.HasPrefix(rel, pkg) {
+				continue
 			}
-			return true
-		})
-		if n == 0 {
-			t.Errorf("%s: %s does not call %s", site.file, site.via, site.fn)
+			for name, fn := range pf.funcs {
+				ast.Inspect(fn.Body, func(node ast.Node) bool {
+					if call, ok := node.(*ast.CallExpr); ok && callsNamed(call, site.fn) {
+						callers[name] = true
+						verifier, named := site.via[name]
+						if !named {
+							t.Errorf("%s: %s calls %s, which reads the pane, and observeSites names no verifier for it", rel, name, site.fn)
+						} else {
+							pf.mustFollow(t, name, pf.fset.Position(call.Pos()).Offset, verifier)
+						}
+					}
+					return true
+				})
+			}
+		}
+		for name := range site.via {
+			if !callers[name] {
+				t.Errorf("%s: %s does not call %s", site.file, name, site.fn)
+			}
 		}
 	}
 }

@@ -20,6 +20,16 @@ type asking struct {
 	err  error
 }
 
+// reading is the composer an observer read off one snapshot, and which
+// observer read it ("fixture", "jev", ...).
+type reading struct {
+	composer send.ComposerState
+	source   string
+}
+
+// fixtureSource is the Source the fixture observer stamps.
+const fixtureSource = "fixture"
+
 // composer is the crew's composer for this round, read off the snapshot
 // whose hash is hash.
 //
@@ -27,55 +37,53 @@ type asking struct {
 // asked in the round. A configured observer can take seconds to answer
 // (Jev's deadline is notice.Timeout), so it is asked in the background and
 // the poll loop never waits for it (docs/plans/jev-observer-2026-10-08.md
-// section 7): the round keeps the last reading - the fixture's, read now,
-// when there is none yet - and a later round uses the answer if the pane
-// still shows the snapshot it was asked about. An answer for a snapshot the
+// section 7). A still pane keeps the observer's reading of it. A pane the
+// observer has not read yet is read by the fixture in the round, and that
+// reading stands until the observer's answer for the same snapshot arrives:
+// a busy pane redraws its spinner every poll, so an answer is often for a
+// snapshot already gone, and keeping the reading from before the change
+// would freeze the column for the whole turn. An answer for a snapshot the
 // pane has since left is dropped (section 4.3), and the pane's current
 // snapshot is asked about next. At most one call per crew is in flight.
 //
-// As in the round, a still pane costs nothing, and a snapshot the observer
-// could not read is no reading: the round that learns it ends without a
-// verdict, and the next asks again.
-func (w *Watcher) composer(ctx context.Context, obs *observation, screens harness.ScreenProfile, pane, hash string) (send.ComposerState, error) {
+// A snapshot the observer could not read is no reading: the round that
+// learns it ends without a verdict, and the next asks again.
+func (w *Watcher) composer(ctx context.Context, obs *observation, screens harness.ScreenProfile, pane, hash string) (reading, error) {
 	if w.deps.Observer == nil {
 		if obs.observed == hash {
-			return obs.composer, nil
+			return obs.reading, nil
 		}
 		observed, err := fixture.New().Observe(ctx, screens, pane)
 		if err != nil {
-			return "", err
+			return reading{}, err
 		}
-		obs.observed = hash
-		return observed.Composer, nil
+		obs.observed, obs.reading = hash, reading{observed.Composer, fixtureSource}
+		return obs.reading, nil
 	}
-	composer := obs.composer
 	if a := obs.asking; a != nil {
 		select {
 		case <-a.done:
 			obs.asking = nil
 			if a.hash == hash {
 				if a.err != nil {
-					return "", a.err
+					return reading{}, a.err
 				}
-				obs.observed, composer = hash, a.obs.Composer
+				obs.observed, obs.reading = hash, reading{a.obs.Composer, a.obs.Source}
 			}
 		default:
 		}
 	}
 	if obs.observed == hash {
-		return composer, nil
+		return obs.reading, nil
 	}
 	if obs.asking == nil {
 		w.ask(ctx, obs, screens, pane, hash)
 	}
-	if obs.observed == "" {
-		interim, err := fixture.New().Observe(ctx, screens, pane)
-		if err != nil {
-			return "", err
-		}
-		return interim.Composer, nil
+	interim, err := fixture.New().Observe(ctx, screens, pane)
+	if err != nil {
+		return reading{}, err
 	}
-	return composer, nil
+	return reading{interim.Composer, fixtureSource}, nil
 }
 
 // ask starts the observer call for one snapshot, bounded by notice.Timeout
