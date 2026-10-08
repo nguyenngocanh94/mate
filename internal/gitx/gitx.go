@@ -394,8 +394,12 @@ func (g Git) Log(ctx context.Context, dir, revisions string, options ...string) 
 // IsDirty is the number of entries `git -C worktree status --porcelain`
 // lists: uncommitted changes a teardown would otherwise discard silently.
 // 0 means the worktree is clean.
+//
+// It is a read: GIT_OPTIONAL_LOCKS=0 keeps git from refreshing the index as
+// `git status` otherwise does, so asking (as `mate migrate --dry-run` does)
+// writes nothing to the repository.
 func (g Git) IsDirty(ctx context.Context, worktree string) (int, error) {
-	out, err := g.run(ctx, worktree, "status", "--porcelain")
+	out, err := g.runEnv(ctx, worktree, []string{"GIT_OPTIONAL_LOCKS=0"}, "status", "--porcelain")
 	if err != nil {
 		return 0, err
 	}
@@ -486,6 +490,15 @@ func (g Git) SyncDefaultBranch(ctx context.Context, repo, defaultBranch string) 
 		return skip("fast-forward to origin/%s failed: %v", defaultBranch, err)
 	}
 	return "fast-forwarded " + defaultBranch
+}
+
+// HasGitDir reports whether dir has a `.git` of its own, a directory or the
+// file a linked worktree carries: dir is the top of a checkout, not merely
+// somewhere inside one. It asks the filesystem, not git, so a directory
+// inside some other repository is not mistaken for a repository.
+func HasGitDir(dir string) bool {
+	_, err := os.Lstat(filepath.Join(dir, ".git"))
+	return err == nil
 }
 
 // SamePath reports whether a and b name the same location, resolving

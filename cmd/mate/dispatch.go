@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|tasks|beads|task-triage|checkpoint|pr|events|reindex|usage|dashboard|console|--version> ...")
+			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|tasks|beads|task-triage|checkpoint|pr|events|reindex|usage|dashboard|console|migrate|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -98,6 +98,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdConsoleLaunch(args[1:], stdout, stderr)
 	case "pane":
 		return cmdPane(args[1:], stdout, stderr)
+	case "migrate":
+		return cmdMigrate(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {

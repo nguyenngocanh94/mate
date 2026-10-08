@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/gitx"
@@ -261,18 +260,64 @@ func RepairRoot(env Env, oldRoot string) []Fix {
 	return fixes
 }
 
-// ReplaceRoot swaps the path prefix oldRoot for root wherever text names a
-// path under it: the old root followed by a separator or by the end of a path
-// (not by more name, so /work/a does not match inside /work/ab).
+// ReplaceRoot swaps the workspace's old root for its new one in text, per
+// ReplacePrefix.
 func ReplaceRoot(text, oldRoot, root string) string {
-	oldRoot = strings.TrimRight(oldRoot, "/")
-	if oldRoot == "" {
+	return ReplacePrefix(text, oldRoot, root)
+}
+
+// ReplacePrefix swaps the path prefix old for new wherever text names a path
+// under old: old followed by a separator, by a character no name has, by
+// the period that ends a sentence, or by the end of the text - not by more
+// name, so /work/a does not match inside /work/ab or /work/a.go. An
+// occurrence that already reads new is left as it is, so when new lies
+// under old - a repo moved into a directory of its own name, /w/shop to
+// /w/shop/shop - a second pass over the same text changes nothing.
+func ReplacePrefix(text, old, new string) string {
+	old = strings.TrimRight(old, "/")
+	new = strings.TrimRight(new, "/")
+	if old == "" || old == new {
 		return text
 	}
-	re := regexp.MustCompile(regexp.QuoteMeta(oldRoot) + `(/|[^A-Za-z0-9._-]|$)`)
-	return re.ReplaceAllStringFunc(text, func(m string) string {
-		return root + m[len(oldRoot):]
-	})
+	var b strings.Builder
+	i := 0
+	for {
+		j := strings.Index(text[i:], old)
+		if j < 0 {
+			break
+		}
+		at, end := i+j, i+j+len(old)
+		if !endsPath(text[end:]) || pathAt(text[at:], new) {
+			b.WriteString(text[i:end])
+		} else {
+			b.WriteString(text[i:at])
+			b.WriteString(new)
+		}
+		i = end
+	}
+	b.WriteString(text[i:])
+	return b.String()
+}
+
+// pathAt reports whether s starts with the whole path p.
+func pathAt(s, p string) bool {
+	rest, ok := strings.CutPrefix(s, p)
+	return ok && endsPath(rest)
+}
+
+// endsPath reports whether rest, the text right after a path, ends it.
+func endsPath(rest string) bool {
+	switch {
+	case rest == "" || rest[0] == '/':
+		return true
+	case rest[0] == '.':
+		return len(rest) == 1 || !nameChar(rest[1])
+	}
+	return !nameChar(rest[0])
+}
+
+func nameChar(c byte) bool {
+	return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '_' || c == '-'
 }
 
 // formerRoot is the root the workspace had before it was copied or moved: the
