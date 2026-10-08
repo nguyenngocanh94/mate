@@ -97,7 +97,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 Quy ước:
 
 - Project là một thư mục thật `<workspace>/<project>/`, tên bằng tên project (2026-10-08). Mọi repo của project nằm dưới thư mục đó, con trực tiếp hay lồng sâu (`shop/services/api`); `repos[].path` vẫn tương đối gốc workspace và store từ chối path ngoài thư mục project. `mate project add <p>` tạo thư mục nếu chưa có; `mate project repo add <p> <url>` clone vào `<p>/<tên>`. `.mate/projects/<p>/` vẫn là state của mate.
-- `workspace.yaml` ghi `layout: 2`; thiếu `layout:` là 1, layout cũ với repo ngang hàng `.mate/`. Mọi lệnh trừ `mate migrate` từ chối workspace layout cũ ngay khi mở (`store.Open`) với câu `this workspace has the old layout (repos beside .mate); run mate migrate first`; chỉ `mate migrate` (`store.OpenForMigrate`) còn đọc layout cũ.
+- `workspace.yaml` ghi `layout: 2`; thiếu `layout:` là 1, layout cũ với repo ngang hàng `.mate/`. Mọi lệnh trừ `mate migrate`, `mate crew stop` và `mate mate stop` từ chối workspace layout cũ ngay khi mở (`store.Open`) với câu `this workspace has the old layout (repos beside .mate); run mate migrate first`; chỉ `mate migrate` và hai lệnh stop mà lời từ chối của nó chỉ tới (`store.OpenForMigrate`) còn đọc layout cũ; hai lệnh stop không ghi đường dẫn repo nào.
 - Một project có từ không tới nhiều repo; một repo thuộc tối đa một project (M9).
 - Worktree gom ở `.worktrees/<project>-<crew>/`. Codex vẫn hỏi trust cho worktree mới (đo 2026-09-17), nên spawn luôn chạy settle step.
 - `.meta` là `key=value` mỗi dòng một khoá. `.status` là text thuần `state: một dòng`.

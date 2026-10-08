@@ -115,7 +115,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 		fs.Usage()
 		return newUsageError("mate mate stop: want exactly 1 argument: <project>")
 	}
-	w, err := resolveWorkspace(*workspaceFlag)
+	w, err := resolveStopWorkspace(*workspaceFlag)
 	if err != nil {
 		return err
 	}

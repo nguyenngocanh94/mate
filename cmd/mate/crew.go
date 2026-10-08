@@ -247,7 +247,7 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 		fs.Usage()
 		return newUsageError("mate crew stop: want exactly 2 arguments: <project> <id>")
 	}
-	w, err := resolveWorkspace(*workspaceFlag)
+	w, err := resolveStopWorkspace(*workspaceFlag)
 	if err != nil {
 		return err
 	}

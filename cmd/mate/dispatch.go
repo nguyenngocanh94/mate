@@ -183,6 +183,19 @@ func resolveWorkspace(flagVal string) (*store.Workspace, error) {
 	return store.Open(dir)
 }
 
+// resolveStopWorkspace is resolveWorkspace for `mate crew stop` and `mate
+// mate stop` alone: it opens a workspace on the old layout too
+// (store.OpenForMigrate), because mate migrate refuses while a crew is open
+// or a Mate runs and names these two commands as the way out. Neither
+// writes a repo path. Every other command stays on resolveWorkspace.
+func resolveStopWorkspace(flagVal string) (*store.Workspace, error) {
+	dir, err := findWorkspaceDir(flagVal)
+	if err != nil {
+		return nil, err
+	}
+	return store.OpenForMigrate(dir)
+}
+
 // findWorkspaceDir resolves the workspace directory per docs/mvp.md task 04:
 // the --workspace flag if given, else MATE_WORKSPACE, else the nearest
 // ancestor of the current directory that contains `.mate/`.

@@ -195,3 +195,113 @@ func TestMigrateRepairsAMovedWorkspaceFirst(t *testing.T) {
 		t.Fatalf("brief = %q", data)
 	}
 }
+
+// oldShopWorkspace is an old-layout workspace: project shop with repo web
+// beside `.mate/`.
+func oldShopWorkspace(t *testing.T) (*store.Workspace, string) {
+	t.Helper()
+	w, err := store.Init(t.TempDir(), store.Defaults{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := w.Root()
+	if err := os.MkdirAll(filepath.Join(root, "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initGitRepo(t, filepath.Join(root, "web"))
+	if err := os.MkdirAll(w.MateDir("shop"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.ProjectFile("shop"), []byte("repos:\n    - name: web\n      path: web\n      default_branch: main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.WorkspaceFile(), []byte("version: 1\nsession: mate-old\nroot: "+root+"\nprojects:\n    - name: shop\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return w, root
+}
+
+// gitOnlyPath puts only git on PATH: no herdr can be asked.
+func gitOnlyPath(t *testing.T) string {
+	t.Helper()
+	bin := t.TempDir()
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(git, filepath.Join(bin, "git")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("MATE_CALLER", "")
+	t.Setenv("HERDR_CONFIG_PATH", t.TempDir())
+	return bin
+}
+
+// TestCrewStopOpensTheOldLayout: migrate refuses an open crew and names
+// mate crew stop; that command opens the old layout, closes the crew, and
+// the migrate that follows moves the repo. No herdr is on PATH.
+func TestCrewStopOpensTheOldLayout(t *testing.T) {
+	w, root := oldShopWorkspace(t)
+	if err := os.MkdirAll(w.CrewDir("shop", "k1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"task": "a task", "state": "spawned", "repo": "web"}); err != nil {
+		t.Fatal(err)
+	}
+	gitOnlyPath(t)
+
+	var stdout, stderr bytes.Buffer
+	if code := mainRun([]string{"migrate", root}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "close it with mate crew stop before migrating") {
+		t.Fatalf("migrate with an open crew: exit %d, stderr %q", code, stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := mainRun([]string{"crew", "stop", "shop", "k1", "--workspace", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("crew stop on the old layout: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := mainRun([]string{"migrate", root}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "moved "+root+"/web -> "+root+"/shop/web\n") {
+		t.Fatalf("migrate after crew stop: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}
+
+// TestMateStopOpensTheOldLayout: with no herdr on PATH, a mate.meta that
+// records a pane makes migrate refuse; mate mate stop opens the old layout
+// (it fails asking Herdr, not on the layout), and the refusal names the way
+// out: with herdr on PATH, mate mate stop stops it and migrate moves.
+func TestMateStopOpensTheOldLayout(t *testing.T) {
+	w, root := oldShopWorkspace(t)
+	if err := w.WriteMateMeta("shop", map[string]string{"harness": "claude", "pane": "w1:p1", "tab": "w1:t1", "agent": "mate-shop"}); err != nil {
+		t.Fatal(err)
+	}
+	bin := gitOnlyPath(t)
+
+	var stdout, stderr bytes.Buffer
+	if code := mainRun([]string{"migrate", root, "--dry-run"}, &stdout, &stderr); code != 1 ||
+		!strings.Contains(stderr.String(), "Herdr could not be asked; with herdr on PATH, run mate migrate again, or stop it with mate mate stop shop") {
+		t.Fatalf("migrate with no herdr: exit %d, stderr %q", code, stderr.String())
+	}
+	stderr.Reset()
+	if code := mainRun([]string{"mate", "stop", "shop", "--no-stow", "--workspace", root}, &stdout, &stderr); code == 0 ||
+		strings.Contains(stderr.String(), store.ErrLayoutOld.Error()) || !strings.Contains(stderr.String(), "herdr") {
+		t.Fatalf("mate stop with no herdr: exit %d, stderr %q; want a Herdr failure, not the layout", code, stderr.String())
+	}
+
+	// herdr on PATH, its server not running: the stop the refusal names
+	// works, and so does the migrate.
+	if err := os.WriteFile(filepath.Join(bin, "herdr"), []byte("#!/bin/sh\necho '{\"sessions\":[]}'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := mainRun([]string{"mate", "stop", "shop", "--no-stow", "--workspace", root}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "shop: already gone") {
+		t.Fatalf("mate stop with herdr: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := mainRun([]string{"migrate", root}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "moved "+root+"/web -> "+root+"/shop/web\n") {
+		t.Fatalf("migrate after mate stop: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}

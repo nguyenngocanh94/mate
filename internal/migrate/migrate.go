@@ -396,7 +396,10 @@ func (pl *planner) plan(cfg store.ProjectConfig, node query.ProjectNode) []Move 
 		if pl.live.Asked {
 			pl.refuse("the Mate of %s is running; stop it with mate mate stop %s before migrating", p, p)
 		} else {
-			pl.refuse("the Mate of %s may be running: mate.meta records a pane and Herdr could not be asked; stop it with mate mate stop %s before migrating", p, p)
+			// mate mate stop asks Herdr too, so the way out is Herdr
+			// first: once it can be asked, a Mate that is gone no
+			// longer counts.
+			pl.refuse("the Mate of %s may be running: mate.meta records a pane and Herdr could not be asked; with herdr on PATH, run mate migrate again, or stop it with mate mate stop %s", p, p)
 		}
 	}
 	return moves
