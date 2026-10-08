@@ -28,15 +28,6 @@ const (
 	// DefaultBranch is what a project falls back to when none is given.
 	DefaultBranch = "main"
 
-	// ModeLocalOnly is the default delivery mode: a crew's branch lands on
-	// the default branch by `mate merge` and nothing is ever pushed.
-	ModeLocalOnly = "local-only"
-
-	// ModeGitHub delivers through GitHub pull requests (docs/mvp.md M18): a
-	// crew pushes its branch and opens one, and only a merge on GitHub (or
-	// `mate merge`, which is `gh pr merge` in this mode) lands it.
-	ModeGitHub = "github"
-
 	// workspaceVersion is the schema version written into workspace.yaml.
 	workspaceVersion = 1
 )

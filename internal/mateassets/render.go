@@ -9,7 +9,6 @@ import (
 
 	"github.com/nguyenngocanh94/mate/assets"
 	"github.com/nguyenngocanh94/mate/internal/harness"
-	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 var (
@@ -44,10 +43,6 @@ type Params struct {
 	// Repos are the project's repos as of this start, in the project's
 	// order: zero or more, each Crew working in exactly one (docs/mvp.md M9).
 	Repos []RepoParams
-	// Mode is the project's delivery mode (`local-only` in the MVP).
-	Mode string
-	// Yolo reports whether the Mate may approve merges without asking.
-	Yolo bool
 	// Harness names the harness the Mate itself runs on: its kind, as
 	// `--harness` takes it.
 	Harness string
@@ -81,10 +76,6 @@ type Params struct {
 	// writes it.
 	CrewsDir string
 }
-
-// GitHub reports whether the project delivers through GitHub pull requests
-// (store.ModeGitHub); the templates branch on it.
-func (p Params) GitHub() bool { return p.Mode == store.ModeGitHub }
 
 // HarnessParams is one harness as the harness-adapters skill describes it.
 type HarnessParams struct {
@@ -220,12 +211,12 @@ type BriefParams struct {
 	Scout bool
 	// RepoPath is the absolute path of the project's primary git checkout.
 	RepoPath string
-	// GitHub selects the github delivery mode (store.ModeGitHub): a ship
-	// pushes its branch and opens a pull request instead of being forbidden
-	// to. A scout is unchanged by it.
-	GitHub bool
+	// PR is the delivery the Mate chose for this ship (docs/mvp.md M19,
+	// crewstate.DeliveryPR): it pushes its branch and opens a pull request
+	// instead of being forbidden to. A scout is unchanged by it.
+	PR bool
 	// MateBin, Project and Crew name the `mate pr watch` command a ship
-	// runs after it opens a pull request; used only when GitHub is set.
+	// runs after it opens a pull request; used only when PR is set.
 	MateBin string
 	Project string
 	Crew    string

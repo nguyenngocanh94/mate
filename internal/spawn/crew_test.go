@@ -14,6 +14,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -144,6 +145,7 @@ func TestSpawnCrewCreatesWorktreeBriefAndMeta(t *testing.T) {
 		spawn.MetaWorktree:   ".worktrees/shop-k3",
 		spawn.MetaBranch:     "mate/k3",
 		spawn.MetaKind:       "ship",
+		spawn.MetaDelivery:   "local",
 		store.MetaRepo:       "shop",
 		spawn.MetaSessionID:  "",
 		spawn.MetaTranscript: "",
@@ -874,26 +876,28 @@ func (s *silentPrompt) PromptAgent(_ context.Context, _ runtime.AgentHandle, _ s
 	return nil
 }
 
-// In the github mode the brief a crew is spawned with tells a ship to push
-// its branch and open a pull request, and to watch it (docs/mvp.md M18).
-func TestSpawnCrewInGitHubModeRendersThePullRequestBrief(t *testing.T) {
+// A ship the Mate spawns with `--deliver pr` (docs/mvp.md M19) is told to
+// push its branch, open a pull request and watch it, and records the choice.
+func TestSpawnCrewDeliverPRRendersThePullRequestBrief(t *testing.T) {
 	w := crewWorkspace(t, "shop")
-	cfg, err := w.LoadProject("shop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.Mode = store.ModeGitHub
-	if err := w.SaveProject("shop", cfg); err != nil {
-		t.Fatal(err)
-	}
+	git(t, w.RepoDir("shop"), "remote", "add", "origin", "git@github.com:acme/shop.git")
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
-	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+	deps.GitHub = github.Client{Runner: &ghScript{}}
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
 		Project:   "shop",
 		Crew:      "k3",
 		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
-	}); err != nil {
+		Delivery:  crewstate.DeliveryPR,
+	})
+	if err != nil {
 		t.Fatalf("SpawnCrew: %v", err)
+	}
+	if res.Delivery != crewstate.DeliveryPR {
+		t.Fatalf("result delivery = %q, want pr", res.Delivery)
+	}
+	if meta, _ := w.ReadCrewMeta("shop", "k3"); meta[spawn.MetaDelivery] != crewstate.DeliveryPR {
+		t.Fatalf("meta delivery = %q, want pr", meta[spawn.MetaDelivery])
 	}
 	brief, err := os.ReadFile(w.CrewBrief("shop", "k3"))
 	if err != nil {
@@ -905,7 +909,64 @@ func TestSpawnCrewInGitHubModeRendersThePullRequestBrief(t *testing.T) {
 		}
 	}
 	if strings.Contains(string(brief), "Never push to any remote") {
-		t.Errorf("a github-mode brief still forbids pushing:\n%s", brief)
+		t.Errorf("a pull request brief still forbids pushing:\n%s", brief)
+	}
+}
+
+// The default delivery is local, recorded as such, and its brief forbids
+// pushing.
+func TestSpawnCrewDeliversLocallyByDefault(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	deps := fakeDeps(t, runtime.NewFake())
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
+	}); err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	if meta, _ := w.ReadCrewMeta("shop", "k3"); meta[spawn.MetaDelivery] != crewstate.DeliveryLocal {
+		t.Fatalf("meta delivery = %q, want local", meta[spawn.MetaDelivery])
+	}
+	brief, _ := os.ReadFile(w.CrewBrief("shop", "k3"))
+	if !strings.Contains(string(brief), "Never push to any remote") {
+		t.Errorf("a local brief does not forbid pushing:\n%s", brief)
+	}
+}
+
+// `--deliver pr` is refused before anything exists when the repo cannot
+// carry a pull request, a scout asks for one, or the value is unknown.
+func TestSpawnCrewDeliverPRRefusals(t *testing.T) {
+	for name, tc := range map[string]struct {
+		origin   string
+		scout    bool
+		delivery string
+		want     string
+	}{
+		"no origin":         {delivery: crewstate.DeliveryPR, want: "has no origin remote"},
+		"origin not GitHub": {origin: "git@gitlab.com:acme/shop.git", delivery: crewstate.DeliveryPR, want: "does not point to GitHub"},
+		"a scout":           {origin: "git@github.com:acme/shop.git", scout: true, delivery: crewstate.DeliveryPR, want: "a scout delivers a report"},
+		"unknown value":     {delivery: "email", want: "--deliver wants local or pr"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := crewWorkspace(t, "shop")
+			if tc.origin != "" {
+				git(t, w.RepoDir("shop"), "remote", "add", "origin", tc.origin)
+			}
+			deps := fakeDeps(t, runtime.NewFake())
+			deps.GitHub = github.Client{Runner: &ghScript{}}
+			text := brieftest.Ship("work")
+			if tc.scout {
+				text = brieftest.Scout("look", "what is there?")
+			}
+			_, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+				Project: "shop", Crew: "k3", BriefText: text, Scout: tc.scout, Delivery: tc.delivery,
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+			if meta, _ := w.ReadCrewMeta("shop", "k3"); len(meta) != 0 {
+				t.Fatalf("a refused spawn left a meta: %v", meta)
+			}
+		})
 	}
 }
 

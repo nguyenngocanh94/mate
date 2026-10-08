@@ -31,12 +31,6 @@ type ProjectConfig struct {
 	// Repos are the git repositories the project owns, zero or more
 	// (docs/mvp.md M9). A crew works in exactly one of them.
 	Repos []RepoConfig `yaml:"repos"`
-	// Mode is the delivery mode, `local-only` (the default) or `github`; no
-	// other value is accepted. Only the captain sets it, with
-	// `mate project mode`.
-	Mode string `yaml:"mode"`
-	// Yolo lets Mate merge without asking the user.
-	Yolo bool `yaml:"yolo"`
 	// Budget is the optional token/cost ceiling mvp.md M5 task 27 checks at
 	// the end of every observer poll. A nil Budget (the field absent from
 	// project.yaml) means no limit is configured, not a limit of zero:
@@ -146,19 +140,20 @@ func (w *Workspace) LoadProject(name string) (ProjectConfig, error) {
 			cfg.Repos[i].DefaultBranch = DefaultBranch
 		}
 	}
-	if cfg.Mode == "" {
-		cfg.Mode = ModeLocalOnly
-	}
 	return cfg, nil
 }
 
-// projectFile is project.yaml as read: the current shape plus the one-repo
-// fields every project.yaml had before M9, which LoadProject turns into a
-// one-entry Repos and SaveProject never writes again.
+// projectFile is project.yaml as read: the current shape plus the fields
+// older files carry and SaveProject never writes again - the one-repo fields
+// every project.yaml had before M9, which LoadProject turns into a one-entry
+// Repos, and the `mode` and `yolo` that M19 removed (the Mate picks each
+// crew's delivery and merges reviewed work itself), read and ignored.
 type projectFile struct {
 	ProjectConfig       `yaml:",inline"`
 	LegacyRepo          string `yaml:"repo"`
 	LegacyDefaultBranch string `yaml:"default_branch"`
+	LegacyMode          string `yaml:"mode"`
+	LegacyYolo          bool   `yaml:"yolo"`
 }
 
 // CrewIDs are the ids with a `.meta` under the project's `crews/`, sorted. A
@@ -203,15 +198,9 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 	return w.writeFile(w.ProjectFile(name), data, 0o644)
 }
 
-// normaliseProject fills the defaults and checks the fields: the repos per
-// normaliseRepos, and the mode must be one of the two delivery modes.
+// normaliseProject fills the defaults and checks the repos per
+// normaliseRepos.
 func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
-	if cfg.Mode == "" {
-		cfg.Mode = ModeLocalOnly
-	}
-	if cfg.Mode != ModeLocalOnly && cfg.Mode != ModeGitHub {
-		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: want %q or %q", cfg.Mode, ModeLocalOnly, ModeGitHub)
-	}
 	repos, err := w.normaliseRepos(cfg.Repos)
 	if err != nil {
 		return ProjectConfig{}, err

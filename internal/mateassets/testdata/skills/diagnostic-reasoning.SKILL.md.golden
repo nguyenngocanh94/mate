@@ -52,4 +52,4 @@ A diagnostic report should distinguish observed facts from hypotheses and state 
 Before acting on the report, verify that its claimed cause explains the end-user reproduction and the proven path without relying on an untested masking condition.
 If a load-bearing element is missing, route a focused follow-up investigation instead of treating confidence or implementation detail as proof.
 A diagnosis or implementation-ready recommendation is evidence, not authorization to change code.
-Implementation still requires the captain's request, and the reproduction should become the regression test when a fix is authorized: put it in the fixing ship's `## Build` and `## Acceptance`.
+A verified cause whose fix serves a goal the captain already set is yours to dispatch as a ship (`task-intake`); a fix beyond what they asked for is a proposal to them. Either way the reproduction becomes the regression test: put it in the fixing ship's `## Build` and `## Acceptance`.

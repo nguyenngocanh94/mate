@@ -7,6 +7,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/autopilot"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
+	"github.com/nguyenngocanh94/mate/internal/prwatch"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
@@ -102,9 +103,13 @@ func (f sleepFunc) Sleep(ctx context.Context, d time.Duration) error { return f(
 // consoleAutoPilot is the auto daemon over ws, queueing into ws's outbox and
 // making its one immediate attempt through a sender over the same handle.
 func consoleAutoPilot(ws *store.Workspace, deps spawn.Deps) *autopilot.Pilot {
-	return autopilot.New(ws, autopilot.Deps{Outbox: consoleOutbox(ws, deps), Maintain: func(ctx context.Context, project string) (bool, error) {
-		return contextRefresh(ctx, ws, deps, project, true)
-	}})
+	return autopilot.New(ws, autopilot.Deps{
+		Outbox: consoleOutbox(ws, deps),
+		Maintain: func(ctx context.Context, project string) (bool, error) {
+			return contextRefresh(ctx, ws, deps, project, true)
+		},
+		Sweep: func(context.Context) { prwatch.Sweep(ws, prStarter) },
+	})
 }
 
 // consoleMateHandle is outbox.HandleFunc over spawn.MateHandle: the recorded

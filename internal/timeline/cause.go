@@ -275,7 +275,7 @@ func (p *pass) causeCrewSpawned(ctx context.Context) error {
 // one fired.
 //
 //  1. The Mate turn that ran `mate merge <project> <crew>`. Exact, and the
-//     one that fires when the Mate landed the branch itself under `yolo`.
+//     one that fires when the Mate landed the branch itself after a review.
 //  2. The crew's handback - its last `wait-mate` status line before the
 //     merge. This is the captain's merge, and it is a weaker rule on purpose:
 //     `mate merge` types into no pane, so a merge run from the Console

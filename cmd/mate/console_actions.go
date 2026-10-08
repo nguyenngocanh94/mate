@@ -215,7 +215,7 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 // never read from the environment: the console is the captain's own
 // program, and a console that inherited MATE_CALLER=mate - which it does
 // whenever the captain opens it from inside a Mate's pane - would otherwise
-// refuse the captain's own keystroke because the project's yolo is off.
+// refuse the captain's own keystroke for want of a review.
 //
 // The line it returns is the command's own one line, so the console and
 // `mate merge` report the same event in the same words, and a refusal is

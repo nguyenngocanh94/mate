@@ -37,6 +37,10 @@ type Sleeper interface {
 type Deps struct {
 	// Maintain runs before digest delivery at a quiet session boundary.
 	Maintain func(context.Context, string) (bool, error)
+	// Sweep runs once at the start of every tick, in auto and manual alike:
+	// the console wires prwatch.Sweep here, so a crew's pull request gets a
+	// watcher even when nobody ran `mate pr watch` (docs/mvp.md M19).
+	Sweep func(context.Context)
 	// Outbox is where a digest is queued, and the sender that makes the
 	// one immediate attempt right after (task 30). The daemon types
 	// nothing itself.
@@ -222,6 +226,9 @@ func (p *Pilot) Tick(ctx context.Context) error {
 	// without a restart.
 	if err := p.ws.LoadConfig(); err != nil {
 		return err
+	}
+	if p.deps.Sweep != nil {
+		p.deps.Sweep(ctx)
 	}
 
 	var errs []error

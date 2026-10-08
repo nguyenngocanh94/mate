@@ -71,8 +71,8 @@ func TestLegacyProjectFilesAreReadAsOneRepo(t *testing.T) {
 		t.Fatalf("LoadProject on a legacy project.yaml: %v", err)
 	}
 	want := []store.RepoConfig{{Name: "shop-v2", Path: "group/Shop.v2", DefaultBranch: "trunk"}}
-	if !reflect.DeepEqual(cfg.Repos, want) || !cfg.Yolo {
-		t.Fatalf("legacy project = %+v, want repos %+v and yolo kept", cfg, want)
+	if !reflect.DeepEqual(cfg.Repos, want) {
+		t.Fatalf("legacy project = %+v, want repos %+v", cfg, want)
 	}
 
 	if err := w.SaveProject("shop", cfg); err != nil {

@@ -70,7 +70,7 @@ For anything the codebase already shows, prefer a pointer to the authoritative f
 Keep it proportionate: skip `AGENTS.md` edits for trivial tasks that produced no durable project knowledge.
 
 # Definition of done
-This project ships through GitHub pull requests: no pipeline, and the pull request is merged on GitHub, never by you.
+This task is delivered through a GitHub pull request: no pipeline, and the pull request is merged by the Mate or on GitHub, never by you.
 The task is complete only when it is committed on this branch, the hand-back below is written, and the branch is pushed with a pull request open.
 Keep the branch a clean fast-forward onto `main`; if it has advanced, rebase onto it so the eventual merge stays a fast-forward.
 
@@ -100,10 +100,10 @@ When the work is committed and the hand-back is written, deliver it:
 3. `echo "pr-open: <the pull request URL gh printed>" >> $MATE_STATUS`.
 4. `/usr/local/bin/mate pr watch shop k3 <the same URL>`. It returns at once and keeps watching in the background; it wakes the Mate when the pull request is merged or closed. Run it once.
 
-Then stop. `pr-open:` is your hand-back line in this project, in place of `wait-mate: ready in branch mate/k3`.
+Then stop. `pr-open:` is your hand-back line for this task, in place of `wait-mate: ready in branch mate/k3`.
 You stay alive after it: the Mate may send you review comments or a failing check. Fix them on this branch and push; the pull request follows the branch. Never open a second one.
 If you could not finish, write the hand-back anyway, push nothing, and append `wait-mate: could not do X because Y`.
-The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the pull request is merged on GitHub.
+The Mate has your hand-back and branch diff reviewed against `## Captain's words` and `## Acceptance`; once the review passes, the pull request is merged.
 
 Do NOT merge the pull request. Do NOT push any branch but `mate/k3`. Do NOT force-push.
 

@@ -49,9 +49,9 @@ func TestIsGitHubURL(t *testing.T) {
 	}
 }
 
-func TestCheckProjectAcceptsAReadyProject(t *testing.T) {
+func TestCheckReposAcceptsAReadyProject(t *testing.T) {
 	gh := github.Client{Runner: &fakeRunner{}}
-	err := github.CheckProject(context.Background(), gh,
+	err := github.CheckRepos(context.Background(), gh,
 		fakeRemotes{"/ws/shop": "git@github.com:acme/shop.git", "/ws/api": "https://github.com/acme/api"},
 		[]github.Repo{{Name: "shop", Path: "/ws/shop"}, {Name: "api", Path: "/ws/api"}})
 	if err != nil {
@@ -59,11 +59,11 @@ func TestCheckProjectAcceptsAReadyProject(t *testing.T) {
 	}
 }
 
-func TestCheckProjectSaysWhatToFixForEveryProblem(t *testing.T) {
+func TestCheckReposSaysWhatToFixForEveryProblem(t *testing.T) {
 	gh := github.Client{Runner: &fakeRunner{results: map[string]github.Result{
 		"auth status": {ExitCode: 1, Stderr: "You are not logged into any GitHub hosts.\n"},
 	}}}
-	err := github.CheckProject(context.Background(), gh,
+	err := github.CheckRepos(context.Background(), gh,
 		fakeRemotes{"/ws/api": "git@gitlab.com:acme/api.git"},
 		[]github.Repo{{Name: "shop", Path: "/ws/shop"}, {Name: "api", Path: "/ws/api"}})
 	if err == nil {

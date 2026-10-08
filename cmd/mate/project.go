@@ -8,14 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/facts"
 	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/memory"
-	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -27,13 +25,11 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project add", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate project add <name> [<repo-path>] [--repo-name <name>] [--default-branch <branch>] [--workspace <dir>] [--mode local-only] [--yolo] [--budget-usd <amount>]")
+		fmt.Fprintln(stderr, "usage: mate project add <name> [<repo-path>] [--repo-name <name>] [--default-branch <branch>] [--workspace <dir>] [--budget-usd <amount>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	repoNameFlag := fs.String("repo-name", "", "name of the repo inside the project (default: derived from its directory)")
 	defaultBranchFlag := fs.String("default-branch", "", "override the repo's detected default branch")
-	modeFlag := fs.String("mode", store.ModeLocalOnly, "project mode: local-only or github (github needs gh logged in and origin on GitHub)")
-	yoloFlag := fs.Bool("yolo", false, "let Mate merge without asking the user")
 	budgetUSDFlag := fs.Float64("budget-usd", 0, "open a budget incident once this project's total cost crosses this amount; hand-edit project.yaml for crew_tokens/crew_usd")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
@@ -52,10 +48,7 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if *modeFlag != store.ModeLocalOnly && *modeFlag != store.ModeGitHub {
-		return newUsageErrorf("mate project add: --mode wants %s or %s, got %q", store.ModeLocalOnly, store.ModeGitHub, *modeFlag)
-	}
-	opts := projectAddOptions{Mode: *modeFlag, Yolo: *yoloFlag, BudgetUSD: *budgetUSDFlag}
+	opts := projectAddOptions{BudgetUSD: *budgetUSDFlag}
 	if fs.NArg() == 2 {
 		repoPath := fs.Arg(1)
 		absRepo, err := filepath.Abs(repoPath)
@@ -68,16 +61,11 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 		}
 		opts.Repos = []store.RepoConfig{repo}
 	}
-	if opts.Mode == store.ModeGitHub {
-		if err := checkGitHubMode(context.Background(), w, opts.Repos); err != nil {
-			return err
-		}
-	}
 	saved, err := addProject(w, name, opts)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "added project %s: %s mode=%s yolo=%t\n", name, describeRepos(name, saved.Repos), saved.Mode, saved.Yolo)
+	fmt.Fprintf(stdout, "added project %s: %s\n", name, describeRepos(name, saved.Repos))
 	return nil
 }
 
@@ -102,8 +90,6 @@ func describeRepo(r store.RepoConfig) string {
 // name. The Console's new-project form passes only Repos.
 type projectAddOptions struct {
 	Repos     []store.RepoConfig // zero or more, each from repoConfigFor
-	Mode      string             // empty: store.ModeLocalOnly
-	Yolo      bool
 	BudgetUSD float64
 }
 
@@ -145,11 +131,7 @@ func repoConfigFor(absRepo, shownRepo, name, defaultBranch string) (store.RepoCo
 // addProject registers a Project the one way both the CLI and the Console
 // do it, and seeds its PROJECT.md.
 func addProject(w *store.Workspace, name string, opts projectAddOptions) (store.ProjectConfig, error) {
-	mode := opts.Mode
-	if mode == "" {
-		mode = store.ModeLocalOnly
-	}
-	cfg := store.ProjectConfig{Repos: opts.Repos, Mode: mode, Yolo: opts.Yolo}
+	cfg := store.ProjectConfig{Repos: opts.Repos}
 	if opts.BudgetUSD > 0 {
 		cfg.Budget = &store.BudgetConfig{ProjectUSD: opts.BudgetUSD}
 	}
@@ -162,86 +144,9 @@ func addProject(w *store.Workspace, name string, opts projectAddOptions) (store.
 	return w.LoadProject(name)
 }
 
-// ghClient and ghRemotes are the seams under the github mode's checks:
-// tests swap them, so nothing reaches the network or a real account.
-var (
-	ghClient                 = github.New()
-	ghRemotes github.Remotes = gitx.New()
-)
-
-// checkGitHubMode is what the github mode requires of a project's repos
-// (docs/mvp.md M18): see github.CheckProject.
-func checkGitHubMode(ctx context.Context, w *store.Workspace, repos []store.RepoConfig) error {
-	checked := make([]github.Repo, 0, len(repos))
-	for _, r := range repos {
-		checked = append(checked, github.Repo{Name: r.Name, Path: w.RepoDir(r.Path)})
-	}
-	return github.CheckProject(ctx, ghClient, ghRemotes, checked)
-}
-
-// cmdProjectMode implements `mate project mode <name> [github|local-only]`:
-// the project's delivery mode (docs/mvp.md M18). Without a mode it prints the
-// current one. It is the captain's: a Mate or a Crew that runs it is refused,
-// because the mode decides whether crews push and open pull requests.
-func cmdProjectMode(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("project mode", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate project mode <name> [github|local-only] [--workspace <dir>]")
-	}
-	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
-		return &usageError{err}
-	}
-	if fs.NArg() < 1 || fs.NArg() > 2 {
-		fs.Usage()
-		return newUsageError("mate project mode: want <name> [github|local-only]")
-	}
-	name := fs.Arg(0)
-	w, err := resolveWorkspace(*workspaceFlag)
-	if err != nil {
-		return err
-	}
-	if _, ok := w.Project(name); !ok {
-		return fmt.Errorf("%w: %s", store.ErrNoProject, name)
-	}
-	cfg, err := w.LoadProject(name)
-	if err != nil {
-		return err
-	}
-	if fs.NArg() == 1 {
-		fmt.Fprintf(stdout, "%s: mode is %s\n", name, cfg.Mode)
-		return nil
-	}
-	mode := fs.Arg(1)
-	if mode != store.ModeGitHub && mode != store.ModeLocalOnly {
-		fs.Usage()
-		return newUsageErrorf("mate project mode: want github or local-only, got %q", mode)
-	}
-	if caller := spawn.CallerFromEnv(); caller != spawn.CallerUser {
-		return observability.NewError(observability.CodePermission,
-			fmt.Sprintf("the captain sets the project mode; a %s cannot change %s to %s", caller, name, mode))
-	}
-	if cfg.Mode == mode {
-		fmt.Fprintf(stdout, "%s: mode is already %s; nothing changed\n", name, mode)
-		return nil
-	}
-	if mode == store.ModeGitHub {
-		if err := checkGitHubMode(context.Background(), w, cfg.Repos); err != nil {
-			return err
-		}
-	}
-	cfg.Mode = mode
-	if err := w.SaveProject(name, cfg); err != nil {
-		return fmt.Errorf("project mode %s: %w", name, err)
-	}
-	if mode == store.ModeGitHub {
-		fmt.Fprintf(stdout, "%s: mode is github; crews push their branch and open a pull request, and never merge it. Crews already running keep their old brief, and a running Mate still reads the old mode in its manual until its next restart.\n", name)
-		return nil
-	}
-	fmt.Fprintf(stdout, "%s: mode is local-only; crews never push and the captain or a yolo Mate runs `mate merge`. Crews already running keep their old brief, and a running Mate still reads the old mode in its manual until its next restart.\n", name)
-	return nil
-}
+// ghClient is the `gh` that `mate pr watch` reads pull requests with; tests
+// swap it, so nothing reaches the network or a real account.
+var ghClient = github.New()
 
 // cmdProjectList implements `mate project list`.
 func cmdProjectList(args []string, stdout, stderr io.Writer) error {
@@ -276,7 +181,7 @@ func cmdProjectList(args []string, stdout, stderr io.Writer) error {
 		for _, r := range cfg.Repos {
 			repos = append(repos, repoRow(r))
 		}
-		rows = append(rows, projectRow{Name: ref.Name, Repos: repos, Mode: cfg.Mode, Yolo: cfg.Yolo})
+		rows = append(rows, projectRow{Name: ref.Name, Repos: repos})
 	}
 
 	if *jsonFlag {
@@ -353,76 +258,11 @@ func stoppedAgentLine(project string, s spawn.StoppedAgent) string {
 	return fmt.Sprintf("%s: Mate stopped (agent %s, session_id kept for resume)", project, s.Stop.Agent)
 }
 
-// cmdProjectYolo implements `mate project yolo <name> on|off`: the one
-// switch that decides whether a Mate may run `mate merge` itself, or has
-// to report the branch and wait for the captain (docs/mvp.md M4 decisions).
-//
-// It is its own subcommand rather than a flag on some edit command because
-// it is the whole of what a reader wants to change, and because the answer
-// they need back is not "saved" but when the Mate will believe it: the
-// manual is rendered from `project.yaml` at every `mate start`, so a Mate
-// that is already running is quoting the old value until it is restarted.
-func cmdProjectYolo(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("project yolo", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: mate project yolo <name> on|off [--workspace <dir>]")
-	}
-	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
-		return &usageError{err}
-	}
-	if fs.NArg() != 2 {
-		fs.Usage()
-		return newUsageError("mate project yolo: want exactly 2 arguments: <name> on|off")
-	}
-	name := fs.Arg(0)
-	var on bool
-	switch fs.Arg(1) {
-	case "on":
-		on = true
-	case "off":
-		on = false
-	default:
-		fs.Usage()
-		return newUsageErrorf("mate project yolo: want on or off, got %q", fs.Arg(1))
-	}
-
-	w, err := resolveWorkspace(*workspaceFlag)
-	if err != nil {
-		return err
-	}
-	if _, ok := w.Project(name); !ok {
-		return fmt.Errorf("%w: %s", store.ErrNoProject, name)
-	}
-	cfg, err := w.LoadProject(name)
-	if err != nil {
-		return err
-	}
-	was := cfg.Yolo
-	cfg.Yolo = on
-	if err := w.SaveProject(name, cfg); err != nil {
-		return fmt.Errorf("project yolo %s: %w", name, err)
-	}
-	if was == on {
-		fmt.Fprintf(stdout, "%s: yolo is already %t; nothing changed\n", name, on)
-		return nil
-	}
-	if on {
-		fmt.Fprintf(stdout, "%s: yolo is on; the Mate may run `mate merge %s <crew>` itself. A running Mate still reads the old value in its manual until its next restart.\n", name, name)
-		return nil
-	}
-	fmt.Fprintf(stdout, "%s: yolo is off; the Mate reports the branch and the captain merges. A running Mate still reads the old value in its manual until its next restart.\n", name)
-	return nil
-}
-
 // projectRow is one row of `mate project list`, in both the table and the
 // --json output.
 type projectRow struct {
 	Name  string    `json:"name"`
 	Repos []repoRow `json:"repos"`
-	Mode  string    `json:"mode"`
-	Yolo  bool      `json:"yolo"`
 }
 
 // repoRow is one repo of a project in `project list --json` and `project
@@ -436,7 +276,7 @@ type repoRow struct {
 // printProjectTable writes an aligned plain-text table: one header row plus
 // one row per project, columns padded to the widest cell.
 func printProjectTable(w io.Writer, rows []projectRow) {
-	headers := []string{"NAME", "REPOS", "MODE", "YOLO"}
+	headers := []string{"NAME", "REPOS"}
 	table := make([][]string, 0, len(rows)+1)
 	table = append(table, headers)
 	for _, r := range rows {
@@ -448,7 +288,7 @@ func printProjectTable(w io.Writer, rows []projectRow) {
 		if repos == "" {
 			repos = "-"
 		}
-		table = append(table, []string{r.Name, repos, r.Mode, strconv.FormatBool(r.Yolo)})
+		table = append(table, []string{r.Name, repos})
 	}
 	printTable(w, table)
 }

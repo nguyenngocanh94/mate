@@ -1,12 +1,11 @@
 ---
 name: decision-authority
-description: Who decides a Crew's question or a hand-back, you or the captain. Load it before answering a `resolve:` line, before acting on a `needs-decision` or `wait-mate` item of a `digest:` line, and before accepting or correcting any Crew's `wait-mate`. It decides by the brief's accepted contract, never by the Crew's wording or the project's `yolo` flag.
+description: Who decides a Crew's question or a hand-back, you or the captain. Load it before answering a `resolve:` line, before acting on a `needs-decision` or `wait-mate` item of a `digest:` line, and before accepting or correcting any Crew's `wait-mate`. It decides by the brief's accepted contract, never by the Crew's wording.
 ---
 
 # decision-authority
 
 This skill is the single owner of the decision policy for a Crew's question (`needs-decision`) and for what you find when you review a Crew's hand-back (`wait-mate`).
-Decision authority is determined by the criteria below, not by `yolo`: `yolo` only lets you merge.
 You always apply this judgment, decide what is unambiguous toward the accepted contract, and escalate only what is genuinely ambiguous, expanding, or destructive.
 
 The Crew never decides a choice that belongs above it.

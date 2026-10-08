@@ -56,7 +56,7 @@ When the captain's request was split across repos (section 5), each brief carrie
 
 Run `/usr/local/bin/mate brief check /ws/.mate/projects/shop/mate/briefs/<id>.md` (with `--scout` for a scout) before you spawn, and fix every line it prints; `crew spawn` refuses the same brief anyway (section 4).
 
-The app wraps your sections in the Crew template, which already supplies the worker role, the worktree assertion, the rule that stops the Crew at every open decision, the status protocol, the hand-back a ship writes to `/ws/.mate/projects/shop/crews/<id>/handback.md`, the report path and report structure of a scout, the project-memory rule, the definition of done for this project's delivery mode (local-only: nothing pushed), and the captain's CREW.md rules.
+The app wraps your sections in the Crew template, which already supplies the worker role, the worktree assertion, the rule that stops the Crew at every open decision, the status protocol, the hand-back a ship writes to `/ws/.mate/projects/shop/crews/<id>/handback.md`, the report path and report structure of a scout, the project-memory rule, the definition of done for the delivery you chose at spawn (`--deliver local`: nothing pushed; `--deliver pr`: push the branch and open a pull request), and the captain's CREW.md rules.
 Do not restate any of that; keep each section to what this task needs.
 
 **Later words.** When the captain adds to or changes a task that is in flight, pass their words, verbatim, to `mate brief append` (section 4); never paraphrase them into a `mate send`.

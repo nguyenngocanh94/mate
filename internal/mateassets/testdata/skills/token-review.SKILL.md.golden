@@ -108,11 +108,11 @@ What you cannot write without knowing the code - the real test command, the real
 
 Then tell the captain in a few lines: which tasks, the causes in outcome language, the proposals by number, and the file's path.
 
-## 6. Apply only on the captain's word
+## 6. Apply each proposal through its owner
 
-Each proposal has one owner, and you are not the owner of most of them.
+Each proposal has one owner.
 
-- A change inside a repo - `AGENTS.md`, a skill, docs, a script - is a ship Crew's commit. When the captain accepts it, brief it like any task, with the captain's acceptance as `## Captain's words` and the proposal's text under `## Build`.
+- A change inside a repo - `AGENTS.md`, a skill, docs, a script - is a ship Crew's commit, and yours to dispatch: brief it like any task, with the captain's request for this review as `## Captain's words` and the proposal's text under `## Build`.
 - A line for `/ws/.mate/projects/shop/CREW.md` and a rule in the dispatch table are the captain's to add; give them the exact line.
 - A fact for `/ws/.mate/projects/shop/PROJECT.md` or a lesson about how you brief, split or dispatch is yours: load `project-memory`, and record a lesson with `/usr/local/bin/mate remember shop --lesson`, sourced to the review file.
 

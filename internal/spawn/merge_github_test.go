@@ -13,8 +13,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// The merge of docs/mvp.md M18 in the github mode: `gh pr merge` under the
-// same caller rules as the fast-forward. gh is a script here; nothing reaches
+// The merge of docs/mvp.md M18 for a crew that delivers a pull request
+// (M19): `gh pr merge` under the same caller rules as the fast-forward. gh is a script here; nothing reaches
 // GitHub.
 
 const mergePR = "https://github.com/acme/shop/pull/7"
@@ -71,35 +71,31 @@ func prView(state, head, merge string) github.Result {
 	return github.Result{Stdout: `{"state":"` + state + `","mergeCommit":` + m + `,"baseRefName":"main","headRefOid":"` + head + `"}`}
 }
 
-// githubMergeFixture is mergeFixture in the github mode with a crew that
-// committed, and a pull request recorded in its meta.
-func githubMergeFixture(t *testing.T, yolo bool, gh *ghScript) (*store.Workspace, spawn.Deps, spawn.CrewResult) {
+// githubMergeFixture is mergeFixture for a crew that delivers a pull
+// request, committed, with the pull request recorded in its meta.
+func githubMergeFixture(t *testing.T, gh *ghScript) (*store.Workspace, spawn.Deps, spawn.CrewResult) {
 	t.Helper()
-	w, deps, res := mergeFixture(t, yolo)
-	cfg, err := w.LoadProject("shop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.Mode = store.ModeGitHub
-	if err := w.SaveProject("shop", cfg); err != nil {
-		t.Fatal(err)
-	}
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
-	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{crewstate.MetaPRURL: mergePR, crewstate.MetaPRState: crewstate.PRStateOpen}); err != nil {
+	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{
+		crewstate.MetaDelivery: crewstate.DeliveryPR,
+		crewstate.MetaPRURL:    mergePR,
+		crewstate.MetaPRState:  crewstate.PRStateOpen,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	deps.GitHub = github.Client{Runner: gh}
 	return w, deps, res
 }
 
-func TestGitHubMergeRefusesTheMateWhileYoloIsOff(t *testing.T) {
+func TestGitHubMergeRefusesAnUnreviewedMate(t *testing.T) {
 	gh := &ghScript{views: []github.Result{prView("OPEN", "aaa", "")}}
-	w, deps, res := githubMergeFixture(t, false, gh)
+	w, deps, res := githubMergeFixture(t, gh)
 	before := headOf(t, w, "main")
 
 	_, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerMate)
-	if err == nil || !strings.Contains(err.Error(), "merge refused: yolo is off for shop; the captain merges") {
-		t.Fatalf("err = %v, want the yolo refusal", err)
+	if err == nil || !strings.Contains(err.Error(), "merge refused: the Mate merges only reviewed work") {
+		t.Fatalf("err = %v, want the review refusal", err)
 	}
 	if len(gh.calls) != 0 {
 		t.Fatalf("gh was called %q for a refused merge", gh.calls)
@@ -114,18 +110,22 @@ func TestGitHubMergeRefusesTheMateWhileYoloIsOff(t *testing.T) {
 
 func TestGitHubMergeMergesThePullRequestAndFinishesTheCrew(t *testing.T) {
 	for name, caller := range map[string]struct {
-		who  string
-		yolo bool
-	}{"the captain": {spawn.CallerUser, false}, "the Mate under yolo": {spawn.CallerMate, true}} {
+		who      string
+		reviewed []spawn.ReviewedCommit
+		merge    string
+	}{
+		"the captain":            {spawn.CallerUser, nil, "pr merge " + mergePR + " --merge"},
+		"the Mate with a review": {spawn.CallerMate, []spawn.ReviewedCommit{{Head: "aaa"}}, "pr merge " + mergePR + " --merge --match-head-commit aaa"},
+	} {
 		t.Run(name, func(t *testing.T) {
 			gh := &ghScript{views: []github.Result{prView("OPEN", "aaa", ""), prView("MERGED", "aaa", "feedbeef1234")}}
-			w, deps, res := githubMergeFixture(t, caller.yolo, gh)
+			w, deps, res := githubMergeFixture(t, gh)
 
-			out, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", caller.who)
+			out, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", caller.who, caller.reviewed...)
 			if err != nil {
 				t.Fatalf("MergeCrew: %v", err)
 			}
-			if !gh.merged() || !contains(gh.calls, "pr merge "+mergePR+" --merge") {
+			if !gh.merged() || !contains(gh.calls, caller.merge) {
 				t.Fatalf("gh calls = %q, want gh pr merge", gh.calls)
 			}
 			if !strings.Contains(out.Line(), "merged pull request "+mergePR+" as feedbee") {
@@ -167,7 +167,7 @@ func TestGitHubMergeRefusalsChangeNothing(t *testing.T) {
 		"gh refuses":               {gh: &ghScript{views: []github.Result{prView("OPEN", "aaa", "")}, mergeFails: true}, want: "gh could not merge"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			w, deps, res := githubMergeFixture(t, false, tc.gh)
+			w, deps, res := githubMergeFixture(t, tc.gh)
 			if tc.noPR {
 				if err := w.WriteCrewMeta("shop", "k3", withoutPR(t, w)); err != nil {
 					t.Fatal(err)
@@ -188,7 +188,7 @@ func TestGitHubMergeRefusalsChangeNothing(t *testing.T) {
 
 func TestGitHubMergePinsTheReviewedHead(t *testing.T) {
 	gh := &ghScript{views: []github.Result{prView("OPEN", "aaa", ""), prView("MERGED", "aaa", "feedbeef1234")}}
-	w, deps, _ := githubMergeFixture(t, false, gh)
+	w, deps, _ := githubMergeFixture(t, gh)
 	if _, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerUser, spawn.ReviewedCommit{Head: "aaa"}); err != nil {
 		t.Fatalf("MergeCrew: %v", err)
 	}

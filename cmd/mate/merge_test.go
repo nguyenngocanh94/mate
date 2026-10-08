@@ -90,7 +90,8 @@ func TestCmdMergePrintsOneLineAndFinishesTheCrew(t *testing.T) {
 
 // TestCmdMergeReadsTheCallerFromThePaneEnvironment is the whole of how a
 // Mate is told apart from the captain: MATE_CALLER, which spawn injects
-// into the Mate's pane, and which no flag can override.
+// into the Mate's pane, and which no flag can override. A Mate merges only
+// reviewed work (docs/mvp.md M19); the captain is never gated.
 func TestCmdMergeReadsTheCallerFromThePaneEnvironment(t *testing.T) {
 	_, root := mergeCLIWorkspace(t)
 	t.Setenv("MATE_CALLER", "mate")
@@ -98,26 +99,27 @@ func TestCmdMergeReadsTheCallerFromThePaneEnvironment(t *testing.T) {
 	var out, errw bytes.Buffer
 	err := cmdMerge([]string{"--workspace", root, "shop", "k3"}, &out, &errw)
 	if err == nil {
-		t.Fatal("a Mate must be refused while yolo is off")
+		t.Fatal("a Mate must be refused without --review")
 	}
-	if !strings.Contains(err.Error(), "merge refused: yolo is off for shop; the captain merges") {
-		t.Fatalf("err = %v, want the yolo refusal", err)
+	if !strings.Contains(err.Error(), "merge refused: the Mate merges only reviewed work") {
+		t.Fatalf("err = %v, want the review refusal", err)
 	}
 	if out.String() != "" {
 		t.Fatalf("a refused merge printed %q", out.String())
 	}
 
-	// `project yolo shop on` is the switch, and it is enough on its own.
-	out.Reset()
-	if err := cmdProjectYolo([]string{"--workspace", root, "shop", "on"}, &out, &errw); err != nil {
-		t.Fatalf("project yolo on: %v", err)
+	t.Setenv("MATE_CALLER", "crew")
+	if err := cmdMerge([]string{"--workspace", root, "shop", "k3"}, &out, &errw); err == nil || !strings.Contains(err.Error(), "a crew cannot merge its own branch") {
+		t.Fatalf("a crew's merge: err = %v, want the crew refusal", err)
 	}
+
+	t.Setenv("MATE_CALLER", "")
 	out.Reset()
 	if err := cmdMerge([]string{"--workspace", root, "shop", "k3"}, &out, &errw); err != nil {
-		t.Fatalf("merge under yolo: %v", err)
+		t.Fatalf("the captain's merge: %v", err)
 	}
 	if !strings.Contains(out.String(), "crew finished") {
-		t.Fatalf("merge under yolo printed %q", out.String())
+		t.Fatalf("the captain's merge printed %q", out.String())
 	}
 }
 
@@ -143,75 +145,16 @@ func TestRunDispatchesMerge(t *testing.T) {
 	}
 }
 
-func TestCmdProjectYoloFlipsTheFlagAndSaysWhenAMateLearnsIt(t *testing.T) {
+// `project yolo` and `project mode` were removed by docs/mvp.md M19; a Mate
+// quoting an old manual is told what replaced them.
+func TestCmdProjectYoloAndModeAreGone(t *testing.T) {
 	_, root := mergeCLIWorkspace(t)
-	w, err := store.Open(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var out, errw bytes.Buffer
-	if err := cmdProjectYolo([]string{"--workspace", root, "shop", "on"}, &out, &errw); err != nil {
-		t.Fatalf("yolo on: %v", err)
-	}
-	cfg, err := w.LoadProject("shop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !cfg.Yolo {
-		t.Fatal("project.yaml still has yolo off after `project yolo shop on`")
-	}
-	// The manual is rendered at `mate start`, so a running Mate is still
-	// quoting the old value. The output has to say so, or the captain flips
-	// the flag and wonders why the Mate keeps refusing.
-	if !strings.Contains(out.String(), "next restart") {
-		t.Fatalf("yolo on printed %q, want it to say a running Mate learns the new value at its next restart", out.String())
-	}
-
-	// The flag is visible where a reader looks for it.
-	out.Reset()
-	if err := cmdProjectList([]string{"--workspace", root}, &out, &errw); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), "YOLO") || !strings.Contains(out.String(), "true") {
-		t.Fatalf("project list = %q, want a YOLO column reading true", out.String())
-	}
-
-	// Off again, and a second `off` is a no-op that says so rather than
-	// claiming a change.
-	out.Reset()
-	if err := cmdProjectYolo([]string{"--workspace", root, "shop", "off"}, &out, &errw); err != nil {
-		t.Fatalf("yolo off: %v", err)
-	}
-	cfg, err = w.LoadProject("shop")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Yolo {
-		t.Fatal("project.yaml still has yolo on after `project yolo shop off`")
-	}
-	out.Reset()
-	if err := cmdProjectYolo([]string{"--workspace", root, "shop", "off"}, &out, &errw); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), "already false") {
-		t.Fatalf("a repeated `off` printed %q, want it to say nothing changed", out.String())
-	}
-
-	// Other fields of project.yaml survive the rewrite.
-	if len(cfg.Repos) != 1 || cfg.Repos[0].Path != "shop" || cfg.Repos[0].DefaultBranch != "main" || cfg.Mode != store.ModeLocalOnly {
-		t.Fatalf("project.yaml after two flips = %+v", cfg)
-	}
-}
-
-func TestCmdProjectYoloRefusesAnythingButOnAndOff(t *testing.T) {
-	_, root := mergeCLIWorkspace(t)
-	var out, errw bytes.Buffer
-	var ue *usageError
-	if err := cmdProjectYolo([]string{"--workspace", root, "shop", "yes"}, &out, &errw); err == nil || !errors.As(err, &ue) {
-		t.Fatalf("err = %v, want a usage error for `yes`", err)
-	}
-	if err := cmdProjectYolo([]string{"--workspace", root, "nope", "on"}, &out, &errw); err == nil {
-		t.Fatal("an unregistered project must be refused")
+	for _, sub := range []string{"yolo", "mode"} {
+		var out, errw bytes.Buffer
+		err := cmdProject([]string{sub, "--workspace", root, "shop", "on"}, &out, &errw)
+		var ue *usageError
+		if err == nil || !errors.As(err, &ue) || !strings.Contains(err.Error(), "--deliver local|pr") || !strings.Contains(err.Error(), "--review") {
+			t.Fatalf("project %s: err = %v, want a usage error naming --deliver and --review", sub, err)
+		}
 	}
 }

@@ -579,3 +579,23 @@ func TestAQueuedDigestIsWithdrawnWhenAutoGoesOff(t *testing.T) {
 		t.Fatalf("cursor = %v, want the question still owed", cursor)
 	}
 }
+
+// Every tick sweeps for pull requests that need a watcher (docs/mvp.md M19),
+// in manual mode too: a pull request's end is delivered in both modes.
+func TestEveryTickSweepsInBothModes(t *testing.T) {
+	f := newFixture(t)
+	sweeps := 0
+	deps := f.deps(nil)
+	deps.Sweep = func(context.Context) { sweeps++ }
+	pilot := autopilot.New(f.ws, deps)
+	if err := pilot.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.auto(true)
+	if err := pilot.Tick(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if sweeps != 2 {
+		t.Fatalf("swept %d times in two ticks, want 2", sweeps)
+	}
+}

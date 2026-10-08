@@ -336,7 +336,7 @@ var mateEdges = []Edge{
 
 	{ID: "mate.merges", Kind: KindMergeDone, From: mateHere, When: mergedByTheMate,
 		Via: Merging, To: Idle, Target: subject,
-		Why: "the Mate ran `mate merge` itself (yolo), so it lands the work"},
+		Why: "the Mate ran `mate merge` itself after a review, so it lands the work"},
 	{ID: "mate.merges.captain", Kind: KindMergeDone, To: stay,
 		Why: "the captain merged from the console: the crew leaves, the Mate did nothing"},
 

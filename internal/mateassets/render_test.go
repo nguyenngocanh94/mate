@@ -24,8 +24,6 @@ func fixedParams() Params {
 		ProjectName:      "shop",
 		WorkspaceRoot:    "/ws",
 		Repos:            []RepoParams{{Name: "shop", Path: "/ws/shop", DefaultBranch: "main"}},
-		Mode:             "local-only",
-		Yolo:             false,
 		Harness:          "claude",
 		Harnesses:        harnesses,
 		SkillsDir:        ".claude/skills",
@@ -114,10 +112,9 @@ func fixedScoutBriefParams() BriefParams {
 	return p
 }
 
-// fixedGitHubBriefParams is the ship brief of a project in the github mode.
-func fixedGitHubBriefParams() BriefParams { return withGitHub(fixedBriefParams()) }
-
-func fixedGitHubScoutBriefParams() BriefParams { return withGitHub(fixedScoutBriefParams()) }
+// fixedPRBriefParams is the brief of a ship the Mate spawned with
+// `--deliver pr` (docs/mvp.md M19).
+func fixedPRBriefParams() BriefParams { return withPR(fixedBriefParams()) }
 
 func compareGolden(t *testing.T, path string, got []byte) {
 	t.Helper()
@@ -147,24 +144,11 @@ func TestRenderAgentsGolden(t *testing.T) {
 	compareGolden(t, filepath.Join("testdata", "AGENTS.md.golden"), got)
 }
 
-// TestRenderAgentsGitHubGolden is the manual of a project in the github mode
-// (docs/mvp.md M18); TestRenderAgentsGolden is the local-only one.
-func TestRenderAgentsGitHubGolden(t *testing.T) {
-	p := fixedParams()
-	p.Mode = "github"
-	got, err := Render(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	compareGolden(t, filepath.Join("testdata", "AGENTS-github.md.golden"), got)
-}
-
 func TestRenderBriefGolden(t *testing.T) {
 	for name, p := range map[string]BriefParams{
-		"brief-ship.md.golden":         fixedBriefParams(),
-		"brief-scout.md.golden":        fixedScoutBriefParams(),
-		"brief-ship-github.md.golden":  fixedGitHubBriefParams(),
-		"brief-scout-github.md.golden": fixedGitHubScoutBriefParams(),
+		"brief-ship.md.golden":    fixedBriefParams(),
+		"brief-scout.md.golden":   fixedScoutBriefParams(),
+		"brief-ship-pr.md.golden": fixedPRBriefParams(),
 	} {
 		t.Run(name, func(t *testing.T) {
 			got, err := RenderBrief(p)
@@ -182,7 +166,7 @@ func TestRenderBriefGolden(t *testing.T) {
 // mention the schema's headings in prose, are never mistaken for the task's.
 func TestRenderedBriefPassesTheCheck(t *testing.T) {
 	for kind, p := range map[brief.Kind]BriefParams{brief.Ship: fixedBriefParams(), brief.Scout: fixedScoutBriefParams()} {
-		for _, p := range []BriefParams{p, withGitHub(p)} {
+		for _, p := range []BriefParams{p, withPR(p)} {
 			got, err := RenderBrief(p)
 			if err != nil {
 				t.Fatal(err)
@@ -201,8 +185,8 @@ func TestRenderedBriefPassesTheCheck(t *testing.T) {
 	}
 }
 
-func withGitHub(p BriefParams) BriefParams {
-	p.GitHub = true
+func withPR(p BriefParams) BriefParams {
+	p.PR = true
 	p.MateBin = "/usr/local/bin/mate"
 	p.Project = "shop"
 	p.Crew = "k3"
@@ -233,33 +217,33 @@ func TestRenderBriefShapes(t *testing.T) {
 			t.Errorf("scout brief lacks %q", want)
 		}
 	}
-	// The github mode swaps the push ban for the pull request flow, and only
-	// for a ship; a scout commits nothing and keeps the ban on pushing.
-	gh, err := RenderBrief(fixedGitHubBriefParams())
+	// A pull request delivery swaps the push ban for the pull request flow,
+	// and only for a ship; a scout commits nothing and keeps the ban.
+	pr, err := RenderBrief(fixedPRBriefParams())
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"gh pr create --base main --head mate/k3", "pr-open: <the pull request URL gh printed>", "/usr/local/bin/mate pr watch shop k3 <the same URL>", "Do NOT merge the pull request."} {
-		if !strings.Contains(string(gh), want) {
-			t.Errorf("github ship brief lacks %q", want)
+		if !strings.Contains(string(pr), want) {
+			t.Errorf("pull request ship brief lacks %q", want)
 		}
 	}
-	for _, gone := range []string{"Never push to any remote", "local-only", "Do NOT push."} {
-		if strings.Contains(string(gh), gone) {
-			t.Errorf("github ship brief still says %q", gone)
+	for _, gone := range []string{"Never push to any remote", "delivered locally", "Do NOT push."} {
+		if strings.Contains(string(pr), gone) {
+			t.Errorf("pull request ship brief still says %q", gone)
 		}
 	}
-	ghScout, err := RenderBrief(fixedGitHubScoutBriefParams())
+	prScout, err := RenderBrief(withPR(fixedScoutBriefParams()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"Never push to any remote and never open a pull request.", "Do NOT push. Do NOT open a pull request. Do NOT merge."} {
-		if !strings.Contains(string(ghScout), want) {
-			t.Errorf("github scout brief lacks %q", want)
+		if !strings.Contains(string(prScout), want) {
+			t.Errorf("scout brief lacks %q", want)
 		}
 	}
-	if strings.Contains(string(ghScout), "pr watch") || strings.Contains(string(ghScout), "local-only") {
-		t.Errorf("github scout brief is wrong:\n%s", ghScout)
+	if strings.Contains(string(prScout), "pr watch") {
+		t.Errorf("scout brief carries the pull request flow:\n%s", prScout)
 	}
 	// Only the project's rules: the section is there, the workspace part is not.
 	p := fixedBriefParams()

@@ -30,26 +30,29 @@ Do not report routine, unremarkable wakes to the captain; batch anything worth m
    Direct review is still available when the captain requests it: `mate diff {{.ProjectName}} <id> --full`. Read the entire diff and verify the evidence; default `mate diff` is only a stat and cannot approve work.
 5. On a scout, start with `mate report {{.ProjectName}} <id> --summary`, then read the evidence and relevant detailed sections needed to verify its claims; a scout commits nothing, so its diff is empty and the report is the whole deliverable.
 
-Read-only git against the Crew's worktree is allowed where you need something `mate diff` does not print, and only in read-only forms; a git that writes, stages, commits, checks out, or merges is forbidden by rule 1 of section 1, whatever the `yolo` flag says - landing a branch is `mate merge` and nothing else.
+Read-only git against the Crew's worktree is allowed where you need something `mate diff` does not print, and only in read-only forms; a git that writes, stages, commits, checks out, or merges is forbidden by rule 1 of section 1 - landing a branch is `mate merge` and nothing else.
 A correction inside the contract is yours: a `fail` row, a criterion with no row, a deviation `## Build` did not allow, a diff that does not do what the captain's words ask - send the Crew one corrective line naming it, and review its next `wait-mate` the same way.
 The smallest downstream changes needed to keep accepted behavior correct, add a test for it, or keep documentation accurate stay inside the contract; a new requirement is follow-up work, not part of this task.
 A correction that would expand the contract, a product call the captain's words do not settle, or a third correction on a theme you have already corrected twice goes to the captain instead (section 13), and the Crew waits.
 
-{{if .GitHub -}}
-**Delivery.** This project delivers through GitHub pull requests, so the Crew has pushed its branch and opened one: `pr-open:` is its hand-back line, the URL is in `{{.CrewsDir}}/<id>.status` and in its meta as `pr_url`, and a watcher (`mate pr watch`) is already running for it. What you review is that branch, exactly as above. A correction after review goes to the Crew as one line; it fixes the branch and pushes, and the same pull request follows. Never push, open or merge anything yourself.
-How the pull request is merged depends on this project's `yolo` flag, and on nothing else.
-
-When `yolo` is **off** - the default - you do not merge it.
-Report to the captain in outcome language that the work is ready, naming the pull request URL, and stop; the captain merges it on GitHub or from their console.
-Running `mate merge` anyway is refused with `merge refused: yolo is off for {{.ProjectName}}; the captain merges`, and that refusal is the answer, not an obstacle: do not look for another way to land it.
-
-When `yolo` is **on**, you merge it with one command:
+**Delivery.** You chose how this ship lands when you spawned it (`--deliver`, in its meta as `delivery`). Once the review passes, you land it yourself with one command:
 
 ```text
 {{.MatevBin}} merge {{.ProjectName}} <id> --review <review-id>
 ```
 
-It runs `gh pr merge` pinned to the commit the reviewer saw, so a branch that moved after review is refused with `review is stale`; for a directly reviewed branch only, omit the flag. A successful merge closes the Crew, so you do not also run `crew stop`; report the one line it printed and stop.
+The app refuses your merge without a passing review, and pins it to the commit the reviewer saw, so a branch or contract that moved after review is refused with `review is stale`.
+A successful merge closes the Crew, so you do not also run `crew stop`; report the one line it printed, in outcome language, and stop.
+When memory `## Captain` says the captain merges this kind of work, report it as ready instead - naming the branch or the pull request - and they merge it from their console or on GitHub.
+
+**A local ship** (`delivery=local`) is fast-forwarded onto the default branch of the primary checkout.
+If the merge answers `merge refused: needs-rebase: ...`, the default branch has moved on and the branch is no longer a fast-forward.
+Nothing changed and the Crew is exactly as it was, so send it one line - `{{.MatevBin}} send {{.ProjectName}} <id> "rebase onto <default> and hand back with wait-mate"`, with that default branch in place of `<default>` - and merge again after its next `wait-mate`.
+`needs-rebase` is never a state of the Crew; it is the answer to a command you ran.
+Section 4's "Delivery" lists the other refusals and what each one asks of you.
+
+**A pull request ship** (`delivery=pr`) has pushed its branch and opened one: `pr-open:` is its hand-back line, the URL is in `{{.CrewsDir}}/<id>.status` and in its meta as `pr_url`, and a watcher follows it. What you review is that branch, exactly as above. A correction after review goes to the Crew as one line; it fixes the branch and pushes, and the same pull request follows. `mate merge` runs `gh pr merge` for it; pushing and opening are the Crew's.
+If a Crew names a pull request URL in its status any other way, the console starts the watcher for it; `{{.MatevBin}} pr watch {{.ProjectName}} <id> <url>` starts it yourself when no console is open.
 
 **When a pull request ends.** Whoever merges it, the watcher notices within a minute, fast-forwards the default branch of the primary checkout when that checkout is clean and on the default branch (its line says when it did not and why), records `pr_state` and `merge_commit` in the Crew's meta, appends `pr-merged: <url>` or `pr-closed: <url>` to its status file, and types one line into your pane - in manual mode too:
 
@@ -58,37 +61,15 @@ It runs `gh pr merge` pinned to the commit the reviewer saw, so a branch that mo
 ```
 
 On `pr-merged:` run `{{.MatevBin}} crew stop {{.ProjectName}} <id>`: it takes the merged pull request as landed - also after a squash or rebase merge, where the branch is not in the default branch's history - removes the Crew's worktree and branch, and records it `finished`. Then do the next task in the backlog. If the line says the checkout was skipped, tell the captain in one line, because their copy of the default branch is behind.
-On `pr-closed:` the pull request was closed without being merged. Tell the captain in one line and wait for their word; do not close the Crew and do not open another pull request yourself.
-{{- else -}}
-**Delivery.** Once the branch is good, how it lands depends on this project's `yolo` flag, and on nothing else.
+On `pr-closed:` the pull request was closed without being merged. Find out why (its comments, through a scout if they are long), then decide: send the Crew the rework and have it reopen the pull request (`gh pr reopen`) and run `pr watch` again, or tell the captain the work was turned down. Throwing the branch away (`--discard`) waits for the captain's word.
 
-When `yolo` is **off** - the default - you do not land it.
-Report to the captain in outcome language that the work is ready, naming the branch, for example "the README line is in place and ready in branch `mate/readme-install-line`".
-Then stop and wait; the captain merges it, from their console or from the CLI.
-Running `mate merge` anyway is refused with `merge refused: yolo is off for {{.ProjectName}}; the captain merges`, and that refusal is the answer, not an obstacle: do not rebase, cherry-pick, or fast-forward anything by hand to get around it, and do not tear the Crew down before the captain has the work - a torn-down Crew's branch may be gone.
-
-When `yolo` is **on**, you land it yourself with one command:
-
-```text
-{{.MatevBin}} merge {{.ProjectName}} <id> --review <review-id>
-```
-
-For an independent review, always supply `--review` so the command rejects a changed branch or contract. A directly reviewed branch has no review id; only that path omits the flag.\n\nThat is the whole of it: the merge closes the Crew for you, so you do not also run `crew stop`.
-Report the one line it printed, in outcome language, and stop.
-
-If it answers `merge refused: needs-rebase: ...`, the default branch of the Crew's repo has moved on and the branch is no longer a fast-forward.
-Nothing changed and the Crew is exactly as it was, so send it one line - `{{.MatevBin}} send {{.ProjectName}} <id> "rebase onto <default> and hand back with wait-mate"`, with that default branch in place of `<default>` - and wait for its next `wait-mate` before merging again.
-`needs-rebase` is never a state of the Crew; it is the answer to a command you ran.
-Section 4's "Delivery" lists the other refusals and what each one asks of you.
-{{- end}}
-
-**Closing a Crew.** A Crew's task ends when the captain or you decide it has, never when the Crew says so.
+**Closing a Crew.** A Crew's task ends when you or the captain decide it has, never when the Crew says so.
 `wait-mate:` is the Crew's report; closing is `{{.MatevBin}} crew stop {{.ProjectName}} <id>`, and until it runs the Crew stays in the captain's console and in `crew list` as work in flight.
 
-- A **scout** is closed when the captain has the report and says they are satisfied with it (or tells you to close it). Not before: the captain may want a follow-up question answered by the same Crew, with its context intact.
-- A **ship** is closed when its branch has been merged into the default branch of its repo{{if .GitHub}} - in this project, when its pull request has been merged on GitHub (`pr-merged:`){{end}}. When the captain merged it, run `crew stop`; it will find the branch landed and record the Crew `finished`. When you merged it yourself under `yolo`, it is already closed - `mate merge` does the `crew stop` for you, and running one afterwards only finds a Crew that is already gone.
-- A Crew whose work the captain rejects outright is closed with `--discard`, on the captain's explicit word only. That records it `failed`.
+- A **scout** is closed when its report answers every question under its `## Deliverable` and you have relayed the findings. Keep it open while you still need a follow-up answered by the same Crew, with its context intact.
+- A **ship** is closed when its work has landed: its branch merged into the default branch of its repo, or its pull request merged (`pr-merged:`). When you merged it with `mate merge`, it is already closed. When the captain merged it, run `crew stop`; it will find the work landed and record the Crew `finished`.
+- A Crew whose unlanded work is thrown away is closed with `--discard`, on the captain's explicit word only. That records it `failed`.
 
 Closing removes the Crew from the console and from `crew list`; `crews/<id>/` with the brief and any report stays, and `crew list --all` still shows the record.
 Load `task-management` to record accepted delivery and close its linked Beads task; a handback or discarded Crew alone does not close the task.
-Never close a Crew on your own initiative because it went quiet or said `wait-mate`; if you think a Crew should be closed, say so to the captain in one line and let them decide.
+A Crew that went quiet or said `wait-mate` is a hand-back to review, not a reason to close it.

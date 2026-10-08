@@ -36,11 +36,12 @@ func IsGitHubURL(remote string) bool {
 	return strings.EqualFold(u.Hostname(), "github.com")
 }
 
-// CheckProject is what setting a project's mode to `github` requires
-// (docs/mvp.md M18): `gh` installed and logged in, and `origin` of every
-// repo pointing at GitHub. Every problem is reported at once, each with the
-// command that fixes it, so the captain fixes them in one pass.
-func CheckProject(ctx context.Context, gh Client, git Remotes, repos []Repo) error {
+// CheckRepos is what delivering through a pull request requires
+// (docs/mvp.md M19, a crew spawned with `--deliver pr`): `gh` installed and
+// logged in, and `origin` of each repo pointing at GitHub. Every problem is
+// reported at once, each with the command that fixes it, so it is fixed in
+// one pass.
+func CheckRepos(ctx context.Context, gh Client, git Remotes, repos []Repo) error {
 	var problems []string
 	if err := gh.AuthStatus(ctx); err != nil {
 		problems = append(problems, err.Error())
@@ -60,5 +61,5 @@ func CheckProject(ctx context.Context, gh Client, git Remotes, repos []Repo) err
 	if len(problems) == 0 {
 		return nil
 	}
-	return fmt.Errorf("the github mode is not ready:\n  - %s", strings.Join(problems, "\n  - "))
+	return fmt.Errorf("pull request delivery is not ready:\n  - %s", strings.Join(problems, "\n  - "))
 }
