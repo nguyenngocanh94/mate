@@ -49,6 +49,14 @@ func (l LogLine) String() string {
 	return out
 }
 
+// BreakerLine is the log's line for a breaker event (BreakerOpen,
+// BreakerClosed), without its newline:
+//
+//	<RFC3339> breaker <open|closed>
+func BreakerLine(at time.Time, event string) string {
+	return at.UTC().Format(time.RFC3339) + " breaker " + event
+}
+
 // ParseLogLine reads one line String wrote.
 func ParseLogLine(line string) (LogLine, error) {
 	f := strings.Fields(line)
@@ -103,6 +111,8 @@ type Summary struct {
 	Fallbacks int
 	// ByFallback counts the fallbacks per rule.
 	ByFallback map[string]int
+	// BreakerOpens counts the times the circuit opened (BreakerLine).
+	BreakerOpens int
 	// Malformed counts lines that do not parse; a trailing partial line,
 	// caught mid-append, is not counted.
 	Malformed int
@@ -123,6 +133,12 @@ func Summarize(r io.Reader) (Summary, error) {
 			return s, err
 		}
 		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if f := strings.Fields(line); len(f) == 3 && f[1] == "breaker" {
+			if f[2] == BreakerOpen {
+				s.BreakerOpens++
+			}
 			continue
 		}
 		l, perr := ParseLogLine(line)

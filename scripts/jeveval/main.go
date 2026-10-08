@@ -216,6 +216,9 @@ func summarizeLog(w io.Writer, path string) error {
 		fmt.Fprintf(w, " (%s)", strings.Join(why, ", "))
 	}
 	fmt.Fprintln(w, ".")
+	if s.BreakerOpens > 0 {
+		fmt.Fprintf(w, "- Circuit opened: %d (Jev not asked for %s after each).\n", s.BreakerOpens, chain.BreakerCooldown)
+	}
 	if s.Malformed > 0 {
 		fmt.Fprintf(w, "- Lines not read: %d.\n", s.Malformed)
 	}

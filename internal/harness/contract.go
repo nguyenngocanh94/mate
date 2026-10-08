@@ -106,6 +106,10 @@ type Launcher interface {
 // PR 1 reshapes the composer half into an observation the core's policy
 // decides from.
 type ScreenProfile interface {
+	// Kind is the harness whose screens these are, the same as its
+	// Profile's Kind.
+	Kind() Kind
+
 	// ReadSource is the pane read this harness's screens were measured
 	// through. Every read of its pane uses it, so what is classified is
 	// what was measured.

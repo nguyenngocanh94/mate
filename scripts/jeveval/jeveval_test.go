@@ -143,7 +143,9 @@ func TestSummarizeLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "jev.log")
 	log := "2026-10-08T09:00:00Z claude 0123456789ab 200 jev composer=empty dialog=none conf=0.91\n" +
 		"2026-10-08T09:00:05Z codex 0123456789ab 300 fixture composer=busy dialog=none conf=0.62 fallback=below-threshold\n" +
-		"2026-10-08T09:00:09Z codex 0123456789ab 8000 fixture composer=- dialog=- conf=0.00 fallback=error\n"
+		"2026-10-08T09:00:09Z codex 0123456789ab 8000 fixture composer=- dialog=- conf=0.00 fallback=error\n" +
+		"2026-10-08T09:00:17Z breaker open\n" +
+		"2026-10-08T09:01:17Z breaker closed\n"
 	if err := os.WriteFile(path, []byte(log), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,8 @@ func TestSummarizeLog(t *testing.T) {
 	if err := summarizeLog(&out, path); err != nil {
 		t.Fatal(err)
 	}
-	want := "- Jev requests: 3.\n- Latency: p50 300 ms, p95 8000 ms.\n- Fallbacks to the fixture observer: 2 (below-threshold 1, error 1).\n"
+	want := "- Jev requests: 3.\n- Latency: p50 300 ms, p95 8000 ms.\n- Fallbacks to the fixture observer: 2 (below-threshold 1, error 1).\n" +
+		"- Circuit opened: 1 (Jev not asked for 1m0s after each).\n"
 	if out.String() != want {
 		t.Fatalf("got\n%s\nwant\n%s", out.String(), want)
 	}

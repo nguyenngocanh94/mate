@@ -10,6 +10,9 @@ import (
 // codexScreen is codex-cli's ScreenProfile.
 type codexScreen struct{}
 
+// Kind implements harness.ScreenProfile.
+func (codexScreen) Kind() harness.Kind { return KindCodex }
+
 // ReadSource implements ScreenProfile.
 func (codexScreen) ReadSource() harness.ReadSource { return harness.ReadRecentUnwrapped }
 

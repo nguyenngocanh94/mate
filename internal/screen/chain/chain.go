@@ -17,8 +17,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"path"
-	"reflect"
 	"sync"
 	"time"
 
@@ -59,8 +57,9 @@ type Chain struct {
 	now               func() time.Time
 	appendLine        func(string) error
 
-	mu    sync.Mutex
-	cache map[cacheKey]cached
+	mu      sync.Mutex
+	cache   map[cacheKey]cached
+	breaker breaker
 }
 
 type cacheKey struct {
@@ -102,7 +101,9 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 //  5. Otherwise the primary's Composer, Dialog, Notice and Confidence.
 //
 // The primary is asked once per harness and screen hash within TTL; a
-// repeat is answered from memory. The call is synchronous, so an answer
+// repeat is answered from memory. After BreakerFailures failures in a row
+// it is not asked at all for BreakerCooldown (breaker.go): the fallback's
+// reading is returned whole, Reason "jev: circuit open". The call is synchronous, so an answer
 // always belongs to the snapshot that was hashed: a pane that changes while
 // Jev is asked is a new snapshot on the caller's next read, never this
 // answer's.
@@ -111,14 +112,21 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 	if err != nil {
 		return fix, err
 	}
+	ask, trial := c.admit()
+	if !ask {
+		return withReason(fix, circuitOpen), nil
+	}
 	key := cacheKey{kind: kindOf(profile), hash: sha256.Sum256([]byte(pane))}
-	if hit, ok := c.lookup(key); ok {
-		obs, _ := decide(fix, hit.obs, hit.err, c.threshold)
-		return obs, nil
+	if !trial {
+		if hit, ok := c.lookup(key); ok {
+			obs, _ := decide(fix, hit.obs, hit.err, c.threshold)
+			return obs, nil
+		}
 	}
 	start := c.now()
 	primary, perr := c.primary.Observe(ctx, profile, pane)
 	latency := c.now().Sub(start)
+	event := c.record(ctx, perr)
 	if ctx.Err() == nil {
 		c.store(key, cached{obs: primary, err: perr, at: c.now()})
 	}
@@ -127,6 +135,9 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 		_ = c.appendLine(LogLine{Time: start, Kind: key.kind, Hash: fmt.Sprintf("%x", key.hash[:6]), Latency: latency,
 			Source: obs.Source, Composer: primary.Composer, Dialog: primary.Dialog, Confidence: primary.Confidence,
 			Fallback: fallback}.String())
+		if event != "" {
+			_ = c.appendLine(BreakerLine(c.now(), event))
+		}
 	}
 	return obs, nil
 }
@@ -193,16 +204,10 @@ func (c *Chain) store(key cacheKey, entry cached) {
 	c.cache[key] = entry
 }
 
-// kindOf names the harness a screen profile belongs to: every harness's
-// profile lives in the harness's own package, named for its kind
-// (internal/harness/claude, codex, grok, pi).
+// kindOf names the harness a screen profile belongs to, "-" for none.
 func kindOf(profile harness.ScreenProfile) string {
 	if profile == nil {
 		return "-"
 	}
-	t := reflect.TypeOf(profile)
-	for t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	return path.Base(t.PkgPath())
+	return string(profile.Kind())
 }
