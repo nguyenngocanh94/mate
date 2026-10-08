@@ -125,6 +125,17 @@ type Deps struct {
 	Observer screenpkg.Observer
 }
 
+// slowObserver reports whether the pane is read through an observer other
+// than the in-process fixture observer, one that may answer seconds after
+// the read.
+func (d Deps) slowObserver() bool {
+	switch d.Observer.(type) {
+	case nil, fixture.Observer, *fixture.Observer:
+		return false
+	}
+	return true
+}
+
 func (d Deps) observer() screenpkg.Observer {
 	if d.Observer != nil {
 		return d.Observer
@@ -314,14 +325,16 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		report.Resumed = true
 		report.Steps = append(report.Steps, Step{What: "resume", Detail: payload})
 	} else {
-		// An observer other than the fixture can take up to its deadline to
-		// answer (Jev's is notice.Timeout), so its Observation may be of a
-		// pane that has since moved on. The pane is read again and the
-		// fixture classifies it: a composer that is no longer one this send
-		// types into (empty, or busy when queueing) is refused before a byte
-		// is typed, and the caller may retry. The fixture observer is
-		// in-process, and its read-to-type gap is what it always was.
-		if observed.Source != fixture.Source {
+		// An observer other than the in-process fixture observer (the
+		// chain, or any injected one) can take up to its deadline to answer
+		// (Jev's is notice.Timeout), whatever Source its Observation then
+		// names: a chain that waited out a Jev timeout reports "fixture".
+		// So after such an observer the pane is read again and the fixture
+		// classifies it: a composer that is no longer one this send types
+		// into (empty, or busy when queueing) is refused before a byte is
+		// typed, and the caller may retry. With the fixture observer the
+		// read-to-type gap is what it always was.
+		if deps.slowObserver() {
 			if err := stillTypeable(ctx, deps, target, source, screens, opts); err != nil {
 				return report, err
 			}

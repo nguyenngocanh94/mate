@@ -543,8 +543,17 @@ func (j jevSaysComposer) Observe(context.Context, harness.ScreenProfile, string)
 		Highlight: -1, Confidence: 0.99, Source: jev.Source}, nil
 }
 
-// An observer other than the fixture can take seconds to answer, so the
-// pane is read again before typing and classified by the fixture: still a
+// jevTimesOut is Jev failing its deadline: the chain falls back to the
+// fixture's reading, Source "fixture", after the wait.
+type jevTimesOut struct{}
+
+func (jevTimesOut) Observe(context.Context, harness.ScreenProfile, string) (screen.Observation, error) {
+	return screen.Observation{}, context.DeadlineExceeded
+}
+
+// An observer other than the in-process fixture observer can take seconds
+// to answer, whatever Source it reports, so the pane is read again before
+// typing and classified by the fixture: still a
 // composer the send types into, the line goes; a draft by then is refused
 // with nothing typed, and the refusal says the send may be tried again. The
 // fixture path reads the pane once before typing, as it always has.
@@ -607,6 +616,19 @@ func TestSendRefusesAPaneThatChangedWhileItWasObserved(t *testing.T) {
 		_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
 		if !errors.Is(err, send.ErrAgentBusy) || len(rt.lines) != 1 {
 			t.Fatalf("err = %v after %d reads, want ErrAgentBusy from the one read", err, len(rt.lines))
+		}
+	})
+
+	t.Run("chain, Jev timed out and a draft by then: refused", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("a human started typing")}}
+		deps, _ := testDeps(rt)
+		deps.Observer = chain.New(jevTimesOut{}, fixture.New(), 0.85)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if !errors.Is(err, send.ErrPaneChanged) || report.Before.State != send.StateEmpty {
+			t.Fatalf("err = %v, before %+v: want ErrPaneChanged after the fixture's empty", err, report.Before)
+		}
+		if len(rt.typed) != 0 || len(rt.keys) != 0 || len(rt.lines) != 2 {
+			t.Fatalf("typed %#v, keys %v, %d reads after the pane changed", rt.typed, rt.keys, len(rt.lines))
 		}
 	})
 
