@@ -20,7 +20,8 @@ import (
 
 // newWorkspace creates a workspace with one registered git project. It is
 // the fixture every test in this package starts from: `store.Init`, a real
-// `git init` repository beside `.mate/`, and the registration between them.
+// `git init` repository under the project's directory (`<root>/<p>/<p>`), and
+// the registration between them.
 func newWorkspace(t *testing.T, project string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
@@ -28,7 +29,7 @@ func newWorkspace(t *testing.T, project string) *store.Workspace {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(w.Root(), project)
+	repo := filepath.Join(w.ProjectHome(project), project)
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -30,7 +30,18 @@ const (
 
 	// workspaceVersion is the schema version written into workspace.yaml.
 	workspaceVersion = 1
+
+	// layoutProjectDirs is the layout where a project is a directory under
+	// the workspace and every repo of it lives under that directory
+	// (docs/mvp.md section 3, 2026-10-08). Init writes it; a workspace.yaml
+	// without `layout:` is layout 1, repos beside `.mate/`.
+	layoutProjectDirs = 2
 )
+
+// ErrLayoutOld refuses a write that would register a repo, or start a crew,
+// in a workspace still on layout 1. The workspace opens and reads; `mate
+// migrate` moves it.
+var ErrLayoutOld = errors.New("this workspace has the old layout (repos beside .mate); run mate migrate first")
 
 // ProjectRef is one row of the project list in workspace.yaml: the project
 // name. Its repos live in the project's own project.yaml (docs/mvp.md M9);
@@ -43,6 +54,11 @@ type ProjectRef struct {
 // WorkspaceConfig is `.mate/workspace.yaml`.
 type WorkspaceConfig struct {
 	Version int `yaml:"version"`
+	// Layout is the directory layout the workspace is on: 2 for a project
+	// that is a directory under the root with its repos under it, absent
+	// (read as 1) for repos beside `.mate/`. It is a label for the status
+	// line and the refusals; the path rule in normaliseRepos is the check.
+	Layout int `yaml:"layout,omitempty"`
 	// Session is the Herdr session name of this workspace. It is derived from
 	// the absolute path once, at Init, and then stored, so moving or
 	// re-resolving the workspace never renames a live session.
@@ -86,6 +102,7 @@ func Init(workspaceDir string, defaults Defaults) (*Workspace, error) {
 	}
 	w.cfg = WorkspaceConfig{
 		Version:  workspaceVersion,
+		Layout:   layoutProjectDirs,
 		Session:  SessionName(root),
 		Root:     root,
 		Defaults: defaults,
@@ -206,6 +223,20 @@ func (w *Workspace) SetSession(name string) error {
 	w.cfg.Session = name
 	return w.SaveConfig()
 }
+
+// Layout is the workspace's directory layout: 2 when workspace.yaml says so,
+// 1 for a file with no `layout:`.
+func (w *Workspace) Layout() int {
+	if w.cfg.Layout == 0 {
+		return 1
+	}
+	return w.cfg.Layout
+}
+
+// LayoutOld reports a workspace not yet on layout 2. It opens and reads as
+// before; AddRepo, AddProject with a repo, and a crew spawn refuse with
+// ErrLayoutOld until `mate migrate` moves it.
+func (w *Workspace) LayoutOld() bool { return w.Layout() < layoutProjectDirs }
 
 // Defaults are the workspace-wide harness defaults.
 func (w *Workspace) Defaults() Defaults { return w.cfg.Defaults }

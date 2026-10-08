@@ -331,7 +331,7 @@ func toolBinding(tools tool.Registry, key string, target console.StageTarget) (t
 // viewerContext is what a tool opens on for target: the project, and for a
 // crew its folder and report.md (reviewReport).
 func viewerContext(ws *store.Workspace, target console.StageTarget) (tool.ViewerContext, error) {
-	vctx := tool.ViewerContext{ProjectDir: filepath.Join(ws.Root(), target.ProjectID)}
+	vctx := tool.ViewerContext{ProjectDir: ws.ProjectHome(target.ProjectID)}
 	if target.Kind != console.StageCrew {
 		return vctx, nil
 	}

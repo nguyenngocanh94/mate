@@ -21,6 +21,21 @@ var ErrRepoExists = errors.New("store: repo already registered")
 // the caller has to say which one.
 var ErrAmbiguousRepo = errors.New("store: project has several repos")
 
+// ErrRepoOutsideProject is matched (errors.Is) by the refusal of a repo path
+// that is not under its project's directory, ProjectHome (docs/mvp.md
+// section 3, layout 2).
+var ErrRepoOutsideProject = errors.New("store: repo is outside its project directory")
+
+// repoOutsideProjectError is that refusal: its text names the repo, the
+// directory it must move under, and the command for an old workspace.
+type repoOutsideProjectError struct{ repo, home string }
+
+func (e *repoOutsideProjectError) Error() string {
+	return fmt.Sprintf("repo %s must live under %s; move it there, or run mate migrate on an old workspace", e.repo, e.home)
+}
+
+func (e *repoOutsideProjectError) Is(target error) bool { return target == ErrRepoOutsideProject }
+
 // ErrRepoInUse is returned by RemoveRepo while an open crew works in the repo.
 var ErrRepoInUse = errors.New("store: repo has open crews")
 
@@ -125,9 +140,12 @@ func DefaultRepoName(repoPath string) string {
 }
 
 // normaliseRepos fills each repo's defaults and checks the list: every path
-// inside the workspace and outside `.mate/`, names valid and unique, and no
-// path registered twice.
-func (w *Workspace) normaliseRepos(repos []RepoConfig) ([]RepoConfig, error) {
+// inside the workspace and outside `.mate/`, under the project's directory
+// (ProjectHome) on layout 2, names valid and unique, and no path registered
+// twice. A workspace still on the old layout keeps the old rule, so its
+// project.yaml files can be rewritten (RemoveRepo, `mate migrate`); the
+// writes that would add a repo there refuse with ErrLayoutOld first.
+func (w *Workspace) normaliseRepos(project string, repos []RepoConfig) ([]RepoConfig, error) {
 	out := make([]RepoConfig, 0, len(repos))
 	names := map[string]bool{}
 	paths := map[string]string{}
@@ -135,6 +153,9 @@ func (w *Workspace) normaliseRepos(repos []RepoConfig) ([]RepoConfig, error) {
 		rel, err := w.RelRepo(r.Path)
 		if err != nil {
 			return nil, err
+		}
+		if !w.LayoutOld() && !strings.HasPrefix(rel, project+"/") {
+			return nil, &repoOutsideProjectError{repo: rel, home: w.ProjectHome(project)}
 		}
 		r.Path = rel
 		if r.Name == "" {
@@ -182,13 +203,17 @@ func (w *Workspace) checkReposUnclaimed(project string, repos []RepoConfig) erro
 }
 
 // AddRepo registers one more repo in an existing project and returns it as
-// stored. An empty Name is derived from the path (DefaultRepoName).
+// stored. An empty Name is derived from the path (DefaultRepoName). It
+// refuses with ErrLayoutOld on a workspace not yet on layout 2.
 func (w *Workspace) AddRepo(project string, repo RepoConfig) (RepoConfig, error) {
+	if w.LayoutOld() {
+		return RepoConfig{}, ErrLayoutOld
+	}
 	cfg, err := w.LoadProject(project)
 	if err != nil {
 		return RepoConfig{}, err
 	}
-	repos, err := w.normaliseRepos(append(append([]RepoConfig(nil), cfg.Repos...), repo))
+	repos, err := w.normaliseRepos(project, append(append([]RepoConfig(nil), cfg.Repos...), repo))
 	if err != nil {
 		return RepoConfig{}, err
 	}

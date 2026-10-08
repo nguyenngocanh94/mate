@@ -213,6 +213,11 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if _, ok := w.Project(project); !ok {
 		return CrewResult{}, fmt.Errorf("%w: %s", store.ErrNoProject, project)
 	}
+	// A crew's worktree is cut from a repo that `mate migrate` will move;
+	// one opened on the old layout would point at the old path.
+	if w.LayoutOld() {
+		return CrewResult{}, store.ErrLayoutOld
+	}
 	cfg, err := w.LoadProject(project)
 	if err != nil {
 		return CrewResult{}, err

@@ -17,14 +17,14 @@ import (
 func newFixtureWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "shop"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "shop", "shop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	w, err := store.Init(dir, store.Defaults{})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w

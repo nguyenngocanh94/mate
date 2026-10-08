@@ -161,7 +161,7 @@ func (f *launchFixture) pinDigests(files map[string]fileState) {
 // like a path.
 func (f *launchFixture) pinHead(t *testing.T) {
 	t.Helper()
-	head := strings.TrimSpace(git(t, f.w.RepoDir("shop"), "rev-parse", "HEAD"))
+	head := strings.TrimSpace(git(t, f.w.RepoDir("shop/shop"), "rev-parse", "HEAD"))
 	f.places = append(f.places, placeholder{head, "{{HEAD}}"})
 }
 

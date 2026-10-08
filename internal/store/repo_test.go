@@ -119,12 +119,12 @@ func TestDefaultRepoName(t *testing.T) {
 // and a second repo by the same name or path is refused.
 func TestAddRepoAndSoleRepo(t *testing.T) {
 	w := newProjectWorkspace(t)
-	mkdirs(t, w, "services/api")
-	added, err := w.AddRepo("shop", store.RepoConfig{Path: filepath.Join(w.Root(), "services/api"), DefaultBranch: "develop"})
+	mkdirs(t, w, "shop/services/api")
+	added, err := w.AddRepo("shop", store.RepoConfig{Path: filepath.Join(w.Root(), "shop/services/api"), DefaultBranch: "develop"})
 	if err != nil {
 		t.Fatalf("AddRepo: %v", err)
 	}
-	if added != (store.RepoConfig{Name: "api", Path: "services/api", DefaultBranch: "develop"}) {
+	if added != (store.RepoConfig{Name: "api", Path: "shop/services/api", DefaultBranch: "develop"}) {
 		t.Fatalf("added = %+v", added)
 	}
 	cfg, err := w.LoadProject("shop")
@@ -137,26 +137,28 @@ func TestAddRepoAndSoleRepo(t *testing.T) {
 	if _, err := cfg.SoleRepo(); !errors.Is(err, store.ErrAmbiguousRepo) || !strings.Contains(err.Error(), "shop, api") {
 		t.Fatalf("SoleRepo on two repos = %v, want ErrAmbiguousRepo listing both", err)
 	}
-	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api", Path: "shop"}); !errors.Is(err, store.ErrRepoExists) {
+	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api", Path: "shop/shop"}); !errors.Is(err, store.ErrRepoExists) {
 		t.Fatalf("same name again: %v, want ErrRepoExists", err)
 	}
-	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api2", Path: "services/api"}); !errors.Is(err, store.ErrRepoExists) {
+	if _, err := w.AddRepo("shop", store.RepoConfig{Name: "api2", Path: "shop/services/api"}); !errors.Is(err, store.ErrRepoExists) {
 		t.Fatalf("same path again: %v, want ErrRepoExists", err)
 	}
 }
 
 // TestRepoBelongsToOneProject: crew branches are `mate/<crew>` and crew ids
-// are unique per project, so two projects sharing a repo would collide.
+// are unique per project, so two projects sharing a repo would collide. On
+// layout 2 a repo lives under its own project's directory, so another
+// project's repo is refused as outside the asking project.
 func TestRepoBelongsToOneProject(t *testing.T) {
 	w := newProjectWorkspace(t)
-	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); !errors.Is(err, store.ErrRepoExists) || !strings.Contains(err.Error(), "project shop") {
-		t.Fatalf("second project on shop's repo: %v, want ErrRepoExists naming shop", err)
+	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); !errors.Is(err, store.ErrRepoOutsideProject) || !strings.Contains(err.Error(), w.ProjectHome("blog")) {
+		t.Fatalf("second project on shop's repo: %v, want ErrRepoOutsideProject naming blog's directory", err)
 	}
 	if err := w.AddProject("blog", store.ProjectConfig{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.AddRepo("blog", store.RepoConfig{Path: "shop"}); !errors.Is(err, store.ErrRepoExists) {
-		t.Fatalf("AddRepo of shop's repo into blog: %v, want ErrRepoExists", err)
+	if _, err := w.AddRepo("blog", store.RepoConfig{Path: "shop/shop"}); !errors.Is(err, store.ErrRepoOutsideProject) {
+		t.Fatalf("AddRepo of shop's repo into blog: %v, want ErrRepoOutsideProject", err)
 	}
 }
 
@@ -164,8 +166,8 @@ func TestRepoBelongsToOneProject(t *testing.T) {
 // before M9 names none and belongs to the sole repo, which stops being an
 // answer once the project has two.
 func TestCrewRepoResolvesLegacyMeta(t *testing.T) {
-	one := store.ProjectConfig{Repos: []store.RepoConfig{{Name: "shop", Path: "shop"}}}
-	two := store.ProjectConfig{Repos: []store.RepoConfig{{Name: "shop", Path: "shop"}, {Name: "api", Path: "api"}}}
+	one := store.ProjectConfig{Repos: []store.RepoConfig{{Name: "shop", Path: "shop/shop"}}}
+	two := store.ProjectConfig{Repos: []store.RepoConfig{{Name: "shop", Path: "shop/shop"}, {Name: "api", Path: "api"}}}
 	if r, err := one.CrewRepo(map[string]string{}); err != nil || r.Name != "shop" {
 		t.Fatalf("legacy meta, one repo = %+v, %v", r, err)
 	}
@@ -185,8 +187,8 @@ func TestCrewRepoResolvesLegacyMeta(t *testing.T) {
 // the repo goes, and its directory is left alone.
 func TestRemoveRepoRefusesOpenCrews(t *testing.T) {
 	w := newProjectWorkspace(t)
-	mkdirs(t, w, "api")
-	if _, err := w.AddRepo("shop", store.RepoConfig{Path: "api"}); err != nil {
+	mkdirs(t, w, "shop/api")
+	if _, err := w.AddRepo("shop", store.RepoConfig{Path: "shop/api"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"state": "working", store.MetaRepo: "api"}); err != nil {
@@ -208,7 +210,7 @@ func TestRemoveRepoRefusesOpenCrews(t *testing.T) {
 	if got := cfg.RepoNames(); !reflect.DeepEqual(got, []string{"shop"}) {
 		t.Fatalf("repos after remove = %v", got)
 	}
-	if _, err := os.Stat(filepath.Join(w.Root(), "api")); err != nil {
+	if _, err := os.Stat(filepath.Join(w.Root(), "shop", "api")); err != nil {
 		t.Fatalf("RemoveRepo touched the repo directory: %v", err)
 	}
 	if err := w.RemoveRepo("shop", "api"); !errors.Is(err, store.ErrNoRepo) {

@@ -35,7 +35,7 @@ func TestLiveRestartMateStowsFirst(t *testing.T) {
 	if w, err = store.Open(root); err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
-	repo := filepath.Join(w.Root(), stowProject)
+	repo := filepath.Join(w.ProjectHome(stowProject), stowProject)
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

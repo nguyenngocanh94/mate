@@ -35,7 +35,7 @@ func consoleFixture(t *testing.T, project string) (*store.Workspace, spawn.Deps)
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(w.Root(), project)
+	repo := filepath.Join(w.ProjectHome(project), project)
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

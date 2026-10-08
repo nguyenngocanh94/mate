@@ -23,7 +23,7 @@ var updateLayout = flag.Bool("update", false, "rewrite testdata/layout/*.golden"
 
 func TestWorkspaceAndProjectYAMLGolden(t *testing.T) {
 	dir := t.TempDir()
-	repo := filepath.Join(dir, "shop")
+	repo := filepath.Join(dir, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

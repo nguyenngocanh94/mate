@@ -30,10 +30,10 @@ func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
 		t.Fatalf("init workspace: %v", err)
 	}
 	for _, name := range projects {
-		if err := os.MkdirAll(filepath.Join(root, name, ".git"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, name, name, ".git"), 0o755); err != nil {
 			t.Fatalf("create repo %s: %v", name, err)
 		}
-		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name}}}); err != nil {
+		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name + "/" + name}}}); err != nil {
 			t.Fatalf("add project %s: %v", name, err)
 		}
 	}
@@ -62,7 +62,7 @@ func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 	if p.Repos.State != Known || len(p.Repos.Value) != 1 {
 		t.Fatalf("repos = %+v, want the one registered repo", p.Repos)
 	}
-	if got, want := p.Repos.Value[0].Path, "shop"; got != want {
+	if got, want := p.Repos.Value[0].Path, "shop/shop"; got != want {
 		t.Fatalf("repo path = %q, want %q", got, want)
 	}
 	if got := p.Repos.Value[0].DefaultBranch; got != store.DefaultBranch {
@@ -377,10 +377,10 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open workspace again: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(ws.Root(), "blog", ".git"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(ws.Root(), "blog", "blog", ".git"), 0o755); err != nil {
 		t.Fatalf("create repo: %v", err)
 	}
-	if err := other.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
+	if err := other.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog/blog"}}}); err != nil {
 		t.Fatalf("add project: %v", err)
 	}
 	snap, err := Load(context.Background(), ws, testHarnesses, nil)

@@ -67,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(ws.Root(), project)
+	repo := filepath.Join(ws.ProjectHome(project), project)
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

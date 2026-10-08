@@ -25,7 +25,7 @@ import (
 // merge are still recorded.
 func TestACommitIsFoundInTheTranscriptWhenTheBranchIsAlreadyGone(t *testing.T) {
 	f := newFixture(t)
-	repo := filepath.Join(f.root, fixtureProject)
+	repo := filepath.Join(f.ws.ProjectHome(fixtureProject), fixtureProject)
 
 	// The crew's work, already merged and its branch already deleted - the
 	// state `mate merge` leaves behind.

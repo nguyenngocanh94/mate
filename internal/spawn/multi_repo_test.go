@@ -30,7 +30,7 @@ func twoRepoWorkspace(t *testing.T) *store.Workspace {
 	}
 	var repos []store.RepoConfig
 	for _, name := range []string{"api", "web"} {
-		dir := filepath.Join(w.Root(), "shop-"+name)
+		dir := filepath.Join(w.ProjectHome("shop"), "shop-"+name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +57,7 @@ func initCommittedRepo(t *testing.T, dir, name string) {
 }
 
 func repoDir(w *store.Workspace, name string) string {
-	return filepath.Join(w.Root(), "shop-"+name)
+	return filepath.Join(w.ProjectHome("shop"), "shop-"+name)
 }
 
 func branchIn(t *testing.T, repo, branch string) bool {

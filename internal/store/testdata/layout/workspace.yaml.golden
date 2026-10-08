@@ -1,4 +1,5 @@
 version: 1
+layout: 2
 session: {{SESSION}}
 root: {{WORKSPACE}}
 defaults:

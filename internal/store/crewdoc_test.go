@@ -13,7 +13,7 @@ func TestInitAndAddProjectSeedCrewDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo := filepath.Join(root, "shop")
+	repo := filepath.Join(root, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

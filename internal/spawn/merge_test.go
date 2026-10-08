@@ -43,7 +43,7 @@ func mergeFixture(t *testing.T) (*store.Workspace, spawn.Deps, spawn.CrewResult)
 func assertNothingChanged(t *testing.T, w *store.Workspace, res spawn.CrewResult, headBefore string) {
 	t.Helper()
 	ctx := context.Background()
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	head, err := gitx.New().HeadCommit(ctx, repo, "main")
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func assertNothingChanged(t *testing.T, w *store.Workspace, res spawn.CrewResult
 
 func headOf(t *testing.T, w *store.Workspace, rev string) string {
 	t.Helper()
-	head, err := gitx.New().HeadCommit(context.Background(), w.RepoDir("shop"), rev)
+	head, err := gitx.New().HeadCommit(context.Background(), w.RepoDir("shop/shop"), rev)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestMergeCrewLandsTheBranchAndFinishesTheCrew(t *testing.T) {
 	if _, err := os.Stat(res.Worktree); !os.IsNotExist(err) {
 		t.Fatalf("the worktree survived a merge: %v", err)
 	}
-	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), res.Branch)
+	exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), res.Branch)
 	if err != nil || exists {
 		t.Fatalf("the branch survived a merge: %v, %v", exists, err)
 	}
@@ -238,7 +238,7 @@ func TestMergeCrewRefusesADivergedBranchWithNeedsRebase(t *testing.T) {
 	// The default branch moves on: the crew's branch is no longer a
 	// fast-forward. mvp.md's M4 decisions call this needs-rebase and are
 	// explicit that it is a command result, never a crew state.
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	if err := os.WriteFile(filepath.Join(repo, "captain.txt"), []byte("captain\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestMergeCrewRefusesADivergedBranchWithNeedsRebase(t *testing.T) {
 func TestMergeCrewRefusesWhenThePrimaryRepoIsNotOnTheDefaultBranch(t *testing.T) {
 	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	git(t, repo, "checkout", "-q", "-b", "captain-scratch")
 	before := headOf(t, w, "main")
 
@@ -276,7 +276,7 @@ func TestMergeCrewRefusesWhenThePrimaryRepoIsNotOnTheDefaultBranch(t *testing.T)
 func TestMergeCrewRefusesADirtyPrimaryRepo(t *testing.T) {
 	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("captain was here\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

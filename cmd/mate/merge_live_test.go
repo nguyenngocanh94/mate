@@ -39,7 +39,7 @@ func mergeLiveWorkspace(t *testing.T, session string) *store.Workspace {
 	if w, err = store.Open(root); err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func crewPaneTail(ctx context.Context, rt *runtime.Herdr, session, configHome, a
 func assertMergedAndFinished(t *testing.T, w *store.Workspace, project, crew, branch, worktree string) {
 	t.Helper()
 	ctx := context.Background()
-	repo := w.RepoDir(project)
+	repo := w.RepoDir(project + "/" + project)
 	readme, err := os.ReadFile(filepath.Join(repo, "README.md"))
 	if err != nil {
 		t.Fatalf("README.md in the primary checkout: %v", err)

@@ -36,13 +36,13 @@ func crewWorkspace(t *testing.T, root string) *store.Workspace {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	run(t, repo, "git", "init", "--quiet", "-b", "main")
 	run(t, repo, "git", "-c", "user.email=a@b", "-c", "user.name=n", "commit", "--quiet", "--allow-empty", "-m", "init")
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop", DefaultBranch: "main"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop", DefaultBranch: "main"}}}); err != nil {
 		t.Fatal(err)
 	}
 	wt := w.WorktreeDir("shop", "k1")

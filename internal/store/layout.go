@@ -71,6 +71,13 @@ func (w *Workspace) ProjectDir(project string) string {
 	return filepath.Join(w.ProjectsDir(), project)
 }
 
+// ProjectHome is `<root>/<project>`, the project's own directory: the user's,
+// not mate's state. Every repo of the project lives under it (docs/mvp.md
+// section 3). Mate's state for the project stays in ProjectDir.
+func (w *Workspace) ProjectHome(project string) string {
+	return filepath.Join(w.root, project)
+}
+
 // ProjectFile is `projects/<project>/project.yaml`.
 func (w *Workspace) ProjectFile(project string) string {
 	return filepath.Join(w.ProjectDir(project), projectFileName)

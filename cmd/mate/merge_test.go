@@ -27,7 +27,7 @@ func mergeCLIWorkspace(t *testing.T) (*store.Workspace, string) {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -50,7 +50,7 @@ func TestLiveConsoleDiffShowsACrewBranch(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

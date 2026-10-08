@@ -18,19 +18,19 @@ import (
 // key the footer advertised could only ever fail.
 func TestConsoleNewProjectRegistersTheRepoItWasGiven(t *testing.T) {
 	w, deps := consoleFixture(t, "alpha")
-	repo := filepath.Join(w.Root(), "services", "beta")
+	repo := filepath.Join(w.ProjectHome("beta"), "services", "beta")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	initGitRepo(t, repo)
 
 	line, err := consoleAction(w, deps)(context.Background(), console.ActionRequest{
-		Action: console.ActionOnboard, TargetKind: "workspace", Input: "beta", Repo: "services/beta",
+		Action: console.ActionOnboard, TargetKind: "workspace", Input: "beta", Repo: "beta/services/beta",
 	})
 	if err != nil {
 		t.Fatalf("workspace onboard: %v", err)
 	}
-	if !strings.Contains(line, "beta") || !strings.Contains(line, "services/beta") {
+	if !strings.Contains(line, "beta") || !strings.Contains(line, "beta/services/beta") {
 		t.Fatalf("result line = %q, want it to name the Project and its repo", line)
 	}
 
@@ -42,8 +42,8 @@ func TestConsoleNewProjectRegistersTheRepoItWasGiven(t *testing.T) {
 	if err != nil {
 		t.Fatalf("beta not registered on disk: %v", err)
 	}
-	if len(cfg.Repos) != 1 || cfg.Repos[0] != (store.RepoConfig{Name: "beta", Path: "services/beta", DefaultBranch: "main"}) {
-		t.Fatalf("beta config = %+v, want repo services/beta on main", cfg)
+	if len(cfg.Repos) != 1 || cfg.Repos[0] != (store.RepoConfig{Name: "beta", Path: "beta/services/beta", DefaultBranch: "main"}) {
+		t.Fatalf("beta config = %+v, want repo beta/services/beta on main", cfg)
 	}
 	if _, err := os.Stat(fresh.ProjectDoc("beta")); err != nil {
 		t.Fatalf("PROJECT.md not seeded: %v", err)
