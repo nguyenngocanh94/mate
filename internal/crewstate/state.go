@@ -222,12 +222,18 @@ type Observation struct {
 	// Evidence is the line the classifier recognised, carried through so
 	// the health column can show what it was read from.
 	Evidence string
+	// Source names the observer that read the pane ("fixture", "jev",
+	// "chain"). Only meaningful when AgentFound is true.
+	Source string
 }
 
 // Health is the observation half of the `mate state` line.
 type Health struct {
 	Kind   HealthKind
 	Detail string
+	// Source is the observer that read the pane, empty when no pane was
+	// read (no agent recorded, or the agent is gone).
+	Source string
 }
 
 func (h Health) String() string {
@@ -246,16 +252,18 @@ func Observe(o Observation) Health {
 	if !o.AgentFound {
 		return Health{Kind: HealthAgentGone, Detail: "the recorded agent is not in herdr"}
 	}
+	h := Health{Source: o.Source}
 	switch o.Composer {
 	case ComposerBusy:
-		return Health{Kind: HealthBusy, Detail: o.Evidence}
+		h.Kind, h.Detail = HealthBusy, o.Evidence
 	case ComposerEmpty:
-		return Health{Kind: HealthIdle, Detail: "composer empty"}
+		h.Kind, h.Detail = HealthIdle, "composer empty"
 	case ComposerPending:
-		return Health{Kind: HealthPending, Detail: detailOr(o.Evidence, "unsubmitted text in the composer")}
+		h.Kind, h.Detail = HealthPending, detailOr(o.Evidence, "unsubmitted text in the composer")
 	default:
-		return Health{Kind: HealthUnrecognised, Detail: detailOr(o.Evidence, "no composer recognised on screen")}
+		h.Kind, h.Detail = HealthUnrecognised, detailOr(o.Evidence, "no composer recognised on screen")
 	}
+	return h
 }
 
 func detailOr(evidence, fallback string) string {
@@ -272,7 +280,8 @@ type Input struct {
 	Observation
 }
 
-// Result is one verdict: `state: <state> · health: <health>`.
+// Result is one verdict: `state: <state> · health: <health>`, followed by
+// ` · via <observer>` when a pane was read.
 type Result struct {
 	State  State
 	Health Health
@@ -280,7 +289,11 @@ type Result struct {
 
 // Line renders the format mvp.md section 4b specifies.
 func (r Result) Line() string {
-	return "state: " + string(r.State) + " · health: " + r.Health.String()
+	line := "state: " + string(r.State) + " · health: " + r.Health.String()
+	if r.Health.Source != "" {
+		line += " · via " + r.Health.Source
+	}
+	return line
 }
 
 // Decide is Declare and Observe together, which is exactly what
