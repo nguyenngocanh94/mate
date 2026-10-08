@@ -2,6 +2,7 @@ package tool_test
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -205,5 +206,19 @@ func TestNewRegistryRefusesTheStageRole(t *testing.T) {
 	_, err := tool.NewRegistry(viewing("alpha", tool.Binding{Key: "x", Label: "x", Scope: tool.ScopeCrew, Role: tool.StageRole}))
 	if !errors.Is(err, tool.ErrReservedRole) || !strings.Contains(err.Error(), "alpha") || !strings.Contains(err.Error(), `"stage"`) {
 		t.Fatalf("NewRegistry = %v, want %v naming alpha and the stage role", err, tool.ErrReservedRole)
+	}
+}
+
+// A key the console owns is refused by name when the registry is built:
+// the console would never press it through to the tool.
+func TestNewRegistryRefusesAConsoleKey(t *testing.T) {
+	for _, k := range tool.ConsoleKeys() {
+		_, err := tool.NewRegistry(viewing("alpha", tool.Binding{Key: k, Label: "x", Scope: tool.ScopeProject, Role: "x"}))
+		if !errors.Is(err, tool.ErrReservedKey) || !strings.Contains(err.Error(), "alpha") || !strings.Contains(err.Error(), strconv.Quote(k)) {
+			t.Fatalf("binding %q: NewRegistry = %v, want %v naming alpha and the key", k, err, tool.ErrReservedKey)
+		}
+	}
+	if _, err := tool.NewRegistry(viewing("alpha", tool.Binding{Key: "x", Label: "x", Scope: tool.ScopeProject, Role: "x"})); err != nil {
+		t.Fatalf("a key the console does not own: %v", err)
 	}
 }

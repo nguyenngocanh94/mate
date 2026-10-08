@@ -255,16 +255,26 @@ func (m Model) keyHints() []keyHint {
 	if m.emptyWorkspace() {
 		return []keyHint{{"n", "new project"}, {"r", "refresh"}, {"q", "quit"}}
 	}
+	tools := m.toolHints()
 	switch m.focus {
 	case paneDetail:
-		return []keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"esc", "list"}, m.toolHint("t"), {"enter", "show"}}
+		return joinHints([]keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"esc", "list"}}, tools, []keyHint{{"enter", "show"}})
 	case paneBox:
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "crew"}, {"a", "assign"}, m.toolHint("t"), {"esc", ""}}
+		return joinHints([]keyHint{{m.g.UpDown, "move"}, {"enter", "crew"}, {"a", "assign"}}, tools, []keyHint{{"esc", ""}})
 	}
 	if m.cur().kind == frameWorkspace {
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "open"}, m.toolHint("t"), {"a", "act"}, {"n", "new"}, {"?", ""}}
+		return joinHints([]keyHint{{m.g.UpDown, "move"}, {"enter", "open"}}, tools, []keyHint{{"a", "act"}, {"n", "new"}, {"?", ""}})
 	}
-	return []keyHint{{m.g.UpDown, "move"}, {"enter", "show"}, m.toolHint("t"), {"a", "act"}, {"tab", "pane"}, {"?", ""}}
+	return joinHints([]keyHint{{m.g.UpDown, "move"}, {"enter", "show"}}, tools, []keyHint{{"a", "act"}, {"tab", "pane"}, {"?", ""}})
+}
+
+// joinHints is the key line's hints in order.
+func joinHints(parts ...[]keyHint) []keyHint {
+	var out []keyHint
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return out
 }
 
 // crewByID resolves a Crew row against the Project frame it belongs to.

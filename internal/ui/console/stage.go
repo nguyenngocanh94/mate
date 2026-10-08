@@ -280,19 +280,30 @@ func (m Model) retryStage() (Model, tea.Cmd) {
 	return m.beginStage(m.staged.target)
 }
 
-// toolKeys are the keys the Console hands to the tool the snapshot binds to
-// them (beginToolView): t from any pane, e from the list.
-var toolKeys = []string{"e", "t"}
+// ownedKeys are the keys the Console handles itself on the tree, in any
+// pane (onKey, onListKey, onDetailKey, onBoxKey). Every other key a tool
+// binds is handed to that tool (beginToolView). The tool registry refuses a
+// binding on one of these (tool.ConsoleKeys, which a test holds equal to
+// this set and to the keys the handlers switch on).
+var ownedKeys = map[string]bool{
+	"?": true, "G": true, "a": true, "backspace": true, "ctrl+c": true,
+	"down": true, "end": true, "enter": true, "esc": true, "g": true,
+	"home": true, "j": true, "k": true, "l": true, "m": true, "n": true,
+	"o": true, "pgdown": true, "pgup": true, "q": true, "r": true,
+	"s": true, "shift+tab": true, "tab": true, "up": true, "y": true,
+}
 
-// toolHint is the key line's hint for a tool key: the bound tool's label,
-// or nothing when no tool binds key.
-func (m Model) toolHint(key string) keyHint {
+// toolHints are the key line's hints for the tool keys that act on every
+// row, the project-scope bindings, with each tool's own label. A crew key
+// means something only on a crew row; the key sheet lists it.
+func (m Model) toolHints() []keyHint {
+	var out []keyHint
 	for _, b := range m.tree.Tools {
-		if b.Key == key {
-			return keyHint{key, b.Label}
+		if b.Scope == "project" && !ownedKeys[b.Key] {
+			out = append(out, keyHint{b.Key, b.Label})
 		}
 	}
-	return keyHint{}
+	return out
 }
 
 // keyProject is the project a project key names: the box item's when the

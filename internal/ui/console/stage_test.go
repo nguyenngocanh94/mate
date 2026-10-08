@@ -212,8 +212,9 @@ func TestEWithoutAHostSaysThereIsNoNextPane(t *testing.T) {
 	}
 }
 
-// A binary that binds no tool to e has nothing for it to open.
-func TestEWithNoToolBoundSaysSo(t *testing.T) {
+// A binary that binds no tool to e has nothing for it to open: e is then
+// a key nothing owns, like any other the Console does not handle.
+func TestEWithNoToolBoundDoesNothing(t *testing.T) {
 	tree := sampleTree()
 	tree.Tools = nil
 	view := &toolSpy{}
@@ -222,8 +223,8 @@ func TestEWithNoToolBoundSaysSo(t *testing.T) {
 	if cmd != nil || len(view.calls) != 0 {
 		t.Fatal("e with no tool bound opened something")
 	}
-	if m.msg.tone != toneError || m.msg.text != "no tool bound to e" {
-		t.Fatalf("message = %+v, want no tool bound to e", m.msg)
+	if m.msg.text != "" {
+		t.Fatalf("message = %+v, want none", m.msg)
 	}
 }
 
@@ -340,14 +341,14 @@ func TestTKeepsInputPriority(t *testing.T) {
 	}
 }
 
-// With no tool bound to t, t says so, the key line offers no t, and
-// without a host tab a bound t says there is no next pane.
+// With no tool bound to t, t does nothing and the key line offers no t,
+// and without a host tab a bound t says there is no next pane.
 func TestTUnboundOrHostlessSaysSo(t *testing.T) {
 	tree := sampleTree()
 	tree.Tools = []query.ToolBinding{reportKey}
 	m := projectFrame(t, tree).WithToolView((&toolSpy{}).fn)
 	m, cmd := send(t, m, key("t"))
-	if cmd != nil || m.msg.text != "no tool bound to t" {
+	if cmd != nil || m.msg.text != "" {
 		t.Fatalf("unbound t: %+v", m.msg)
 	}
 	if slices.ContainsFunc(m.keyHints(), func(h keyHint) bool { return h.key == "t" }) {

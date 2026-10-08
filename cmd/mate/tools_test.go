@@ -22,15 +22,15 @@ import (
 // plain data.
 func TestConsoleToolsAreTheRegistrys(t *testing.T) {
 	r, err := tool.NewRegistry(keyTool{"alpha", []tool.Binding{
-		{Key: "a", Label: "alpha", Scope: tool.ScopeCrew, Role: "alpha"},
-		{Key: "A", Label: "all alpha", Scope: tool.ScopeProject, Role: "alpha-all"},
+		{Key: "x", Label: "alpha", Scope: tool.ScopeCrew, Role: "alpha"},
+		{Key: "X", Label: "all alpha", Scope: tool.ScopeProject, Role: "alpha-all"},
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []query.ToolBinding{
-		{Key: "a", Label: "alpha", Scope: "crew", Role: "alpha", Tool: "alpha"},
-		{Key: "A", Label: "all alpha", Scope: "project", Role: "alpha-all", Tool: "alpha"},
+		{Key: "x", Label: "alpha", Scope: "crew", Role: "alpha", Tool: "alpha"},
+		{Key: "X", Label: "all alpha", Scope: "project", Role: "alpha-all", Tool: "alpha"},
 	}
 	if got := toolBindings(r); !reflect.DeepEqual(got, want) {
 		t.Fatalf("toolBindings = %+v, want %+v", got, want)

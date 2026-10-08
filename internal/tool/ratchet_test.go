@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,8 +23,9 @@ import (
 // Two kinds of reference are counted, in every non-test .go file of the
 // module outside internal/tool/...:
 //
-//   - literal: a string literal equal to a tool name (ratchetToolNames), or
-//     carrying one as a whole path segment (".beads/metadata.json"). Never
+//   - literal: a string literal equal to a tool name (ratchetToolNames) or
+//     a tool's own word (ratchetToolWords), or carrying one as a whole
+//     path segment (".beads/metadata.json"). Never
 //     a substring: "bd" must not hit "bdd", ".beads" must not hit
 //     ".beads-old", "fresh" must not hit "refresh".
 //   - identifier: a use of an exported identifier of a tool's own package,
@@ -43,8 +45,15 @@ import (
 const toolRatchetCeiling = 0
 
 // ratchetToolNames is every spelling of a tool name a literal can carry:
-// the executables, Beads' directory, and Fresh's Homebrew formula.
-var ratchetToolNames = []string{"bd", "bv", "fresh", ".beads", "fresh-editor"}
+// the executables, Beads' registered name and directory, and Fresh's
+// Homebrew formula.
+var ratchetToolNames = []string{"bd", "bv", "beads", "fresh", ".beads", "fresh-editor"}
+
+// ratchetToolWords are literals that are one tool's own vocabulary rather
+// than its name, counted the same way: Beads' argv cmd/mate still builds
+// for `mate tool beads <p> --list|--json|--triage` (bd's `--no-pager`, bv's
+// `--robot-triage`) and the plan file Beads replaced (`tasks.yaml`).
+var ratchetToolWords = []string{"--no-pager", "--robot-triage", "tasks.yaml"}
 
 // toolImportPrefix is the import path every tool's own package sits under;
 // catalogImportPath is the one package under it that is not a tool.
@@ -84,6 +93,25 @@ var ratchetAllow = []struct {
 	{
 		file: "internal/quota/quota.go", decl: "Reading.Line", literal: "fresh",
 		reason: "a quota reading's freshness status, not the Fresh editor",
+	},
+	// The Beads knowledge still in the core (docs/mvp.md M20): plan section
+	// 10's third-tool criterion is met for console keys, not yet for CLI
+	// modes. Each entry goes when its mode moves into the Beads profile.
+	{
+		file: "cmd/mate/tasks.go", decl: "taskTool", literal: "beads",
+		reason: "Beads knowledge still in the core: the one tool `mate tool <name> <p>` opens with no --, and whose --list/--json/--triage modes cmd/mate maps",
+	},
+	{
+		file: "cmd/mate/tasks.go", decl: "cmdToolHere", literal: "--no-pager",
+		reason: "Beads knowledge still in the core: the bd argv of `mate tool beads <p> --list|--json` (list --all --limit 0 --no-pager)",
+	},
+	{
+		file: "cmd/mate/tasks.go", decl: "cmdToolHere", literal: "--robot-triage",
+		reason: "Beads knowledge still in the core: the bv argv of `mate tool beads <p> --triage` (--robot-triage --brief)",
+	},
+	{
+		file: "cmd/mate/tool.go", decl: "toolDataRefusal", literal: "tasks.yaml",
+		reason: "Beads knowledge still in the core: the legacy plan Beads replaced, checked before any tool's data is used",
 	},
 }
 
@@ -260,7 +288,7 @@ func scanRatchetFile(t *testing.T, root, path string) []ratchetHit {
 				if err != nil {
 					return true
 				}
-				for _, name := range literalToolNames(s, ratchetToolNames) {
+				for _, name := range literalToolNames(s, append(slices.Clone(ratchetToolNames), ratchetToolWords...)) {
 					add(n.Pos(), "literal", strconv.Quote(name), decl)
 				}
 			case *ast.SelectorExpr:
@@ -408,7 +436,8 @@ func TestToolRatchetLiteralMatchingIsWholeSegment(t *testing.T) {
 		{"bdd", nil},
 		{"refresh", nil},
 		{".beads-old", nil},
-		{"beads", nil},
+		{"beads", []string{"beads"}},
+		{"beads-old", nil},
 		{"Fresh", nil},
 		{"a fresh session", nil},
 		{"bd export", nil},

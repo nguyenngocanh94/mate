@@ -3,6 +3,7 @@ package tool
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/observability"
@@ -34,10 +35,27 @@ const StageRole = "stage"
 // ErrReservedRole is a binding that takes a role mate owns (StageRole).
 var ErrReservedRole = errors.New("tool registry: a binding takes a role mate owns")
 
+// ConsoleKeys are the keys the console handles itself on its tree, in any
+// pane; every other key a tool binds is pressed through to that tool.
+// internal/ui/console's test holds this list equal to the keys its
+// handlers switch on.
+func ConsoleKeys() []string {
+	return []string{
+		"?", "G", "a", "backspace", "ctrl+c", "down", "end", "enter", "esc",
+		"g", "home", "j", "k", "l", "m", "n", "o", "pgdown", "pgup", "q",
+		"r", "s", "shift+tab", "tab", "up", "y",
+	}
+}
+
+// ErrReservedKey is a binding on a key the console owns (ConsoleKeys): it
+// would never be pressed through to its tool.
+var ErrReservedKey = errors.New("tool registry: a binding takes a key the console owns")
+
 // NewRegistry registers profiles in the order given. A duplicate name, an
 // empty or non-canonical name, a verified Viewer with no implementation, a
-// binding with no key or an unknown scope, a binding to mate's own role,
-// and one key bound twice on one row of the console are refused. Each
+// binding with no key or an unknown scope, a binding on a key the console
+// owns (ErrReservedKey), a binding to mate's own role, and one key bound
+// twice on one row of the console are refused. Each
 // binding is recorded with the name of the tool that declares it.
 func NewRegistry(profiles ...Profile) (Registry, error) {
 	r := Registry{profiles: map[Name]Profile{}}
@@ -64,6 +82,9 @@ func NewRegistry(profiles ...Profile) (Registry, error) {
 			b.Tool = n
 			if b.Key == "" {
 				return Registry{}, fmt.Errorf("tool registry: %s binds a key with no key (label %q)", n, b.Label)
+			}
+			if slices.Contains(ConsoleKeys(), b.Key) {
+				return Registry{}, fmt.Errorf("%w: %s binds key %q", ErrReservedKey, n, b.Key)
 			}
 			if b.Scope != ScopeProject && b.Scope != ScopeCrew {
 				return Registry{}, fmt.Errorf("tool registry: %s binds key %q to scope %q, not %s or %s", n, b.Key, b.Scope, ScopeProject, ScopeCrew)
