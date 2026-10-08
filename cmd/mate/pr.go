@@ -86,8 +86,12 @@ func cmdPRWatch(args []string, stdout, stderr io.Writer) error {
 		return runPRWatch(w, project, crew, url, stdout)
 	}
 
-	if state := meta[crewstate.MetaPRState]; meta[crewstate.MetaPRURL] == url && (state == crewstate.PRStateMerged || state == crewstate.PRStateClosed) {
-		fmt.Fprintf(stdout, "%s/%s: %s is already %s; nothing to watch\n", project, crew, url, state)
+	// A merged pull request is over for good. A closed one is watched
+	// again: it may have been reopened (docs/mvp.md M19), and if it is still
+	// closed the watcher's line to the Mate is the one already delivered,
+	// which the outbox does not type twice.
+	if meta[crewstate.MetaPRURL] == url && meta[crewstate.MetaPRState] == crewstate.PRStateMerged {
+		fmt.Fprintf(stdout, "%s/%s: %s is already merged; nothing to watch\n", project, crew, url)
 		return nil
 	}
 	if err := w.UpdateCrewMeta(project, crew, map[string]string{

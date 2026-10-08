@@ -135,3 +135,24 @@ func TestPRWatchOfAnEndedPullRequestStartsNothing(t *testing.T) {
 		t.Fatalf("starts = %d, output = %q", len(st.specs), out.String())
 	}
 }
+
+// A closed pull request is watched again: it may have been reopened
+// (docs/mvp.md M19), and only a merge ends a pull request for good.
+func TestPRWatchOfAClosedPullRequestWatchesAgain(t *testing.T) {
+	ws, w := prWorkspace(t)
+	st := &recordingStarter{pid: 4242}
+	usePRStarter(t, st)
+	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{crewstate.MetaPRURL: testPR, crewstate.MetaPRState: crewstate.PRStateClosed}); err != nil {
+		t.Fatal(err)
+	}
+	var out, errw bytes.Buffer
+	if err := cmdPRWatch([]string{"--workspace", ws, "shop", "k3", testPR}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.specs) != 1 || !strings.Contains(out.String(), "watching "+testPR) {
+		t.Fatalf("starts = %d, output = %q", len(st.specs), out.String())
+	}
+	if meta, _ := w.ReadCrewMeta("shop", "k3"); meta[crewstate.MetaPRState] != crewstate.PRStateOpen {
+		t.Fatalf("pr_state = %q, want open again", meta[crewstate.MetaPRState])
+	}
+}

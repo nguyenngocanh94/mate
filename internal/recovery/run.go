@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/prwatch"
@@ -210,27 +209,14 @@ func lost(ws *store.Workspace, live query.Liveness) []Item {
 // WatcherStarter starts a detached pull request watcher. A test replaces it.
 var WatcherStarter prwatch.Starter = prwatch.ExecStarter{}
 
-// RestartWatchers starts `mate pr watch` again for every open crew whose meta
-// records a pull request that has not ended (`pr_state` is neither `merged`
-// nor `closed`) and whose watcher is not alive, by the pid in its
-// `.prwatch` file. A crew that is over has nobody to wake and is left alone.
+// RestartWatchers is prwatch.Sweep: a live watcher for every open crew with
+// a pull request that has not ended, whether its meta records it or only its
+// status names it (docs/mvp.md M18, M19). A crew that is over has nobody to
+// wake and is left alone.
 func RestartWatchers(ws *store.Workspace) []Watcher {
 	var out []Watcher
-	for _, ref := range ws.Projects() {
-		for _, c := range crewsOf(ws, ref.Name) {
-			url := strings.TrimSpace(c.meta[crewstate.MetaPRURL])
-			if url == "" || query.CrewStateOf(c.meta, false, "").Closed() {
-				continue
-			}
-			if state := c.meta[crewstate.MetaPRState]; state == crewstate.PRStateMerged || state == crewstate.PRStateClosed {
-				continue
-			}
-			if prwatch.Running(ws, ref.Name, c.crew) {
-				continue
-			}
-			started, err := prwatch.Ensure(ws, WatcherStarter, ref.Name, c.crew, url)
-			out = append(out, Watcher{Project: ref.Name, Crew: c.crew, PID: started.PID, Err: err})
-		}
+	for _, s := range prwatch.Sweep(ws, WatcherStarter) {
+		out = append(out, Watcher{Project: s.Project, Crew: s.Crew, PID: s.PID, Err: s.Err})
 	}
 	return out
 }
