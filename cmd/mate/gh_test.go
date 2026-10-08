@@ -35,7 +35,7 @@ func useGH(t *testing.T, f *scriptedGH) {
 func projectWithOrigin(t *testing.T, origin string) (ws, repo string) {
 	t.Helper()
 	ws = t.TempDir()
-	repo = filepath.Join(ws, "shop")
+	repo = filepath.Join(ws, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

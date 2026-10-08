@@ -32,8 +32,9 @@ import (
 // most stable, most recoverable part and never the crews.
 //
 // It is the read half of firstmate's bin/fm-session-start.sh and nothing
-// else: it reads `.mate/` and git metadata. Beads queries take the project's
-// short-lived tracker lock; recall never initializes or mutates the plan.
+// else: it reads `.mate/` and git metadata, and asks each tool with a
+// Recall for its lines (recallTools); recall never makes or changes a
+// tool's data.
 func cmdRecall(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("recall", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -236,7 +237,7 @@ func recallLive(w *store.Workspace, project string, cfg store.ProjectConfig, now
 	if err := printBacklog(w, project, false, now, &b); err != nil {
 		return recallPart{}, err
 	}
-	recallTaskPlan(w, project, &b)
+	recallTools(w, project, tools, &b)
 
 	box := query.LoadBox(w, project)
 	switch {

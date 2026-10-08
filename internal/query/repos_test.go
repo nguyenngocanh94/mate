@@ -27,7 +27,7 @@ func addProjectWithRepos(t *testing.T, ws *store.Workspace, project string, repo
 
 func loadOnly(t *testing.T, ws *store.Workspace) ProjectNode {
 	t.Helper()
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -53,18 +53,18 @@ func TestLoadProjectRepos(t *testing.T) {
 		{name: "none"},
 		{
 			name:  "one",
-			repos: []store.RepoConfig{{Path: "src/storefront"}},
-			want:  []RepoValue{{RepoID: "storefront", DisplayName: "storefront", Path: "src/storefront", DefaultBranch: store.DefaultBranch}},
+			repos: []store.RepoConfig{{Path: "shop/src/storefront"}},
+			want:  []RepoValue{{RepoID: "storefront", DisplayName: "storefront", Path: "shop/src/storefront", DefaultBranch: store.DefaultBranch}},
 		},
 		{
 			name: "two",
 			repos: []store.RepoConfig{
-				{Name: "web", Path: "repos/shop-web"},
-				{Name: "api", Path: "services/shop-api", DefaultBranch: "develop"},
+				{Name: "web", Path: "shop/repos/shop-web"},
+				{Name: "api", Path: "shop/services/shop-api", DefaultBranch: "develop"},
 			},
 			want: []RepoValue{
-				{RepoID: "web", DisplayName: "web", Path: "repos/shop-web", DefaultBranch: store.DefaultBranch},
-				{RepoID: "api", DisplayName: "api", Path: "services/shop-api", DefaultBranch: "develop"},
+				{RepoID: "web", DisplayName: "web", Path: "shop/repos/shop-web", DefaultBranch: store.DefaultBranch},
+				{RepoID: "api", DisplayName: "api", Path: "shop/services/shop-api", DefaultBranch: "develop"},
 			},
 		},
 	} {
@@ -98,8 +98,8 @@ func TestLoadProjectRepos(t *testing.T) {
 // a meta written before M9 names none and belongs to the sole repo, and
 // with no repo or several the answer is an honest Unknown.
 func TestLoadResolvesEachCrewsRepo(t *testing.T) {
-	web := store.RepoConfig{Name: "web", Path: "web"}
-	api := store.RepoConfig{Name: "api", Path: "api"}
+	web := store.RepoConfig{Name: "web", Path: "shop/web"}
+	api := store.RepoConfig{Name: "api", Path: "shop/api"}
 	for _, tc := range []struct {
 		name     string
 		repos    []store.RepoConfig
@@ -109,8 +109,8 @@ func TestLoadResolvesEachCrewsRepo(t *testing.T) {
 		wantPath string
 		reason   string
 	}{
-		{name: "named in a two-repo project", repos: []store.RepoConfig{web, api}, metaRepo: "api", wantID: "api", want: Known, wantPath: "api"},
-		{name: "legacy meta with one repo", repos: []store.RepoConfig{web}, wantID: "web", want: Known, wantPath: "web"},
+		{name: "named in a two-repo project", repos: []store.RepoConfig{web, api}, metaRepo: "api", wantID: "api", want: Known, wantPath: "shop/api"},
+		{name: "legacy meta with one repo", repos: []store.RepoConfig{web}, wantID: "web", want: Known, wantPath: "shop/web"},
 		{name: "legacy meta with two repos", repos: []store.RepoConfig{web, api}, want: Unknown, reason: "has 2"},
 		{name: "legacy meta with no repo", want: Unknown, reason: "has none"},
 		{name: "named repo since removed", repos: []store.RepoConfig{web}, metaRepo: "api", wantID: "api", want: Absent, reason: "api, which is not registered"},

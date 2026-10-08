@@ -13,7 +13,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/host"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
@@ -67,7 +66,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	// adapter and the agent-name registry it shares, so a Mate started from
 	// the action menu and the stream opened on it a keystroke later agree
 	// about which names are reserved.
-	deps := spawn.LiveDeps(harnesses)
+	deps := baseDeps()
 	// Point the runtime at the `herdr` findTool resolves - the one the stage
 	// column runs by absolute path, which can be in ~/.local/bin when the
 	// Console's PATH cannot reach it. Without this, a session check would
@@ -119,7 +118,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	defer stopRecovery()
 
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
-		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleLiveness(loadCtx, ws, deps))
+		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleTools(), consoleLiveness(loadCtx, ws, deps))
 		if err != nil {
 			return snap, err
 		}
@@ -160,7 +159,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	}
 	var columns *consoleColumns
 	if h != nil {
-		if columns, err = newConsoleColumns(h, os.Getenv); err != nil {
+		if columns, err = newConsoleColumns(h, os.Getenv, tools); err != nil {
 			addNotice("no next pane: " + err.Error())
 		} else {
 			defer columns.close()
@@ -175,8 +174,10 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 					addNotice("no next pane: " + err.Error())
 				}
 			}
-			if !layoutFailed && columns.review == "" {
-				addNotice("a crew's report needs the Fresh editor: brew install fresh-editor")
+			if !layoutFailed {
+				for _, n := range columns.missingTools(tools) {
+					addNotice(n)
+				}
 			}
 		}
 	}
@@ -197,8 +198,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, deps, columns)).
-		WithReview(consoleReview(ws, columns)).
-		WithTasks(consoleTasks(ws, columns)).
+		WithToolView(consoleToolView(ws, columns, tools)).
 		WithNoHostHint(host.NoHostHint(os.Getenv)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).

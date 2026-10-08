@@ -31,15 +31,17 @@ func TestConsoleGalleryRendersRegisteredProjects(t *testing.T) {
 		t.Fatalf("init workspace: %v", err)
 	}
 	for _, name := range []string{"shop", "blog"} {
-		if err := os.MkdirAll(filepath.Join(root, name, ".git"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, name, name, ".git"), 0o755); err != nil {
 			t.Fatalf("create repo %s: %v", name, err)
 		}
-		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name}}}); err != nil {
+		if err := ws.AddProject(name, store.ProjectConfig{Repos: []store.RepoConfig{{Path: name + "/" + name}}}); err != nil {
 			t.Fatalf("add project %s: %v", name, err)
 		}
 	}
 
-	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws, consoleHarnesses()) }
+	load := func(ctx context.Context) (query.Snapshot, error) {
+		return query.Load(ctx, ws, consoleHarnesses(), consoleTools())
+	}
 	// New picks the glyph set from the locale, and the assertions spell the
 	// Unicode arrow; force that set so a shell without UTF-8 draws the same.
 	t.Setenv("MATE_ASCII", "0")
@@ -75,10 +77,10 @@ func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init workspace: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "shop", ".git"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "shop", "shop", ".git"), 0o755); err != nil {
 		t.Fatalf("create repo: %v", err)
 	}
-	if err := ws.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := ws.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatalf("add project: %v", err)
 	}
 	raw, err := os.ReadFile(ws.WorkspaceFile())
@@ -94,7 +96,9 @@ func TestConsoleHarnessPickerPutsTheWorkspaceDefaultFirst(t *testing.T) {
 	}
 
 	var got []console.ActionRequest
-	load := func(ctx context.Context) (query.Snapshot, error) { return query.Load(ctx, ws, consoleHarnesses()) }
+	load := func(ctx context.Context) (query.Snapshot, error) {
+		return query.Load(ctx, ws, consoleHarnesses(), consoleTools())
+	}
 	act := func(_ context.Context, req console.ActionRequest) (string, error) {
 		got = append(got, req)
 		return "ok", nil

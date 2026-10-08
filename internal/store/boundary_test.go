@@ -67,7 +67,7 @@ func TestStoreWritesRefuseSymlinkEscape(t *testing.T) {
 			name: "project.yaml through a symlinked project dir",
 			link: ".mate/projects/shop",
 			write: func(w *store.Workspace) error {
-				return w.SaveProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}})
+				return w.SaveProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}})
 			},
 		},
 		{

@@ -247,12 +247,12 @@ func cmdCrewStop(args []string, stdout, stderr io.Writer) error {
 		fs.Usage()
 		return newUsageError("mate crew stop: want exactly 2 arguments: <project> <id>")
 	}
-	w, err := resolveWorkspace(*workspaceFlag)
+	w, err := resolveStopWorkspace(*workspaceFlag)
 	if err != nil {
 		return err
 	}
 	project, crew := fs.Arg(0), fs.Arg(1)
-	res, err := spawn.StopCrew(context.Background(), w, spawn.LiveDeps(harnesses), project, crew, *discardFlag)
+	res, err := spawn.StopCrew(context.Background(), w, liveDeps(w, stderr), project, crew, *discardFlag)
 	if err != nil {
 		// Including ErrUnlandedWork, which is now a refusal that changed
 		// nothing: there is no outcome to report, only the reason.

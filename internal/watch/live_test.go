@@ -276,7 +276,7 @@ func liveWorkspace(t *testing.T, session string) *store.Workspace {
 	if w, err = store.Open(root); err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}

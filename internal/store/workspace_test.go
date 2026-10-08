@@ -10,12 +10,12 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
-// newWorkspace initialises a workspace in a temp dir with a repo directory
-// ready to register.
+// newWorkspace initialises a workspace in a temp dir with a repo directory,
+// `shop/shop` (project shop's directory, then the repo), ready to register.
 func newWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "shop"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "shop", "shop"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	w, err := store.Init(dir, store.Defaults{})

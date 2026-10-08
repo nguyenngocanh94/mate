@@ -212,7 +212,7 @@ func TestEveryBriefHeadingMentionIsKnown(t *testing.T) {
 		known[s] = true
 	}
 	texts := map[string]string{"AGENTS.md": renderedManual(t)}
-	for _, name := range SkillNames {
+	for _, name := range fixedParams().Skills() {
 		got, err := RenderSkill(name, fixedParams())
 		if err != nil {
 			t.Fatal(err)

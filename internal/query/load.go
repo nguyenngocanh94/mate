@@ -31,20 +31,22 @@ import (
 // after that there is no tree to show.
 //
 // harnesses is the binary's harness catalog: the snapshot carries it, and
-// resolves the workspace's default Mate harness against it.
-func Load(ctx context.Context, ws *store.Workspace, harnesses Harnesses) (Snapshot, error) {
-	return load(ctx, ws, harnesses, Liveness{}, time.Now)
+// resolves the workspace's default Mate harness against it. tools are the
+// console keys of the binary's tool registry, which the snapshot carries
+// as given.
+func Load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, tools []ToolBinding) (Snapshot, error) {
+	return load(ctx, ws, harnesses, tools, Liveness{}, time.Now)
 }
 
 // LoadLive is Load with Herdr's answer about which agents are up (M17). A
 // Mate or Crew whose meta records a pane but whom Herdr does not list is
 // stopped, not running: after a machine restart the file still names a pane
 // that no longer exists, and `s` must be able to bring the agent back.
-func LoadLive(ctx context.Context, ws *store.Workspace, harnesses Harnesses, live Liveness) (Snapshot, error) {
-	return load(ctx, ws, harnesses, live, time.Now)
+func LoadLive(ctx context.Context, ws *store.Workspace, harnesses Harnesses, tools []ToolBinding, live Liveness) (Snapshot, error) {
+	return load(ctx, ws, harnesses, tools, live, time.Now)
 }
 
-func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, live Liveness, now func() time.Time) (Snapshot, error) {
+func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, tools []ToolBinding, live Liveness, now func() time.Time) (Snapshot, error) {
 	if ws == nil {
 		return Snapshot{}, fmt.Errorf("query: no workspace is open")
 	}
@@ -72,6 +74,7 @@ func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, live Li
 			MateHarness: defaultMateHarness(ws, harnesses),
 		}),
 		Harnesses: append([]Harness(nil), harnesses.List...),
+		Tools:     append([]ToolBinding(nil), tools...),
 	}
 	for _, ref := range ws.Projects() {
 		if err := ctx.Err(); err != nil {

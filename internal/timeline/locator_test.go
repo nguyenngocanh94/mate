@@ -322,7 +322,7 @@ func TestIncidentsBecomeOpenAndResolvedEvents(t *testing.T) {
 // silent about it (docs/mvp.md section 7).
 func TestCommitsAndTheMergeComeFromGit(t *testing.T) {
 	f := newFixture(t)
-	repo := filepath.Join(f.root, fixtureProject)
+	repo := filepath.Join(f.ws.ProjectHome(fixtureProject), fixtureProject)
 	gitRun(t, repo, "checkout", "-b", fixtureBranch)
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# shop\n\n[Buy](pages/checkout-express.html)\n"), 0o644); err != nil {
 		t.Fatalf("edit README: %v", err)

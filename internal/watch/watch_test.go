@@ -528,10 +528,10 @@ func TestWatchSnapshotIsACopy(t *testing.T) {
 
 func TestWatchWatchesEveryProject(t *testing.T) {
 	f := newFixture(t)
-	if err := os.MkdirAll(f.ws.Root()+"/blog", 0o755); err != nil {
+	if err := os.MkdirAll(f.ws.Root()+"/blog/blog", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.ws.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
+	if err := f.ws.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog/blog"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	if err := f.ws.WriteCrewMeta("blog", "k9", map[string]string{

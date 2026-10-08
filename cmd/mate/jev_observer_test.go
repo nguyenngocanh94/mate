@@ -243,22 +243,27 @@ func callersOf(t *testing.T) map[string]map[string]bool {
 }
 
 // Every command that reads a pane builds its deps with liveDeps, so it
-// observes through what `.mate/.env` configures. spawn.LiveDeps alone is
-// left only where no pane is read (status, stop, peek, merge, reindex),
-// and in the console, which sets the observer itself.
+// observes through what `.mate/.env` configures. baseDeps (spawn.LiveDeps
+// plus this binary's tools, no observer) is left only where no pane is
+// read (status, stop, peek, merge, migrate, events, reindex), and in the
+// console, which sets the observer itself. spawn.LiveDeps is called by
+// baseDeps alone.
 func TestCommandsThatReadAPaneUseTheConfiguredObserver(t *testing.T) {
 	calls := callersOf(t)
 	for _, fn := range []string{"cmdSend", "cmdBriefAppend", "cmdMateStart", "cmdMateRefresh", "cmdMateStop", "cmdProjectRemove",
-		"cmdCrewSpawn", "cmdCrewRelaunch", "cmdReview", "cmdState", "runPRWatch"} {
+		"cmdCrewSpawn", "cmdCrewRelaunch", "cmdReview", "cmdState", "cmdPeek", "runPRWatch"} {
 		if !calls[fn]["liveDeps"] {
 			t.Errorf("%s does not build its deps with liveDeps", fn)
 		}
 	}
 	readsNoPane := map[string]bool{"liveDeps": true, "runConsole": true, "cmdMateStatus": true, "cmdCrewStop": true,
-		"cmdPeek": true, "cmdMerge": true, "cmdReindex": true}
+		"cmdMerge": true, "cmdMigrate": true, "cmdEvents": true, "cmdReindex": true}
 	for fn, c := range calls {
-		if c["spawn.LiveDeps"] && !readsNoPane[fn] {
-			t.Errorf("%s builds spawn.LiveDeps without the configured observer", fn)
+		if c["spawn.LiveDeps"] && fn != "baseDeps" {
+			t.Errorf("%s builds spawn.LiveDeps directly; go through baseDeps or liveDeps", fn)
+		}
+		if c["baseDeps"] && !readsNoPane[fn] {
+			t.Errorf("%s builds baseDeps without the configured observer", fn)
 		}
 	}
 	if !calls["runConsole"]["configuredObserver"] {

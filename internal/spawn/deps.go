@@ -15,6 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/tool"
 )
 
 // Meta keys written to `mate/mate.meta`. They are spelled once, here, so the
@@ -96,6 +97,10 @@ type Deps struct {
 	// The zero Registry holds none, so every start is refused; cmd/mate
 	// passes catalog.Default().
 	Harnesses harness.Registry
+	// Tools are the tools whose skills a Mate's manual installs beside its
+	// own (tool.Skill). The zero Registry holds none; cmd/mate passes its
+	// catalog's.
+	Tools tool.Registry
 	// Names is the live agent-name registry. Nil means a fresh in-process
 	// one, which is what a one-shot CLI invocation wants.
 	Names runtime.LiveNameRegistry

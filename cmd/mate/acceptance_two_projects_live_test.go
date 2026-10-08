@@ -92,7 +92,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 
-	shop := filepath.Join(w.Root(), "shop")
+	shop := filepath.Join(w.ProjectHome("shop"), "shop")
 	writeRepo(t, shop, map[string]string{
 		"README.md": "# shop\n\nA tiny shop.\n",
 		// Two candidate checkout pages and no rule saying which: the open
@@ -109,7 +109,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		t.Fatalf("AddProject shop: %v", err)
 	}
 
-	blog := filepath.Join(w.Root(), "blog")
+	blog := filepath.Join(w.ProjectHome("blog"), "blog")
 	writeRepo(t, blog, map[string]string{"README.md": "# blog\n\nA tiny blog.\n"})
 	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: blog, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject blog: %v", err)

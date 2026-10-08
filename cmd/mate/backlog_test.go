@@ -27,7 +27,7 @@ func backlogFixtureWorkspace(t *testing.T) (*store.Workspace, time.Time) {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo := filepath.Join(w.Root(), "blog")
+	repo := filepath.Join(w.ProjectHome("blog"), "blog")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 func TestBacklogStateMatchesQueryLoad(t *testing.T) {
 	w, now := backlogFixtureWorkspace(t)
 
-	snap, err := query.Load(context.Background(), w, consoleHarnesses())
+	snap, err := query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

@@ -58,12 +58,22 @@ func jevThreshold(value string) (float64, error) {
 	return t, nil
 }
 
-// liveDeps is spawn.LiveDeps with the observer `.mate/.env` asks for, for a
-// command that reads a pane (send, state, a start's settle). A Jev
-// configuration problem is one line on stderr, and the command goes on with
-// the fixture observer.
-func liveDeps(w *store.Workspace, stderr io.Writer) spawn.Deps {
+// baseDeps is spawn.LiveDeps with this binary's tools, so a Mate's manual
+// installs their skills beside its own. Commands that never read a pane, and
+// the console (which wires its own observer once for the whole run), use it
+// directly.
+func baseDeps() spawn.Deps {
 	deps := spawn.LiveDeps(harnesses)
+	deps.Tools = tools
+	return deps
+}
+
+// liveDeps is baseDeps plus the observer `.mate/.env` asks for, for a command
+// that reads a pane (send, state, a start's settle). A Jev configuration
+// problem is one line on stderr, and the command goes on with the fixture
+// observer.
+func liveDeps(w *store.Workspace, stderr io.Writer) spawn.Deps {
+	deps := baseDeps()
 	observer, err := configuredObserver(w)
 	if err != nil {
 		fmt.Fprintln(stderr, err)

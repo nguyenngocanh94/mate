@@ -31,7 +31,7 @@ func liveWorkspace(t *testing.T) (*runtime.Fake, runtime.SessionSpec, runtime.Se
 	return rt, spec, session, func(t *testing.T) ProjectNode {
 		t.Helper()
 		live := ReadLiveness(context.Background(), rt, spec)
-		snap, err := LoadLive(context.Background(), ws, testHarnesses, live)
+		snap, err := LoadLive(context.Background(), ws, testHarnesses, nil, live)
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
@@ -102,7 +102,7 @@ func TestLoadLiveDeliberateStopStaysCreated(t *testing.T) {
 	if err := ws.WriteMateMeta("shop", map[string]string{"harness": "claude", "agent": "mate-shop"}); err != nil {
 		t.Fatal(err)
 	}
-	snap, err := LoadLive(context.Background(), ws, testHarnesses, Liveness{Asked: true})
+	snap, err := LoadLive(context.Background(), ws, testHarnesses, nil, Liveness{Asked: true})
 	if err != nil {
 		t.Fatal(err)
 	}

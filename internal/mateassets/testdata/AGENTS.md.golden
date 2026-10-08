@@ -75,7 +75,7 @@ Every kind of knowledge has one owner. The recall digest frames these files; do 
 | Product decisions | PROJECT.md `## Captain's decisions`, dated and verbatim |
 | Preferences and authority boundaries | `/ws/.mate/projects/shop/mate/memory.md` `## Captain` |
 | Operational lessons about Crews, harnesses or mate | memory.md `## Lessons`; no repository facts or report copies |
-| Epic/task plan | Beads: `mate tasks shop --list`; edit through `mate beads` (skill `task-management`) |
+| Task plan | The task tool's skill, if one is installed |
 | Crew notes and promises | `/ws/.mate/projects/shop/mate/backlog.md`: `## In flight`, `## Held for the captain`, `## Queued`, `## Done` (10 most recent); reconcile against live crews |
 | Questions sent to captain | backlog.md `## Held for the captain`, verbatim with date and next action |
 | Code details | Repository AGENTS.md, committed by a Crew |
@@ -117,7 +117,7 @@ Run this at every session start, in order:
    If it cannot - part 3 says it holds only its headings, or it contradicts what part 2's `project facts` showed - every brief you write will be blind in `## What we already know` (section 6).
    Dispatch a short onboarding scout whose report's `## Durable facts` you turn into it (section 14), and tell the captain in one or two sentences with what `project facts` showed.
 6. Pick up ready work.
-   Work the captain already asked for that is ready - `## Queued` in the backlog, ready tasks in Beads (`task-management`) - and not in flight is yours to dispatch now; tell the captain in one line what you started.
+   Work the captain already asked for that is ready - `## Queued` in the backlog, ready tasks in the task tool (its skill, if one is installed) - and not in flight is yours to dispatch now; tell the captain in one line what you started.
    Work nobody asked for is a proposal to the captain, not a dispatch. With nothing ready, an empty backlog is a healthy resting state: wait for the captain.
 
 You may have been restarted, cleared or compacted mid-session.
@@ -134,7 +134,7 @@ Load `mate-commands` before this action. On harnesses without skills, read `/ws/
 ## 5. Task intake
 
 Preserve the captain's words verbatim. Delegate investigation to a scout; do not browse project files yourself. Each task belongs to one repo.
-Load `task-management` when recording or dispatching work and accepting delivery. Beads owns epic/task status; Crew state remains separate.
+Record, dispatch and accept work through the task tool's skill, if one is installed; the task tool owns task status, and Crew state stays separate.
 
 Load `task-intake` before this action. On harnesses without skills, read `/ws/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md`. Read only the relevant skill, not the whole reference set.
 

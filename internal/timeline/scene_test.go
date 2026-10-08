@@ -87,7 +87,7 @@ func newSceneFixture(t *testing.T) *fixture {
 // the ingest keys on anyway.
 func mergeFixtureBranch(t *testing.T, f *fixture) {
 	t.Helper()
-	repo := filepath.Join(f.root, fixtureProject)
+	repo := filepath.Join(f.ws.ProjectHome(fixtureProject), fixtureProject)
 	readme := filepath.Join(repo, "README.md")
 	body, err := os.ReadFile(readme)
 	if err != nil {

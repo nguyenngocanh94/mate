@@ -359,8 +359,7 @@ var keyTable = [][2]string{
 	{"s", "start the mate"},
 	{"m", "flip its mode"},
 	{"y", "copy"},
-	{"e", "crew report"},
-	{"t", "project tasks"},
+	toolKeyRows,
 	{"l", "box: whole log"},
 	{"r", "refresh"},
 	{"q", "quit"},
@@ -371,14 +370,38 @@ var keyTable = [][2]string{
 	{"shift+drag", "select text"},
 }
 
-func (m Model) keysSheetLines(p framePlan) []gline {
-	kw := 0
+// toolKeyRows marks where keyRows draws the snapshot's tool keys.
+var toolKeyRows = [2]string{"", "tool keys"}
+
+// keyRows is keyTable with the tool keys of the snapshot in their place,
+// each as "<scope> <label>": "e  crew report". A binding on a key the
+// Console owns (ownedKeys) is never pressed through to its tool, so it is
+// not offered, and the Console's own row for that key stays.
+func (m Model) keyRows() [][2]string {
+	out := make([][2]string, 0, len(keyTable)+len(m.tree.Tools))
 	for _, k := range keyTable {
+		if k == toolKeyRows {
+			for _, b := range m.tree.Tools {
+				if !ownedKeys[b.Key] {
+					out = append(out, [2]string{b.Key, b.Scope + " " + b.Label})
+				}
+			}
+			continue
+		}
+		out = append(out, k)
+	}
+	return out
+}
+
+func (m Model) keysSheetLines(p framePlan) []gline {
+	rows := m.keyRows()
+	kw := 0
+	for _, k := range rows {
 		kw = maxInt(kw, cells(k[0]))
 	}
 	kw = minInt(kw+2, p.w/3)
-	out := make([]gline, 0, len(keyTable))
-	for _, k := range keyTable {
+	out := make([]gline, 0, len(rows))
+	for _, k := range rows {
 		key := k[0]
 		if m.g.Name == "ascii" {
 			key = strings.NewReplacer("↑ ↓", "^ v", "▸", "+", "·", ".").Replace(key)

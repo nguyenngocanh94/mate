@@ -39,6 +39,7 @@ func designTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Harnesses:   testHarnesses,
+		Tools:       []query.ToolBinding{reportKey, tasksKey},
 		Workspace:   query.KnownField(query.WorkspaceValue{Name: "acme", Root: "/Users/dev/work/acme"}),
 		Projects: []query.ProjectNode{
 			simple("auth-gateway", running("auth-gateway", at(13, 0)), quiet(1)),

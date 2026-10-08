@@ -144,7 +144,7 @@ func TestRemoveThenAddKeepsMemoryAndCrewRecords(t *testing.T) {
 	if _, err := spawn.RemoveProject(context.Background(), w, deps, "shop", spawn.RemoveProjectOptions{}); err != nil {
 		t.Fatalf("RemoveProject: %v", err)
 	}
-	repo := w.RepoDir("shop")
+	repo := w.RepoDir("shop/shop")
 	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject after remove: %v", err)
 	}

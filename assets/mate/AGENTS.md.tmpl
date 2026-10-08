@@ -81,7 +81,7 @@ Every kind of knowledge has one owner. The recall digest frames these files; do 
 | Product decisions | PROJECT.md `## Captain's decisions`, dated and verbatim |
 | Preferences and authority boundaries | `{{.MemoryFile}}` `## Captain` |
 | Operational lessons about Crews, harnesses or mate | memory.md `## Lessons`; no repository facts or report copies |
-| Epic/task plan | Beads: `mate tasks {{.ProjectName}} --list`; edit through `mate beads` (skill `task-management`) |
+| Task plan | The task tool's skill, if one is installed |
 | Crew notes and promises | `{{.BacklogFile}}`: `## In flight`, `## Held for the captain`, `## Queued`, `## Done` (10 most recent); reconcile against live crews |
 | Questions sent to captain | backlog.md `## Held for the captain`, verbatim with date and next action |
 | Code details | Repository AGENTS.md, committed by a Crew |
@@ -101,8 +101,8 @@ Load the operational skill when its trigger fires:
 - `diagnostic-reasoning` - before scoping a bug or acting on a diagnostic report.
 - `stow` - for stow/"ghi nhớ lại", a `⟦mate⟧ stow:` request, memory check problems, or a corrected task's closure.
 - `token-review` - when the captain asks which tasks cost too many tokens, why, or what skills and docs would make this project cheaper to run.
-- `task-management` - when recording requested work, choosing ready tasks, dispatching, tracking dependencies or accepting delivery in Beads.
-
+{{range .ToolSkills}}{{if .Manual}}{{.Manual}}
+{{end}}{{end}}
 ## 3. Bootstrap checklist
 
 Your state at a session start is one digest: `{{.MatevBin}} recall {{.ProjectName}}` (section 4, "Recall").
@@ -123,7 +123,7 @@ Run this at every session start, in order:
    If it cannot - part 3 says it holds only its headings, or it contradicts what part 2's `project facts` showed - every brief you write will be blind in `## What we already know` (section 6).
    Dispatch a short onboarding scout whose report's `## Durable facts` you turn into it (section 14), and tell the captain in one or two sentences with what `project facts` showed.
 6. Pick up ready work.
-   Work the captain already asked for that is ready - `## Queued` in the backlog, ready tasks in Beads (`task-management`) - and not in flight is yours to dispatch now; tell the captain in one line what you started.
+   Work the captain already asked for that is ready - `## Queued` in the backlog, ready tasks in the task tool (its skill, if one is installed) - and not in flight is yours to dispatch now; tell the captain in one line what you started.
    Work nobody asked for is a proposal to the captain, not a dispatch. With nothing ready, an empty backlog is a healthy resting state: wait for the captain.
 
 You may have been restarted, cleared or compacted mid-session.
@@ -140,7 +140,7 @@ Load `mate-commands` before this action. On harnesses without skills, read `{{.M
 ## 5. Task intake
 
 Preserve the captain's words verbatim. Delegate investigation to a scout; do not browse project files yourself. Each task belongs to one repo.
-Load `task-management` when recording or dispatching work and accepting delivery. Beads owns epic/task status; Crew state remains separate.
+Record, dispatch and accept work through the task tool's skill, if one is installed; the task tool owns task status, and Crew state stays separate.
 
 Load `task-intake` before this action. On harnesses without skills, read `{{.MateDir}}/{{.SkillsDir}}/task-intake/SKILL.md`. Read only the relevant skill, not the whole reference set.
 

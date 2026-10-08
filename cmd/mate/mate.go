@@ -115,7 +115,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 		fs.Usage()
 		return newUsageError("mate mate stop: want exactly 1 argument: <project>")
 	}
-	w, err := resolveWorkspace(*workspaceFlag)
+	w, err := resolveStopWorkspace(*workspaceFlag)
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func cmdMateStatus(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	status, err := spawn.MateStatus(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0))
+	status, err := spawn.MateStatus(context.Background(), w, liveDeps(w, stderr), fs.Arg(0))
 	if err != nil {
 		return err
 	}

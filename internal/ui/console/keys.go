@@ -68,8 +68,6 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.keysOpen = true
 		return m.relayout(), nil
-	case "t":
-		return m.beginTasks()
 	case "tab":
 		return m.onTab(), nil
 	case "shift+tab":
@@ -80,6 +78,12 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.msg = footerMsg{}
 		return m.startLoad()
+	}
+	// Any other key a tool binds (Snapshot.Tools) is the tool's, from every
+	// pane. The Console's own keys (ownedKeys) are never handed over; the
+	// tool registry refuses a binding on one (tool.ErrReservedKey).
+	if !ownedKeys[key] && m.toolBound(key) {
+		return m.beginToolView(key)
 	}
 	switch m.focus {
 	case paneBox:
@@ -101,8 +105,6 @@ func (m Model) onListKey(key string) (tea.Model, tea.Cmd) {
 		return m.beginMateStart()
 	case "m":
 		return m.beginModeToggle(m.modeTarget())
-	case "e":
-		return m.beginReview()
 	case "y":
 		if r, ok := m.selectedRow(); ok {
 			if v, ok := m.rowCopyValue(r); ok {
@@ -155,8 +157,6 @@ func (m Model) onDetailKey(key string) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		m.detailSel = clampInt(m.detailSel+1, 0, max0(n-1))
 		return m, nil
-	case "e":
-		return m.beginReview()
 	case "y":
 		if v, ok := m.detailCopy(); ok {
 			return m.copyText(v)
