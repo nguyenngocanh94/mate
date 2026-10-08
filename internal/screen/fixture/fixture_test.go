@@ -94,11 +94,12 @@ func TestFixtureObservesRepresentativeScreens(t *testing.T) {
 	}
 }
 
-// TestFixtureObserveAgreesWithTheProfileOnEveryCapture pins that observing
-// changes no classification: on every committed composer capture the
-// Observation carries ClassifyComposer's verdict and ClassifyStartup's, as
-// the profile returns them.
-func TestFixtureObserveAgreesWithTheProfileOnEveryCapture(t *testing.T) {
+// TestFixtureObserveCarriesTheClassifiersVerdicts pins Observe's plumbing,
+// not the classification itself: on every committed composer capture the
+// Observation carries ClassifyComposer's and ClassifyStartup's verdicts
+// field for field. That the classification did not change in the move is
+// what the moved classify_test.go pins, against its own expected states.
+func TestFixtureObserveCarriesTheClassifiersVerdicts(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join("testdata", "screens"))
 	if err != nil {
 		t.Fatal(err)

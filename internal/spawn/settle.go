@@ -245,7 +245,11 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 	if err != nil {
 		return presses, err
 	}
-	if observed.Startup != dialog || observed.Highlight != answer.Target {
+	if observed.Startup != dialog {
+		return presses, startupRefusal(handle, kind, screen,
+			fmt.Sprintf("%s %s: after pressing %s the screen reads as %s, not the %s; refusing to confirm a selection on a dialog mate did not mean to answer", kind, what, strings.Join(answer.SelectKeys, ", "), observed.Startup, what))
+	}
+	if observed.Highlight != answer.Target {
 		return presses, startupRefusal(handle, kind, screen,
 			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
 	}

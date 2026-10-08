@@ -498,3 +498,40 @@ func TestStartMateConfirmsOnlyTheHighlightTheObserverSees(t *testing.T) {
 		t.Fatalf("observer read %d screens, want the dialog and the re-read after the select press", observer.calls)
 	}
 }
+
+// dialogChanges is the fixture observer that, after its first reading,
+// reports a different dialog from the one the settle began answering.
+type dialogChanges struct{ calls int }
+
+func (o *dialogChanges) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	if o.calls > 1 {
+		obs.Startup = harness.StartupScreenUpdateDialog
+	}
+	return obs, err
+}
+
+// When the re-read after the select press reads as a different dialog, the
+// refusal says so rather than blaming the highlight.
+func TestStartMateRefusesWhenTheDialogChangesUnderTheSelectPress(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = &dialogChanges{}
+	rt.NextStartupScreen = screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) { rt.SetReadOutput(handle, accepted) }
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the screen reads as update_dialog, not the trust dialog") {
+		t.Fatalf("err = %v, want a refusal naming the dialog the observer saw", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+}
