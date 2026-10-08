@@ -194,7 +194,7 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 
 	// And the snapshot the Console renders follows the flag.
-	snap, err := query.Load(ctx, w, consoleHarnesses())
+	snap, err := query.Load(ctx, w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	if err := w.SetAuto("shop", true); err != nil {
 		t.Fatal(err)
 	}
-	if snap, err = query.Load(ctx, w, consoleHarnesses()); err != nil {
+	if snap, err = query.Load(ctx, w, consoleHarnesses(), consoleTools()); err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
 	if snap.Projects[0].Mode != query.ModeAuto {

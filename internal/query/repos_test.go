@@ -27,7 +27,7 @@ func addProjectWithRepos(t *testing.T, ws *store.Workspace, project string, repo
 
 func loadOnly(t *testing.T, ws *store.Workspace) ProjectNode {
 	t.Helper()
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

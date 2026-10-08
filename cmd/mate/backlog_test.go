@@ -221,7 +221,7 @@ func TestBacklogEmptyProjectPrintsOneLine(t *testing.T) {
 func TestBacklogStateMatchesQueryLoad(t *testing.T) {
 	w, now := backlogFixtureWorkspace(t)
 
-	snap, err := query.Load(context.Background(), w, consoleHarnesses())
+	snap, err := query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

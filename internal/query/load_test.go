@@ -42,7 +42,7 @@ func newWorkspace(t *testing.T, projects ...string) *store.Workspace {
 
 func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 	ws := newWorkspace(t, "shop", "blog")
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestLoadListsRegisteredProjectsWithTheirRepo(t *testing.T) {
 // would claim the read failed.
 func TestLoadReportsNoMateAsAbsentNotUnknown(t *testing.T) {
 	ws := newWorkspace(t, "shop")
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestLoadReadsMateMetaAndCrewStatus(t *testing.T) {
 		}
 	}
 
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestLoadGivesACrewThatWroteNothingTheSpawnedState(t *testing.T) {
 	if err := ws.WriteCrewMeta("shop", "k9", map[string]string{"task": "scout", "state": "spawned"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestLoadResolvesEachCrewStateInTheOrderOfSection4b(t *testing.T) {
 	// Backward compatibility: stopped_at with no state= is finished.
 	write("k8", map[string]string{"stopped_at": "2026-09-17T10:00:00Z"})
 
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestLoadReadsBlockedFromTheObserversOpenIncidents(t *testing.T) {
 		}
 	}
 
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestLoadLeavesTokensAbsent(t *testing.T) {
 		t.Fatalf("write crew meta: %v", err)
 	}
 
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestLoadDoesNotBlockOnABudgetIncident(t *testing.T) {
 		t.Fatalf("AppendIncident: %v", err)
 	}
 
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestLoadPicksUpAProjectRegisteredAfterOpen(t *testing.T) {
 	if err := other.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "blog"}}}); err != nil {
 		t.Fatalf("add project: %v", err)
 	}
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestLoadHidesClosedCrewsAndCountsThem(t *testing.T) {
 		"task": "scout", "state": "finished", "stopped_at": "2026-09-18T10:18:34Z", "teardown": "clean"}); err != nil {
 		t.Fatalf("write crew meta: %v", err)
 	}
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -434,7 +434,7 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	if err := ws.WriteCrewMeta("shop", "k1", map[string]string{"task": "ship", "agent": "crew-k1", "pane": "w1:p2", "state": "spawned"}); err != nil {
 		t.Fatal(err)
 	}
-	snap, err := Load(context.Background(), ws, testHarnesses)
+	snap, err := Load(context.Background(), ws, testHarnesses, nil)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestLoadFillsUpdatedFromTheBox(t *testing.T) {
 	if err := ws.AppendSent("shop", store.SentEntry{Time: at, Source: "user", Target: "mate", Text: "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if snap, err = Load(context.Background(), ws, testHarnesses); err != nil {
+	if snap, err = Load(context.Background(), ws, testHarnesses, nil); err != nil {
 		t.Fatalf("load: %v", err)
 	}
 	p := snap.Projects[0]
@@ -487,7 +487,7 @@ func TestLoadCarriesTheWorkspaceDefaultMateHarness(t *testing.T) {
 			if err := os.WriteFile(ws.WorkspaceFile(), []byte(edited), 0o644); err != nil {
 				t.Fatalf("write workspace.yaml: %v", err)
 			}
-			snap, err := Load(context.Background(), ws, testHarnesses)
+			snap, err := Load(context.Background(), ws, testHarnesses, nil)
 			if err != nil {
 				t.Fatalf("load: %v", err)
 			}
@@ -507,7 +507,7 @@ func TestLoadReadsWhatTheMateHoldsForTheCaptain(t *testing.T) {
 	ws := newWorkspace(t, "shop")
 	held := func() Field[[]HeldItem] {
 		t.Helper()
-		snap, err := Load(context.Background(), ws, testHarnesses)
+		snap, err := Load(context.Background(), ws, testHarnesses, nil)
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
@@ -537,5 +537,29 @@ func TestLoadReadsWhatTheMateHoldsForTheCaptain(t *testing.T) {
 	want := []HeldItem{{Task: "checkout-button", Date: "2026-09-24", Question: "Classic or express?"}}
 	if !got.IsKnown() || !reflect.DeepEqual(got.Value, want) {
 		t.Fatalf("Held = %+v, want %+v", got, want)
+	}
+}
+
+// The tool keys cmd/mate hands Load reach the snapshot as data, in the
+// order given, and the snapshot holds its own copy.
+func TestLoadCarriesToolBindings(t *testing.T) {
+	ws := newWorkspace(t, "shop")
+	tools := []ToolBinding{
+		{Key: "e", Label: "report", Scope: "crew", Role: "review"},
+		{Key: "t", Label: "tasks", Scope: "project", Role: "tasks"},
+	}
+	snap, err := Load(context.Background(), ws, testHarnesses, tools)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !reflect.DeepEqual(snap.Tools, tools) {
+		t.Fatalf("Tools = %+v, want %+v", snap.Tools, tools)
+	}
+	tools[0].Key = "z"
+	if snap.Tools[0].Key != "e" {
+		t.Fatal("the snapshot shares the caller's slice")
+	}
+	if snap, err = Load(context.Background(), ws, testHarnesses, nil); err != nil || snap.Tools != nil {
+		t.Fatalf("Load with no tools: Tools = %+v, %v; want none", snap.Tools, err)
 	}
 }

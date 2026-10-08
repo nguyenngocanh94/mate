@@ -57,7 +57,7 @@ func TestConsoleWatcherObservesASpawnedCrew(t *testing.T) {
 	}
 
 	// And the snapshot the Console draws carries it.
-	snap, err := query.Load(context.Background(), w, consoleHarnesses())
+	snap, err := query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestWithRuntimeNoticeCarriesHerdrDownIntoTheSnapshot(t *testing.T) {
 		t.Fatalf("Poll: %v", err)
 	}
 
-	snap, err := query.Load(context.Background(), w, consoleHarnesses())
+	snap, err := query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestWithTokensFillsFromTheLedger(t *testing.T) {
 		t.Fatalf("WriteCrewMeta: %v", err)
 	}
 
-	snap, err := query.Load(context.Background(), w, consoleHarnesses())
+	snap, err := query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestWithTokensFillsFromTheLedger(t *testing.T) {
 		t.Fatalf("date the mate's turn: %v", err)
 	}
 
-	snap, err = query.Load(context.Background(), w, consoleHarnesses())
+	snap, err = query.Load(context.Background(), w, consoleHarnesses(), consoleTools())
 	if err != nil {
 		t.Fatalf("query.Load: %v", err)
 	}

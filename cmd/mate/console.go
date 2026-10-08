@@ -114,7 +114,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	defer stopRecovery()
 
 	load := func(loadCtx context.Context) (query.Snapshot, error) {
-		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleLiveness(loadCtx, ws, deps))
+		snap, err := query.LoadLive(loadCtx, ws, consoleHarnesses(), consoleTools(), consoleLiveness(loadCtx, ws, deps))
 		if err != nil {
 			return snap, err
 		}
