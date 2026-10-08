@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/nguyenngocanh94/mate/internal/migrate"
 	"github.com/nguyenngocanh94/mate/internal/observability"
@@ -14,7 +15,8 @@ import (
 
 // cmdMigrate is `mate migrate [<workspace-dir>] [--dry-run]`: it moves a
 // workspace written before layout 2 so every repo lives under its project's
-// directory (internal/migrate). It is the captain's: it moves the captain's
+// directory (internal/migrate), after repairing the links of a workspace
+// that was moved or copied. It is the captain's: it moves the captain's
 // directories, so a Mate or a Crew that runs it is refused.
 func cmdMigrate(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
@@ -47,7 +49,12 @@ func cmdMigrate(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return runMigrate(context.Background(), w, migrate.Deps{Runtime: live.Runtime, Session: spec}, *dryRun, stdout)
+	binary := live.Binary
+	if binary == "" {
+		binary, _ = os.Executable()
+	}
+	deps := migrate.Deps{Runtime: live.Runtime, Session: spec, Harnesses: live.Harnesses, Binary: binary}
+	return runMigrate(context.Background(), w, deps, *dryRun, stdout)
 }
 
 // runMigrate is cmdMigrate's core over any deps, for tests.

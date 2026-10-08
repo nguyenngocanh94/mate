@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/gitx"
+	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/recovery"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -38,8 +39,15 @@ type Deps struct {
 	// the question open, and a Mate whose meta records a pane is then
 	// taken as running.
 	Runtime runtime.ReadAdapter
-	// Session is the workspace's Herdr session (spawn.SessionSpec).
+	// Session is the workspace's Herdr session (spawn.SessionSpec). Its
+	// ConfigHome holds the session owner marker the link repair of a moved
+	// workspace settles.
 	Session runtime.SessionSpec
+	// Harnesses and Binary are what the link repair of a moved workspace
+	// repoints the Mates' hooks with (recovery.Env). An empty Binary
+	// leaves the hooks alone.
+	Harnesses harness.Registry
+	Binary    string
 	// Git runs the worktree repair and the dirty check. The zero value is
 	// the real git.
 	Git gitx.Git
@@ -154,6 +162,43 @@ type Summary struct {
 	Warnings []string
 	// Layout is true once workspace.yaml says layout 2.
 	Layout bool
+	// Links are the link repairs of a workspace that was moved or copied
+	// (repairLinks), made before anything else.
+	Links []recovery.Fix
+}
+
+// movedFrom is the root workspace.yaml records when it is not the root the
+// workspace was opened at: the workspace was moved or copied, and its links
+// (recovery.RepairLinks) still name the old place.
+func movedFrom(ws *store.Workspace) (string, bool) {
+	recorded := ws.RecordedRoot()
+	return recorded, recorded != "" && recorded != ws.Root()
+}
+
+// repairLinks makes the link repair the console makes on layout 2
+// (recovery.RepairLinks), under `.mate/recover.lock`, and says what it did.
+// The session may be renamed by it, so deps follows. A repair that failed
+// is a refusal: nothing is moved over links that still name the old root.
+func repairLinks(ctx context.Context, ws *store.Workspace, deps *Deps, out io.Writer) ([]recovery.Fix, error) {
+	unlock, err := ws.LockRecover(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("recovery lock: %w", err)
+	}
+	defer unlock()
+	fixes := recovery.RepairLinks(ctx, recovery.Env{WS: ws, Git: deps.Git, Harnesses: deps.Harnesses, Binary: deps.Binary, ConfigHome: deps.Session.ConfigHome})
+	deps.Session.Name = ws.Session()
+	var failed []Refusal
+	for _, f := range fixes {
+		if f.Err != nil {
+			failed = append(failed, Refusal{Reason: fmt.Sprintf("link repair: %s: %v", f.What, f.Err)})
+			continue
+		}
+		fmt.Fprintf(out, "repaired %s: %s\n", f.Step, f.What)
+	}
+	if len(failed) > 0 {
+		return fixes, &RefusedError{Refusals: failed}
+	}
+	return fixes, nil
 }
 
 const (
@@ -438,6 +483,9 @@ func unfinished(journal []store.MigrateEntry, project, at string) (string, bool)
 // and changes nothing. It does not take the migrate lock; it says when
 // another migrate holds it.
 func DryRun(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Summary, error) {
+	if old, moved := movedFrom(ws); moved {
+		fmt.Fprintf(out, "recorded root %s differs from %s: migrate will repair links first\n", old, ws.Root())
+	}
 	moves, refusals, err := Plan(ctx, ws, deps)
 	if err != nil {
 		return Summary{}, err
@@ -469,9 +517,10 @@ func DryRun(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) 
 
 // Run moves every repo of the plan under its project's directory, project
 // by project, then writes layout 2 into workspace.yaml. It holds
-// `.mate/migrate.lock` throughout. A refusal is a *RefusedError and nothing
-// was moved; any other error stopped the run half way, and the next run
-// finishes it.
+// `.mate/migrate.lock` throughout. A workspace that was moved or copied has
+// its links repaired first (repairLinks), and they stay repaired when the
+// plan is then refused. A refusal is a *RefusedError and nothing was moved;
+// any other error stopped the run half way, and the next run finishes it.
 func Run(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Summary, error) {
 	unlock, ok, err := ws.LockMigrate()
 	if err != nil {
@@ -482,14 +531,19 @@ func Run(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Su
 	}
 	defer unlock()
 
+	var sum Summary
+	if _, moved := movedFrom(ws); moved {
+		if sum.Links, err = repairLinks(ctx, ws, &deps, out); err != nil {
+			return sum, err
+		}
+	}
 	moves, refusals, err := Plan(ctx, ws, deps)
 	if err != nil {
-		return Summary{}, err
+		return sum, err
 	}
 	if len(refusals) > 0 {
-		return Summary{}, &RefusedError{Refusals: refusals}
+		return sum, &RefusedError{Refusals: refusals}
 	}
-	var sum Summary
 	if len(moves) == 0 && !ws.LayoutOld() {
 		fmt.Fprintln(out, "nothing to do")
 		return sum, nil

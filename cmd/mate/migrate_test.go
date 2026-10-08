@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/migrate"
+	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -88,5 +90,108 @@ func TestMigrateCommandMovesAnOldWorkspace(t *testing.T) {
 	}
 	if want := "moved " + root + "/web -> " + root + "/shop/web\nrepaired 0 worktree(s)\nrewrote 0 brief(s)\nworkspace layout 2\n"; out.String() != want {
 		t.Fatalf("run printed %q, want %q", out.String(), want)
+	}
+}
+
+// TestMigrateRepairsAMovedWorkspaceFirst: an old-layout workspace moved to
+// another root, its workspace.yaml, owner marker and a closed crew's brief
+// still naming the old one, cannot reach the console's link repair, so
+// mate migrate makes it. The dry run says so and changes nothing; the run
+// repairs root and owner, rewrites the brief, then moves the repo.
+func TestMigrateRepairsAMovedWorkspaceFirst(t *testing.T) {
+	w, err := store.Init(filepath.Join(t.TempDir(), "old"), store.Defaults{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldRoot := w.Root()
+	if err := os.MkdirAll(filepath.Join(oldRoot, "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initGitRepo(t, filepath.Join(oldRoot, "web"))
+	if err := os.MkdirAll(w.CrewDir("shop", "k1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.ProjectFile("shop"), []byte("repos:\n    - name: web\n      path: web\n      default_branch: main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k1", map[string]string{"task": "an old task", "state": "finished", "repo": "web"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.CrewBrief("shop", "k1"), []byte("Work in "+oldRoot+"/web.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.WorkspaceFile(), []byte("version: 1\nsession: mate-old\nroot: "+oldRoot+"\nprojects:\n    - name: shop\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configHome := t.TempDir()
+	if err := runtime.ReclaimSessionOwner(configHome, "mate-old", store.SessionName(oldRoot)); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(filepath.Dir(oldRoot), "moved")
+	if err := os.Rename(oldRoot, root); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := store.OpenForMigrate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brief := moved.CrewBrief("shop", "k1")
+
+	// Only git on PATH: no herdr is asked.
+	bin := t.TempDir()
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(git, filepath.Join(bin, "git")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("MATE_CALLER", "")
+	t.Setenv("HERDR_CONFIG_PATH", configHome)
+
+	before, err := os.ReadFile(moved.WorkspaceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := mainRun([]string{"migrate", root, "--dry-run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("dry run: exit %d, stderr %q", code, stderr.String())
+	}
+	if want := "recorded root " + oldRoot + " differs from " + root + ": migrate will repair links first\n"; !strings.HasPrefix(stdout.String(), want) {
+		t.Fatalf("dry run printed %q, want it to start with %q", stdout.String(), want)
+	}
+	if after, _ := os.ReadFile(moved.WorkspaceFile()); string(after) != string(before) {
+		t.Fatalf("the dry run changed workspace.yaml:\n%s", after)
+	}
+	if data, _ := os.ReadFile(brief); string(data) != "Work in "+oldRoot+"/web.\n" {
+		t.Fatalf("the dry run changed the brief: %q", data)
+	}
+	if owner, _, _ := runtime.SessionOwner(configHome, "mate-old"); owner != store.SessionName(oldRoot) {
+		t.Fatalf("the dry run changed the owner marker to %q", owner)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := mainRun([]string{"migrate", root}, &stdout, &stderr); code != 0 {
+		t.Fatalf("run: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+	for _, want := range []string{"repaired owner: ", "repaired root: brief of crew shop/k1 moved from " + oldRoot + " to " + root, "moved " + root + "/web -> " + root + "/shop/web\n", "rewrote 1 brief(s)\n", "workspace layout 2\n"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("run printed %q, want %q in it", stdout.String(), want)
+		}
+	}
+	after, err := store.Open(root)
+	if err != nil {
+		t.Fatalf("store.Open after migrate: %v", err)
+	}
+	if after.RecordedRoot() != root || after.Session() != "mate-old" {
+		t.Fatalf("root %q session %q, want %s and mate-old", after.RecordedRoot(), after.Session(), root)
+	}
+	if owner, _, _ := runtime.SessionOwner(configHome, "mate-old"); owner != store.SessionName(root) {
+		t.Fatalf("owner marker = %q, want this workspace", owner)
+	}
+	if data, _ := os.ReadFile(brief); string(data) != "Work in "+root+"/shop/web.\n" {
+		t.Fatalf("brief = %q", data)
 	}
 }
