@@ -233,7 +233,7 @@ func TestFailedMutationStillRefreshesAndExportFailureKeepsSnapshot(t *testing.T)
 	failExport = true
 	err = (command{}).Run(context.Background(), f.env, []string{"update", "shop-abc"}, nil, io.Discard, io.Discard)
 	if !errors.Is(err, writeErr) || !errors.Is(err, exportErr) || !strings.Contains(err.Error(), "do not repeat the write") ||
-		!strings.Contains(err.Error(), "mate tasks shop --init") {
+		!strings.Contains(err.Error(), "mate tool beads shop --init") {
 		t.Fatal(err)
 	}
 	data, _ = os.ReadFile(path)
@@ -265,7 +265,7 @@ func TestRecallDoesNotInitializeAndReadsAuthoritativeWork(t *testing.T) {
 	// A bogus snapshot must never be the source for recall readiness.
 	os.WriteFile(filepath.Join(f.env.DataDir, "issues.jsonl"), []byte("wrong"), 0o600)
 	text, present, err = recall{}.Render(context.Background(), f.env, 4096)
-	want := "Beads work (up to 10 active/blocked and 10 ready; mate tasks shop --list):\n" +
+	want := "Beads work (up to 10 active/blocked and 10 ready; mate tool beads shop --list):\n" +
 		"  shop-a [blocked P1] Waiting\n" +
 		"  shop-b [ready P2] Ready\n"
 	if err != nil || !present || text != want {

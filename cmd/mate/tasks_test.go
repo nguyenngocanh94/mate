@@ -25,7 +25,7 @@ func fakeBD(t *testing.T) {
 case "$1" in
 init) mkdir -p "$BEADS_DIR"; printf '{"backend":"dolt"}' > "$BEADS_DIR/metadata.json" ;;
 export) printf '{"id":"shop-abc"}\n' ;;
-create) printf '%s\n' "$BEADS_DIR" "$PWD" "$@" > "$BEADS_DIR/argv"; printf '{"id":"shop-abc"}\n' ;;
+create) printf '%s\n' "$BEADS_DIR" "$BEADS_DB" "$PWD" "$@" > "$BEADS_DIR/argv"; printf '{"id":"shop-abc"}\n' ;;
 list) printf '[]\n' ;;
 ready) printf '[]\n' ;;
 *) exit 17 ;;
@@ -40,29 +40,27 @@ esac
 func TestToolCLISeparatesMateAndUpstreamFlags(t *testing.T) {
 	w, _ := consoleFixture(t, "shop")
 	fakeBD(t)
+	// The tracker variables of the environment mate runs in never cross
+	// the process boundary: bd sees the project's tracker.
+	t.Setenv("BEADS_DIR", "/wrong")
+	t.Setenv("BEADS_DB", "/wrong")
 	home := w.ProjectHome("shop")
 	dir := filepath.Join(home, ".beads")
-	for _, alias := range [][]string{{"tool", "beads"}, {"beads"}} {
-		var out, stderr bytes.Buffer
-		args := append(append([]string{}, alias...), "shop", "--workspace", w.Root(), "--", "create", "--title", "Việt Nam có dấu", "--description", "one\ntwo", "--json")
-		if err := run(args, &out, &stderr); err != nil {
-			t.Fatalf("%v: %v: %s", alias, err, &stderr)
-		}
-		var issue map[string]string
-		if err := json.Unmarshal(out.Bytes(), &issue); err != nil || issue["id"] != "shop-abc" {
-			t.Fatalf("%v: JSON polluted: %s %v", alias, &out, err)
-		}
-		argv, err := os.ReadFile(filepath.Join(dir, "argv"))
-		if err != nil || !strings.Contains(string(argv), "Việt Nam có dấu\n--description\none\ntwo\n--json") || !strings.HasPrefix(string(argv), dir+"\n"+home+"\n") {
-			t.Fatalf("%v: arguments: %s %v", alias, argv, err)
-		}
-		wantStderr := ""
-		if alias[0] == "beads" {
-			wantStderr = "note: mate beads is now mate tool beads\n"
-		}
-		if stderr.String() != wantStderr {
-			t.Fatalf("%v: stderr = %q, want %q", alias, &stderr, wantStderr)
-		}
+	var out, stderr bytes.Buffer
+	args := []string{"tool", "beads", "shop", "--workspace", w.Root(), "--", "create", "--title", "Việt Nam có dấu", "--description", "one\ntwo", "--json"}
+	if err := run(args, &out, &stderr); err != nil {
+		t.Fatalf("%v: %s", err, &stderr)
+	}
+	var issue map[string]string
+	if err := json.Unmarshal(out.Bytes(), &issue); err != nil || issue["id"] != "shop-abc" {
+		t.Fatalf("JSON polluted: %s %v", &out, err)
+	}
+	argv, err := os.ReadFile(filepath.Join(dir, "argv"))
+	if err != nil || !strings.Contains(string(argv), "Việt Nam có dấu\n--description\none\ntwo\n--json") || !strings.HasPrefix(string(argv), dir+"\n\n"+home+"\n") {
+		t.Fatalf("arguments and tracker environment: %q %v", argv, err)
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q, want none", &stderr)
 	}
 	if _, err := os.Stat(filepath.Join(w.ProjectDir("shop"), ".beads")); !os.IsNotExist(err) {
 		t.Fatalf("the tracker was made under .mate: %v", err)
@@ -71,11 +69,10 @@ func TestToolCLISeparatesMateAndUpstreamFlags(t *testing.T) {
 		t.Fatalf("no tool lock under .mate: %v", err)
 	}
 
-	var out, stderr bytes.Buffer
 	for _, args := range [][]string{
-		{"tasks", "shop", "--json", "--workspace", w.Root()},
-		{"tasks", "shop", "--list", "--workspace", w.Root()},
-		{"tasks", "shop", "--init", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--json", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--list", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--init", "--workspace", w.Root()},
 	} {
 		out.Reset()
 		stderr.Reset()
@@ -84,12 +81,14 @@ func TestToolCLISeparatesMateAndUpstreamFlags(t *testing.T) {
 		}
 	}
 	if out.String() != dir+"\n" {
-		t.Fatalf("tasks --init printed %q, want the tracker %s", &out, dir)
+		t.Fatalf("tool beads --init printed %q, want the tracker %s", &out, dir)
 	}
 	for _, args := range [][]string{
-		{"beads", "shop", "--workspace", w.Root(), "create"},
-		{"beads", "shop", "--workspace", w.Root(), "--"},
-		{"beads", "missing", "--workspace", w.Root(), "--", "list"},
+		{"tool", "beads", "shop", "--workspace", w.Root(), "create"},
+		{"tool", "beads", "shop", "--workspace", w.Root(), "--"},
+		{"tool", "beads", "shop", "--init", "--workspace", w.Root(), "--", "list"},
+		{"tool", "beads", "missing", "--workspace", w.Root(), "--", "list"},
+		{"tool", "fresh", "shop", "--list", "--workspace", w.Root()},
 		{"tool", "shop", "--workspace", w.Root(), "--", "list"},
 		{"tool", "nope", "shop", "--workspace", w.Root(), "--", "list"},
 		{"epic", "add", "shop"}, {"task", "add", "shop"},
@@ -98,9 +97,35 @@ func TestToolCLISeparatesMateAndUpstreamFlags(t *testing.T) {
 			t.Fatalf("accepted %v", args)
 		}
 	}
-	err := run([]string{"tool", "fresh", "shop", "--workspace", w.Root(), "--", "x"}, &out, &stderr)
+	err = run([]string{"tool", "fresh", "shop", "--workspace", w.Root(), "--", "x"}, &out, &stderr)
 	if err == nil || err.Error() != "Fresh has no command: Fresh is an editor; it owns no data of mate's" {
 		t.Fatalf("a tool with no command = %v", err)
+	}
+	err = run([]string{"tool", "fresh", "shop", "--init", "--workspace", w.Root()}, &out, &stderr)
+	if err == nil || err.Error() != "Fresh keeps no data to initialize" {
+		t.Fatalf("--init on a tool with no data = %v", err)
+	}
+}
+
+// mate beads, mate tasks and mate task-triage were kept for one release
+// after mate tool replaced them; they are gone.
+func TestTaskAliasesAreGone(t *testing.T) {
+	w, _ := consoleFixture(t, "shop")
+	fakeBD(t)
+	for _, args := range [][]string{
+		{"beads", "shop", "--workspace", w.Root(), "--", "list"},
+		{"tasks", "shop", "--list", "--workspace", w.Root()},
+		{"task-triage", "shop", "--workspace", w.Root()},
+	} {
+		var out, stderr bytes.Buffer
+		err := run(args, &out, &stderr)
+		var ue *usageError
+		if !errors.As(err, &ue) || err.Error() != "unknown command \""+args[0]+"\"" {
+			t.Fatalf("%v = %v, want unknown command", args, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(w.ProjectHome("shop"), ".beads")); !os.IsNotExist(err) {
+		t.Fatalf("a removed alias made a tracker: %v", err)
 	}
 }
 
@@ -117,14 +142,13 @@ func TestOldTrackerIsRefusedNotMoved(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(old, "metadata.json"), []byte(`{"backend":"dolt"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	want := "a Beads tracker from before layout 2 sits at " + old + "; move it to " +
-		filepath.Join(w.ProjectHome("shop"), ".beads") + " by hand (mv), or run mate tasks shop --init to start empty"
+	want := "Beads data from before layout 2 sits at " + old + "; move it to " +
+		filepath.Join(w.ProjectHome("shop"), ".beads") + " by hand (mv), or run mate tool beads shop --init to start empty"
 	var out, stderr bytes.Buffer
 	for _, args := range [][]string{
 		{"tool", "beads", "shop", "--workspace", w.Root(), "--", "list"},
-		{"beads", "shop", "--workspace", w.Root(), "--", "list"},
-		{"tasks", "shop", "--list", "--workspace", w.Root()},
-		{"task-triage", "shop", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--list", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--triage", "--workspace", w.Root()},
 	} {
 		if err := run(args, &out, &stderr); err == nil || err.Error() != want {
 			t.Fatalf("%v = %v, want %q", args, err, want)
@@ -133,8 +157,8 @@ func TestOldTrackerIsRefusedNotMoved(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(w.ProjectHome("shop"), ".beads")); !os.IsNotExist(err) {
 		t.Fatalf("a refused command made a tracker: %v", err)
 	}
-	if err := run([]string{"tasks", "shop", "--init", "--workspace", w.Root()}, &out, &stderr); err != nil {
-		t.Fatalf("tasks --init beside an old tracker: %v %s", err, &stderr)
+	if err := run([]string{"tool", "beads", "shop", "--init", "--workspace", w.Root()}, &out, &stderr); err != nil {
+		t.Fatalf("tool beads --init beside an old tracker: %v %s", err, &stderr)
 	}
 	if data, err := os.ReadFile(filepath.Join(old, "metadata.json")); err != nil || string(data) != `{"backend":"dolt"}` {
 		t.Fatalf("the old tracker changed: %q %v", data, err)
@@ -155,7 +179,7 @@ func TestLegacyTaskPlanIsRefused(t *testing.T) {
 	}
 	var out, stderr bytes.Buffer
 	for _, args := range [][]string{
-		{"tasks", "shop", "--init", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--init", "--workspace", w.Root()},
 		{"tool", "beads", "shop", "--workspace", w.Root(), "--", "list"},
 	} {
 		err := run(args, &out, &stderr)
@@ -183,7 +207,7 @@ func TestToolCommandsRefuseTheOldLayout(t *testing.T) {
 	var out, stderr bytes.Buffer
 	for _, args := range [][]string{
 		{"tool", "beads", "shop", "--workspace", w.Root(), "--", "list"},
-		{"tasks", "shop", "--init", "--workspace", w.Root()},
+		{"tool", "beads", "shop", "--init", "--workspace", w.Root()},
 	} {
 		if err := run(args, &out, &stderr); !errors.Is(err, store.ErrLayoutOld) {
 			t.Fatalf("%v on the old layout = %v", args, err)
@@ -246,7 +270,7 @@ func TestConsoleTasksRefusesBesideAnOldTracker(t *testing.T) {
 	}
 	rec := newRecordingColumns(t)
 	err := consoleToolView(w, rec.consoleColumns, tools)(context.Background(), "t", console.StageTarget{ProjectID: "shop"})
-	if err == nil || !strings.Contains(err.Error(), "a Beads tracker from before layout 2") || len(rec.of(roleTasks)) != 0 {
+	if err == nil || !strings.Contains(err.Error(), "Beads data from before layout 2") || len(rec.of(roleTasks)) != 0 {
 		t.Fatalf("t beside an old tracker = %v, shown %d", err, len(rec.of(roleTasks)))
 	}
 	if _, err := os.Stat(filepath.Join(w.ProjectHome("shop"), ".beads")); !os.IsNotExist(err) {

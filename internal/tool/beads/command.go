@@ -35,7 +35,7 @@ func (command) Run(ctx context.Context, env tool.CommandEnv, args []string, in i
 		return err
 	}
 	if len(args) == 0 || args[0] == "init" {
-		return fmt.Errorf("use mate tasks %s --init to initialize; pass a bd subcommand after --", t.name)
+		return fmt.Errorf("use mate tool beads %s --init to initialize; pass a bd subcommand after --", t.name)
 	}
 	unlock, err := t.lock(ctx)
 	if err != nil {
@@ -48,7 +48,7 @@ func (command) Run(ctx context.Context, env tool.CommandEnv, args []string, in i
 	commandErr := t.run(ctx, tracker, args, in, out, stderr)
 	exportErr := t.export(ctx)
 	if exportErr != nil {
-		exportErr = fmt.Errorf("Beads command may already have saved changes; viewer refresh failed: %w; run mate tasks %s --init to refresh, do not repeat the write", exportErr, t.name)
+		exportErr = fmt.Errorf("Beads command may already have saved changes; viewer refresh failed: %w; run mate tool beads %s --init to refresh, do not repeat the write", exportErr, t.name)
 	}
 	return errors.Join(commandErr, exportErr)
 }

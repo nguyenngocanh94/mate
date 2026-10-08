@@ -23,7 +23,7 @@ const toolUsage = "usage: mate tool <name> <project> [--workspace <dir>] -- <arg
 // cmdTool implements `mate tool <name> <project> [--workspace <dir>] --
 // <arguments>`: the tool's own command (tool.Command) on the project, with
 // every argument after -- passed whole. The -- separates mate's flags from
-// the tool's.
+// the tool's; with no --, the flags are all mate's (cmdToolHere).
 func cmdTool(args []string, stdout, stderr io.Writer) error {
 	sep := -1
 	for i, a := range args {
@@ -33,7 +33,7 @@ func cmdTool(args []string, stdout, stderr io.Writer) error {
 		}
 	}
 	if sep < 0 {
-		return newUsageError(toolUsage)
+		return cmdToolHere(args, stdout, stderr)
 	}
 	fs := flag.NewFlagSet("tool", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -129,11 +129,12 @@ func runTool(ctx context.Context, inv tool.Invocation, in io.Reader, out, stderr
 //
 //   - data mate kept under `.mate/projects/<p>/` before layout 2, under the
 //     same name: the captain moves it by hand, or starts empty with
-//     `mate tasks <p> --init` (starting is true then, and only then is the
-//     old copy no obstacle). mate never moves it: it may be all there is.
+//     `mate tool <name> <p> --init` (starting is true then, and only then
+//     is the old copy no obstacle). mate never moves it: it may be all
+//     there is.
 //   - the task plan of mate's own task manager, `tasks.yaml`, replaced
-//     before release (docs/beads.md): the tracker is not made empty over
-//     it, even to start.
+//     before release (docs/beads.md): the tool's data is not made empty
+//     over it, even to start.
 func toolDataRefusal(w *store.Workspace, project string, p tool.Profile, starting bool) error {
 	data := p.Capabilities().Data
 	if !data.Verified() {
@@ -157,7 +158,7 @@ func toolDataRefusal(w *store.Workspace, project string, p tool.Profile, startin
 	dir := data.Impl.Dir(home)
 	old := filepath.Join(w.ProjectDir(project), filepath.Base(dir))
 	if st, err := os.Stat(old); err == nil && st.IsDir() {
-		return fmt.Errorf("a %s tracker from before layout 2 sits at %s; move it to %s by hand (mv), or run mate tasks %s --init to start empty", info.Title, old, dir, project)
+		return fmt.Errorf("%s data from before layout 2 sits at %s; move it to %s by hand (mv), or run mate tool %s %s --init to start empty", info.Title, old, dir, p.Name(), project)
 	}
 	return nil
 }

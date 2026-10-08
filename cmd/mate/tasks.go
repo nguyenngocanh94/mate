@@ -13,37 +13,48 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/tool"
 )
 
-// taskTool is the tool `mate tasks`, `mate beads` and `mate task-triage`
-// stand for: they are kept for one release while manuals still name them,
-// then `mate tool` alone remains
-// (docs/plans/workspace-layout-and-tools-2026-10-08.md, PR 6).
+// taskTool is the one tool whose `mate tool` takes mate's own flags beyond
+// --init: --list, --json and --triage, and its viewer in this terminal
+// with none, are bd's and bv's arguments chosen by mate.
 const taskTool tool.Name = "beads"
 
-// cmdTasks implements `mate tasks <project> [--list|--json|--init]`: the
-// task tool's data made (Data.Init), listed (its Command), or open in its
-// viewer in this terminal.
-func cmdTasks(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("tasks", flag.ContinueOnError)
+const toolHereUsage = "usage: mate tool <name> <project> --init [--workspace <dir>] | mate tool beads <project> [--list|--json|--triage] [--workspace <dir>]"
+
+// cmdToolHere implements `mate tool <name> <project>` with mate's own flags
+// and no --: --init makes the tool's data (Data.Init) and prints where it
+// is; for the task tool, --list and --json list it (its Command), --triage
+// is its viewer's robot triage, which never waits for a person, and no
+// flag opens its viewer in this terminal.
+func cmdToolHere(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("tool", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	workspace := fs.String("workspace", "", "workspace directory")
 	list := fs.Bool("list", false, "list Beads issues")
 	jsonFlag := fs.Bool("json", false, "list Beads issues as JSON")
-	init := fs.Bool("init", false, "initialize Beads and refresh its viewer export")
+	triage := fs.Bool("triage", false, "Beads Viewer's robot triage")
+	init := fs.Bool("init", false, "initialize the tool's data and refresh its viewer export")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
-	if fs.NArg() != 1 {
-		return newUsageError("usage: mate tasks <project> [--list|--json|--init] [--workspace <dir>]")
+	if fs.NArg() != 2 {
+		return newUsageError(toolHereUsage)
 	}
-	if !*list && !*jsonFlag && !*init && !term.IsTerminal(os.Stdin.Fd()) {
-		return newUsageError("mate tasks needs a terminal; use --list or --json")
+	name, err := tools.Parse(fs.Arg(0))
+	if err != nil {
+		return &usageError{err}
+	}
+	if !*init && name != taskTool {
+		return newUsageError(toolHereUsage)
+	}
+	if !*list && !*jsonFlag && !*init && !*triage && !term.IsTerminal(os.Stdin.Fd()) {
+		return newUsageError("mate tool beads needs a terminal; use --list or --json")
 	}
 	w, err := resolveWorkspace(*workspace)
 	if err != nil {
 		return err
 	}
-	project := fs.Arg(0)
-	p, err := taskToolOn(w, project, *init)
+	project := fs.Arg(1)
+	p, err := toolHereOn(w, name, project, *init)
 	if err != nil {
 		return err
 	}
@@ -68,59 +79,29 @@ func cmdTasks(args []string, stdout, stderr io.Writer) error {
 	if err := caps.Data.Impl.Init(ctx, env, stderr); err != nil {
 		return err
 	}
+	if *triage {
+		return runViewerHere(ctx, p, env, []string{"--robot-triage", "--brief"}, nil, stdout, stderr)
+	}
 	// The captain decides the interactive process lifetime. Initialization is
 	// bounded; the viewer stays open until they quit it.
 	return runViewerHere(context.Background(), p, env, nil, os.Stdin, stdout, stderr)
 }
 
-// cmdBeads is `mate beads <project> -- <bd arguments>`, which `mate tool
-// beads` replaced: it says so and runs that.
-func cmdBeads(args []string, stdout, stderr io.Writer) error {
-	fmt.Fprintln(stderr, "note: mate beads is now mate tool beads")
-	return cmdTool(append([]string{string(taskTool)}, args...), stdout, stderr)
-}
-
-// cmdTaskTriage implements `mate task-triage <project>`: the task tool's
-// data made, then its viewer's robot triage, which never waits for a
-// person.
-func cmdTaskTriage(args []string, stdout, stderr io.Writer) error {
-	fs := flag.NewFlagSet("task-triage", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	workspace := fs.String("workspace", "", "workspace directory")
-	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
-		return &usageError{err}
-	}
-	if fs.NArg() != 1 {
-		return newUsageError("usage: mate task-triage <project> [--workspace <dir>]")
-	}
-	w, err := resolveWorkspace(*workspace)
-	if err != nil {
-		return err
-	}
-	project := fs.Arg(0)
-	p, err := taskToolOn(w, project, false)
-	if err != nil {
-		return err
-	}
-	env := toolEnv(w, project, p)
-	ctx, cancel := context.WithTimeout(context.Background(), toolCommandTimeout)
-	defer cancel()
-	if err := p.Capabilities().Data.Impl.Init(ctx, env, stderr); err != nil {
-		return err
-	}
-	return runViewerHere(ctx, p, env, []string{"--robot-triage", "--brief"}, nil, stdout, stderr)
-}
-
-// taskToolOn is the task tool on project, refused while its data is not
-// where it should be (toolDataRefusal). starting is `--init`.
-func taskToolOn(w *store.Workspace, project string, starting bool) (tool.Profile, error) {
-	p, err := toolOnProject(w, taskTool, project)
+// toolHereOn is the tool on project, refused while its data is not where
+// it should be (toolDataRefusal). starting is --init, which needs only the
+// tool's data; the task tool's other flags need its command and viewer
+// too.
+func toolHereOn(w *store.Workspace, name tool.Name, project string, starting bool) (tool.Profile, error) {
+	p, err := toolOnProject(w, name, project)
 	if err != nil {
 		return nil, err
 	}
 	caps := p.Capabilities()
-	if !caps.Data.Verified() || !caps.Command.Verified() || !caps.Viewer.Verified() {
-		return nil, fmt.Errorf("%s has no data, command and viewer to run mate tasks with", p.Info().Title)
+	if !caps.Data.Verified() {
+		return nil, fmt.Errorf("%s keeps no data to initialize", p.Info().Title)
+	}
+	if !starting && (!caps.Command.Verified() || !caps.Viewer.Verified()) {
+		return nil, fmt.Errorf("%s has no command and viewer to run mate tool %s with", p.Info().Title, name)
 	}
 	if err := toolDataRefusal(w, project, p, starting); err != nil {
 		return nil, err

@@ -56,7 +56,7 @@ func (recall) Render(ctx context.Context, env tool.CommandEnv, maxBytes int) (st
 	if len(active)+len(ready) == 0 {
 		return "", false, nil
 	}
-	lines := []string{fmt.Sprintf("Beads work (up to 10 active/blocked and 10 ready; mate tasks %s --list):\n", t.name)}
+	lines := []string{fmt.Sprintf("Beads work (up to 10 active/blocked and 10 ready; mate tool beads %s --list):\n", t.name)}
 	for _, i := range active {
 		lines = append(lines, fmt.Sprintf("  %s [%s P%d] %s\n", i.ID, i.Status, i.Priority, clip(i.Title, 120)))
 	}

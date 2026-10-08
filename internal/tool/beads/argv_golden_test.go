@@ -61,8 +61,10 @@ func TestTrackerArgvGolden(t *testing.T) {
 			os.Unsetenv(key)
 		}
 	}
-	// Every ambient variable the profile strips, so the golden proves none
-	// reaches a subprocess.
+	// Every ambient variable the profile strips, set wrong, so the golden
+	// proves each Invocation overrides it. The Runner here is a fake;
+	// cmd/mate's TestToolCLISeparatesMateAndUpstreamFlags proves it at the
+	// process boundary.
 	for _, key := range trackerEnv {
 		t.Setenv(key, "/wrong")
 	}

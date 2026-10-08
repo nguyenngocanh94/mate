@@ -204,8 +204,8 @@ CODEX_HOME={{CODEX_HOME}}
 (rendered asset) sha256=1e5b59e6a63b64bb2d772001c114803c91815b5cdc50b9b1128967eb34337547
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-management/SKILL.md mode=-rw-r--r-- bytes=3450 ---
-(rendered asset) sha256=debd8b44d964e772178b6e485a90d1976b4745af1f47cef4aa03f39e06413819
+--- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-management/SKILL.md mode=-rw-r--r-- bytes=3501 ---
+(rendered asset) sha256=81b940aaee2e3c2b4aaff942b0ab22d2e284ee1e29d33dc41bbc0af8ce84d32b
 --- end {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/task-management/SKILL.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/mate/.claude/skills/token-review/SKILL.md mode=-rw-r--r-- bytes=8413 ---

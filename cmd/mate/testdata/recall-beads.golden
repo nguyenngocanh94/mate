@@ -1,6 +1,6 @@
 == two active, one ready
 == Tool: Beads ==
-Beads work (up to 10 active/blocked and 10 ready; mate tasks shop --list):
+Beads work (up to 10 active/blocked and 10 ready; mate tool beads shop --list):
   shop-a1 [in_progress P1] Wire the checkout button to the payment form
   shop-b2 [blocked P0] Blocked on the payment provider's sandbox keys, Blocked on the payment provider's sandbox keys, Blocked on the payment p…
   shop-c3 [ready P2] Add a Buy button to README.md

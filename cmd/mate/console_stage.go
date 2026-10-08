@@ -312,7 +312,7 @@ func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry
 }
 
 // consoleToolData makes a tool's data for project when the tool keeps data
-// and the project has none yet, the way `mate tasks` made the tracker
+// and the project has none yet, the way `mate tool beads` makes the tracker
 // before opening the viewer: Beads Viewer on a project with no tracker
 // shows nothing. The viewer's export is not refreshed here when the data
 // exists: bv reads the tracker itself (--db). Making it is refused on the
