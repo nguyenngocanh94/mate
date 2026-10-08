@@ -225,7 +225,7 @@ func probability(p float64) bool { return !math.IsNaN(p) && !math.IsInf(p, 0) &&
 
 // markFaint wraps every run drawn with SGR 2 in the faint markers and
 // drops every other CSI sequence; text without escapes is returned as is.
-// The SGR reading is internal/send's (classify.go applySGR): only 0, 2 and
+// The SGR reading is internal/screen/fixture's (classify.go applySGR): only 0, 2 and
 // 22 move faintness, and 38/48/58 colour arguments are consumed, so the 2
 // of `38;2;r;g;b` is not read as faint.
 func markFaint(screen string) string {

@@ -395,7 +395,7 @@ func pct(sorted []int64, p int) int64 {
 }
 
 func short(file string) string {
-	for _, prefix := range []string{"internal/send/testdata/screens/", "internal/harness/", "internal/notice/testdata/", "scripts/jeveval/testdata/screens/"} {
+	for _, prefix := range []string{"internal/screen/fixture/testdata/screens/", "internal/harness/", "internal/notice/testdata/", "scripts/jeveval/testdata/screens/"} {
 		if rest, ok := strings.CutPrefix(file, prefix); ok {
 			return strings.Replace(rest, "/testdata/", "/", 1)
 		}

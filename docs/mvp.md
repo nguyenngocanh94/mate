@@ -440,7 +440,7 @@ Tri thức về code đi vào AGENTS.md của repo qua PR của crew.
   `claudeBusy` rơi về các seed chung, seed `esc to interrupt` khớp dòng trích đó, và digest bị từ chối `agent mate-blog is mid-turn` suốt năm phút tới khi incident `wedged` mở; crew nằm ở `wait-mate` còn test hết giờ.
   Đó là lý do lần 1 và 3 xanh còn lần 2 và 4 đỏ với cùng một bộ phân loại: hỏng hay không tuỳ tool call cuối của Mate có tình cờ in pane của crew đang bận hay không.
   Sửa trong `internal/send`: Claude chỉ bận theo dấu hiệu của chính nó - spinner vẽ ở cột 0, hoặc placeholder hàng đợi - và không dùng seed chung nữa, vì Claude không tự vẽ seed nào (2.1.274 và 2.1.281) còn mọi thứ nó trích đều thụt lề dưới `⏺`/`⎿`.
-  Capture nằm ở `internal/send/testdata/screens/claude_idle_quoting_codex_busy.ansi`, và test cũng giữ chiều ngược lại: spinner của chính pane vẫn là bận.
+  Capture nằm ở `internal/screen/fixture/testdata/screens/claude_idle_quoting_codex_busy.ansi`, và test cũng giữ chiều ngược lại: spinner của chính pane vẫn là bận.
   Bài học chung: bộ phân loại của một harness chỉ được tin dấu hiệu mà harness đó tự vẽ, vì pane của Mate là nơi mọi harness khác được trích ra.
 - Lần `crew stop` thứ hai trên một crew đã đóng không được viết lại trạng thái cuối.
   Đo 2026-09-24 (task 34): mọi crew đã merge trong acceptance kết thúc `.meta` bằng `state=failed`, vì cleanup của test gọi `StopCrew(..., discard=true)` trên mọi crew `ListCrews` trả về, kể cả crew đã đóng, và `StopCrew` ghi lại meta như một lần dừng mới.

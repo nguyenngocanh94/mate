@@ -42,7 +42,7 @@ type Runtime interface {
 	// ReadAgentStyled, not ReadAgent: the health column reports the
 	// composer state, and telling a harness's own faint suggestion from a
 	// person's unsubmitted line needs the attributes
-	// (internal/send/classify.go's faintPlaceholder).
+	// (internal/screen/fixture/classify.go's faintPlaceholder).
 	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 }
 

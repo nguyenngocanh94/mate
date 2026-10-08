@@ -4,107 +4,107 @@
   "prompt": "6ea1f2de62e5",
   "entries": [
     {
-      "file": "internal/send/testdata/screens/claude_busy.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_busy.txt",
       "request_sha256": "343a6ee346f4d004331afeea9c861d2ec284a4031e1ecba0590ec83806f7748d",
       "latency_ms": 677
     },
     {
-      "file": "internal/send/testdata/screens/claude_busy_queued.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_busy_queued.txt",
       "request_sha256": "4581fc6e42954f6ac7a9951244714ac65cc7756a0dc427217778c4dd165c5965",
       "latency_ms": 234
     },
     {
-      "file": "internal/send/testdata/screens/claude_empty.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_empty.txt",
       "request_sha256": "e3a994c24d205677180774b72fd4f741e65f6fc7ddd15185ee39740c6d39ef61",
       "latency_ms": 253
     },
     {
-      "file": "internal/send/testdata/screens/claude_ghost_suggestion.ansi",
+      "file": "internal/screen/fixture/testdata/screens/claude_ghost_suggestion.ansi",
       "request_sha256": "78aeff2e47cc55a0989dcf33766c13cfb5e49896e63d2ed726fb15159164dd62",
       "latency_ms": 241
     },
     {
-      "file": "internal/send/testdata/screens/claude_idle_quoting_codex_busy.ansi",
+      "file": "internal/screen/fixture/testdata/screens/claude_idle_quoting_codex_busy.ansi",
       "request_sha256": "306852a74b433c76f2507aac711f865e957e3ed3794911787189639bdfff5a5d",
       "latency_ms": 238
     },
     {
-      "file": "internal/send/testdata/screens/claude_pending.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_pending.txt",
       "request_sha256": "254513b0f9f8fb1886e1a5b74292199d70cc43247eb7b3e32e17dc3caafba9e3",
       "latency_ms": 266
     },
     {
-      "file": "internal/send/testdata/screens/claude_startup_splash.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash.txt",
       "request_sha256": "9f3d1db405981fb8b32bd4c5bf858389d21dafedbf84f3b9a7f986626813ea5c",
       "latency_ms": 239
     },
     {
-      "file": "internal/send/testdata/screens/claude_startup_splash_80x24.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash_80x24.txt",
       "request_sha256": "764de29c436d8cae5602118fe1850ea2fb2cff266939cd0033163d4304119c1d",
       "latency_ms": 236
     },
     {
-      "file": "internal/send/testdata/screens/claude_startup_splash_pending.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash_pending.txt",
       "request_sha256": "5fd58b485b72e3def76ff3d9d38d2f013e9cd93f49c9d63397beac17a16bbaa5",
       "latency_ms": 214
     },
     {
-      "file": "internal/send/testdata/screens/claude_trust_dialog.txt",
+      "file": "internal/screen/fixture/testdata/screens/claude_trust_dialog.txt",
       "request_sha256": "38071c9a7a04cc4c7c77322ad2db9273e690224d03f058de057c47ba136de24c",
       "latency_ms": 237
     },
     {
-      "file": "internal/send/testdata/screens/codex_after_turn_v157.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_after_turn_v157.txt",
       "request_sha256": "1ecb4cc2e91637cefde1e0a17d99a07ea50d290540be3cfd5502c4e20eb87791",
       "latency_ms": 262
     },
     {
-      "file": "internal/send/testdata/screens/codex_busy.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_busy.txt",
       "request_sha256": "8184d3fccd7a99085bef8ecbea43faebc1f96978ed6a7e67d32ba52327bdf1ae",
       "latency_ms": 237
     },
     {
-      "file": "internal/send/testdata/screens/codex_busy_visible_v157.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_busy_visible_v157.txt",
       "request_sha256": "2565ef50ca2e2556d1d0e8cc1681c1008a9a79254ed94f8e7c5da029bb38bcc0",
       "latency_ms": 234
     },
     {
-      "file": "internal/send/testdata/screens/codex_empty.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_empty.txt",
       "request_sha256": "0b2dbb238a2291929636742eed14ddc36a50ce9247906a634838ea8137bbeaaf",
       "latency_ms": 308
     },
     {
-      "file": "internal/send/testdata/screens/codex_empty_v157.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_empty_v157.txt",
       "request_sha256": "6ff75b77e5c124d05fd1b4eff5f2700cf240953c13c81039d3251c3c5bc29b9e",
       "latency_ms": 238
     },
     {
-      "file": "internal/send/testdata/screens/codex_modal.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_modal.txt",
       "request_sha256": "d0a95bf5bb887153db06051c0800a61e767ccc638901be654fed61dcfab1f659",
       "latency_ms": 239
     },
     {
-      "file": "internal/send/testdata/screens/codex_pending.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_pending.txt",
       "request_sha256": "d8b9897392d3f4351a36ce6cde551eae8b9f33c9c9784f89a7ff02c1406b5e7c",
       "latency_ms": 212
     },
     {
-      "file": "internal/send/testdata/screens/codex_pending_v157.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_pending_v157.txt",
       "request_sha256": "9763f1461dd644e56fe37cb8185fd062c5531f8fdabe9413494fdc80d075e82f",
       "latency_ms": 263
     },
     {
-      "file": "internal/send/testdata/screens/codex_slash_popup.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_slash_popup.txt",
       "request_sha256": "e6e00cea4b7c3113f0889273c60f5f7b2d62806cd1a7d48a2e3e1cbed67b9119",
       "latency_ms": 225
     },
     {
-      "file": "internal/send/testdata/screens/codex_trust_dialog.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_trust_dialog.txt",
       "request_sha256": "33e3ea1f40198b59131bedb661865d605442745b50c94e84ded885910c1d3cb2",
       "latency_ms": 231
     },
     {
-      "file": "internal/send/testdata/screens/codex_trust_dialog_v157.txt",
+      "file": "internal/screen/fixture/testdata/screens/codex_trust_dialog_v157.txt",
       "request_sha256": "1d642d1c42a1bc5c20763c8c1d50c17e155e87bef5c06802d2f6da3343bfc8b0",
       "latency_ms": 298
     },

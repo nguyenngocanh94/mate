@@ -80,9 +80,9 @@ type Runtime interface {
 	ReadAgent(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 	// ReadAgentStyled is the same snapshot with SGR attributes intact. The
 	// composer classifier needs them: a harness's own faint suggestion and
-	// a person's unsubmitted line are the same characters (classify.go's
-	// faintPlaceholder), and typing over the second is the mistake this
-	// package exists to prevent.
+	// a person's unsubmitted line are the same characters
+	// (internal/screen/fixture/classify.go's faintPlaceholder), and typing
+	// over the second is the mistake this package exists to prevent.
 	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 	SendText(ctx context.Context, handle runtime.AgentHandle, text string) error
 	SendKeys(ctx context.Context, handle runtime.AgentHandle, keys []string) error

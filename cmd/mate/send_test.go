@@ -14,7 +14,7 @@ import (
 
 // codexEmptyScreen and codexBusyScreen are the smallest scripted Codex
 // snapshots send.ClassifyComposer recognises, mirroring
-// internal/send/testdata/screens without depending on that package's
+// internal/screen/fixture/testdata/screens without depending on that package's
 // private fixtures.
 const codexEmptyScreen = "› Ask Codex to do anything\n\n  model · cwd\n"
 

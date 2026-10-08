@@ -4,7 +4,7 @@ package harness
 // signature; what they share is how far up the snapshot the busy scan
 // reads. Measured 2026-09-17 against Claude Code 2.1.274 and codex-cli
 // 0.154.0 through `herdr agent read --source recent-unwrapped --lines 40`;
-// the captures are internal/send/testdata/screens and
+// the captures are internal/screen/fixture/testdata/screens and
 // TestClassifyComposerOnCapturedScreens runs the classifiers over them.
 //
 // `--source recent-unwrapped --format text` hands mate plain text with the

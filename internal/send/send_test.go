@@ -100,6 +100,15 @@ func claudeBusyScreen() string {
 	return "some transcript\n✶ Pollinating…\n" + rule + "\n❯ \n" + rule + "\n"
 }
 
+// screenOf is the screen profile catalog.Default() registers for a kind.
+func screenOf(kind harness.Kind) harness.ScreenProfile {
+	profile, err := catalog.Default().Lookup(kind)
+	if err != nil {
+		panic(err)
+	}
+	return profile.Screen()
+}
+
 func testDeps(rt send.Runtime) (send.Deps, *[]time.Duration) {
 	var slept []time.Duration
 	return send.Deps{
@@ -396,7 +405,7 @@ func TestSendTreatsAnUnconfirmedWaitAsAWarningNotAFailure(t *testing.T) {
 }
 
 // The Codex composer has no box; the same send drives it from its
-// placeholder (internal/send/testdata/screens/codex_empty.txt).
+// placeholder (internal/screen/fixture/testdata/screens/codex_empty.txt).
 func TestSendDrivesACodexComposer(t *testing.T) {
 	t.Parallel()
 	empty := "  Tip: something\n\n› " + codex.CodexComposerPlaceholder + "\n\n  gpt-5.6-terra high · /repo\n"

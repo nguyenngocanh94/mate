@@ -111,8 +111,8 @@ func loadCorpus(root string) ([]Screen, error) {
 		return out, nil
 	}
 
-	// 1. internal/send's composer captures: ClassifyComposer.
-	sendDir := "internal/send/testdata/screens"
+	// 1. internal/screen/fixture's composer captures: ClassifyComposer.
+	sendDir := "internal/screen/fixture/testdata/screens"
 	names, err := files(sendDir)
 	if err != nil {
 		return nil, err
