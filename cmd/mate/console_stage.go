@@ -315,9 +315,8 @@ func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry
 // and the project has none yet, the way `mate tool beads` makes the tracker
 // before opening the viewer: Beads Viewer on a project with no tracker
 // shows nothing. The viewer's export is not refreshed here when the data
-// exists: bv reads the tracker itself (--db). Making it is refused on the
-// old layout, where the project directory may be one of its repos, and
-// while older data sits where toolDataRefusal says. The tool's own
+// exists: bv reads the tracker itself (--db). Making it is refused while
+// older data sits where toolDataRefusal says. The tool's own
 // diagnostic, if it failed, is the last line of what it wrote.
 func consoleToolData(ctx context.Context, ws *store.Workspace, project string, p tool.Profile) error {
 	data := p.Capabilities().Data
@@ -327,9 +326,6 @@ func consoleToolData(ctx context.Context, ws *store.Workspace, project string, p
 	exists, err := data.Impl.Exists(ws.ProjectHome(project))
 	if err != nil || exists {
 		return err
-	}
-	if ws.LayoutOld() {
-		return store.ErrLayoutOld
 	}
 	if err := toolDataRefusal(ws, project, p, false); err != nil {
 		return err

@@ -122,16 +122,20 @@ func writeOldLayout(t *testing.T, w *store.Workspace) {
 	}
 }
 
-// TestOldLayoutOpensReadMostly is the store half of plan test 11: a workspace
-// with no `layout:` opens, reads as layout 1, and refuses the writes that
-// would register a repo, naming mate migrate.
-func TestOldLayoutOpensReadMostly(t *testing.T) {
+// TestOpenRefusesTheOldLayout: a workspace with no `layout:` is refused by
+// Open with the sentence every command prints, and opened only by
+// OpenForMigrate, which reads it as layout 1.
+func TestOpenRefusesTheOldLayout(t *testing.T) {
 	w := newWorkspace(t)
 	writeOldLayout(t, w)
 
-	old, err := store.Open(w.Root())
+	const msg = "this workspace has the old layout; run mate migrate with the previous mate release"
+	if _, err := store.Open(w.Root()); !errors.Is(err, store.ErrLayoutOld) || err.Error() != msg {
+		t.Fatalf("Open on the old layout = %v, want %q", err, msg)
+	}
+	old, err := store.OpenForMigrate(w.Root())
 	if err != nil {
-		t.Fatalf("Open on the old layout: %v", err)
+		t.Fatalf("OpenForMigrate on the old layout: %v", err)
 	}
 	if old.Layout() != 1 || !old.LayoutOld() {
 		t.Fatalf("Layout() = %d, LayoutOld() = %v; want 1, true", old.Layout(), old.LayoutOld())
@@ -140,24 +144,8 @@ func TestOldLayoutOpensReadMostly(t *testing.T) {
 	if err != nil || len(cfg.Repos) != 1 || cfg.Repos[0].Path != "shop" {
 		t.Fatalf("LoadProject on the old layout = %+v, %v", cfg, err)
 	}
-
-	const msg = "this workspace has the old layout (repos beside .mate); run mate migrate first"
-	if _, err := old.AddRepo("shop", store.RepoConfig{Path: "api"}); !errors.Is(err, store.ErrLayoutOld) || err.Error() != msg {
-		t.Fatalf("AddRepo on the old layout = %v, want ErrLayoutOld %q", err, msg)
-	}
-	if err := old.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "api"}}}); !errors.Is(err, store.ErrLayoutOld) {
-		t.Fatalf("AddProject with a repo on the old layout = %v, want ErrLayoutOld", err)
-	}
-	if _, ok := old.Project("blog"); ok {
-		t.Fatal("a refused AddProject registered the project")
-	}
-	// A project with no repo registers no path, so the old layout does not
-	// stop it.
-	if err := old.AddProject("notes", store.ProjectConfig{}); err != nil {
-		t.Fatalf("AddProject without a repo on the old layout: %v", err)
-	}
-	// Writes that do not register a repo keep working, and none of them
-	// relabels the workspace: only mate migrate writes layout 2.
+	// migrate's own writes keep the old repo paths and do not relabel the
+	// workspace: only SetLayoutProjectDirs writes layout 2.
 	cfg.Repos[0].DefaultBranch = "trunk"
 	if err := old.SaveProject("shop", cfg); err != nil {
 		t.Fatalf("SaveProject on the old layout: %v", err)

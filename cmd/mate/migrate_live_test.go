@@ -65,8 +65,8 @@ func TestLiveMigrateThenSpawn(t *testing.T) {
 	if err := os.WriteFile(w.WorkspaceFile(), []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if w, err = store.Open(root); err != nil {
-		t.Fatalf("store.Open: %v", err)
+	if w, err = store.OpenForMigrate(root); err != nil {
+		t.Fatalf("store.OpenForMigrate: %v", err)
 	}
 	if !w.LayoutOld() || len(w.Projects()) != 1 {
 		t.Fatalf("the fixture is not an old-layout workspace with project shop:\n%s", old)

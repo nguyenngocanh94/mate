@@ -99,7 +99,7 @@ func oldWorkspace(t *testing.T, projects ...project) *store.Workspace {
 		writeFile(t, w.ProjectFile(p.name), yaml)
 	}
 	writeFile(t, w.WorkspaceFile(), ws)
-	old, err := store.Open(w.Root())
+	old, err := store.OpenForMigrate(w.Root())
 	if err != nil {
 		t.Fatal(err)
 	}

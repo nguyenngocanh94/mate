@@ -36,10 +36,6 @@ type Snapshot struct {
 	// Tools are the console keys of the tools the binary drives, in
 	// registration order: what a UI binds and draws on its key line.
 	Tools []ToolBinding
-	// Layout is the workspace's directory layout (store.Workspace.Layout):
-	// 2 when every project is a directory under the root with its repos
-	// under it, 1 for a workspace still waiting for `mate migrate`.
-	Layout int
 	// Warnings lists every Unknown field in the tree, in tree order. Empty
 	// means every field either read successfully or is legitimately absent -
 	// it does not mean the snapshot is fresh.

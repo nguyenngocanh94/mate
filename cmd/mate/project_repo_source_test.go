@@ -201,8 +201,8 @@ func TestRepoAddRefusesAPathOutsideTheProject(t *testing.T) {
 	}
 }
 
-// TestRepoAddOnTheOldLayoutClonesNothing: on a workspace not yet migrated
-// the refusal comes before the clone, so no directory is left behind.
+// TestRepoAddOnTheOldLayoutClonesNothing: a workspace not yet migrated does
+// not open, so no clone is made and no directory is left behind.
 func TestRepoAddOnTheOldLayoutClonesNothing(t *testing.T) {
 	ws := initProjectWorkspace(t)
 	var out, errw bytes.Buffer
@@ -221,7 +221,7 @@ func TestRepoAddOnTheOldLayoutClonesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + bareRepo(t, true)}, &out, &errw)
-	if !errors.Is(err, store.ErrLayoutOld) || !strings.Contains(err.Error(), "run mate migrate first") {
+	if !errors.Is(err, store.ErrLayoutOld) || err.Error() != "this workspace has the old layout; run mate migrate with the previous mate release" {
 		t.Fatalf("repo add on the old layout = %v, want ErrLayoutOld", err)
 	}
 	for _, dir := range []string{filepath.Join(ws, "shop", "backend"), filepath.Join(ws, "backend")} {

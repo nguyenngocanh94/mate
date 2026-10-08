@@ -68,15 +68,10 @@ type BudgetConfig struct {
 // `mate/` and `crews/` directories, writes project.yaml and appends the
 // project to workspace.yaml. Before any of that is written it makes the
 // project's own directory, ProjectHome, if it is not there yet: the user's
-// directory, where its repos live, kept as it is when it exists. On a
-// workspace not yet on layout 2 a project with repos is refused with
-// ErrLayoutOld; one without registers no path and is not.
+// directory, where its repos live, kept as it is when it exists.
 func (w *Workspace) AddProject(name string, cfg ProjectConfig) error {
 	if err := ValidateProjectName(name); err != nil {
 		return err
-	}
-	if w.LayoutOld() && len(cfg.Repos) > 0 {
-		return ErrLayoutOld
 	}
 	if _, ok := w.Project(name); ok {
 		return fmt.Errorf("%w: %s", ErrProjectExists, name)

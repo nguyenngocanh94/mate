@@ -53,7 +53,22 @@ func TestMigrateCommandMovesAnOldWorkspace(t *testing.T) {
 	if err := os.WriteFile(w.WorkspaceFile(), []byte("version: 1\nsession: mate-old\nroot: "+root+"\nprojects:\n    - name: shop\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if w, err = store.Open(root); err != nil {
+	// Every command but mate migrate refuses the old layout.
+	var stdout, stderr bytes.Buffer
+	if code := mainRun([]string{"tool", "beads", "shop", "--init", "--workspace", root}, &stdout, &stderr); code != 1 || stderr.String() != "mate: this workspace has the old layout; run mate migrate with the previous mate release\n" {
+		t.Fatalf("another command on the old layout: exit %d, stderr %q", code, stderr.String())
+	}
+	// mate migrate opens it. No herdr on PATH: the dry run asks no
+	// session.
+	t.Run("migrate opens it", func(t *testing.T) {
+		t.Setenv("MATE_CALLER", "")
+		t.Setenv("PATH", t.TempDir())
+		var stdout, stderr bytes.Buffer
+		if code := mainRun([]string{"migrate", root, "--dry-run"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "would move "+root+"/web -> "+root+"/shop/web\n") {
+			t.Fatalf("mate migrate --dry-run on the old layout: exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+		}
+	})
+	if w, err = store.OpenForMigrate(root); err != nil {
 		t.Fatal(err)
 	}
 

@@ -38,10 +38,9 @@ const (
 	layoutProjectDirs = 2
 )
 
-// ErrLayoutOld refuses a write that would register a repo, or start a crew,
-// in a workspace still on layout 1. The workspace opens and reads; `mate
-// migrate` moves it.
-var ErrLayoutOld = errors.New("this workspace has the old layout (repos beside .mate); run mate migrate first")
+// ErrLayoutOld is Open's refusal of a workspace still on layout 1: only
+// `mate migrate` reads one (OpenForMigrate).
+var ErrLayoutOld = errors.New("this workspace has the old layout; run mate migrate with the previous mate release")
 
 // ProjectRef is one row of the project list in workspace.yaml: the project
 // name. Its repos live in the project's own project.yaml (docs/mvp.md M9);
@@ -56,8 +55,8 @@ type WorkspaceConfig struct {
 	Version int `yaml:"version"`
 	// Layout is the directory layout the workspace is on: 2 for a project
 	// that is a directory under the root with its repos under it, absent
-	// (read as 1) for repos beside `.mate/`. It is a label for the status
-	// line and the refusals; the path rule in normaliseRepos is the check.
+	// (read as 1) for repos beside `.mate/`, which only `mate migrate`
+	// opens.
 	Layout int `yaml:"layout,omitempty"`
 	// Session is the Herdr session name of this workspace. It is derived from
 	// the absolute path once, at Init, and then stored, so moving or
@@ -148,8 +147,22 @@ Nothing is written here yet.
 `
 
 // Open resolves workspaceDir, which must contain `.mate/workspace.yaml`, and
-// loads the configuration.
+// loads the configuration. A workspace still on the old layout is refused
+// with ErrLayoutOld.
 func Open(workspaceDir string) (*Workspace, error) {
+	w, err := OpenForMigrate(workspaceDir)
+	if err != nil {
+		return nil, err
+	}
+	if w.LayoutOld() {
+		return nil, ErrLayoutOld
+	}
+	return w, nil
+}
+
+// OpenForMigrate is Open for `mate migrate` alone: it opens a workspace on
+// either layout, the old one included.
+func OpenForMigrate(workspaceDir string) (*Workspace, error) {
 	root, err := resolveRoot(workspaceDir)
 	if err != nil {
 		return nil, err
@@ -233,9 +246,8 @@ func (w *Workspace) Layout() int {
 	return w.cfg.Layout
 }
 
-// LayoutOld reports a workspace not yet on layout 2. It opens and reads as
-// before; AddRepo, AddProject with a repo, and a crew spawn refuse with
-// ErrLayoutOld until `mate migrate` moves it.
+// LayoutOld reports a workspace not yet on layout 2, which only
+// OpenForMigrate opens.
 func (w *Workspace) LayoutOld() bool { return w.Layout() < layoutProjectDirs }
 
 // Defaults are the workspace-wide harness defaults.

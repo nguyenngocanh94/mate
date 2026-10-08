@@ -98,8 +98,7 @@ const (
 
 // ViewerContext is what a Viewer is opened on.
 type ViewerContext struct {
-	// ProjectDir is <root>/<project>. It may not exist yet on a workspace
-	// in the old layout.
+	// ProjectDir is <root>/<project>.
 	ProjectDir string
 	// CrewDir is .mate/projects/<p>/crews/<id>; empty on a project row.
 	CrewDir string

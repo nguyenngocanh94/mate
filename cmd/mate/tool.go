@@ -69,8 +69,7 @@ func cmdTool(args []string, stdout, stderr io.Writer) error {
 }
 
 // toolOnProject is the profile of the tool named, once the project is
-// known and the workspace is on layout 2: on the old layout the project
-// directory may be one of its repos, and a tool's data must not land there.
+// known.
 func toolOnProject(w *store.Workspace, name tool.Name, project string) (tool.Profile, error) {
 	p, err := tools.Lookup(name)
 	if err != nil {
@@ -78,9 +77,6 @@ func toolOnProject(w *store.Workspace, name tool.Name, project string) (tool.Pro
 	}
 	if err := requireProject(w, project); err != nil {
 		return nil, err
-	}
-	if w.LayoutOld() {
-		return nil, fmt.Errorf("mate tool %s %s: %w", name, project, store.ErrLayoutOld)
 	}
 	return p, nil
 }

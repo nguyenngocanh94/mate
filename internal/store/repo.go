@@ -142,9 +142,8 @@ func DefaultRepoName(repoPath string) string {
 // normaliseRepos fills each repo's defaults and checks the list: every path
 // inside the workspace and outside `.mate/`, under the project's directory
 // (ProjectHome) on layout 2, names valid and unique, and no path registered
-// twice. A workspace still on the old layout keeps the old rule, so its
-// project.yaml files can be rewritten (RemoveRepo, `mate migrate`); the
-// writes that would add a repo there refuse with ErrLayoutOld first.
+// twice. A workspace still on the old layout, which only `mate migrate`
+// opens, keeps the old rule, so migrate can rewrite its project.yaml files.
 func (w *Workspace) normaliseRepos(project string, repos []RepoConfig) ([]RepoConfig, error) {
 	out := make([]RepoConfig, 0, len(repos))
 	names := map[string]bool{}
@@ -203,12 +202,8 @@ func (w *Workspace) checkReposUnclaimed(project string, repos []RepoConfig) erro
 }
 
 // AddRepo registers one more repo in an existing project and returns it as
-// stored. An empty Name is derived from the path (DefaultRepoName). It
-// refuses with ErrLayoutOld on a workspace not yet on layout 2.
+// stored. An empty Name is derived from the path (DefaultRepoName).
 func (w *Workspace) AddRepo(project string, repo RepoConfig) (RepoConfig, error) {
-	if w.LayoutOld() {
-		return RepoConfig{}, ErrLayoutOld
-	}
 	cfg, err := w.LoadProject(project)
 	if err != nil {
 		return RepoConfig{}, err

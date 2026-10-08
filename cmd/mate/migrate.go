@@ -38,7 +38,7 @@ func cmdMigrate(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	w, err := store.Open(dir)
+	w, err := store.OpenForMigrate(dir)
 	if err != nil {
 		return err
 	}

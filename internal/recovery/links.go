@@ -12,6 +12,7 @@ package recovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -215,9 +216,13 @@ func RepairOwner(env Env, oldRoot string) []Fix {
 }
 
 // workspaceHolds reports whether the workspace at root is still on disk and
-// still names session.
+// still names session. One still on the old layout, which Open refuses, is
+// taken to hold it: two workspaces must never share a session.
 func workspaceHolds(root, session string) bool {
 	old, err := store.Open(root)
+	if errors.Is(err, store.ErrLayoutOld) {
+		return true
+	}
 	return err == nil && old.Session() == session
 }
 

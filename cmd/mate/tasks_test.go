@@ -192,8 +192,8 @@ func TestLegacyTaskPlanIsRefused(t *testing.T) {
 	}
 }
 
-// On the old layout the project directory may be one of its repos: no
-// tracker is made there.
+// A workspace on the old layout does not open: no tracker is made in a
+// project directory that may be one of its repos.
 func TestToolCommandsRefuseTheOldLayout(t *testing.T) {
 	w, _ := consoleFixture(t, "shop")
 	fakeBD(t)

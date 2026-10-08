@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-
-	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // cmdProjectRepo dispatches `mate project repo <add|list|remove>`: a
@@ -52,11 +50,6 @@ func cmdProjectRepoAdd(args []string, stdout, stderr io.Writer) error {
 	}
 	if err := requireProject(w, project); err != nil {
 		return err
-	}
-	// The store refuses the repo on the old layout too, but only after a
-	// clone would have landed; refusing here leaves nothing to clean up.
-	if w.LayoutOld() {
-		return fmt.Errorf("project repo add %s: %w", project, store.ErrLayoutOld)
 	}
 	shown := repoPath
 	if isGitURL(repoPath) {

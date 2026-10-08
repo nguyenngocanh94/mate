@@ -70,7 +70,7 @@ func TestMigrateLogRoundTrip(t *testing.T) {
 func TestSetLayoutProjectDirs(t *testing.T) {
 	w := newWorkspace(t)
 	writeOldLayout(t, w)
-	old, err := store.Open(w.Root())
+	old, err := store.OpenForMigrate(w.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
