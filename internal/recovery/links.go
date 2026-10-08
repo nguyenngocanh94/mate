@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
@@ -267,9 +268,10 @@ func ReplaceRoot(text, oldRoot, root string) string {
 }
 
 // ReplacePrefix swaps the path prefix old for new wherever text names a path
-// under old: old followed by a separator, by a character no name has, by
-// the period that ends a sentence, or by the end of the text - not by more
-// name, so /work/a does not match inside /work/ab or /work/a.go. An
+// under old: old followed by a separator, by a character no name has, by a
+// period followed by whitespace or the end of the text (the one that ends a
+// sentence), or by the end of the text - not by more name, so /work/a does
+// not match inside /work/ab, /work/a.go or /work/a./x. An
 // occurrence that already reads new is left as it is, so when new lies
 // under old - a repo moved into a directory of its own name, /w/shop to
 // /w/shop/shop - a second pass over the same text changes nothing.
@@ -311,7 +313,7 @@ func endsPath(rest string) bool {
 	case rest == "" || rest[0] == '/':
 		return true
 	case rest[0] == '.':
-		return len(rest) == 1 || !nameChar(rest[1])
+		return len(rest) == 1 || unicode.IsSpace(rune(rest[1]))
 	}
 	return !nameChar(rest[0])
 }

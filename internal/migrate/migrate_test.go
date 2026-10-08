@@ -669,3 +669,71 @@ func TestMigrateLockRefusesASecondMigrate(t *testing.T) {
 		t.Fatal("web moved while another migrate held the lock")
 	}
 }
+
+// assertRefusedUntouched runs the migrate, expects it refused with a reason
+// containing want, and the workspace unchanged beyond its lock file.
+func assertRefusedUntouched(t *testing.T, w *store.Workspace, deps migrate.Deps, want string) {
+	t.Helper()
+	before := tree(t, w.Root())
+	var out bytes.Buffer
+	_, err := migrate.Run(context.Background(), w, deps, &out)
+	reasons := refused(t, err)
+	if !strings.Contains(strings.Join(reasons, "\n"), want) {
+		t.Fatalf("refused with\n%s\nwant a reason containing %q", strings.Join(reasons, "\n"), want)
+	}
+	if d := diffTrees(before, tree(t, w.Root())); len(d) > 1 || (len(d) == 1 && d[0] != "new: .mate/migrate.lock") {
+		t.Fatalf("a refused run changed the workspace:\n%s", strings.Join(d, "\n"))
+	}
+}
+
+// TestMigrateRefusesARepoNestedInTheSameNameRepo: on the old layout project
+// shop could register both `shop` and `shop/api`. Moving shop to shop/shop
+// would carry api along and leave project.yaml naming a path that is gone,
+// so nothing moves.
+func TestMigrateRefusesARepoNestedInTheSameNameRepo(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"shop", "shop/api"}})
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	assertRefusedUntouched(t, w, deps,
+		"repo api of project shop at "+root+"/shop/api is inside repo shop of project shop at "+root+"/shop, which would move")
+}
+
+// TestMigrateRefusesARepoNestedInAnotherProjectsRepo: project plug's repo
+// lives inside project site's repo web. Moving web first would strand
+// plug's move half way, so nothing moves.
+func TestMigrateRefusesARepoNestedInAnotherProjectsRepo(t *testing.T) {
+	w := oldWorkspace(t,
+		project{"site", []string{"web"}},
+		project{"plug", []string{"web/plugin"}},
+	)
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	assertRefusedUntouched(t, w, deps,
+		"repo plugin of project plug at "+root+"/web/plugin is inside repo web of project site at "+root+"/web, which would move")
+}
+
+// TestMigrateWarnsWhenTheDirtyCheckFails: a registered directory git cannot
+// read is not reported clean; the line says so, and it still moves.
+func TestMigrateWarnsWhenTheDirtyCheckFails(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"web"}})
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	writeFile(t, filepath.Join(root, "docs", "notes.md"), "not a repo\n")
+	writeFile(t, w.ProjectFile("shop"), "repos:\n    - name: web\n      path: web\n      default_branch: main\n    - name: docs\n      path: docs\n      default_branch: main\n")
+	want := "warning: could not tell whether " + root + "/docs has uncommitted changes ("
+
+	var out bytes.Buffer
+	if _, err := migrate.DryRun(context.Background(), w, deps, &out); err != nil {
+		t.Fatalf("DryRun: %v", err)
+	}
+	if !strings.Contains(out.String(), "would move "+root+"/docs -> "+root+"/shop/docs\n") || !strings.Contains(out.String(), want) {
+		t.Fatalf("dry run printed:\n%s", out.String())
+	}
+	out.Reset()
+	if _, err := migrate.Run(context.Background(), w, deps, &out); err != nil {
+		t.Fatalf("Run: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), want) || readFile(t, filepath.Join(root, "shop", "docs", "notes.md")) != "not a repo\n" {
+		t.Fatalf("Run printed:\n%s", out.String())
+	}
+}

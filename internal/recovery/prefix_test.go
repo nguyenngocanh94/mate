@@ -14,6 +14,7 @@ func TestReplacePrefix(t *testing.T) {
 		{"trailing slash", "/w/web/", "/w/web/", "/w/shop/web/", "/w/shop/web/"},
 		{"nothing", "no paths here", "/w/web", "/w/shop/web", "no paths here"},
 		{"sentence period", "Work in /w/web.\nThen /w/web.go and /w/web.d/x.", "/w/web", "/w/shop/web", "Work in /w/shop/web.\nThen /w/web.go and /w/web.d/x."},
+		{"directory named with a trailing period", "/w/web./x and /w/web... and /w/web.", "/w/web", "/w/shop/web", "/w/web./x and /w/web... and /w/shop/web."},
 		{"end of text", "cd /w/web", "/w/web", "/w/shop/web", "cd /w/shop/web"},
 	} {
 		if got := ReplacePrefix(tc.text, tc.old, tc.new); got != tc.want {

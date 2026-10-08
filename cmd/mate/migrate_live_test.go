@@ -27,12 +27,15 @@ func TestLiveMigrateThenSpawn(t *testing.T) {
 	requireConsoleLive(t)
 	session, configHome := consoleLiveLab(t)
 
-	root := liveWorkspaceRoot(t)
-	w, err := store.Init(root, workspaceDefaults())
+	w, err := store.Init(liveWorkspaceRoot(t), workspaceDefaults())
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
 	consoleUseLabSession(t, w, session)
+	// The resolved root (/private/var/... on macOS, not /var/...): migrate
+	// prints and rewrites the paths store resolved, so the fixture's brief
+	// and every assertion must use the same.
+	root := w.Root()
 
 	// The old layout, by hand: store no longer writes one.
 	repo := filepath.Join(root, "shop")
@@ -108,6 +111,12 @@ func TestLiveMigrateThenSpawn(t *testing.T) {
 	}
 	if got := strings.TrimSpace(gitOut(t, k1, "rev-parse", "--show-toplevel")); got != k1 {
 		t.Fatalf("k1's worktree reports toplevel %q, want %s", got, k1)
+	}
+	if brief, err := os.ReadFile(w.CrewBrief("shop", "k1")); err != nil || string(brief) != "Work in "+moved+".\n" {
+		t.Fatalf("k1's brief = %q (%v), want it to name %s", brief, err, moved)
+	}
+	if !strings.Contains(out.String(), "rewrote 1 brief(s)") {
+		t.Fatalf("migrate did not rewrite k1's brief:\n%s", out.String())
 	}
 
 	t.Cleanup(func() {

@@ -99,6 +99,9 @@ type Move struct {
 	// Dirty is how many uncommitted changes the repo has; they move with
 	// it untouched.
 	Dirty int
+	// Warning is set when the dirty check itself failed: the repo is not
+	// known to be clean.
+	Warning string
 }
 
 // note is what the move's line says after the paths.
@@ -110,6 +113,11 @@ func (m Move) note() string {
 		return fmt.Sprintf(" (%d uncommitted change(s) kept)", m.Dirty)
 	}
 	return ""
+}
+
+func oneLine(err error) string {
+	msg, _, _ := strings.Cut(err.Error(), "\n")
+	return strings.TrimSpace(msg)
 }
 
 // Refusal is one reason a migrate will not start.
@@ -183,6 +191,7 @@ func Plan(ctx context.Context, ws *store.Workspace, deps Deps) ([]Move, []Refusa
 	var refusals []Refusal
 	configs := map[string]store.ProjectConfig{}
 	owners := map[string]string{} // absolute repo path -> project
+	var registered []repoRef
 	for _, ref := range ws.Projects() {
 		cfg, err := ws.LoadProject(ref.Name)
 		if err != nil {
@@ -192,6 +201,7 @@ func Plan(ctx context.Context, ws *store.Workspace, deps Deps) ([]Move, []Refusa
 		configs[ref.Name] = cfg
 		for _, r := range cfg.Repos {
 			owners[ws.RepoDir(r.Path)] = ref.Name
+			registered = append(registered, repoRef{project: ref.Name, name: r.Name, path: ws.RepoDir(r.Path)})
 		}
 	}
 	var moves []Move
@@ -205,10 +215,36 @@ func Plan(ctx context.Context, ws *store.Workspace, deps Deps) ([]Move, []Refusa
 		moves = append(moves, pm...)
 		refusals = append(refusals, pl.refusals...)
 	}
+	refusals = append(refusals, nested(moves, registered)...)
 	if len(moves) > 0 && !ws.LayoutOld() {
 		refusals = append(refusals, Refusal{Reason: "workspace.yaml already says layout 2 but a project.yaml names a repo outside its project's directory; fix that project.yaml by hand"})
 	}
 	return moves, refusals, nil
+}
+
+// repoRef is one registered repo of any project.
+type repoRef struct{ project, name, path string }
+
+// nested refuses every registered repo that lies inside a repo still at the
+// old path it would move from: the rename would carry it along, leaving its
+// project.yaml naming a path that no longer exists, or stranding its own
+// move half way. The old layout never forbade nesting, so only a hand move
+// can say where such a repo belongs.
+func nested(moves []Move, registered []repoRef) []Refusal {
+	var out []Refusal
+	for _, m := range moves {
+		if m.Stage != StageNew {
+			continue
+		}
+		for _, r := range registered {
+			if strings.HasPrefix(r.path, m.Old+string(filepath.Separator)) {
+				out = append(out, Refusal{Project: r.project, Reason: fmt.Sprintf(
+					"repo %s of project %s at %s is inside repo %s of project %s at %s, which would move; move or unregister the inner repo by hand first",
+					r.name, r.project, r.path, m.Repo, m.Project, m.Old)})
+			}
+		}
+	}
+	return out
 }
 
 // planner plans one project.
@@ -246,6 +282,8 @@ func (pl *planner) plan(cfg store.ProjectConfig, node query.ProjectNode) []Move 
 		if m.Stage == StageNew {
 			if n, err := pl.deps.Git.IsDirty(pl.ctx, m.Old); err == nil {
 				m.Dirty = n
+			} else {
+				m.Warning = fmt.Sprintf("could not tell whether %s has uncommitted changes (%v); it moves as it is", m.Old, oneLine(err))
 			}
 		}
 		moves = append(moves, m)
@@ -412,6 +450,11 @@ func DryRun(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) 
 	for _, m := range moves {
 		fmt.Fprintf(out, "would move %s -> %s%s\n", m.Old, m.New, m.note())
 	}
+	for _, m := range moves {
+		if m.Warning != "" {
+			fmt.Fprintln(out, "warning: "+m.Warning)
+		}
+	}
 	sum := Summary{Moves: moves}
 	if len(refusals) > 0 {
 		return sum, &RefusedError{Refusals: refusals}
@@ -452,6 +495,11 @@ func Run(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Su
 		return sum, nil
 	}
 	briefs := map[string]bool{}
+	for _, m := range moves {
+		if m.Warning != "" {
+			sum.Warnings = append(sum.Warnings, m.Warning)
+		}
+	}
 	for _, m := range moves {
 		if err := ctx.Err(); err != nil {
 			return sum, err
