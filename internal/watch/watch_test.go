@@ -3,6 +3,7 @@ package watch_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -693,6 +694,7 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	f.appendStatus("k3", "working: running the suite")
 
 	f.poll()
+	f.poll() // the pane held still for a poll: the observer is asked
 	f.w.AwaitObserver()
 	f.clock.advance(10 * time.Minute)
 	f.poll()
@@ -711,6 +713,7 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	f.setScreen(codexBusyScreen)
 	f.clock.advance(time.Minute)
 	f.poll()
+	f.poll()
 	f.w.AwaitObserver()
 	if err := f.w.Poll(context.Background()); err == nil {
 		t.Fatal("a round whose screen the observer could not read reported no error")
@@ -720,9 +723,10 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	f.assertIncidents("k3 stale open", "k3 stale resolved")
 }
 
-// The observer is asked only when the pane's snapshot changes: three polls
-// of the same screen are one observation, a new screen is the next, and a
-// screen the observer could not read is asked about again.
+// The observer is asked only when the pane's snapshot changes, and only once
+// the pane has held it for a poll: three polls of the same screen are one
+// observation, a new screen is the next, and a screen the observer could
+// not read is asked about again.
 func TestWatchObservesOnlyWhenTheScreenChanges(t *testing.T) {
 	f := newFixture(t)
 	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerEmpty, Source: "test"}}
@@ -746,6 +750,7 @@ func TestWatchObservesOnlyWhenTheScreenChanges(t *testing.T) {
 	f.setScreen(codexBusyScreen)
 	says.obs.Composer = screen.ComposerBusy
 	f.poll()
+	f.poll()
 	f.w.AwaitObserver()
 	f.poll()
 	if h, _ := f.health("k3"); says.calls != 2 || h.Composer != send.StateBusy {
@@ -755,6 +760,7 @@ func TestWatchObservesOnlyWhenTheScreenChanges(t *testing.T) {
 	f.setScreen(codexIdleScreen)
 	says.err = errors.New("observer could not read the screen")
 	f.clock.advance(5 * time.Second)
+	f.poll()
 	f.poll()
 	f.w.AwaitObserver()
 	if err := f.w.Poll(context.Background()); err == nil {
@@ -867,6 +873,10 @@ func TestWatchObservesInTheBackground(t *testing.T) {
 	f, slow := newSlowFixture(t, map[string]screen.ComposerState{codexIdleScreen: screen.ComposerBusy})
 
 	f.pollUnblocked()
+	if got := f.composer(); got != send.StateEmpty || len(slow.asked) != 0 {
+		t.Fatalf("first sight of the pane: composer %q, %d asks; want the fixture's empty and no ask yet", got, len(slow.asked))
+	}
+	f.pollUnblocked()
 	if got := f.composer(); got != send.StateEmpty {
 		t.Fatalf("while the observer thinks: composer %q, want the fixture's empty", got)
 	}
@@ -903,6 +913,7 @@ func TestWatchDropsAnAnswerForAScreenThatIsGone(t *testing.T) {
 		later:           screen.ComposerUnknown,
 	})
 	f.pollUnblocked()
+	f.pollUnblocked()
 	slow.next(t)
 	slow.answer(t, f.w)
 	f.pollUnblocked()
@@ -912,9 +923,10 @@ func TestWatchDropsAnAnswerForAScreenThatIsGone(t *testing.T) {
 
 	f.setScreen(codexBusyScreen)
 	f.pollUnblocked()
-	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" {
-		t.Fatalf("pane changed: %+v, want the fixture's busy, not the reading of the screen before", h)
+	if h := f.reading(); h.Composer != send.StateBusy || h.Source != "fixture" || len(slow.asked) != 0 {
+		t.Fatalf("pane changed: %+v, %d asks; want the fixture's busy, not the reading of the screen before, and no ask yet", h, len(slow.asked))
 	}
+	f.pollUnblocked()
 	if pane := slow.next(t); pane != codexBusyScreen {
 		t.Fatalf("asked about %q", pane)
 	}
@@ -942,11 +954,13 @@ func TestWatchUsesTheAnswerOnceThePaneHoldsStill(t *testing.T) {
 		codexBusyScreen: screen.ComposerUnknown,
 	})
 	f.pollUnblocked()
+	f.pollUnblocked()
 	slow.next(t)
 	slow.answer(t, f.w)
 	f.pollUnblocked()
 
 	f.setScreen(codexBusyScreen)
+	f.pollUnblocked()
 	f.pollUnblocked()
 	slow.next(t)
 	f.pollUnblocked()
@@ -962,5 +976,35 @@ func TestWatchUsesTheAnswerOnceThePaneHoldsStill(t *testing.T) {
 	f.pollUnblocked()
 	if h := f.reading(); h.Composer != send.StateUnknown || h.Source != "jev" || len(slow.asked) != 0 {
 		t.Fatalf("still pane: %+v, %d new asks; want Jev's reading kept and no call", h, len(slow.asked))
+	}
+}
+
+// A pane that changes every poll, as a busy one redrawing its spinner does,
+// is read by the fixture alone and costs no request; a pane that holds still
+// for two polls costs one.
+func TestWatchAsksOnlyAboutAPaneThatHeldStill(t *testing.T) {
+	f := newFixture(t)
+	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerBusy, Deterministic: screen.ComposerBusy, Source: "jev"}}
+	deps := f.deps()
+	deps.Observer = says
+	f.w = watch.New(f.ws, deps)
+	f.appendStatus("k3", "working: running the suite")
+
+	for i := range 6 {
+		f.setScreen(fmt.Sprintf("• Working (%ds • esc to interrupt)\n› Ask Codex to do anything\n\n  model · cwd\n", i))
+		f.poll()
+		f.w.AwaitObserver()
+		f.clock.advance(5 * time.Second)
+	}
+	if h, _ := f.health("k3"); says.calls != 0 || h.Composer != send.StateBusy || h.Source != "fixture" {
+		t.Fatalf("spinner pane: %d asks, health %+v; want none and the fixture's busy", says.calls, h)
+	}
+
+	f.setScreen(codexIdleScreen)
+	f.poll()
+	f.poll()
+	f.w.AwaitObserver()
+	if says.calls != 1 {
+		t.Fatalf("pane still for two polls: %d asks, want 1", says.calls)
 	}
 }

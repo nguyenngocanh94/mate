@@ -127,3 +127,25 @@ type Observation struct {
 type Observer interface {
 	Observe(ctx context.Context, profile harness.ScreenProfile, screen string) (Observation, error)
 }
+
+// The callers an Observe is made for, as the chain's log names them.
+const (
+	CallerWatch  = "watch"
+	CallerSend   = "send"
+	CallerSettle = "settle"
+	CallerStow   = "stow"
+)
+
+type callerKey struct{}
+
+// WithCaller names, in ctx, who the Observe calls made with it are for
+// (CallerWatch, ...). An observer reads it only to log it.
+func WithCaller(ctx context.Context, caller string) context.Context {
+	return context.WithValue(ctx, callerKey{}, caller)
+}
+
+// CallerOf is the caller WithCaller named in ctx, "" for none.
+func CallerOf(ctx context.Context) string {
+	caller, _ := ctx.Value(callerKey{}).(string)
+	return caller
+}

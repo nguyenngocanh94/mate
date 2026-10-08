@@ -303,7 +303,7 @@ func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind 
 	if look.read && look.hash == hash {
 		return look.obs, nil
 	}
-	observed, err := s.deps.observer().Observe(ctx, screens, pane)
+	observed, err := s.deps.observer().Observe(screen.WithCaller(ctx, screen.CallerStow), screens, pane)
 	if err != nil {
 		return unknown, err
 	}

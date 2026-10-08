@@ -39,7 +39,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
-	"github.com/nguyenngocanh94/mate/internal/screen"
+	screenpkg "github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
@@ -119,10 +119,10 @@ type Deps struct {
 	// send's policy decides from that Observation. Nil means the fixture
 	// observer (internal/screen/fixture). The re-reads after typing never
 	// ask it: they compare the composer with the typed text directly.
-	Observer screen.Observer
+	Observer screenpkg.Observer
 }
 
-func (d Deps) observer() screen.Observer {
+func (d Deps) observer() screenpkg.Observer {
 	if d.Observer != nil {
 		return d.Observer
 	}
@@ -266,7 +266,7 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if err != nil {
 		return report, err
 	}
-	observed, err := deps.observer().Observe(ctx, screens, screen)
+	observed, err := deps.observer().Observe(screenpkg.WithCaller(ctx, screenpkg.CallerSend), screens, screen)
 	if err != nil {
 		return report, err
 	}

@@ -145,7 +145,7 @@ func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane
 	if c.appendLine != nil {
 		_ = c.appendLine(LogLine{Time: start, Kind: key.kind, Hash: fmt.Sprintf("%x", key.hash[:6]), Latency: latency,
 			Source: obs.Source, Composer: primary.Composer, Dialog: primary.Dialog, Confidence: primary.Confidence,
-			Fallback: fallback}.String())
+			Caller: screen.CallerOf(ctx), Used: used(fallback), Fallback: fallback}.String())
 		if event != "" {
 			_ = c.appendLine(BreakerLine(c.now(), event))
 		}
@@ -181,6 +181,15 @@ func veto(fixture, jev screen.ComposerState) screen.ComposerState {
 		return jev
 	}
 	return fixture
+}
+
+// used is the log's word for whether the primary's answer is in the
+// reading returned: it is whenever no fallback rule applied.
+func used(fallback string) string {
+	if fallback == "" {
+		return UsedYes
+	}
+	return UsedNo
 }
 
 // recognisedDialog reports whether a startup classification names a

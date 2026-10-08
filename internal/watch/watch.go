@@ -445,18 +445,21 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	}
 	hash := screenHash(screen)
 	paneMoved := obs.screen != "" && obs.screen != hash
+	held := obs.screen == hash
 	obs.screen = hash
 	if paneMoved {
 		obs.changedAt = now
 	}
 
-	// The observer is asked only about a snapshot it has not read: a pane
-	// that has not changed keeps its last reading, so a still pane costs
-	// no observer call (docs/plans/jev-observer-2026-10-08.md section 4.3).
+	// The observer is asked only about a snapshot it has not read and the
+	// pane has held for a poll: a pane that has not changed keeps its last
+	// reading, so a still pane costs one observer call, and a pane that
+	// changes every poll costs none (docs/plans/jev-observer-2026-10-08.md
+	// section 4.3).
 	// A screen the observer could not read is not a reading: the round ends
 	// without a verdict, as for a pane that could not be read, and the next
 	// round asks again.
-	read, err := w.composer(ctx, obs, screens, screen, hash)
+	read, err := w.composer(ctx, obs, screens, screen, hash, held)
 	if err != nil {
 		return err
 	}

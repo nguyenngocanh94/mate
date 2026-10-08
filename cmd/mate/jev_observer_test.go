@@ -176,10 +176,12 @@ func TestCallSitesReadThroughTheDepsObserver(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// The watcher asks the observer in the background and uses its
-		// answer on the next round.
-		if err := watcher.Poll(context.Background()); err != nil {
-			t.Fatal(err)
+		// The watcher asks the observer in the background once the pane
+		// has held still for a poll, and uses its answer on the next round.
+		for range 2 {
+			if err := watcher.Poll(context.Background()); err != nil {
+				t.Fatal(err)
+			}
 		}
 		watcher.AwaitObserver()
 		if err := watcher.Poll(context.Background()); err != nil {

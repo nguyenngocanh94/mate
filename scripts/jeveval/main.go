@@ -15,7 +15,8 @@
 // of the network. -list prints the corpus and its labels without calling.
 // -log reads the observer chain's log instead (internal/screen/chain) and
 // prints the numbers a day with the chain on is measured by: requests,
-// latency p50/p95 and how many fell back to the fixture observer.
+// latency p50/p95, how many fell back to the fixture observer, and how many
+// answers were used and unused, with the requests per caller.
 package main
 
 import (
@@ -217,6 +218,14 @@ func summarizeLog(w io.Writer, path string) error {
 		fmt.Fprintf(w, " (%s)", strings.Join(why, ", "))
 	}
 	fmt.Fprintln(w, ".")
+	if s.Used+s.Unused > 0 {
+		fmt.Fprintf(w, "- Answers used: %d; unused: %d", s.Used, s.Unused)
+		var by []string
+		for _, k := range slices.Sorted(maps.Keys(s.ByCaller)) {
+			by = append(by, fmt.Sprintf("%s %d", k, s.ByCaller[k]))
+		}
+		fmt.Fprintf(w, " (requests by caller: %s).\n", strings.Join(by, ", "))
+	}
 	if s.BreakerOpens > 0 {
 		fmt.Fprintf(w, "- Circuit opened: %d (Jev not asked for %s after each).\n", s.BreakerOpens, chain.BreakerCooldown)
 	}

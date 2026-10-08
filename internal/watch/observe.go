@@ -44,16 +44,19 @@ func readingOf(obs screen.Observation) reading {
 // the poll loop never waits for it (docs/plans/jev-observer-2026-10-08.md
 // section 7). A still pane keeps the observer's reading of it. A pane the
 // observer has not read yet is read by the fixture in the round, and that
-// reading stands until the observer's answer for the same snapshot arrives:
-// a busy pane redraws its spinner every poll, so an answer is often for a
-// snapshot already gone, and keeping the reading from before the change
-// would freeze the column for the whole turn. An answer for a snapshot the
-// pane has since left is dropped (section 4.3), and the pane's current
-// snapshot is asked about next. At most one call per crew is in flight.
+// reading stands until the observer's answer for the same snapshot arrives.
+//
+// The observer is asked about a snapshot only once the pane has held it for
+// a poll (held: this round's hash is the last round's). A busy pane redraws
+// its spinner every poll, so asking about each snapshot would pay for
+// answers that are for a snapshot already gone; such a pane is read by the
+// fixture alone, and costs no request, until it holds still. An answer for
+// a snapshot the pane has since left is dropped (section 4.3). At most one
+// call per crew is in flight.
 //
 // A snapshot the observer could not read is no reading: the round that
 // learns it ends without a verdict, and the next asks again.
-func (w *Watcher) composer(ctx context.Context, obs *observation, screens harness.ScreenProfile, pane, hash string) (reading, error) {
+func (w *Watcher) composer(ctx context.Context, obs *observation, screens harness.ScreenProfile, pane, hash string, held bool) (reading, error) {
 	if w.deps.Observer == nil {
 		if obs.observed == hash {
 			return obs.reading, nil
@@ -81,7 +84,7 @@ func (w *Watcher) composer(ctx context.Context, obs *observation, screens harnes
 	if obs.observed == hash {
 		return obs.reading, nil
 	}
-	if obs.asking == nil {
+	if obs.asking == nil && held {
 		w.ask(ctx, obs, screens, pane, hash)
 	}
 	interim, err := fixture.New().Observe(ctx, screens, pane)
@@ -103,7 +106,7 @@ func (w *Watcher) ask(ctx context.Context, obs *observation, screens harness.Scr
 		defer close(a.done)
 		ctx, cancel := context.WithTimeout(ctx, notice.Timeout)
 		defer cancel()
-		a.obs, a.err = observer.Observe(ctx, screens, pane)
+		a.obs, a.err = observer.Observe(screen.WithCaller(ctx, screen.CallerWatch), screens, pane)
 	}()
 }
 

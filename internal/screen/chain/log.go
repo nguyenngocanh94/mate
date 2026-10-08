@@ -15,12 +15,17 @@ import (
 // LogLine is one request the chain sent to Jev, as `.mate/jev.log` keeps
 // it, one line each:
 //
-//	<RFC3339> <kind> <hash12> <latency_ms> <source> composer=<x> dialog=<y> conf=<0.00> [fallback=<why>]
+//	<RFC3339> <kind> <hash12> <latency_ms> <source> composer=<x> dialog=<y> conf=<0.00> caller=<who> used=<yes|no> [fallback=<why>]
 //
 // Composer, Dialog and Confidence are Jev's answer ("-" when the request
 // failed); Source is the observer whose reading the chain returned, and
-// Fallback the rule that sent it to the fixture. No screen text and no key
-// is ever in it.
+// Fallback the rule that sent it to the fixture. Caller is who asked
+// (screen.WithCaller: watch, send, settle, stow; "-" for none), and Used
+// whether any of Jev's answer is in the reading the chain returned. A
+// caller can still drop a reading it was handed (watch, for a pane that
+// changed while Jev was asked); the log cannot see that. No screen text and
+// no key is ever in it. A line written before caller and used were logged
+// reads with both empty.
 type LogLine struct {
 	Time       time.Time
 	Kind       string
@@ -30,8 +35,17 @@ type LogLine struct {
 	Composer   screen.ComposerState
 	Dialog     screen.DialogKind
 	Confidence float64
-	Fallback   string
+	Caller     string
+	// Used is "yes", "no", or "" on a line from before it was logged.
+	Used     string
+	Fallback string
 }
+
+// The two values of LogLine.Used.
+const (
+	UsedYes = "yes"
+	UsedNo  = "no"
+)
 
 // String formats the line, without its newline.
 func (l LogLine) String() string {
@@ -43,6 +57,9 @@ func (l LogLine) String() string {
 	}
 	out := fmt.Sprintf("%s %s %s %d %s composer=%s dialog=%s conf=%.2f", l.Time.UTC().Format(time.RFC3339), dash(l.Kind),
 		dash(l.Hash), l.Latency.Milliseconds(), dash(l.Source), dash(string(l.Composer)), dash(string(l.Dialog)), l.Confidence)
+	if l.Caller != "" || l.Used != "" {
+		out += fmt.Sprintf(" caller=%s used=%s", dash(l.Caller), dash(l.Used))
+	}
 	if l.Fallback != "" {
 		out += " fallback=" + l.Fallback
 	}
@@ -60,8 +77,8 @@ func BreakerLine(at time.Time, event string) string {
 // ParseLogLine reads one line String wrote.
 func ParseLogLine(line string) (LogLine, error) {
 	f := strings.Fields(line)
-	if len(f) != 8 && len(f) != 9 {
-		return LogLine{}, fmt.Errorf("%d fields, want 8 or 9", len(f))
+	if len(f) < 8 || len(f) > 11 {
+		return LogLine{}, fmt.Errorf("%d fields, want 8 to 11", len(f))
 	}
 	at, err := time.Parse(time.RFC3339, f[0])
 	if err != nil {
@@ -95,10 +112,30 @@ func ParseLogLine(line string) (LogLine, error) {
 		return LogLine{}, fmt.Errorf("conf %q", conf)
 	}
 	l.Composer, l.Dialog = screen.ComposerState(composer), screen.DialogKind(dialog)
-	if len(f) == 9 {
-		if l.Fallback, err = field(f[8], "fallback"); err != nil {
+	rest := f[8:]
+	if len(rest) >= 2 && strings.HasPrefix(rest[0], "caller=") {
+		if l.Caller, err = field(rest[0], "caller"); err != nil {
 			return LogLine{}, err
 		}
+		if l.Used, err = field(rest[1], "used"); err != nil {
+			return LogLine{}, err
+		}
+		if l.Used != UsedYes && l.Used != UsedNo {
+			return LogLine{}, fmt.Errorf("used %q", l.Used)
+		}
+		if l.Caller == "-" {
+			l.Caller = ""
+		}
+		rest = rest[2:]
+	}
+	switch len(rest) {
+	case 0:
+	case 1:
+		if l.Fallback, err = field(rest[0], "fallback"); err != nil {
+			return LogLine{}, err
+		}
+	default:
+		return LogLine{}, fmt.Errorf("unexpected fields %q", rest)
 	}
 	return l, nil
 }
@@ -111,6 +148,12 @@ type Summary struct {
 	Fallbacks int
 	// ByFallback counts the fallbacks per rule.
 	ByFallback map[string]int
+	// Used and Unused count the requests whose answer was, and was not,
+	// in the reading the chain returned; a line from before Used was
+	// logged is in neither.
+	Used, Unused int
+	// ByCaller counts the requests per caller, "-" for none named.
+	ByCaller map[string]int
 	// BreakerOpens counts the times the circuit opened (BreakerLine).
 	BreakerOpens int
 	// Malformed counts lines that do not parse; a trailing partial line,
@@ -120,7 +163,7 @@ type Summary struct {
 
 // Summarize reads a log.
 func Summarize(r io.Reader) (Summary, error) {
-	s := Summary{ByFallback: map[string]int{}}
+	s := Summary{ByFallback: map[string]int{}, ByCaller: map[string]int{}}
 	var lat []time.Duration
 	br := bufio.NewReader(r)
 	for {
@@ -151,6 +194,19 @@ func Summarize(r io.Reader) (Summary, error) {
 		if l.Fallback != "" {
 			s.Fallbacks++
 			s.ByFallback[l.Fallback]++
+		}
+		switch l.Used {
+		case UsedYes:
+			s.Used++
+		case UsedNo:
+			s.Unused++
+		}
+		if l.Used != "" {
+			caller := l.Caller
+			if caller == "" {
+				caller = "-"
+			}
+			s.ByCaller[caller]++
 		}
 	}
 	slices.Sort(lat)

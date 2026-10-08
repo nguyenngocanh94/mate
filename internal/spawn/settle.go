@@ -10,7 +10,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
-	"github.com/nguyenngocanh94/mate/internal/screen"
+	scr "github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
@@ -133,7 +133,7 @@ var startupDialogs = map[harness.StartupScreen]string{
 // Mate's SessionStart hook). Codex's hook review is walked, and those hooks
 // trusted, only when every hook the review lists is one of them; with none,
 // the review is refused at once.
-func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, observer screen.Observer, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
+func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, observer scr.Observer, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
 	if sleep == nil {
 		sleep = sleepCtx
 	}
@@ -146,7 +146,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err != nil {
 			return settled, err
 		}
-		observed, err := observer.Observe(ctx, screens, screen)
+		observed, err := observer.Observe(scr.WithCaller(ctx, scr.CallerSettle), screens, screen)
 		if err != nil {
 			return settled, err
 		}
@@ -209,8 +209,8 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 
 // jevSays is what Jev named the dialog on a screen the harness profile
 // could not, for the refusal: Jev's word is reported, never acted on.
-func jevSays(observed screen.Observation) string {
-	if observed.Source != "jev" || observed.Dialog == screen.DialogNone {
+func jevSays(observed scr.Observation) string {
+	if observed.Source != "jev" || observed.Dialog == scr.DialogNone {
 		return ""
 	}
 	return " · jev says " + string(observed.Dialog)
@@ -223,7 +223,7 @@ func jevSays(observed screen.Observation) string {
 // and Codex's update highlight opens on "1. Update now", so this order is the
 // difference between settling the pane and killing the agent or starting a
 // package install under it.
-func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, observer screen.Observer, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
+func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, observer scr.Observer, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
 	answer, err := screens.StartupAnswer(dialog)
 	if err != nil {
 		return nil, err
@@ -252,7 +252,7 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 			return presses, err
 		}
 	}
-	observed, err := observer.Observe(ctx, screens, screen)
+	observed, err := observer.Observe(scr.WithCaller(ctx, scr.CallerSettle), screens, screen)
 	if err != nil {
 		return presses, err
 	}
