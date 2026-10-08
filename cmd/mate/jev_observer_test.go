@@ -22,10 +22,10 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
-// The MATE_JEV value table (jevSettings): with a readable key, on,
-// observer and unset are the observer chain and the notice action; fixture
-// keeps the action and reads panes with the fixture observer (nil); off is
-// neither. Without a key, or on any mistake, the observer is the fixture's,
+// The MATE_JEV value table (jevSettings): with a readable key, on and
+// observer are the observer chain and the notice action; unset and fixture
+// keep the action and read panes with the fixture observer (nil) until the
+// day-long run's evidence is committed; off is neither. Without a key, or on any mistake, the observer is the fixture's,
 // with one line saying why when the setting asked for Jev.
 func TestConfiguredObserver(t *testing.T) {
 	ws := noticeWorkspace(t)
@@ -47,8 +47,10 @@ func TestConfiguredObserver(t *testing.T) {
 		noticeErr string
 	}{
 		{env: ""},
-		{env: keyLine, chained: true, noticed: true},
+		{env: keyLine, noticed: true},
 		{env: "MATE_JEV_API_KEY_FILE=" + filepath.Join(t.TempDir(), "missing") + "\n",
+			noticeErr: "Jev disabled: cannot read MATE_JEV_API_KEY_FILE"},
+		{env: "MATE_JEV=on\nMATE_JEV_API_KEY_FILE=" + filepath.Join(t.TempDir(), "missing") + "\n",
 			err: "Jev disabled: cannot read MATE_JEV_API_KEY_FILE", noticeErr: "Jev disabled: cannot read MATE_JEV_API_KEY_FILE"},
 		{env: "MATE_JEV=off\n" + keyLine},
 		{env: "MATE_JEV=OFF\n" + keyLine},
@@ -59,10 +61,12 @@ func TestConfiguredObserver(t *testing.T) {
 		{env: "MATE_JEV=observer\n" + keyLine, chained: true, noticed: true},
 		{env: "MATE_JEV=Observer\n" + keyLine + "MATE_JEV_THRESHOLD=0.9\n", chained: true, noticed: true},
 		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=0\n", chained: true, noticed: true},
-		{env: keyLine + "MATE_JEV_THRESHOLD=1\n", chained: true, noticed: true},
+		{env: keyLine + "MATE_JEV_THRESHOLD=1\n", noticed: true},
+		{env: "MATE_JEV=on\n" + keyLine + "MATE_JEV_THRESHOLD=1\n", chained: true, noticed: true},
 		{env: "MATE_JEV=observer\n", err: noKey, noticeErr: noKey},
 		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=1.5\n", noticed: true, err: badLimit},
-		{env: keyLine + "MATE_JEV_THRESHOLD=high\n", noticed: true, err: badLimit},
+		{env: keyLine + "MATE_JEV_THRESHOLD=high\n", noticed: true},
+		{env: "MATE_JEV=on\n" + keyLine + "MATE_JEV_THRESHOLD=high\n", noticed: true, err: badLimit},
 		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=-0.1\n", noticed: true, err: badLimit},
 		{env: "MATE_JEV=maybe\n" + keyLine, err: badSwitch, noticeErr: badSwitch},
 	} {

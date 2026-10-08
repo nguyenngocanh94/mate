@@ -54,8 +54,12 @@ const (
 //	off (false, 0, no)               nothing goes to Jev
 //	fixture                          the notice action; panes read by the fixture observer
 //	on, observer (true, 1, yes)      the notice action and the observer chain
-//	unset, with MATE_JEV_API_KEY_FILE  the same as on
+//	unset, with MATE_JEV_API_KEY_FILE  the same as fixture
 //	unset, no key file named         off, silently: a workspace that never set Jev up
+//
+// A key alone keeps the panes on the fixture observer until the day-long
+// live run's evidence is committed (docs/plans/jev-observer-2026-10-08.md
+// section 6, PR 3); the chain is asked for by name.
 //
 // Any other value is a mistake, said in the error, and Jev stays off.
 func jevSettings(ws *store.Workspace) (map[string]string, jevMode, error) {
@@ -68,7 +72,7 @@ func jevSettings(ws *store.Workspace) (map[string]string, jevMode, error) {
 		if env["MATE_JEV_API_KEY_FILE"] == "" {
 			return env, jevOff, nil
 		}
-		return env, jevObserver, nil
+		return env, jevNotice, nil
 	case "off", "false", "0", "no":
 		return env, jevOff, nil
 	case "fixture":

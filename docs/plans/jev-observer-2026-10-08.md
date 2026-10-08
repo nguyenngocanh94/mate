@@ -121,7 +121,7 @@ Unit cho policy mục 4.2: mọi hàng của bảng có một case; `chain` fall
 | 0 | Eval: script chạy Jev trên corpus, evidence, quyết định đi tiếp | Evidence có bảng đầy đủ; captain ký đi tiếp hoặc dừng |
 | 1 | `internal/screen` với `Observation`, `fixture` bọc `ScreenProfile`; `send`, `watch`, settle nhận `Observer` thay vì gọi profile trực tiếp; mặc định `fixture` | Mọi capture phân loại như cũ; golden console không đổi; không gọi mạng |
 | 2 | `screen/jev` từ `notice.Client`, cassette, `chain`, ngưỡng, dedup, huỷ theo hash; bật bằng `MATE_JEV=observer` trong `.mate/.env`; `· via jev` trên health | Unit từ cassette; bật trên workspace thật một ngày, evidence ghi số lần gọi, latency p50/p95, số lần fallback |
-| 3 | Mặc định `chain` khi có key; `docs/jev-notices.md` và spec; `mate state` in nguồn | Spec quyết định 8 sửa: pane là tín hiệu qua Jev, hook vẫn là bằng chứng |
+| 3 | Mặc định `chain` khi có key; `docs/jev-notices.md` và spec; `mate state` in nguồn | Spec quyết định 8 sửa: pane là tín hiệu qua Jev, hook vẫn là bằng chứng. (Sửa 2026-10-08: mặc định chưa chuyển; chỉ có key thì vẫn là action notice với fixture, chain bật bằng `MATE_JEV=on` hoặc `observer`. Mặc định chuyển sang chain sau khi evidence của lần chạy thật một ngày đã được commit.) |
 
 Quan hệ: PR 1 trùng chỗ với probe-TUI PR 1 (tách quan sát khỏi policy). Phương án này *là* bước đó, nên probe-TUI PR 1 không làm riêng nữa; ghi vào `tui-probe-redesign` khi mở PR 1.
 

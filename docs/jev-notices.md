@@ -1,6 +1,6 @@
 # Thử Jev để đọc notice trong terminal
 
-Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Action mặc định tắt khi workspace chưa đặt key, và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh. Từ khi có key, Jev còn là bộ quan sát pane mặc định (mục "Bộ quan sát" bên dưới).
+Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Action mặc định tắt khi workspace chưa đặt key, và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh. Với `MATE_JEV=on` hoặc `observer`, Jev còn là bộ quan sát pane (mục "Bộ quan sát" bên dưới); chỉ có key thì chưa.
 
 ## Bật bản thử
 
@@ -14,7 +14,7 @@ MATE_JEV=on
 MATE_JEV_API_KEY_FILE=~/.config/mate/jev-trial-api-key
 ```
 
-`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Có key thì `MATE_JEV` không cần đặt: action và bộ quan sát cùng bật. `MATE_JEV=fixture` chỉ giữ action, `MATE_JEV=off` tắt cả hai (bảng ở mục "Bộ quan sát"); mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
+`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Có key mà không đặt `MATE_JEV` thì chỉ action bật, như `MATE_JEV=fixture`; `MATE_JEV=on` hoặc `observer` bật cả action lẫn bộ quan sát, `MATE_JEV=off` tắt cả hai (bảng ở mục "Bộ quan sát"); mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
 
 ## Kết quả có ý nghĩa gì?
 
@@ -42,12 +42,12 @@ Sheet ghi thời điểm capture và confidence từ model. Confidence không ph
 
 ## Bộ quan sát
 
-Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), khi `.mate/.env` đặt `MATE_JEV_API_KEY_FILE` và file key đọc được, bộ quan sát pane là chain (Jev trước, fixture classifier là fallback) mà không cần đặt `MATE_JEV`. Giá trị `MATE_JEV`:
+Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), `MATE_JEV=on` hoặc `observer` cùng một file key đọc được bật chain làm bộ quan sát pane (Jev trước, fixture classifier là fallback). Chỉ đặt `MATE_JEV_API_KEY_FILE` mà không đặt `MATE_JEV` thì như hôm nay: action Explain notice bật, pane vẫn do fixture đọc. Mặc định sẽ chuyển sang chain khi evidence của lần chạy thật một ngày đã được commit. Giá trị `MATE_JEV`:
 
 | `MATE_JEV` | Action Explain notice | Bộ quan sát pane |
 | --- | --- | --- |
-| không đặt, `on`, `observer` | bật | chain: Jev trước, fixture khi Jev không chắc |
-| `fixture` | bật | fixture, không request nào cho pane |
+| `on`, `observer` | bật | chain: Jev trước, fixture khi Jev không chắc |
+| không đặt (có key), `fixture` | bật | fixture, không request nào cho pane |
 | `off` | tắt | fixture, không request nào tới Jev |
 | giá trị khác | tắt, báo lỗi | fixture |
 
