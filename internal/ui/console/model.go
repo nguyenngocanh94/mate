@@ -102,6 +102,12 @@ const (
 	// It is dangerous - a live crew would be stopped first - so the menu's
 	// confirmation stands in front of it, like ActionRestartMate.
 	ActionRestartCrew Action = "restart_crew"
+	// ActionRemoveProject takes a Project out of the workspace: it stops the
+	// Project's crews and Mate, then unregisters it (mvp.md task 75). Nothing
+	// on disk is deleted, so adding the Project again brings its history
+	// back. It is dangerous only in that it stops agents, so the confirmation
+	// is a plain `y`, not a typed name.
+	ActionRemoveProject Action = "remove_project"
 	// TODO: v1 also had retry, discard and switch_harness. mate has no
 	// retry (a Crew runs once), and no discard action: throwing work away
 	// is `mate crew stop --discard`, on the captain's explicit word.
@@ -299,6 +305,9 @@ type Model struct {
 	// change the snapshot. A missing key is collapsed, which is the default
 	// view.
 	completedOpen map[string]bool
+	// handedBackOpen is the same presentation choice for wait-mate crews.
+	// Hand-back keeps the task open; its rows are collapsed by default.
+	handedBackOpen map[string]bool
 	// detailSel is the field under detail's cursor; every selection change
 	// resets it.
 	detailSel int
@@ -486,12 +495,13 @@ func New(load LoadFunc, action ...ActionFunc) Model {
 		run = action[0]
 	}
 	return Model{
-		load:          load,
-		action:        run,
-		phase:         phaseLoading,
-		stack:         []frame{{kind: frameWorkspace}},
-		focus:         paneList,
-		completedOpen: map[string]bool{},
+		load:           load,
+		action:         run,
+		phase:          phaseLoading,
+		stack:          []frame{{kind: frameWorkspace}},
+		focus:          paneList,
+		completedOpen:  map[string]bool{},
+		handedBackOpen: map[string]bool{},
 		// -1 is "follow the newest box entry".
 		boxSel: -1,
 		g:      glyphsFor(os.Getenv),
@@ -645,7 +655,7 @@ func (m Model) rowsFor(i int) []row {
 		if !ok {
 			return nil
 		}
-		return projectDetailRows(p, m.completedOpen[p.ProjectID])
+		return projectDetailRows(p, m.completedOpen[p.ProjectID], m.handedBackOpen[p.ProjectID])
 	default:
 		return nil
 	}
@@ -658,12 +668,19 @@ func (m Model) currentRows() []row { return m.rowsFor(len(m.stack) - 1) }
 // selects the given Crew, reusing reconcileSelection's own by-identity
 // positioning rather than hand-computing a row index. A finished Crew sits
 // in the collapsed Completed group, which reconcileSelection expands for
-// exactly this case (revealCompletedIfSelHidden).
+// exactly this case (revealCompletedIfSelHidden). A jump also reveals a
+// handed-back crew; ordinary refreshes keep that group collapsed.
 func (m Model) jumpToCrew(crewID string) (Model, bool) {
 	for _, p := range m.tree.Projects {
 		for _, c := range p.Crews {
 			if c.CrewID != crewID {
 				continue
+			}
+			if c.Status == query.CrewWaitMate {
+				if m.handedBackOpen == nil {
+					m.handedBackOpen = map[string]bool{}
+				}
+				m.handedBackOpen[p.ProjectID] = true
 			}
 			m.stack = []frame{
 				{kind: frameWorkspace, selID: p.ProjectID},

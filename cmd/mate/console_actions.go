@@ -81,6 +81,8 @@ func consoleAction(ws *store.Workspace, deps spawn.Deps) console.ActionFunc {
 			return relaunchCrewAction(ctx, ws, deps, req)
 		case console.ActionClearComposer:
 			return clearComposerAction(ctx, ws, deps, req)
+		case console.ActionRemoveProject:
+			return removeProjectAction(ctx, ws, deps, req)
 		case console.ActionMerge:
 			return mergeCrewAction(ctx, ws, deps, req)
 		default:
@@ -105,6 +107,30 @@ func stopCrewAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, r
 		return "", err
 	}
 	return crewStopReport(req.Target, req.Crew, res), nil
+}
+
+// removeProjectAction is the Project row's `Remove project…` entry (mvp.md
+// task 75). It is `mate project remove`: the crews and the Mate are stopped,
+// the Mate after the captain's stow, and only then does the Project leave
+// workspace.yaml. Like addProjectAction it works on a store it opens itself,
+// because RemoveProject saves the whole config and the console's own copy
+// may be older than the file.
+func removeProjectAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, req console.ActionRequest) (string, error) {
+	if req.Target == "" || req.TargetKind != "project" {
+		return "", observability.NewError(observability.CodeUsage,
+			fmt.Sprintf("remove project needs a Project; the request named %s %q", req.TargetKind, req.Target))
+	}
+	fresh, err := store.Open(ws.Root())
+	if err != nil {
+		return "", err
+	}
+	var stderr strings.Builder
+	res, err := spawn.RemoveProject(ctx, fresh, deps, req.Target, removeProjectOptions(fresh, deps, spawn.CallerUser, &stderr, nil))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Project %s removed: %d agent(s) stopped; its files stay on disk, `mate project add %s` brings it back",
+		req.Target, len(res.Stopped), req.Target), nil
 }
 
 // relaunchCrewAction is the Console's `Restart crew…` entry (mvp.md M13).
@@ -156,11 +182,19 @@ func startMateAction(ctx context.Context, ws *store.Workspace, deps spawn.Deps, 
 	if err != nil {
 		return "", err
 	}
-	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Harness: kind})
+	// Resume is the 's' on a stopped Mate: the conversation recorded in
+	// mate.meta comes back, or a fresh one starts with a note saying why.
+	res, err := spawn.StartMate(ctx, ws, deps, spawn.StartRequest{Project: req.Target, Harness: kind, Resume: req.Action == console.ActionResume})
 	if err != nil {
 		return "", err
 	}
 	line := fmt.Sprintf("Mate %s is running on %s in pane %s", res.Agent, res.Harness, res.Pane)
+	if res.Resumed {
+		line += "; resumed session " + res.ResumedFrom
+	}
+	if res.ResumeNote != "" {
+		line += "; " + res.ResumeNote
+	}
 	if res.Adopted {
 		line += "; adopted: an interrupted start had left it running unrecorded"
 	}

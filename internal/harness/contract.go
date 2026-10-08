@@ -233,6 +233,12 @@ type HookInstaller interface {
 	// DigestMaxBytes bounds the session-start digest the hook prints, to
 	// what the harness puts in context whole.
 	DigestMaxBytes() int
+	// Repoint rewrites the mate binary in the hook files of the Mate whose
+	// cwd this is, when the binary they name no longer exists (exists
+	// reports it): the shape a workspace copied to another machine takes. It
+	// keeps every other hook and reports whether it changed anything. A
+	// harness whose hook files a launch always rewrites changes nothing.
+	Repoint(binary, cwd string, exists func(string) bool) (changed bool, err error)
 	// BareSessionHook reports whether the harness's SessionStart hook runs
 	// `mate hook mate-session` without --harness, so a hook that names no
 	// harness is this one's. At most one registered harness says so.

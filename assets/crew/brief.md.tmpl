@@ -31,7 +31,11 @@ Run `pwd -P` and `git rev-parse --show-toplevel`; both must resolve to `{{.Workt
 If the top-level path is the primary checkout, STOP: do not edit or commit here, append `needs-decision: launched in primary checkout, not an isolated worktree` to the status file, and stop.
 
 # Rules
+{{- if and .GitHub (not .Scout)}}
+1. Push only your own branch `{{.Branch}}`, to `origin`, and open a pull request for it against `{{.DefaultBranch}}` with `gh pr create`. Never push any other branch, never force-push, and never merge the pull request.
+{{- else}}
 1. Never push to any remote and never open a pull request.
+{{- end}}
 2. Stay inside this worktree; modify nothing outside it except the two files this brief names by absolute path: the status file and `{{if .Scout}}{{.ReportPath}}{{else}}{{.HandbackPath}}{{end}}`.
 3. Report status by appending one line:
    `echo "{state}: {one short line}" >> $MATE_STATUS`
@@ -39,6 +43,9 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
    - `working: {phase}` - you are making progress.
    - `needs-decision: {summary of the options}` - you cannot decide this yourself. Stop your turn; somebody will type an answer into this pane and you carry on.
    - `wait-mate: {one line}` - you have done all you can and are handing the task back to the Mate. It is your last line.
+{{- if and .GitHub (not .Scout)}}
+   - `pr-open: {url}` - the form of `wait-mate` for a pull request you opened; the Definition of done says when. It is your last line.
+{{- end}}
    Never write `blocked`, `failed`, `finished` or `done`. Those words belong to the app and to the Mate: `blocked` is what the app calls a crew that cannot speak at all, and whether the task finished or failed is the Mate's decision, not yours.
    Append `working: {what you are about to do}` once, as your very first action, before you read or change anything. Until you do, nobody can tell a Crew that started work from one whose harness never came up.
    After that first line, report sparingly: each append wakes the Mate, so write only phase changes a supervisor would act on, plus `needs-decision` and `wait-mate`. No step-by-step FYI progress lines.
@@ -50,7 +57,7 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 {{- if .Scout}}
 
 # Definition of done
-This project ships local-only: no remote, no pull request, no pipeline.
+{{if .GitHub}}This project ships through GitHub pull requests, but this task asks for knowledge: nothing is pushed and no pull request is opened.{{else}}This project ships local-only: no remote, no pull request, no pipeline.{{end}}
 This task asks for knowledge - an investigation, a plan, a reproduction, an audit - and there is nothing to commit.
 Write your findings to `{{.ReportPath}}`.
 It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.
@@ -72,8 +79,13 @@ For anything the codebase already shows, prefer a pointer to the authoritative f
 Keep it proportionate: skip `AGENTS.md` edits for trivial tasks that produced no durable project knowledge.
 
 # Definition of done
+{{- if .GitHub}}
+This project ships through GitHub pull requests: no pipeline, and the pull request is merged on GitHub, never by you.
+The task is complete only when it is committed on this branch, the hand-back below is written, and the branch is pushed with a pull request open.
+{{- else}}
 This project ships local-only: no remote, no pull request, no pipeline.
 The task is complete only when it is committed on this branch and the hand-back below is written.
+{{- end}}
 Keep the branch a clean fast-forward onto `{{.DefaultBranch}}`; if it has advanced, rebase onto it so the eventual merge stays a fast-forward.
 
 # Before you hand back
@@ -96,12 +108,25 @@ What you could not settle, follow-up work you noticed but did not do, and anythi
 ```
 
 A criterion that fails is reported as `fail` with its output, never left out or softened.
+{{- if .GitHub}}
+When the work is committed and the hand-back is written, deliver it:
+1. `git push -u origin {{.Branch}}`.
+2. `gh pr create --base {{.DefaultBranch}} --head {{.Branch}} --title "<one line>" --body-file {{.HandbackPath}}`.
+3. `echo "pr-open: <the pull request URL gh printed>" >> $MATE_STATUS`.
+4. `{{.MateBin}} pr watch {{.Project}} {{.Crew}} <the same URL>`. It returns at once and keeps watching in the background; it wakes the Mate when the pull request is merged or closed. Run it once.
+
+Then stop. `pr-open:` is your hand-back line in this project, in place of `wait-mate: ready in branch {{.Branch}}`.
+You stay alive after it: the Mate may send you review comments or a failing check. Fix them on this branch and push; the pull request follows the branch. Never open a second one.
+If you could not finish, write the hand-back anyway, push nothing, and append `wait-mate: could not do X because Y`.
+The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the pull request is merged on GitHub.
+{{- else}}
 When the work is committed and the hand-back is written, append `wait-mate: ready in branch {{.Branch}}` to the status file and stop.
 If you could not finish, write the hand-back anyway, then append `wait-mate: could not do X because Y`.
 The Mate reviews your hand-back against `## Captain's words` and `## Acceptance`, then your branch diff; the captain approves, and the branch is merged into local `{{.DefaultBranch}}`.
 {{- end}}
+{{- end}}
 
-Do NOT push. Do NOT open a pull request. Do NOT merge.
+{{if and .GitHub (not .Scout)}}Do NOT merge the pull request. Do NOT push any branch but `{{.Branch}}`. Do NOT force-push.{{else}}Do NOT push. Do NOT open a pull request. Do NOT merge.{{end}}
 {{- if or .WorkspaceCrewRules .ProjectCrewRules}}
 
 # Captain's standing crew rules

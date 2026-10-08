@@ -280,6 +280,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		branch:           branch,
 		worktree:         worktree,
 		repoCfg:          repoCfg,
+		github:           cfg.Mode == store.ModeGitHub,
 	})
 	if err != nil {
 		saga.compensate(ctx)
@@ -355,6 +356,11 @@ type crewPlan struct {
 	branch           string
 	worktree         string
 	repoCfg          store.RepoConfig
+	// github is the project's delivery mode being `github`.
+	github bool
+	// resumeID is the harness session a relaunch resumes; empty is a fresh
+	// session.
+	resumeID string
 }
 
 // spawnInWorktree is everything a failure has to compensate for: the brief,
@@ -364,7 +370,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 	// that the compensated worktree still leaves the evidence behind.
 	briefPath := w.CrewBrief(plan.project, plan.crew)
 	statusPath := w.CrewStatus(plan.project, plan.crew)
-	brief, err := renderCrewBrief(w, plan)
+	brief, err := renderCrewBrief(w, deps, plan)
 	if err != nil {
 		return CrewResult{}, err
 	}
@@ -726,8 +732,16 @@ func assertIsolatedWorktree(ctx context.Context, git gitx.Git, repo, worktree st
 
 // renderCrewBrief fills the embedded template with this crew's task, paths
 // and the captain's standing crew rules.
-func renderCrewBrief(w *store.Workspace, plan crewPlan) ([]byte, error) {
+func renderCrewBrief(w *store.Workspace, deps Deps, plan crewPlan) ([]byte, error) {
+	binary, err := deps.binary()
+	if err != nil {
+		return nil, err
+	}
 	return mateassets.RenderBrief(mateassets.BriefParams{
+		GitHub:             plan.github,
+		MateBin:            binary,
+		Project:            plan.project,
+		Crew:               plan.crew,
 		Task:               plan.brief,
 		Scout:              plan.scout,
 		RepoPath:           plan.repo,
@@ -753,12 +767,13 @@ func prepareCrewLaunch(ctx context.Context, w *store.Workspace, deps Deps, git g
 		return harness.Prepared{}, err
 	}
 	prep, err := plan.profile.Launcher().Prepare(ctx, harness.PrepareRequest{
-		Role:         harness.RoleCrew,
-		Cwd:          plan.worktree,
-		StateDir:     w.CrewDir(plan.project, plan.crew),
-		ContextPath:  w.CrewBrief(plan.project, plan.crew),
-		Binary:       binary,
-		NewSessionID: deps.NewSessionID,
+		Role:            harness.RoleCrew,
+		Cwd:             plan.worktree,
+		StateDir:        w.CrewDir(plan.project, plan.crew),
+		ContextPath:     w.CrewBrief(plan.project, plan.crew),
+		Binary:          binary,
+		ResumeSessionID: plan.resumeID,
+		NewSessionID:    deps.NewSessionID,
 	})
 	if err != nil {
 		return harness.Prepared{}, err
@@ -822,8 +837,9 @@ func buildCrewLaunchSpec(ctx context.Context, plan crewPlan, prep harness.Prepar
 		// No launch env: Herdr 0.8.2 applies `--env` when a pane is created,
 		// so the crew's identity (and MATE_STATUS) is injected by the tab
 		// create above.
-		Model:  plan.model,
-		Effort: plan.effort,
+		Model:           plan.model,
+		Effort:          plan.effort,
+		ResumeSessionID: plan.resumeID,
 	})
 }
 

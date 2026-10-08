@@ -19,7 +19,7 @@
       "crews_by_state": {
         "waiting_review": 1
       },
-      "inbox_waiting": 0
+      "inbox_waiting": 1
     }
   ]
 }
@@ -107,7 +107,19 @@
       "harness": "codex"
     }
   ],
-  "inbox": []
+  "inbox": [
+    {
+      "seq": 5,
+      "at": "2026-09-19T10:46:40.000000000Z",
+      "kind": "status",
+      "source": "crew",
+      "target": "crew:buybtn",
+      "crew": "buybtn",
+      "verb": "wait-mate",
+      "text": "ready in branch mate/buybtn",
+      "attention": false
+    }
+  ]
 }
 
 == /api/projects/shop/mate

@@ -127,21 +127,9 @@ func mateStop(ctx context.Context, w *store.Workspace, deps spawn.Deps, project,
 	if err := requireProject(w, project); err != nil {
 		return err
 	}
-	stowed := "not stowed: --no-stow"
-	switch {
-	case noStow:
-	case caller == spawn.CallerMate:
-		stowed = "not stowed: the Mate stopped itself"
-	case caller != spawn.CallerUser:
-		stowed = "not stowed: only the captain's stop asks the Mate to stow"
-	default:
-		fmt.Fprintf(stderr, "stowing: asking the Mate to record what exists only in its conversation, waiting up to %s for its turn (--no-stow skips this)\n",
-			outbox.Span(outbox.DefaultStowCeiling))
-		res, err := consoleOutbox(w, deps).Stow(ctx, project, outbox.StowOptions{RequireEmpty: true})
-		if err != nil {
-			return err
-		}
-		stowed = res.Outcome()
+	stowed, err := stowBeforeStop(ctx, w, deps, project, caller, noStow, stderr)
+	if err != nil {
+		return err
 	}
 	res, err := spawn.StopMate(ctx, w, deps, project)
 	if err != nil {
@@ -153,6 +141,27 @@ func mateStop(ctx context.Context, w *store.Workspace, deps spawn.Deps, project,
 	}
 	fmt.Fprintf(stdout, "%s: %s (agent %s, session_id kept for resume); %s\n", res.Project, what, res.Agent, stowed)
 	return nil
+}
+
+// stowBeforeStop is the stow half of `mate mate stop`, also run by `mate
+// project remove` before it stops the Mate. It returns the words the stop
+// reports for it: what the stow did, or why none was asked for.
+func stowBeforeStop(ctx context.Context, w *store.Workspace, deps spawn.Deps, project, caller string, noStow bool, stderr io.Writer) (string, error) {
+	switch {
+	case noStow:
+		return "not stowed: --no-stow", nil
+	case caller == spawn.CallerMate:
+		return "not stowed: the Mate stopped itself", nil
+	case caller != spawn.CallerUser:
+		return "not stowed: only the captain's stop asks the Mate to stow", nil
+	}
+	fmt.Fprintf(stderr, "stowing: asking the Mate to record what exists only in its conversation, waiting up to %s for its turn (--no-stow skips this)\n",
+		outbox.Span(outbox.DefaultStowCeiling))
+	res, err := consoleOutbox(w, deps).Stow(ctx, project, outbox.StowOptions{RequireEmpty: true})
+	if err != nil {
+		return "", err
+	}
+	return res.Outcome(), nil
 }
 
 // cmdMateStatus implements `mate mate status <project>`. It prints one

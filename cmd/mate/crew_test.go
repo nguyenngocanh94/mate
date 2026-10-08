@@ -83,6 +83,10 @@ func TestCrewListPrintsTheRecordedCrews(t *testing.T) {
 	// STATE is the app's word, NOTE the crew's own. A legacy `done:` line
 	// reads as `wait-mate` and its text lands in NOTE (mvp.md section 4b).
 	// HARNESS carries the launch profile the crew was spawned with.
+	out.Reset()
+	if err := run([]string{"crew", "list", "shop", "--all", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{"k3", "codex gpt-5.5/high", "mate/k3", "wait-mate", "ready in branch mate/k3", "w1:p2"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("out = %q, want it to carry %q", out.String(), want)
@@ -228,11 +232,9 @@ func TestCrewStopRequiresProjectAndID(t *testing.T) {
 	}
 }
 
-// TestCrewListShowsOnlyOpenCrewsByDefault: a `wait-mate:` line is the
-// crew's report, not the end of its task - the Mate or the captain ends it
-// with `crew stop` (2026-09-18). So a crew that reported is still listed, a
-// closed one is not, and the footer says how many are hidden.
-func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
+// Handed-back crews leave the default list without being closed; --all
+// still lists them, and a new working status brings them back.
+func TestCrewListHidesWaitMateUntilItWorksAgain(t *testing.T) {
 	w, err := store.Init(t.TempDir(), workspaceDefaults())
 	if err != nil {
 		t.Fatal(err)
@@ -260,14 +262,32 @@ func TestCrewListShowsOnlyOpenCrewsByDefault(t *testing.T) {
 		t.Fatalf("crew list: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "k1") || !strings.Contains(got, "wait-mate") || !strings.Contains(got, "ready in branch") {
-		t.Fatalf("crew list = %q, want the reported-but-open crew listed with its own note", got)
+	if strings.Contains(got, "k1") || strings.Contains(got, "k2") {
+		t.Fatalf("crew list = %q, want the handed-back and closed crews hidden", got)
 	}
-	if strings.Contains(got, "k2") {
-		t.Fatalf("crew list = %q, want the closed crew hidden", got)
+	if !strings.Contains(got, "1 wait-mate") || !strings.Contains(got, "1 closed") || !strings.Contains(got, "--all") {
+		t.Fatalf("crew list = %q, want both hidden counts and the --all hint", got)
 	}
-	if !strings.Contains(got, "1 closed") {
-		t.Fatalf("crew list = %q, want the hidden count", got)
+	out.Reset()
+	if err := run([]string{"crew", "list", "shop", "--all", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "k1") || !strings.Contains(got, "wait-mate") || !strings.Contains(got, "k2") {
+		t.Fatalf("crew list --all = %q, want every recorded crew", got)
+	}
+	meta, err := w.ReadCrewMeta("shop", "k1")
+	if err != nil || meta["pane"] != "w1:p2" || meta["state"] == "finished" {
+		t.Fatalf("hiding the crew changed its record: %+v, %v", meta, err)
+	}
+	if err := w.AppendStatus("shop", "k1", "working: applying review feedback"); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := run([]string{"crew", "list", "shop", "--workspace", w.Root()}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "k1") || !strings.Contains(got, "working") {
+		t.Fatalf("crew list = %q, want the crew working again", got)
 	}
 }
 

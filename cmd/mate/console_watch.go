@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"sort"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/db"
@@ -146,6 +147,23 @@ func consoleSession(ws *store.Workspace, deps spawn.Deps) watch.SessionFunc {
 	return func(ctx context.Context) error {
 		return herdrSession(ctx, ws, deps)
 	}
+}
+
+// livenessBound caps the Herdr question a refresh asks, so a wedged server
+// slows one reload and never freezes the tree.
+const livenessBound = 3 * time.Second
+
+// consoleLiveness asks Herdr which agents are up, for query.LoadLive. It
+// never starts a server; a question that cannot be asked is left unasked and
+// the rows keep their recorded state.
+func consoleLiveness(ctx context.Context, ws *store.Workspace, deps spawn.Deps) query.Liveness {
+	spec, err := spawn.SessionSpec(deps, ws)
+	if err != nil {
+		return query.Liveness{}
+	}
+	ctx, cancel := context.WithTimeout(ctx, livenessBound)
+	defer cancel()
+	return query.ReadLiveness(ctx, deps.Runtime, spec)
 }
 
 // withCrewHealth puts the observer's latest readings into a snapshot

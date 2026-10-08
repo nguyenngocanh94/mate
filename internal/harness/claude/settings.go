@@ -186,3 +186,81 @@ func EnsureAutoMemoryOff(data []byte) (out []byte, changed bool, err error) {
 	}
 	return append(out, '\n'), true, nil
 }
+
+// RepointHooks rewrites the mate binary of every mate hook in an existing
+// settings file whose binary no longer exists (exists reports it), keeping
+// every other key and every hook that is not mate's. It is what a workspace
+// copied to another machine needs: the file holds the old machine's absolute
+// path. A hook whose binary exists, however it differs from binary, is left
+// alone, and so is a file with nothing to repoint (changed is false).
+func RepointHooks(data []byte, binary string, exists func(string) bool) (out []byte, changed bool, err error) {
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return nil, false, fmt.Errorf("claude settings are not a JSON object: %w", err)
+	}
+	raw, ok := settings["hooks"]
+	if !ok {
+		return data, false, nil
+	}
+	var hooks map[string]any
+	if err := json.Unmarshal(raw, &hooks); err != nil || hooks == nil {
+		return nil, false, fmt.Errorf("claude settings: \"hooks\" is not a JSON object")
+	}
+	for _, entries := range hooks {
+		list, _ := entries.([]any)
+		for _, entry := range list {
+			matcher, _ := entry.(map[string]any)
+			inner, _ := matcher["hooks"].([]any)
+			for _, h := range inner {
+				hook, _ := h.(map[string]any)
+				command, _ := hook["command"].(string)
+				old, rest, ok := splitMateHook(command)
+				if !ok || old == binary || exists(old) {
+					continue
+				}
+				hook["command"] = harness.ShellQuote(binary) + rest
+				changed = true
+			}
+		}
+	}
+	if !changed {
+		return data, false, nil
+	}
+	if settings["hooks"], err = json.Marshal(hooks); err != nil {
+		return nil, false, err
+	}
+	out, err = json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return nil, false, err
+	}
+	return append(out, '\n'), true, nil
+}
+
+// splitMateHook takes a hook command apart when it is one mate wrote:
+// a shell-quoted binary path (harness.ShellQuote) followed by " hook <name>".
+// rest is everything after the quoted path.
+func splitMateHook(command string) (binary, rest string, ok bool) {
+	command = strings.TrimSpace(command)
+	if !strings.HasPrefix(command, "'") {
+		return "", "", false
+	}
+	var b strings.Builder
+	i := 1
+	for i < len(command) {
+		switch {
+		case strings.HasPrefix(command[i:], `'\''`):
+			b.WriteByte('\'')
+			i += 4
+		case command[i] == '\'':
+			rest = command[i+1:]
+			if !strings.HasPrefix(rest, " hook ") {
+				return "", "", false
+			}
+			return b.String(), rest, true
+		default:
+			b.WriteByte(command[i])
+			i++
+		}
+	}
+	return "", "", false
+}

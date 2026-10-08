@@ -8,6 +8,7 @@ import (
 	"io"
 	"text/tabwriter"
 
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -149,7 +150,7 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stderr, "usage: mate crew list <project> [--all] [--workspace <dir>]")
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
-	allFlag := fs.Bool("all", false, "include closed crews (those `crew stop` has run on)")
+	allFlag := fs.Bool("all", false, "include wait-mate and closed crews")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
 	}
@@ -167,6 +168,7 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	}
 	crews := all
 	closed := 0
+	waitMate := 0
 	if !*allFlag {
 		crews = crews[:0:0]
 		for _, c := range all {
@@ -174,13 +176,21 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 				closed++
 				continue
 			}
+			if c.State == string(crewstate.StateWaitMate) {
+				waitMate++
+				continue
+			}
 			crews = append(crews, c)
 		}
 	}
 	if len(crews) == 0 {
 		switch {
+		case waitMate > 0 && closed > 0:
+			fmt.Fprintf(stdout, "no active crews for %s (%d wait-mate, %d closed; --all lists them)\n", fs.Arg(0), waitMate, closed)
 		case closed > 0:
 			fmt.Fprintf(stdout, "no open crews for %s (%d closed; --all lists them)\n", fs.Arg(0), closed)
+		case waitMate > 0:
+			fmt.Fprintf(stdout, "no active crews for %s (%d wait-mate; --all lists them)\n", fs.Arg(0), waitMate)
 		default:
 			fmt.Fprintf(stdout, "no crews recorded for %s\n", fs.Arg(0))
 		}
@@ -201,6 +211,9 @@ func cmdCrewList(args []string, stdout, stderr io.Writer) error {
 	}
 	if closed > 0 {
 		fmt.Fprintf(stdout, "(%d closed crew(s) not shown; --all lists them)\n", closed)
+	}
+	if waitMate > 0 {
+		fmt.Fprintf(stdout, "(%d wait-mate crew(s) not shown; --all lists them)\n", waitMate)
 	}
 	return nil
 }

@@ -156,7 +156,7 @@ func (m Model) onBusyQuit() Model {
 	return m
 }
 
-// onEnter opens a Project row, toggles the Completed group, and shows a
+// onEnter opens a Project row, toggles a crew group, and shows a
 // Mate or Crew row in the next pane (stageRow).
 func (m Model) onEnter() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
@@ -172,6 +172,14 @@ func (m Model) onEnter() (tea.Model, tea.Cmd) {
 			m.completedOpen = map[string]bool{}
 		}
 		m.completedOpen[parent] = !m.completedOpen[parent]
+		m.detailSel = 0
+		return m.relayout(), nil
+	case rowHandedBackGroup:
+		parent := m.cur().id
+		if m.handedBackOpen == nil {
+			m.handedBackOpen = map[string]bool{}
+		}
+		m.handedBackOpen[parent] = !m.handedBackOpen[parent]
 		m.detailSel = 0
 		return m.relayout(), nil
 	case rowMate, rowCrew:

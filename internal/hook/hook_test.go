@@ -58,13 +58,12 @@ func TestHandlePromptTableDriven(t *testing.T) {
 			},
 		},
 		{
-			name:       "plain user prompt turns auto off",
+			name:       "plain user prompt leaves auto on",
 			payload:    `{"prompt":"never mind, I've got it"}`,
 			autoBefore: true,
-			wantAuto:   false,
+			wantAuto:   true,
 			wantSent: []store.SentEntry{
 				{Source: store.SourceUser, Target: store.TargetMate, Text: "never mind, I've got it"},
-				{Source: store.SourceApp, Target: store.TargetMate, Text: hook.AutoOffText},
 			},
 		},
 		{

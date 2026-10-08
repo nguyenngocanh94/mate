@@ -116,8 +116,8 @@ func (w *Workspace) AutoFlag(project string) string {
 }
 
 // ManualHold is `projects/<project>/mate/.manual`; its presence means the
-// captain chose manual mode with the console's `m` key, so the auto daemon
-// never turns auto mode back on by itself (internal/autopilot, Rearm).
+// captain chose manual mode with the console's `m` key, so context refresh
+// does not run on its own while the captain holds the Mate.
 func (w *Workspace) ManualHold(project string) string {
 	return filepath.Join(w.MateDir(project), manualHoldName)
 }
@@ -152,6 +152,19 @@ func (w *Workspace) CrewMeta(project, crew string) string {
 // a crew writes with echo.
 func (w *Workspace) CrewStatus(project, crew string) string {
 	return filepath.Join(w.CrewsDir(project), crew+".status")
+}
+
+// CrewPRWatch is `projects/<project>/crews/<crew>.prwatch`: the pid of the
+// background `mate pr watch` of the crew's pull request, one number per file
+// (docs/mvp.md M18).
+func (w *Workspace) CrewPRWatch(project, crew string) string {
+	return filepath.Join(w.CrewsDir(project), crew+".prwatch")
+}
+
+// CrewPRWatchLog is `projects/<project>/crews/<crew>/prwatch.log`, where the
+// detached watcher writes what it did.
+func (w *Workspace) CrewPRWatchLog(project, crew string) string {
+	return filepath.Join(w.CrewDir(project, crew), "prwatch.log")
 }
 
 // CrewDir is `projects/<project>/crews/<crew>`, kept after teardown.

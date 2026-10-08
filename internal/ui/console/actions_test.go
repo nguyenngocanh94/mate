@@ -398,7 +398,7 @@ func TestTheSheetOrderIsFixedPerKind(t *testing.T) {
 	}
 	m := loaded(t, sampleTree(), nil)
 	m, _ = send(t, m, key("a"))
-	if got := keys(m); got != "enter s m n" {
+	if got := keys(m); got != "enter s m n x" {
 		t.Fatalf("project row sheet = %q", got)
 	}
 	m, _ = send(t, m, key("esc"))

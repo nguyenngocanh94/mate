@@ -39,7 +39,11 @@ func bxCrewMenu(t *testing.T, tree query.Snapshot, act *bxAction) Model {
 		m, _ = send(t, m, key("down"))
 	}
 	m, _ = send(t, m, key("enter"))
-	m, _ = send(t, m, key("down"))
+	var found bool
+	m, found = m.jumpToCrew("k7")
+	if !found {
+		t.Fatal("could not locate crew k7")
+	}
 	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != "k7" {
 		t.Fatalf("selected row = %+v, want crew k7", r)
 	}

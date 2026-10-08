@@ -25,8 +25,12 @@ func mergeTree() query.Snapshot {
 func toMergeableCrew(t *testing.T, m Model) Model {
 	t.Helper()
 	m, _ = send(t, m, key("enter")) // payments-api
-	m, _ = send(t, m, key("down"))  // the open crew; the closed one sits in Completed
 	want := sampleTree().Projects[0].Crews[1].CrewID
+	var found bool
+	m, found = m.jumpToCrew(want)
+	if !found {
+		t.Fatalf("could not locate crew %s", want)
+	}
 	if r, ok := m.selectedRow(); !ok || r.kind != rowCrew || r.id != want {
 		t.Fatalf("selected row = %+v (ok=%v), want crew %s", r, ok, want)
 	}

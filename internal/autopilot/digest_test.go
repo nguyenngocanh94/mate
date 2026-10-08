@@ -47,6 +47,22 @@ func TestGatherSkipsAWaitMateTheCrewHasSpokenAfter(t *testing.T) {
 	}
 }
 
+// `mate pr watch` tells the Mate about a merged or closed pull request
+// itself (docs/mvp.md M18), so the digest repeats neither; the crew's
+// pr-open hand-back it does carry, like any wait-mate.
+func TestGatherDoesNotRepeatWhatThePullRequestWatcherDelivered(t *testing.T) {
+	f := newFixture(t)
+	f.status("k3", "pr-open: https://github.com/a/b/pull/1")
+	f.status("k4", "pr-open: https://github.com/a/b/pull/2")
+	f.status("k4", "pr-merged: https://github.com/a/b/pull/2")
+	f.status("k5", "pr-closed: https://github.com/a/b/pull/3")
+
+	items := autopilot.Gather(f.view(), nil, f.clock.Now())
+	if len(items) != 1 || items[0].Crew != "k3" || items[0].Kind != autopilot.ItemWaitMate {
+		t.Fatalf("gathered %+v, want only k3's pr-open hand-back", items)
+	}
+}
+
 // A closed crew has no pane to answer into, and its lines are history.
 func TestGatherSkipsClosedCrews(t *testing.T) {
 	f := newFixture(t)

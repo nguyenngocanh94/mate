@@ -12,8 +12,11 @@ import (
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/facts"
+	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/memory"
+	"github.com/nguyenngocanh94/mate/internal/observability"
+	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -29,7 +32,7 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	repoNameFlag := fs.String("repo-name", "", "name of the repo inside the project (default: derived from its directory)")
 	defaultBranchFlag := fs.String("default-branch", "", "override the repo's detected default branch")
-	modeFlag := fs.String("mode", store.ModeLocalOnly, "project mode (only local-only is supported)")
+	modeFlag := fs.String("mode", store.ModeLocalOnly, "project mode: local-only or github (github needs gh logged in and origin on GitHub)")
 	yoloFlag := fs.Bool("yolo", false, "let Mate merge without asking the user")
 	budgetUSDFlag := fs.Float64("budget-usd", 0, "open a budget incident once this project's total cost crosses this amount; hand-edit project.yaml for crew_tokens/crew_usd")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
@@ -49,6 +52,9 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if *modeFlag != store.ModeLocalOnly && *modeFlag != store.ModeGitHub {
+		return newUsageErrorf("mate project add: --mode wants %s or %s, got %q", store.ModeLocalOnly, store.ModeGitHub, *modeFlag)
+	}
 	opts := projectAddOptions{Mode: *modeFlag, Yolo: *yoloFlag, BudgetUSD: *budgetUSDFlag}
 	if fs.NArg() == 2 {
 		repoPath := fs.Arg(1)
@@ -61,6 +67,11 @@ func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		opts.Repos = []store.RepoConfig{repo}
+	}
+	if opts.Mode == store.ModeGitHub {
+		if err := checkGitHubMode(context.Background(), w, opts.Repos); err != nil {
+			return err
+		}
 	}
 	saved, err := addProject(w, name, opts)
 	if err != nil {
@@ -151,6 +162,87 @@ func addProject(w *store.Workspace, name string, opts projectAddOptions) (store.
 	return w.LoadProject(name)
 }
 
+// ghClient and ghRemotes are the seams under the github mode's checks:
+// tests swap them, so nothing reaches the network or a real account.
+var (
+	ghClient                 = github.New()
+	ghRemotes github.Remotes = gitx.New()
+)
+
+// checkGitHubMode is what the github mode requires of a project's repos
+// (docs/mvp.md M18): see github.CheckProject.
+func checkGitHubMode(ctx context.Context, w *store.Workspace, repos []store.RepoConfig) error {
+	checked := make([]github.Repo, 0, len(repos))
+	for _, r := range repos {
+		checked = append(checked, github.Repo{Name: r.Name, Path: w.RepoDir(r.Path)})
+	}
+	return github.CheckProject(ctx, ghClient, ghRemotes, checked)
+}
+
+// cmdProjectMode implements `mate project mode <name> [github|local-only]`:
+// the project's delivery mode (docs/mvp.md M18). Without a mode it prints the
+// current one. It is the captain's: a Mate or a Crew that runs it is refused,
+// because the mode decides whether crews push and open pull requests.
+func cmdProjectMode(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("project mode", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "usage: mate project mode <name> [github|local-only] [--workspace <dir>]")
+	}
+	workspaceFlag := fs.String("workspace", "", "workspace directory")
+	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
+		return &usageError{err}
+	}
+	if fs.NArg() < 1 || fs.NArg() > 2 {
+		fs.Usage()
+		return newUsageError("mate project mode: want <name> [github|local-only]")
+	}
+	name := fs.Arg(0)
+	w, err := resolveWorkspace(*workspaceFlag)
+	if err != nil {
+		return err
+	}
+	if _, ok := w.Project(name); !ok {
+		return fmt.Errorf("%w: %s", store.ErrNoProject, name)
+	}
+	cfg, err := w.LoadProject(name)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() == 1 {
+		fmt.Fprintf(stdout, "%s: mode is %s\n", name, cfg.Mode)
+		return nil
+	}
+	mode := fs.Arg(1)
+	if mode != store.ModeGitHub && mode != store.ModeLocalOnly {
+		fs.Usage()
+		return newUsageErrorf("mate project mode: want github or local-only, got %q", mode)
+	}
+	if caller := spawn.CallerFromEnv(); caller != spawn.CallerUser {
+		return observability.NewError(observability.CodePermission,
+			fmt.Sprintf("the captain sets the project mode; a %s cannot change %s to %s", caller, name, mode))
+	}
+	if cfg.Mode == mode {
+		fmt.Fprintf(stdout, "%s: mode is already %s; nothing changed\n", name, mode)
+		return nil
+	}
+	if mode == store.ModeGitHub {
+		if err := checkGitHubMode(context.Background(), w, cfg.Repos); err != nil {
+			return err
+		}
+	}
+	cfg.Mode = mode
+	if err := w.SaveProject(name, cfg); err != nil {
+		return fmt.Errorf("project mode %s: %w", name, err)
+	}
+	if mode == store.ModeGitHub {
+		fmt.Fprintf(stdout, "%s: mode is github; crews push their branch and open a pull request, and never merge it. Crews already running keep their old brief, and a running Mate still reads the old mode in its manual until its next restart.\n", name)
+		return nil
+	}
+	fmt.Fprintf(stdout, "%s: mode is local-only; crews never push and the captain or a yolo Mate runs `mate merge`. Crews already running keep their old brief, and a running Mate still reads the old mode in its manual until its next restart.\n", name)
+	return nil
+}
+
 // cmdProjectList implements `mate project list`.
 func cmdProjectList(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project list", flag.ContinueOnError)
@@ -196,7 +288,10 @@ func cmdProjectList(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// cmdProjectRemove implements `mate project remove <name>`.
+// cmdProjectRemove implements `mate project remove <name>`: it stops the
+// project's crews and Mate, then drops it from workspace.yaml (docs/mvp.md
+// task 75). Everything on disk stays, so `mate project add <name>` brings
+// the history back.
 func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project remove", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -217,11 +312,45 @@ func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := w.RemoveProject(name); err != nil {
-		return fmt.Errorf("project remove %s: %w", name, err)
+	return projectRemove(context.Background(), w, spawn.LiveDeps(harnesses), name, spawn.CallerFromEnv(), stdout, stderr)
+}
+
+// projectRemove is cmdProjectRemove's core, over any deps, for tests.
+func projectRemove(ctx context.Context, w *store.Workspace, deps spawn.Deps, name, caller string, stdout, stderr io.Writer) error {
+	res, err := spawn.RemoveProject(ctx, w, deps, name, removeProjectOptions(w, deps, caller, stderr, nil))
+	for _, s := range res.Stopped {
+		fmt.Fprintln(stdout, stoppedAgentLine(name, s))
+	}
+	if err != nil {
+		return err
 	}
 	fmt.Fprintf(stdout, "removed project %s\n", name)
 	return nil
+}
+
+// removeProjectOptions is how the CLI and the Console stop a project's Mate
+// for a removal: with the stow `mate mate stop` runs.
+func removeProjectOptions(w *store.Workspace, deps spawn.Deps, caller string, stderr io.Writer, progress func(string)) spawn.RemoveProjectOptions {
+	return spawn.RemoveProjectOptions{
+		Progress: progress,
+		Stow: func(ctx context.Context, project string) error {
+			_, err := stowBeforeStop(ctx, w, deps, project, caller, false, stderr)
+			return err
+		},
+	}
+}
+
+// stoppedAgentLine is the one line a removal prints per agent it stopped.
+func stoppedAgentLine(project string, s spawn.StoppedAgent) string {
+	switch {
+	case s.Cleared && s.Crew != "":
+		return fmt.Sprintf("%s/%s: not listed by Herdr; run meta cleared", project, s.Crew)
+	case s.Crew != "":
+		return crewStopReport(project, s.Crew, s.Stop)
+	case s.Stop.AlreadyGone:
+		return fmt.Sprintf("%s: Mate already gone (agent %s)", project, s.Stop.Agent)
+	}
+	return fmt.Sprintf("%s: Mate stopped (agent %s, session_id kept for resume)", project, s.Stop.Agent)
 }
 
 // cmdProjectYolo implements `mate project yolo <name> on|off`: the one

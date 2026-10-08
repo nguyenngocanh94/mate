@@ -80,6 +80,7 @@ func (m Model) menuFor(r row, ok bool) []menuEntry {
 			m.startMateEntry(r),
 			m.modeEntry(r.id),
 			m.newProjectEntry(),
+			m.choiceEntry("x", "Remove project…", m.removeProjectChoice(r)),
 		}
 	case rowCompletedGroup:
 		label := "Show completed"
@@ -88,6 +89,13 @@ func (m Model) menuFor(r row, ok bool) []menuEntry {
 		}
 		return []menuEntry{{key: "enter", label: label, kind: entryOpen, enabled: true,
 			about: "Finished crews stay in the snapshot; this shows or hides them in the list."}}
+	case rowHandedBackGroup:
+		label := "Show handed back"
+		if m.handedBackOpen[m.cur().id] {
+			label = "Hide handed back"
+		}
+		return []menuEntry{{key: "enter", label: label, kind: entryOpen, enabled: true,
+			about: "Crews waiting on the Mate keep their panes and actions; this shows or hides their rows."}}
 	}
 	return nil
 }
@@ -331,7 +339,11 @@ func (m Model) runEntry(i int) (Model, tea.Cmd) {
 		return m.beginModeToggle(project)
 	}
 	if e.confirms() {
-		m.confirm = &actionConfirmation{choice: e.choice, key: e.key, label: e.label}
+		key := e.key
+		if e.choice.confirmKey != "" {
+			key = e.choice.confirmKey
+		}
+		m.confirm = &actionConfirmation{choice: e.choice, key: key, label: e.label}
 		return m, nil
 	}
 	m = m.closeActions()

@@ -203,6 +203,33 @@ Anything longer goes in a file and you send the Crew a line naming that file's a
 
 ### Delivery
 
+{{if .GitHub -}}
+```text
+mate merge <project> <crew> [--review <review-id>] [--workspace <dir>]
+mate pr watch <project> <crew> <pull-request-url> [--workspace <dir>]
+```
+
+This project delivers through GitHub pull requests. A Crew pushes its branch, opens a pull request with `gh pr create`, appends `pr-open: <url>` to its status file and runs `mate pr watch` itself; you never run it, and you never push, open or merge anything with git or gh.
+`mate merge` is `gh pr merge` here: it merges the Crew's pull request on GitHub, pinned to the reviewed commit when `--review` is given, records the merge in the Crew's meta, fast-forwards the default branch of the Crew's repo when its checkout is clean and on that branch, and then closes the Crew.
+Whether you may run it at all depends on this project's `yolo` flag; section 9's "Delivery" says which of the two ways you deliver. `Merge` in the console is the captain's own and is never refused for `yolo`.
+
+Success is one line:
+
+```text
+{{.ProjectName}}/add-healthcheck: merged pull request https://github.com/acme/{{.ProjectName}}/pull/7 as e4f5a6b (fast-forwarded {{.ExampleRepo.DefaultBranch}}); crew finished, worktree and branch removed
+```
+
+The part in brackets is `skipped: <why>` when the primary checkout was not on the default branch, had uncommitted files, or could not fetch: the pull request is merged either way, and you tell the captain their copy of `{{.ExampleRepo.DefaultBranch}}` is behind.
+
+Each refusal starts with `merge refused:` and changes nothing:
+
+- `yolo is off for {{.ProjectName}}; the captain merges` - the captain has not delegated merging on this project. Report the pull request as ready and stop.
+- `... has no pull request recorded` - the Crew has not opened one, or never ran `mate pr watch`. Send it one line saying so.
+- `<url> is closed, not open` or `is merged, not open` - there is nothing to merge; a merged one needs `crew stop` (`pr-merged:` already told you).
+- `review is stale; the pull request's branch changed` - the Crew pushed after the review. Review again.
+- `gh could not merge <url>` - GitHub refused (a failing check, a conflict, a required review). Read the reason after it, send the Crew one line to fix it on the same branch, and merge again after its next hand-back.
+- `... has N uncommitted file(s) ...` - the Crew's worktree still holds work that is not in the branch. Send the Crew one line to commit or drop it.
+{{- else -}}
 ```text
 mate merge <project> <crew> [--workspace <dir>]
 ```
@@ -228,6 +255,7 @@ In each refusal below, `<default>` is the default branch of the Crew's repo.
 - `... has N uncommitted file(s) ...` - the Crew's worktree still holds work that is not in the branch. Send the Crew one line to commit or drop it; never merge around it, because what would land is not what you reviewed.
 - `branch ... is not ahead of <default>: nothing to merge` - the Crew committed nothing. That is a scout, or a ship that did not do its job; report it as such.
 - `... has <branch> checked out, not <default>` or `... has N uncommitted file(s)` naming the repo's own checkout - the captain is in the middle of something there. Say so and stop; that checkout is theirs, not yours.
+{{- end}}
 
 ### Backlog
 

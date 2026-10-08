@@ -73,6 +73,10 @@ const (
 	// OutboxSourceStow is the `⟦mate⟧ stow:` line the app sends just
 	// before it restarts the Mate (docs/mvp.md task 37, B7).
 	OutboxSourceStow = "stow"
+	// OutboxSourcePR is the line `mate pr watch` queues when a crew's pull
+	// request is merged or closed (docs/mvp.md M18). Unlike a digest it is
+	// delivered in manual mode too.
+	OutboxSourcePR = "pr"
 )
 
 // Compaction bounds (see the package comment above).

@@ -27,9 +27,18 @@ type step struct {
 	at     time.Time
 }
 
+// runInbox is runInboxIn with auto mode on, where a wait-mate is not an item.
 func runInbox(t *testing.T, incidents []store.IncidentEntry, steps ...step) []box.Item {
 	t.Helper()
+	return runInboxIn(t, true, incidents, steps...)
+}
+
+func runInboxIn(t *testing.T, auto bool, incidents []store.IncidentEntry, steps ...step) []box.Item {
+	t.Helper()
 	w := newFixtureWorkspace(t)
+	if err := w.SetAuto("shop", auto); err != nil {
+		t.Fatalf("SetAuto: %v", err)
+	}
 	for _, inc := range incidents {
 		if err := w.AppendIncident("shop", inc); err != nil {
 			t.Fatalf("AppendIncident: %v", err)
@@ -120,7 +129,7 @@ func TestInboxLegacyBlockedFromACrewIsAQuestion(t *testing.T) {
 	}
 }
 
-// TestInboxWaitMateIsNotAQuestion: `wait-mate` is a report, not a decision,
+// TestInboxWaitMateIsNotAQuestion: in auto mode `wait-mate` is a report, not a decision,
 // and the decision of 2026-09-18 keeps it out of the inbox - the crews
 // table's STATE column carries it and the user can type into the pane at
 // any time. The legacy `done:`/`failed:` spellings map onto it and are out
@@ -131,6 +140,41 @@ func TestInboxWaitMateIsNotAQuestion(t *testing.T) {
 		step{crew: "k9", status: "done: PR ready"},
 		step{crew: "z1", status: "failed: the build never went green"},
 	))
+}
+
+// TestInboxManualKeepsEachCrewsLatestWaitMate: in manual mode no digest tells
+// the Mate, so a crew's latest wait-mate is an item for the captain
+// (docs/mvp.md M18). An earlier one, a reply and a closed crew take it out.
+func TestInboxManualKeepsEachCrewsLatestWaitMate(t *testing.T) {
+	assertInbox(t, runInboxIn(t, false, nil,
+		step{crew: "k3", status: "wait-mate: first report"},
+		step{crew: "k3", status: "working: fixing review"},
+		step{crew: "k3", status: "wait-mate: ready again"},
+		step{crew: "k9", status: "done: PR ready"},
+		step{crew: "z1", status: "wait-mate: answered"},
+		step{source: store.SourceMate, target: store.CrewTarget("z1"), text: "merged, thanks"},
+	), "k3 wait-mate", "k9 wait-mate")
+}
+
+// TestInboxManualDropsAClosedCrewsWaitMate: crew stop ends the item.
+func TestInboxManualDropsAClosedCrewsWaitMate(t *testing.T) {
+	w := newFixtureWorkspace(t)
+	if err := w.AppendStatus("shop", "k3", "wait-mate: ready"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"state": "finished"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := box.Load(w, "shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Manual {
+		t.Fatal("view is not manual")
+	}
+	if got := box.Inbox(v); len(got) != 0 {
+		t.Fatalf("inbox = %v, want empty", itemStates(got))
+	}
 }
 
 // TestInboxResolvedByUserReply is rule 2 with the user as the replier: `r`
@@ -256,6 +300,9 @@ func TestInboxDoesNotShrinkTheView(t *testing.T) {
 		if err := w.AppendStatus("shop", "k3", s); err != nil {
 			t.Fatalf("AppendStatus: %v", err)
 		}
+	}
+	if err := w.SetAuto("shop", true); err != nil {
+		t.Fatal(err)
 	}
 	v, err := box.Load(w, "shop")
 	if err != nil {

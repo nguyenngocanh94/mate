@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|checkpoint|events|reindex|usage|dashboard|console|--version> ...")
+			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|checkpoint|pr|events|reindex|usage|dashboard|console|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -78,6 +78,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdMerge(args[1:], stdout, stderr)
 	case "backlog":
 		return cmdBacklog(args[1:], stdout, stderr)
+	case "pr":
+		return cmdPR(args[1:], stdout, stderr)
 	case "events":
 		return cmdEvents(args[1:], stdout, stderr)
 	case "reindex":
@@ -108,7 +110,7 @@ func isDir(path string) bool {
 // cmdProject dispatches `mate project <add|list|remove>`.
 func cmdProject(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate project <add|list|remove|repo|yolo|facts> ...")
+		return newUsageError("usage: mate project <add|list|remove|repo|yolo|mode|facts> ...")
 	}
 	switch args[0] {
 	case "facts":
@@ -123,6 +125,8 @@ func cmdProject(args []string, stdout, stderr io.Writer) error {
 		return cmdProjectRepo(args[1:], stdout, stderr)
 	case "yolo":
 		return cmdProjectYolo(args[1:], stdout, stderr)
+	case "mode":
+		return cmdProjectMode(args[1:], stdout, stderr)
 	default:
 		return newUsageErrorf("unknown project subcommand %q", args[0])
 	}

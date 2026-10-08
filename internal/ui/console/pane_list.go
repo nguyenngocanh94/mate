@@ -168,6 +168,8 @@ func (m Model) listItems(p framePlan) []listItem {
 			lines = m.crewRowLines(r, p)
 		case rowCompletedGroup:
 			lines = m.completedRowLines(p)
+		case rowHandedBackGroup:
+			lines = m.handedBackRowLines(p)
 		}
 		for j := range lines {
 			lines[j] = m.markRow(lines[j], j == 0, selected, focused, p.w)
@@ -411,4 +413,23 @@ func (m Model) finishedCrews() []query.CrewNode {
 		}
 	}
 	return out
+}
+
+func (m Model) handedBackCrews() []query.CrewNode {
+	var out []query.CrewNode
+	for _, c := range m.currentProject().Crews {
+		if !c.Closed && c.Status == query.CrewWaitMate {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func (m Model) handedBackRowLines(p framePlan) []gline {
+	mark := m.g.Collapsed
+	if m.handedBackOpen[m.cur().id] {
+		mark = m.g.Expanded
+	}
+	name := gl().pad(1).add(mark, tFg).add(fmt.Sprintf(" Handed back (%d)", len(m.handedBackCrews())), tFg)
+	return []gline{spread(name, gl(), p.w-1, m.g)}
 }

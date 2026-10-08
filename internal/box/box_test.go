@@ -197,6 +197,11 @@ func TestParseStatusVocabulary(t *testing.T) {
 		{"working: on it", box.StateWorking, "on it"},
 		{"needs-decision: pick one", box.StateNeedsDecision, "pick one"},
 		{"wait-mate: ready in branch mate/k3", box.StateWaitMate, "ready in branch mate/k3"},
+		// The pull request verbs of the github mode: the crew is handed
+		// back, so they are wait-mate, and Verb says which one.
+		{"pr-open: https://github.com/a/b/pull/1", box.StateWaitMate, "https://github.com/a/b/pull/1"},
+		{"pr-merged: https://github.com/a/b/pull/1", box.StateWaitMate, "https://github.com/a/b/pull/1"},
+		{"pr-closed: https://github.com/a/b/pull/1", box.StateWaitMate, "https://github.com/a/b/pull/1"},
 		// Legacy. `done:` is the old spelling of `wait-mate:`.
 		{"done: shipped", box.StateWaitMate, "shipped"},
 		// A crew that said `blocked:` could still speak, which is a
@@ -343,4 +348,21 @@ func TestLineRendersMessageEntry(t *testing.T) {
 func hasSuffixRune(s string, r rune) bool {
 	rs := []rune(s)
 	return len(rs) > 0 && rs[len(rs)-1] == r
+}
+
+func TestParseStatusKeepsThePullRequestVerb(t *testing.T) {
+	for line, want := range map[string]string{
+		"pr-open: u":      box.VerbPROpen,
+		"pr-merged: u":    box.VerbPRMerged,
+		"pr-closed: u":    box.VerbPRClosed,
+		"wait-mate: done": "",
+		"done: x":         "",
+	} {
+		if got := box.ParseStatus(line).Verb; got != want {
+			t.Errorf("ParseStatus(%q).Verb = %q, want %q", line, got, want)
+		}
+	}
+	if got := box.LastVerb([]string{"working: a", "pr-merged: u"}); got != box.StateWaitMate {
+		t.Errorf("LastVerb = %q, want wait-mate", got)
+	}
 }

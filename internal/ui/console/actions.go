@@ -26,7 +26,9 @@ type actionChoice struct {
 	// full. `merge` is one: "CONFIRM merge?" does not say which branch moves
 	// where, and that is the whole of what the reader is agreeing to.
 	confirmPrompt string
-	req           ActionRequest
+	// confirmKey is the key that confirms, when it is not the entry's own.
+	confirmKey string
+	req        ActionRequest
 }
 
 type actionConfirmation struct {
@@ -255,6 +257,35 @@ func (m Model) restartCrewChoice(r row) actionChoice {
 	default:
 		c.desc = "unavailable · the worktree record could not be read; r re-reads"
 	}
+	return c
+}
+
+// removeProjectChoice is the Project row's `Remove project…` entry (mvp.md
+// task 75). The confirmation counts what the removal will stop, from the
+// snapshot the row was drawn from; the command re-reads the live state and
+// refuses, changing nothing more, if a stop fails.
+func (m Model) removeProjectChoice(r row) actionChoice {
+	c := actionChoice{action: ActionRemoveProject, desc: "unavailable · applies to a Project"}
+	if r.kind != rowProject {
+		return c
+	}
+	p, ok := m.projectByID(r.id)
+	if !ok {
+		c.desc = "unavailable · this Project is not in the snapshot"
+		return c
+	}
+	crews := "no running crews"
+	switch n := len(p.Crews); n {
+	case 0:
+	case 1:
+		crews = "1 running crew"
+	default:
+		crews = itoa(n) + " running crews"
+	}
+	c.enabled, c.dangerous, c.confirmKey = true, true, "y"
+	c.desc = "Stop the Mate and " + crews + ", then take " + p.Name + " out of the workspace"
+	c.confirmPrompt = "Remove project " + p.Name + "? This stops its Mate and " + crews + ". Its memory, backlog, crew records and repos stay on disk; `mate project add " + p.Name + "` brings it back."
+	c.req = ActionRequest{Action: ActionRemoveProject, Target: p.ProjectID, TargetKind: "project"}
 	return c
 }
 

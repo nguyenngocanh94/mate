@@ -18,7 +18,7 @@ Then resolve three things before you brief anyone.
 **Shape: ship or scout.**
 
 - **Ship** (the default): the deliverable is a change to one of the project's repos.
-  It lands on that repo's default branch through the project's mode, `{{.Mode}}`, in the MVP always local-only: no remote, no pull request.
+  It lands on that repo's default branch through the project's mode, `{{.Mode}}`: {{if .GitHub}}the Crew pushes its branch and opens a GitHub pull request, and the pull request is merged on GitHub, never by the Crew{{else}}no remote, no pull request, nothing pushed{{end}}.
   Once implementation is asked for, dispatch a ship and keep any remaining bounded research inside it, unless unresolved uncertainty could materially change whether or what to build.
 - **Scout:** the deliverable is knowledge - an investigation, a plan, a bug reproduction, an audit.
   Use one when the captain asks for knowledge, or when unresolved uncertainty could materially change whether or what to build.

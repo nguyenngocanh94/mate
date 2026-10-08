@@ -31,7 +31,9 @@ type ProjectConfig struct {
 	// Repos are the git repositories the project owns, zero or more
 	// (docs/mvp.md M9). A crew works in exactly one of them.
 	Repos []RepoConfig `yaml:"repos"`
-	// Mode is `local-only` in the MVP; no other value is accepted.
+	// Mode is the delivery mode, `local-only` (the default) or `github`; no
+	// other value is accepted. Only the captain sets it, with
+	// `mate project mode`.
 	Mode string `yaml:"mode"`
 	// Yolo lets Mate merge without asking the user.
 	Yolo bool `yaml:"yolo"`
@@ -202,13 +204,13 @@ func (w *Workspace) SaveProject(name string, cfg ProjectConfig) error {
 }
 
 // normaliseProject fills the defaults and checks the fields: the repos per
-// normaliseRepos, and the mode must be the one the MVP supports.
+// normaliseRepos, and the mode must be one of the two delivery modes.
 func (w *Workspace) normaliseProject(cfg ProjectConfig) (ProjectConfig, error) {
 	if cfg.Mode == "" {
 		cfg.Mode = ModeLocalOnly
 	}
-	if cfg.Mode != ModeLocalOnly {
-		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: the MVP supports only %q", cfg.Mode, ModeLocalOnly)
+	if cfg.Mode != ModeLocalOnly && cfg.Mode != ModeGitHub {
+		return ProjectConfig{}, fmt.Errorf("store: invalid mode %q: want %q or %q", cfg.Mode, ModeLocalOnly, ModeGitHub)
 	}
 	repos, err := w.normaliseRepos(cfg.Repos)
 	if err != nil {
@@ -270,7 +272,7 @@ func (w *Workspace) Held(project string) bool {
 
 // SetMode is the captain's own choice of mode, the console's `m` key: auto
 // turns `.auto` on and releases the hold; manual turns it off and holds it
-// off, so the daemon does not turn it back on after a quiet spell. The hold
+// off, so the captain's choice is recorded. The hold
 // is released before auto goes on and set before it goes off, so no reader
 // between the two writes sees a state the captain did not choose.
 func (w *Workspace) SetMode(project string, auto bool) error {

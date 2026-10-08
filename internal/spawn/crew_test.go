@@ -13,6 +13,7 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/config"
+	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
@@ -871,4 +872,101 @@ type silentPrompt struct {
 
 func (s *silentPrompt) PromptAgent(_ context.Context, _ runtime.AgentHandle, _ string) error {
 	return nil
+}
+
+// In the github mode the brief a crew is spawned with tells a ship to push
+// its branch and open a pull request, and to watch it (docs/mvp.md M18).
+func TestSpawnCrewInGitHubModeRendersThePullRequestBrief(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	cfg, err := w.LoadProject("shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Mode = store.ModeGitHub
+	if err := w.SaveProject("shop", cfg); err != nil {
+		t.Fatal(err)
+	}
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	if _, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project:   "shop",
+		Crew:      "k3",
+		BriefFile: briefFile(t, w, brieftest.Ship("Add a healthcheck endpoint.\n")),
+	}); err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	brief, err := os.ReadFile(w.CrewBrief("shop", "k3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"gh pr create --base main --head mate/k3", "pr watch shop k3 <the same URL>"} {
+		if !strings.Contains(string(brief), want) {
+			t.Errorf("brief.md does not carry %q:\n%s", want, brief)
+		}
+	}
+	if strings.Contains(string(brief), "Never push to any remote") {
+		t.Errorf("a github-mode brief still forbids pushing:\n%s", brief)
+	}
+}
+
+// A pull request merged on GitHub landed the work even though a squash or
+// rebase merge leaves the crew's branch out of the default branch's history
+// (docs/mvp.md M18): `crew stop` takes pr_state=merged as landed and removes
+// the branch with -D. Open and closed pull requests prove nothing.
+func TestStopCrewTakesAMergedPullRequestAsLanded(t *testing.T) {
+	for _, tc := range []struct {
+		prState    string
+		wantLanded bool
+	}{
+		{crewstate.PRStateMerged, true},
+		{crewstate.PRStateOpen, false},
+		{crewstate.PRStateClosed, false},
+		{"", false},
+	} {
+		t.Run("pr_state="+tc.prState, func(t *testing.T) {
+			w := crewWorkspace(t, "shop")
+			rt := runtime.NewFake()
+			deps := fakeDeps(t, rt)
+			res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+				Project: "shop", Crew: "k3", BriefText: brieftest.Ship("work"),
+			})
+			if err != nil {
+				t.Fatalf("SpawnCrew: %v", err)
+			}
+			commitInWorktree(t, res.Worktree, "new.txt", "squashed on GitHub\n")
+			// The squash: default gets a commit of its own with the same
+			// content, so the crew's branch is no ancestor of it.
+			repo := w.RepoDir("shop")
+			if err := os.WriteFile(filepath.Join(repo, "new.txt"), []byte("squashed on GitHub\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			git(t, repo, "add", "new.txt")
+			git(t, repo, "commit", "-m", "squash merge of mate/k3")
+			if tc.prState != "" {
+				if err := w.UpdateCrewMeta("shop", "k3", map[string]string{crewstate.MetaPRURL: "https://github.com/a/b/pull/1", crewstate.MetaPRState: tc.prState}); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			stop, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false)
+			if !tc.wantLanded {
+				if !errors.Is(err, spawn.ErrUnlandedWork) {
+					t.Fatalf("err = %v, want ErrUnlandedWork", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("StopCrew: %v", err)
+			}
+			if stop.State != spawn.CrewStateFinished || stop.Teardown != spawn.TeardownClean || stop.Unlanded || !stop.BranchRemoved {
+				t.Fatalf("stop = %+v, want a clean finish that removed the branch", stop)
+			}
+			if exists, err := gitx.New().BranchExists(context.Background(), repo, "mate/k3"); err != nil || exists {
+				t.Fatalf("branch exists = %v, %v; want it deleted with -D", exists, err)
+			}
+			if _, statErr := os.Stat(res.Worktree); !os.IsNotExist(statErr) {
+				t.Fatal("the worktree was not removed")
+			}
+		})
+	}
 }

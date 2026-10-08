@@ -285,8 +285,8 @@ func TestManualNeverHasTheMateWaitForACrew(t *testing.T) {
 	for _, want := range []string{
 		"### Ending the turn\n",
 		"in either mode, after you spawn a Crew or answer one with `mate send`",
-		"they have typed nothing to you for 5 minutes",
-		"The captain typing to you puts the project in manual mode.",
+		"digests keep arriving after your turn",
+		"The captain typing to you does not change the mode.",
 	} {
 		if !strings.Contains(sec10, want) {
 			t.Errorf("section 10 does not say %q", want)

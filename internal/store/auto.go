@@ -11,10 +11,9 @@ import (
 )
 
 // QuietAfter is how long the captain has to leave a Mate that has answered
-// them alone before the auto daemon turns auto mode back on (docs/mvp.md
-// task 57). It lives here, beside the flags it governs, so the daemon
-// (internal/autopilot) and the Mate's manual (internal/mateassets) quote the
-// same number.
+// them alone before a context refresh may run (cmd/mate/context_refresh.go).
+// Auto mode no longer waits on it: a captain prompt does not turn auto off
+// (docs/mvp.md M18).
 const QuietAfter = 5 * time.Minute
 
 // The auto daemon's digest cursor (docs/mvp.md section 5, task 19): how far
@@ -25,11 +24,10 @@ const QuietAfter = 5 * time.Minute
 // # Why its own file and not the `.auto` flag
 //
 // The flag and the cursor have different writers and different lifetimes.
-// `.auto` is created and deleted by three parties - the console's `m` key,
-// the Mate's own UserPromptSubmit hook when the captain types an unmarked
-// prompt (internal/hook), and a user who runs `touch`/`rm` on it - and its
+// `.auto` is created and deleted by two parties - the console's `m` key,
+// and a user who runs `touch`/`rm` on it - and its
 // whole meaning is its presence. A cursor stored inside it would be
-// destroyed every time the hook turned auto off, so the next time auto came
+// destroyed every time auto went off, so the next time auto came
 // on the daemon would re-send every item it had already digested, which is
 // precisely the property the cursor exists to guarantee. A hand-`touch`ed
 // `.auto` would also read as an empty or corrupt cursor. `.auto-cursor`

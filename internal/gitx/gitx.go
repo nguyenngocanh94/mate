@@ -203,6 +203,15 @@ func (g Git) WorktreeAttached(ctx context.Context, path string) (bool, error) {
 	return res.ExitCode == 0 && SamePath(res.Stdout, path), nil
 }
 
+// RepairWorktree is `git -C repo worktree repair <path>`: it rewrites the two
+// links between a repository and one of its linked worktrees after either was
+// moved or copied. The paths git writes are absolute, so a workspace taken to
+// another directory or machine needs this before git recognises its worktrees.
+func (g Git) RepairWorktree(ctx context.Context, repo, path string) error {
+	_, err := g.run(ctx, repo, "worktree", "repair", path)
+	return err
+}
+
 // PruneWorktrees is `git -C repo worktree prune`: it drops the
 // administrative entries of worktrees whose directories are gone.
 func (g Git) PruneWorktrees(ctx context.Context, repo string) error {
@@ -270,6 +279,27 @@ func (g Git) ChangedPaths(ctx context.Context, repo, a, b string) (int, error) {
 // DeleteBranch is `git -C repo branch -D <branch>`.
 func (g Git) DeleteBranch(ctx context.Context, repo, branch string) error {
 	_, err := g.run(ctx, repo, "branch", "-D", branch)
+	return err
+}
+
+// RemoteURL is `git -C repo remote get-url <name>`: the URL the remote
+// points at, or "" when the repo has no remote of that name (git exits
+// non-zero for that, which is an answer here and not a failure).
+func (g Git) RemoteURL(ctx context.Context, repo, name string) (string, error) {
+	res, err := g.runner().Run(ctx, Command{Dir: repo, Args: []string{"remote", "get-url", name}})
+	if err != nil {
+		return "", err
+	}
+	if res.ExitCode != 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(res.Stdout), nil
+}
+
+// Fetch is `git -C repo fetch <remote>`: it updates the remote-tracking
+// branches and nothing in the working tree.
+func (g Git) Fetch(ctx context.Context, repo, remote string) error {
+	_, err := g.run(ctx, repo, "fetch", remote)
 	return err
 }
 
@@ -422,6 +452,40 @@ func (g Git) MergeFFOnly(ctx context.Context, repo, branch string) error {
 	}
 	_, err = g.run(ctx, repo, "merge", "--ff-only", branch)
 	return err
+}
+
+// SyncDefaultBranch brings the default branch of a primary checkout up to
+// what a pull request merge put on origin (docs/mvp.md M18): fetch, then
+// fast-forward. It never forces anything and never touches a checkout
+// somebody is working in, so it answers with a note instead of an error:
+// "fast-forwarded <branch>" when it moved the branch, and "skipped: <why>"
+// when the checkout is not on the default branch, has uncommitted files,
+// could not fetch or could not fast-forward.
+func (g Git) SyncDefaultBranch(ctx context.Context, repo, defaultBranch string) string {
+	skip := func(format string, args ...any) string {
+		return "skipped: " + fmt.Sprintf(format, args...)
+	}
+	head, err := g.CurrentBranch(ctx, repo)
+	if err != nil {
+		return skip("could not read the checkout's branch: %v", err)
+	}
+	if head != defaultBranch {
+		return skip("the primary checkout is on %s, not %s", head, defaultBranch)
+	}
+	dirty, err := g.IsDirty(ctx, repo)
+	if err != nil {
+		return skip("could not read the checkout's state: %v", err)
+	}
+	if dirty > 0 {
+		return skip("the primary checkout has %d uncommitted file(s)", dirty)
+	}
+	if err := g.Fetch(ctx, repo, "origin"); err != nil {
+		return skip("git fetch origin failed: %v", err)
+	}
+	if err := g.MergeFFOnly(ctx, repo, "origin/"+defaultBranch); err != nil {
+		return skip("fast-forward to origin/%s failed: %v", defaultBranch, err)
+	}
+	return "fast-forwarded " + defaultBranch
 }
 
 // SamePath reports whether a and b name the same location, resolving

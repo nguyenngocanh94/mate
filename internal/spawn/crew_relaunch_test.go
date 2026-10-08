@@ -3,8 +3,11 @@ package spawn_test
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/brief/brieftest"
 	"github.com/nguyenngocanh94/mate/internal/harness"
@@ -12,6 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 func TestRelaunchCrewStartsAFreshAgentInTheSameWorktree(t *testing.T) {
@@ -312,5 +316,156 @@ func TestRelaunchCrewThatCannotPrepareLeavesALiveAgentRunning(t *testing.T) {
 	}
 	if meta[spawn.MetaPane] != res.Pane {
 		t.Fatalf("meta pane = %q, want the untouched %q", meta[spawn.MetaPane], res.Pane)
+	}
+}
+
+func spawnClaudeCrew(t *testing.T, w *store.Workspace, deps spawn.Deps, rt *runtime.Fake) spawn.CrewResult {
+	t.Helper()
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", Harness: claude.KindClaude, BriefText: brieftest.Ship("work"),
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	rt.ClosePane(res.Pane)
+	return res
+}
+
+func TestRelaunchCrewResumesTheClaudeSession(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res := spawnClaudeCrew(t, w, deps, rt)
+
+	rec := &promptRecorder{Fake: rt}
+	deps.Runtime = rec
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "", spawn.RelaunchOptions{Resume: true})
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	argv := lastArgv(t, rt)
+	if !slices.Contains(argv, "--resume") || !slices.Contains(argv, res.SessionID) {
+		t.Fatalf("argv %v does not resume session %s", argv, res.SessionID)
+	}
+	if slices.Contains(argv, "--session-id") {
+		t.Fatalf("argv %v carries --session-id beside --resume", argv)
+	}
+	if !again.Resumed || again.ResumedFrom != res.SessionID || again.SessionID != res.SessionID {
+		t.Fatalf("result = resumed %v from %q id %q, want the spawn's session %s", again.Resumed, again.ResumedFrom, again.SessionID, res.SessionID)
+	}
+	if len(rec.prompts) != 1 || strings.Contains(rec.prompts[0], "not available") {
+		t.Fatalf("prompts = %q, want the plain brief pointer", rec.prompts)
+	}
+	meta, err := w.ReadCrewMeta("shop", "k3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta[spawn.MetaSessionID] != res.SessionID || meta[spawn.MetaResumed] != "true" {
+		t.Fatalf("meta = %v, want the session kept and resumed=true", meta)
+	}
+}
+
+func TestRelaunchCrewByHandStaysFresh(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	spawnClaudeCrew(t, w, deps, rt)
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "")
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	if slices.Contains(lastArgv(t, rt), "--resume") || again.Resumed {
+		t.Fatalf("a relaunch without Resume must start fresh: argv %v resumed %v", lastArgv(t, rt), again.Resumed)
+	}
+}
+
+func TestRelaunchCrewResumesTheCodexRollout(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps, sessions := codexDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, BriefText: brieftest.Ship("work"),
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	cwd, err := filepath.EvalSymlinks(res.Worktree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCodexRollout(t, sessions, codexSessionA, cwd, deps.Now().Add(2*time.Second))
+	rt.ClosePane(res.Pane)
+
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "", spawn.RelaunchOptions{Resume: true})
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	argv := lastArgv(t, rt)
+	if !slices.Contains(argv, "resume") || argv[len(argv)-1] != codexSessionA {
+		t.Fatalf("argv %v is not `codex resume ... %s`", argv, codexSessionA)
+	}
+	if !again.Resumed || again.ResumedFrom != codexSessionA {
+		t.Fatalf("result = %+v, want resumed from %s", again, codexSessionA)
+	}
+}
+
+func TestRelaunchCrewGoesFreshWithANoteWhenTheConversationIsGone(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps, _ := codexDeps(t, rt)
+	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
+		Project: "shop", Crew: "k3", Harness: codex.KindCodex, BriefText: brieftest.Ship("work"),
+	})
+	if err != nil {
+		t.Fatalf("SpawnCrew: %v", err)
+	}
+	rt.ClosePane(res.Pane)
+	rec := &promptRecorder{Fake: rt}
+	deps.Runtime = rec
+	// No rollout was written: the conversation lived on another machine.
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "", spawn.RelaunchOptions{Resume: true})
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	if again.Resumed || again.ResumeNote == "" {
+		t.Fatalf("result = resumed %v note %q, want fresh with a note", again.Resumed, again.ResumeNote)
+	}
+	if slices.Contains(lastArgv(t, rt), "resume") {
+		t.Fatalf("argv %v must not resume", lastArgv(t, rt))
+	}
+	if len(rec.prompts) != 1 || !strings.Contains(rec.prompts[0], res.BriefPath) || !strings.Contains(rec.prompts[0], "earlier conversation is not available") {
+		t.Fatalf("prompts = %q, want the brief pointer with the note", rec.prompts)
+	}
+}
+
+func TestRelaunchCrewFallsBackToFreshWhenTheResumedLaunchFails(t *testing.T) {
+	w := crewWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	res := spawnClaudeCrew(t, w, deps, rt)
+	rec := &promptRecorder{Fake: rt}
+	deps.Runtime = rec
+	// The resumed pane shows a screen the settle cannot name; the fake shows
+	// it once, then the composer again.
+	rt.NextStartupScreen = "ERROR: something claude has never printed before\n"
+	again, err := spawn.RelaunchCrew(context.Background(), w, deps, "shop", "k3", "", spawn.RelaunchOptions{Resume: true})
+	if err != nil {
+		t.Fatalf("RelaunchCrew: %v", err)
+	}
+	if n := len(rt.StartArgv); n != 3 {
+		t.Fatalf("StartAgent calls = %d, want 3 (spawn, failed resume, fresh)", n)
+	}
+	if !slices.Contains(rt.StartArgv[1], "--resume") || slices.Contains(rt.StartArgv[2], "--resume") {
+		t.Fatalf("argv: resume attempt %v, fallback %v", rt.StartArgv[1], rt.StartArgv[2])
+	}
+	if again.Resumed || !strings.Contains(again.ResumeNote, "resuming the claude session "+res.SessionID+" failed") {
+		t.Fatalf("result = resumed %v note %q", again.Resumed, again.ResumeNote)
+	}
+	if len(rec.prompts) != 1 || !strings.Contains(rec.prompts[0], "earlier conversation is not available") {
+		t.Fatalf("prompts = %q, want one prompt carrying the note", rec.prompts)
+	}
+	meta, _ := w.ReadCrewMeta("shop", "k3")
+	if meta[spawn.MetaAgent] != again.Agent || meta[spawn.MetaResumed] != "" {
+		t.Fatalf("meta after fallback = %v", meta)
 	}
 }
