@@ -230,3 +230,30 @@ func TestRepoAddOnTheOldLayoutClonesNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestRepoAddRefusedWritesNothingIntoTheRepo: a repo with no commit outside
+// the project's directory is refused before the empty first commit, so the
+// captain's repo is left as it was.
+func TestRepoAddRefusedWritesNothingIntoTheRepo(t *testing.T) {
+	gitIdentity(t)
+	ws := initProjectWorkspace(t)
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	loose := filepath.Join(ws, "loose")
+	if err := os.MkdirAll(loose, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGitOrFatal(t, loose, "init", "-q", "-b", "main")
+	err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", loose}, &out, &errw)
+	if !errors.Is(err, store.ErrRepoOutsideProject) {
+		t.Fatalf("repo add of a repo outside shop/ = %v, want ErrRepoOutsideProject", err)
+	}
+	if n, _ := runGit(loose, "rev-list", "--count", "--all"); n != "0" {
+		t.Fatalf("the refused repo has %s commit(s): repo add wrote into it", n)
+	}
+	if strings.Contains(out.String(), "had no commit") {
+		t.Fatalf("repo add said it made a commit:\n%s", out.String())
+	}
+}

@@ -157,9 +157,10 @@ type Summary struct {
 	Repaired int
 	// Rewrote is how many briefs had a repo path rewritten.
 	Rewrote int
-	// Warnings are worktrees that could not be re-attached. They do not
-	// stop a migrate: the worktree is a closed crew's or the captain's,
-	// and `git worktree repair` can be run on it later.
+	// Warnings are worktrees that could not be re-attached, and link
+	// repairs other than root and owner that failed. They do not stop a
+	// migrate: the worktree is a closed crew's or the captain's, and `git
+	// worktree repair` can be run on it later.
 	Warnings []string
 	// Layout is true once workspace.yaml says layout 2.
 	Layout bool
@@ -178,28 +179,38 @@ func movedFrom(ws *store.Workspace) (string, bool) {
 
 // repairLinks makes the link repair the console makes on layout 2
 // (recovery.RepairLinks), under `.mate/recover.lock`, and says what it did.
-// The session may be renamed by it, so deps follows. A repair that failed
-// is a refusal: nothing is moved over links that still name the old root.
-func repairLinks(ctx context.Context, ws *store.Workspace, deps *Deps, out io.Writer) ([]recovery.Fix, error) {
+// The session may be renamed by it, so deps follows. A root or owner
+// repair that failed is a refusal: nothing is moved over a workspace.yaml,
+// a brief or a session that still names the old root. Any other failed
+// repair (a worktree re-attach, a Mate's hooks) is a warning, printed at
+// once and returned: the root is recorded by then, so a rerun would not
+// try it again, and a refusal that vanishes on rerun says nothing useful.
+func repairLinks(ctx context.Context, ws *store.Workspace, deps *Deps, out io.Writer) ([]recovery.Fix, []string, error) {
 	unlock, err := ws.LockRecover(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("recovery lock: %w", err)
+		return nil, nil, fmt.Errorf("recovery lock: %w", err)
 	}
 	defer unlock()
 	fixes := recovery.RepairLinks(ctx, recovery.Env{WS: ws, Git: deps.Git, Harnesses: deps.Harnesses, Binary: deps.Binary, ConfigHome: deps.Session.ConfigHome})
 	deps.Session.Name = ws.Session()
 	var failed []Refusal
+	var warnings []string
 	for _, f := range fixes {
-		if f.Err != nil {
+		switch {
+		case f.Err == nil:
+			fmt.Fprintf(out, "repaired %s: %s\n", f.Step, f.What)
+		case f.Step == "root" || f.Step == "owner":
 			failed = append(failed, Refusal{Reason: fmt.Sprintf("link repair: %s: %v", f.What, f.Err)})
-			continue
+		default:
+			w := fmt.Sprintf("link repair: %s: %v", f.What, oneLine(f.Err))
+			fmt.Fprintln(out, "warning: "+w)
+			warnings = append(warnings, w)
 		}
-		fmt.Fprintf(out, "repaired %s: %s\n", f.Step, f.What)
 	}
 	if len(failed) > 0 {
-		return fixes, &RefusedError{Refusals: failed}
+		return fixes, warnings, &RefusedError{Refusals: failed}
 	}
-	return fixes, nil
+	return fixes, warnings, nil
 }
 
 const (
@@ -335,6 +346,10 @@ func (pl *planner) plan(cfg store.ProjectConfig, node query.ProjectNode) []Move 
 		moves = append(moves, m)
 	}
 	if len(moves) == 0 {
+		// Run makes the directory of a project with nothing to move too.
+		if fi, err := os.Stat(home); err == nil && !fi.IsDir() {
+			pl.refuse("%s, project %s's directory, is a file", home, p)
+		}
 		return nil
 	}
 	// The repo at the project's own directory goes first: until it has
@@ -520,7 +535,8 @@ func DryRun(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) 
 }
 
 // Run moves every repo of the plan under its project's directory, project
-// by project, then writes layout 2 into workspace.yaml. It holds
+// by project, makes the directory of every project that has none (a project
+// with no repo), then writes layout 2 into workspace.yaml. It holds
 // `.mate/migrate.lock` throughout. A workspace that was moved or copied has
 // its links repaired first (repairLinks), and they stay repaired when the
 // plan is then refused. A refusal is a *RefusedError and nothing was moved;
@@ -537,10 +553,12 @@ func Run(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Su
 
 	var sum Summary
 	if _, moved := movedFrom(ws); moved {
-		if sum.Links, err = repairLinks(ctx, ws, &deps, out); err != nil {
+		if sum.Links, sum.Warnings, err = repairLinks(ctx, ws, &deps, out); err != nil {
 			return sum, err
 		}
 	}
+	// The link repair's warnings are printed already.
+	printed := len(sum.Warnings)
 	moves, refusals, err := Plan(ctx, ws, deps)
 	if err != nil {
 		return sum, err
@@ -573,9 +591,15 @@ func Run(ctx context.Context, ws *store.Workspace, deps Deps, out io.Writer) (Su
 		sum.Moves = append(sum.Moves, m)
 		fmt.Fprintf(out, "moved %s -> %s%s\n", m.Old, m.New, m.note())
 	}
+	// Every project has its directory on layout 2, one with no repo too.
+	for _, ref := range ws.Projects() {
+		if err := os.MkdirAll(ws.ProjectHome(ref.Name), 0o755); err != nil {
+			return sum, err
+		}
+	}
 	fmt.Fprintf(out, "repaired %d worktree(s)\n", sum.Repaired)
 	fmt.Fprintf(out, "rewrote %d brief(s)\n", sum.Rewrote)
-	for _, w := range sum.Warnings {
+	for _, w := range sum.Warnings[printed:] {
 		fmt.Fprintln(out, "warning: "+w)
 	}
 	if err := ws.SetLayoutProjectDirs(); err != nil {

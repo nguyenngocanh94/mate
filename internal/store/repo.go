@@ -204,23 +204,42 @@ func (w *Workspace) checkReposUnclaimed(project string, repos []RepoConfig) erro
 // AddRepo registers one more repo in an existing project and returns it as
 // stored. An empty Name is derived from the path (DefaultRepoName).
 func (w *Workspace) AddRepo(project string, repo RepoConfig) (RepoConfig, error) {
-	cfg, err := w.LoadProject(project)
+	cfg, added, err := w.addRepoPlan(project, repo)
 	if err != nil {
 		return RepoConfig{}, err
 	}
-	repos, err := w.normaliseRepos(project, append(append([]RepoConfig(nil), cfg.Repos...), repo))
-	if err != nil {
-		return RepoConfig{}, err
-	}
-	added := repos[len(repos)-1]
-	if err := w.checkReposUnclaimed(project, []RepoConfig{added}); err != nil {
-		return RepoConfig{}, err
-	}
-	cfg.Repos = repos
 	if err := w.SaveProject(project, cfg); err != nil {
 		return RepoConfig{}, err
 	}
 	return added, nil
+}
+
+// CheckAddRepo is every refusal AddRepo would make, the repo outside the
+// project's directory among them, with nothing written. A caller that
+// changes the repo itself before AddRepo (an empty first commit) asks it
+// first, so a refused repo is left as it was.
+func (w *Workspace) CheckAddRepo(project string, repo RepoConfig) error {
+	_, _, err := w.addRepoPlan(project, repo)
+	return err
+}
+
+// addRepoPlan is project.yaml with repo added, and repo as it would be
+// stored, or why AddRepo refuses it.
+func (w *Workspace) addRepoPlan(project string, repo RepoConfig) (ProjectConfig, RepoConfig, error) {
+	cfg, err := w.LoadProject(project)
+	if err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	repos, err := w.normaliseRepos(project, append(append([]RepoConfig(nil), cfg.Repos...), repo))
+	if err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	added := repos[len(repos)-1]
+	if err := w.checkReposUnclaimed(project, []RepoConfig{added}); err != nil {
+		return ProjectConfig{}, RepoConfig{}, err
+	}
+	cfg.Repos = repos
+	return cfg, added, nil
 }
 
 // RemoveRepo drops a repo from a project. The repository directory is never

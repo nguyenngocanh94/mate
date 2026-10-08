@@ -355,8 +355,9 @@ func TestTUnboundOrHostlessSaysSo(t *testing.T) {
 		t.Fatalf("key line offers an unbound t: %+v", m.keyHints())
 	}
 	m = projectFrame(t, sampleTree())
+	want := m.modeTarget()
 	m, cmd = send(t, m, key("t"))
-	if cmd != nil || !strings.Contains(m.msg.text, "no next pane") {
+	if cmd != nil || m.msg.text != "no next pane: run mate console inside WezTerm or Ghostty; or run mate tool tracker "+want+" in a terminal" {
 		t.Fatalf("hostless t: %+v", m.msg)
 	}
 }

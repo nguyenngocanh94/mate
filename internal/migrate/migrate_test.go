@@ -803,3 +803,63 @@ func TestMigrateWarnsForALinkedWorktreeItCannotRepair(t *testing.T) {
 		t.Fatalf("warnings %q, output\n%s\nwant one naming %s", sum.Warnings, out.String(), beside)
 	}
 }
+
+// A moved workspace whose link repair cannot re-attach a crew's worktree
+// still migrates: that failure is a warning, said at once, not a refusal
+// that a rerun (the root recorded by then) would never repeat.
+func TestMigrateWarnsForALinkRepairOtherThanRootOrOwner(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"web"}})
+	closedCrew(t, w, "shop", "k1", "web", "web", "Work in "+w.Root()+"/web.\n")
+	root := filepath.Join(filepath.Dir(w.Root()), "moved")
+	if err := os.Rename(w.Root(), root); err != nil {
+		t.Fatal(err)
+	}
+	moved, err := store.OpenForMigrate(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps, _, _ := liveDeps(t)
+	deps.Git = gitx.Git{Runner: failRepair{}}
+
+	var out bytes.Buffer
+	sum, err := migrate.Run(context.Background(), moved, deps, &out)
+	if err != nil || !sum.Layout {
+		t.Fatalf("Run: %v (layout %v)\n%s", err, sum.Layout, out.String())
+	}
+	want := "link repair: worktree of crew shop/k1 could not be re-attached: "
+	if len(sum.Warnings) == 0 || !strings.HasPrefix(sum.Warnings[0], want) {
+		t.Fatalf("warnings %q, want the first to start %q", sum.Warnings, want)
+	}
+	if strings.Count(out.String(), "warning: "+want) != 1 || !strings.Contains(out.String(), "repaired root: ") {
+		t.Fatalf("output\n%s\nwant the link warning once and the root repaired", out.String())
+	}
+	if moved.RecordedRoot() != root {
+		t.Fatalf("recorded root %q, want %s", moved.RecordedRoot(), root)
+	}
+}
+
+// A project with no repo gets its directory too (docs/mvp.md section 3,
+// `notes/`); a file in its place is refused before anything moves.
+func TestMigrateMakesTheDirectoryOfARepolessProject(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"web"}}, project{"notes", nil})
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	writeFile(t, filepath.Join(root, "notes"), "a file\n")
+	var out bytes.Buffer
+	_, err := migrate.Run(context.Background(), w, deps, &out)
+	if got := refused(t, err); len(got) != 1 || got[0] != filepath.Join(root, "notes")+", project notes's directory, is a file" {
+		t.Fatalf("refused with %q", got)
+	}
+	if err := os.Remove(filepath.Join(root, "notes")); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if _, err := migrate.Run(context.Background(), w, deps, &out); err != nil {
+		t.Fatalf("Run: %v\n%s", err, out.String())
+	}
+	for _, dir := range []string{"notes", "shop"} {
+		if fi, err := os.Stat(filepath.Join(root, dir)); err != nil || !fi.IsDir() {
+			t.Fatalf("%s/ after the migrate: %v", dir, err)
+		}
+	}
+}

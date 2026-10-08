@@ -43,13 +43,15 @@ The JSONL export is not a database backup. Back up the whole `.beads/` directory
 
 ## A tracker from before layout 2
 
-Before layout 2 (2026-10-08) the tracker lived in `.mate/projects/<project>/.beads/`. Mate never moves it, and `mate migrate` leaves it alone: it is Beads' data, not part of the layout. While the project has no tracker in its directory, `mate tool beads` and Console `t` refuse with:
+Before layout 2 (2026-10-08) the tracker lived in `.mate/projects/<project>/.beads/`. Mate never moves it, and `mate migrate` leaves it alone: it is Beads' data, not part of the layout. While the project has no tracker in its directory, `mate tool beads` and Console `t` refuse with this sentence, and `mate recall` prints it as `Beads: unreadable (...)`:
 
 ```text
 Beads data from before layout 2 sits at <old>; move it to <new> by hand (mv), or run mate tool beads <p> --init to start empty
 ```
 
 To keep it, close the viewer and move it once: `mv <workspace>/.mate/projects/<project>/.beads <workspace>/<project>/.beads`. To start empty instead, run `mate tool beads <project> --init`; the old directory stays where it is until you delete it.
+
+After the `mv`, delete what the old layout left beside it in `.mate/projects/<project>/`: `.beads.lock`, `.beads.gate.lock` and `.gitignore`. Nothing reads them any more.
 
 ## Unreleased native-plan data
 

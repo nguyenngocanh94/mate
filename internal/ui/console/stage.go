@@ -357,7 +357,13 @@ func (m Model) beginToolView(key string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.toolView == nil {
-		m.msg = errMsg("no next pane: " + m.noHostHint())
+		hint := "no next pane: " + m.noHostHint()
+		if b.Scope == "project" && b.Tool != "" {
+			// `mate tool <name> <project>` opens a tool on a project in
+			// the terminal it runs in.
+			hint += "; or run mate tool " + b.Tool + " " + target.ProjectID + " in a terminal"
+		}
+		m.msg = errMsg(hint)
 		return m, nil
 	}
 	m.msg = infoMsg(m.g.Arrow + " " + b.Label + " " + m.g.Dot + " opening " + toolTargetName(target) + m.g.Ellipsis)
