@@ -79,7 +79,7 @@ Bảng ánh xạ Observation sang hành động nằm trong code, có test, khô
 | Dialog Unknown, hoặc Confidence dưới ngưỡng ở cả hai nguồn | từ chối | health `unknown`, không mở incident | từ chối, `startup screen not recognised` kèm nhãn Jev nếu có |
 | Notice quota_exhausted | từ chối | vào inbox như `budget` | không đổi |
 
-`send.Send` sau khi gõ text vẫn đọc lại và đòi composer chứa đúng text đã gõ trước khi Enter; bước này không hỏi Jev, so chuỗi trực tiếp. Settle vẫn một phím một lần, đọc lại, và chỉ Enter khi `Highlight` ở option mà `StartupAnswer` xác nhận. Bằng chứng gửi thành công vẫn là hook echo trong `sent.log`.
+`send.Send` sau khi gõ text vẫn đọc lại và đòi composer chứa đúng text đã gõ trước khi Enter; bước này không hỏi Jev, so chuỗi trực tiếp. (Sửa 2026-10-08: lúc viết, bước đọc lại này chỉ chặn các lần Enter thử lại và gửi tiếp `ResumePending`, không chặn Enter đầu tiên; PR 3 thêm nó trước Enter đầu tiên khi chỉ Jev đọc màn hình, tức Observation trước khi gõ có `Source` là `jev`. Khi fixture đọc màn hình, fixture đã tự từ chối draft nên Enter đầu tiên giữ như cũ.) Settle vẫn một phím một lần, đọc lại, và chỉ Enter khi `Highlight` ở option mà `StartupAnswer` xác nhận. Bằng chứng gửi thành công vẫn là hook echo trong `sent.log`.
 
 ### 4.3. Khi nào gọi Jev
 

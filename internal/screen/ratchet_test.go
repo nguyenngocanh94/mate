@@ -30,10 +30,11 @@ import (
 var observeSites = []struct {
 	file, fn, via, verifier string
 }{
-	// The line is typed only into a composer the observer read, and an
-	// Enter after the first goes only while the composer holds exactly the
-	// typed text.
-	{file: "send/send.go", fn: "Send", verifier: "pendingMatches(screens, screen, payload)"},
+	// The line is typed only into a composer the observer read. When only
+	// Jev read it, the first Enter goes only while a fresh read shows the
+	// composer holding exactly the typed text, as every later Enter does
+	// (when the fixture read it, the fixture has already refused a draft).
+	{file: "send/send.go", fn: "Send", verifier: "if jevOnly && !opts.ResumePending && !pendingMatches(screens, screen, payload)"},
 	// A startup dialog is answered only by answerStartupDialog, below.
 	{file: "spawn/settle.go", fn: "settleStartupPrompt", verifier: "answerStartupDialog("},
 	// The confirm key goes only when the highlight is on the option the

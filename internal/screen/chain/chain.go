@@ -103,7 +103,9 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 // The primary is asked once per harness and screen hash within TTL; a
 // repeat is answered from memory. After BreakerFailures failures in a row
 // it is not asked at all for BreakerCooldown (breaker.go): the fallback's
-// reading is returned whole, Reason "jev: circuit open". The call is synchronous, so an answer
+// reading is returned whole, Reason "jev: circuit open", even for a screen
+// whose earlier answer is still in memory - a cache hit costs no request,
+// but an open circuit answers from the fixture alone. The call is synchronous, so an answer
 // always belongs to the snapshot that was hashed: a pane that changes while
 // Jev is asked is a new snapshot on the caller's next read, never this
 // answer's.

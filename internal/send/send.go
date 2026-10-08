@@ -19,6 +19,15 @@
 // exactly once, settle, then press enter and re-read until the composer
 // clears. Enter is retried; the text never is, because a swallowed enter
 // leaves the line in the composer and retyping would double it.
+//
+// Every Enter after the first, and every Enter of a resumed send, goes only
+// while a fresh read shows the composer holding exactly the typed line
+// (pendingMatches). The first Enter of a new send is guarded the same way
+// when only Jev read the screen before typing (the Observation's Source is
+// "jev": the fixture did not vouch for it), so a line typed into a draft Jev
+// called empty is never submitted. When the fixture read the screen it has
+// already refused any draft, and the first Enter follows the settle as it
+// always has.
 package send
 
 import (
@@ -34,6 +43,10 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
+
+// jevSource is the Source of an Observation Jev made (internal/screen/jev
+// Source; this package does not import the Jev client).
+const jevSource = "jev"
 
 // Marker is the sentinel every line mate sends on its own initiative
 // carries, so a Mate can tell an app-generated digest from something its
@@ -309,13 +322,21 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if err := sleep(ctx, deps, opts.Settle); err != nil {
 		return report, err
 	}
-	if opts.ResumePending {
+	// Only Jev read the screen before typing: the fixture did not vouch
+	// that the composer was empty, so the line may have joined a draft.
+	jevOnly := observed.Source == jevSource
+	if opts.ResumePending || jevOnly {
 		// A human can edit during the settle interval. Do not submit the
 		// earlier snapshot's text without reading the composer again.
 		screen, err = deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
 		if err != nil {
 			return report, err
 		}
+	}
+	if jevOnly && !opts.ResumePending && !pendingMatches(screens, screen, payload) {
+		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
+			"composer does not show the typed line after a Jev-only read; no Enter sent",
+			map[string]any{"screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 
 	// Enter only, never the text again: a swallowed enter leaves the line in

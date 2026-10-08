@@ -16,6 +16,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
+	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
@@ -501,6 +502,76 @@ func TestSendDecidesFromTheObserverOnce(t *testing.T) {
 	if len(busy.typed) != 0 {
 		t.Fatalf("a send the observer called busy typed anyway: %#v", busy.typed)
 	}
+}
+
+// A screen only Jev read before typing (Source "jev": the fixture did not
+// vouch for it) gets a fresh read after the settle, and the first Enter goes
+// only while the composer holds exactly the typed line: a line that joined a
+// draft Jev called empty is never submitted. A screen the fixture read keeps
+// today's sequence, with no extra read.
+func TestSendChecksTheLineBeforeTheFirstEnterWhenOnlyJevRead(t *testing.T) {
+	t.Parallel()
+	saysEmpty := func(source string) *observing {
+		return &observing{says: &screen.Observation{Composer: screen.ComposerEmpty, Dialog: screen.DialogNone,
+			Highlight: -1, Confidence: 0.97, Source: source}}
+	}
+	if saysEmpty(jev.Source).says.Source != "jev" {
+		t.Fatal("jev.Source is not the source send guards")
+	}
+
+	t.Run("jev, the line is in the composer: one Enter", func(t *testing.T) {
+		rt := &scripted{
+			screens: []string{claudeScreen("")},
+			onType:  func(text string) []string { return []string{claudeScreen(text), claudeScreen("")} },
+		}
+		deps, _ := testDeps(rt)
+		deps.Observer = saysEmpty(jev.Source)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if len(rt.keys) != 1 || report.Presses != 1 || !report.Delivered() {
+			t.Fatalf("keys %v, report %+v: want one Enter and delivery", rt.keys, report)
+		}
+		if len(rt.lines) != 3 {
+			t.Fatalf("%d reads, want 3: before typing, after the settle, after the Enter", len(rt.lines))
+		}
+	})
+
+	t.Run("jev, the line joined a draft: no Enter", func(t *testing.T) {
+		rt := &scripted{
+			screens: []string{claudeScreen("")},
+			onType:  func(text string) []string { return []string{claudeScreen("half typed " + text)} },
+		}
+		deps, _ := testDeps(rt)
+		deps.Observer = saysEmpty(jev.Source)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if !errors.Is(err, send.ErrSubmissionUnconfirmed) ||
+			!strings.Contains(err.Error(), "composer does not show the typed line after a Jev-only read; no Enter sent") {
+			t.Fatalf("err = %v, want ErrSubmissionUnconfirmed with the Jev-only detail", err)
+		}
+		if len(rt.keys) != 0 || report.Presses != 0 || !report.Typed {
+			t.Fatalf("keys %v, report %+v: want the line typed and no Enter", rt.keys, report)
+		}
+	})
+
+	t.Run("fixture: no extra read", func(t *testing.T) {
+		rt := &scripted{
+			screens: []string{claudeScreen("")},
+			onType:  func(text string) []string { return []string{claudeScreen(text), claudeScreen("")} },
+		}
+		deps, _ := testDeps(rt)
+		deps.Observer = saysEmpty("fixture")
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		// The first Enter follows the settle unread, and the read after it
+		// still shows the line, so a second Enter submits it.
+		if len(rt.lines) != 3 || report.Presses != 2 || !report.Delivered() {
+			t.Fatalf("%d reads, report %+v: want 3 reads, the first Enter unchecked as before", len(rt.lines), report)
+		}
+	})
 }
 
 // ComposerLabel keeps the word mate has always printed for the draft state.
