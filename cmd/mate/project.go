@@ -20,7 +20,9 @@ import (
 
 // cmdProjectAdd implements `mate project add <name> [<repo-path>]`. A
 // project may start without a repo (docs/mvp.md M9); repos are added and
-// removed later with `mate project repo`.
+// removed later with `mate project repo`. The project's directory,
+// `<root>/<name>/`, is made if it is not there (docs/mvp.md section 3), and
+// a <repo-path> must be under it.
 func cmdProjectAdd(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("project add", flag.ContinueOnError)
 	fs.SetOutput(stderr)
