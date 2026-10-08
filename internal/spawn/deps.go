@@ -12,7 +12,10 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/tool"
 )
 
 // Meta keys written to `mate/mate.meta`. They are spelled once, here, so the
@@ -94,6 +97,10 @@ type Deps struct {
 	// The zero Registry holds none, so every start is refused; cmd/mate
 	// passes catalog.Default().
 	Harnesses harness.Registry
+	// Tools are the tools whose skills a Mate's manual installs beside its
+	// own (tool.Skill). The zero Registry holds none; cmd/mate passes its
+	// catalog's.
+	Tools tool.Registry
 	// Names is the live agent-name registry. Nil means a fresh in-process
 	// one, which is what a one-shot CLI invocation wants.
 	Names runtime.LiveNameRegistry
@@ -129,6 +136,9 @@ type Deps struct {
 	// NewSessionID mints the Claude session uuid; tests make it
 	// deterministic. Nil means uuid.NewString.
 	NewSessionID func() string
+	// Observer reads the pane during the startup settle (settle.go). Nil
+	// means the fixture observer (internal/screen/fixture).
+	Observer screen.Observer
 }
 
 // LiveDeps is what the CLI uses: the real Herdr adapter over os/exec, and
@@ -210,6 +220,13 @@ func (d Deps) now() time.Time {
 		return d.Now()
 	}
 	return time.Now().UTC()
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 func (d Deps) sleep() sleeper {

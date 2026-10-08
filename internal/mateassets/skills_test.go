@@ -15,7 +15,7 @@ import (
 // Mate acts on, so a change to one is a change to behaviour and has to be
 // reviewed as a diff.
 func TestRenderSkillGolden(t *testing.T) {
-	for _, name := range SkillNames {
+	for _, name := range fixedParams().Skills() {
 		t.Run(name, func(t *testing.T) {
 			got, err := RenderSkill(name, fixedParams())
 			if err != nil {
@@ -33,7 +33,7 @@ func TestRenderSkillUnknownName(t *testing.T) {
 }
 
 func TestRenderSkillsNoUnexpandedVarsOrForbiddenWords(t *testing.T) {
-	for _, name := range SkillNames {
+	for _, name := range fixedParams().Skills() {
 		t.Run(name, func(t *testing.T) {
 			got, err := RenderSkill(name, fixedParams())
 			if err != nil {
@@ -53,7 +53,7 @@ func TestRenderSkillsNoUnexpandedVarsOrForbiddenWords(t *testing.T) {
 // directory the skill is installed under, and a non-empty `description`,
 // which is the only text Claude sees when deciding whether to load it.
 func TestRenderSkillHasFrontmatter(t *testing.T) {
-	for _, name := range SkillNames {
+	for _, name := range fixedParams().Skills() {
 		t.Run(name, func(t *testing.T) {
 			got, err := RenderSkill(name, fixedParams())
 			if err != nil {
@@ -91,7 +91,7 @@ func TestWriteInstallsSkills(t *testing.T) {
 	if err := Write(dir, fixedParams()); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range SkillNames {
+	for _, name := range fixedParams().Skills() {
 		path := filepath.Join(dir, ".claude", "skills", name, "SKILL.md")
 		got, err := os.ReadFile(path)
 		if err != nil {
@@ -155,5 +155,46 @@ func TestHarnessAdaptersFollowTheMatesHarness(t *testing.T) {
 	}
 	if bytes.Contains(got, []byte("Claude Code is what you run on")) {
 		t.Error("the skill tells a Codex Mate it runs on Claude Code")
+	}
+}
+
+// A tool's skill comes from the registry: with no tool that has one, the
+// manual lists none and none is written; with one, it is written beside
+// mate's own and the manual lists it where it lists them.
+func TestToolSkillsComeFromTheRegistry(t *testing.T) {
+	p := fixedParams()
+	if got := p.Skills(); got[len(got)-1] != "task-management" || len(got) != len(SkillNames)+1 {
+		t.Fatalf("Skills() = %q, want mate's own then task-management", got)
+	}
+	manual, err := Render(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(manual, []byte("project cheaper to run.\n- `task-management` - when recording requested work")) {
+		t.Fatalf("the manual does not list the tool's skill after mate's own:\n%s", manual)
+	}
+
+	p.ToolSkills = nil
+	if _, err := RenderSkill("task-management", p); err == nil {
+		t.Fatal("RenderSkill rendered a tool skill no tool declares")
+	}
+	manual, err = Render(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(manual, []byte("task-management")) || !bytes.Contains(manual, []byte("project cheaper to run.\n\n## 3.")) {
+		t.Fatalf("with no tool skill the manual still names one, or lost its spacing")
+	}
+	dir := t.TempDir()
+	if err := Write(dir, p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "skills", "task-management")); !os.IsNotExist(err) {
+		t.Fatalf("a tool skill no tool declares was written: %v", err)
+	}
+
+	p.ToolSkills = []ToolSkill{{Name: "broken", Template: "{{.Nope"}}
+	if _, err := RenderSkill("broken", p); err == nil {
+		t.Fatal("a malformed tool skill rendered")
 	}
 }

@@ -412,3 +412,22 @@ func TestDetachedWorktreeIsSnapshottedAgainstHistory(t *testing.T) {
 		t.Fatalf("SnapshotTree changed the primary checkout:\n%s", status)
 	}
 }
+
+func TestHasGitDir(t *testing.T) {
+	repo := newRepo(t)
+	if !gitx.HasGitDir(repo) {
+		t.Fatalf("HasGitDir(%s) = false for a repository", repo)
+	}
+	sub := filepath.Join(repo, "sub")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if gitx.HasGitDir(sub) {
+		t.Fatalf("HasGitDir(%s) = true for a directory inside a repository", sub)
+	}
+	wt := filepath.Join(filepath.Dir(repo), "wt")
+	run(t, repo, "worktree", "add", "-b", "k1", wt)
+	if !gitx.HasGitDir(wt) {
+		t.Fatalf("HasGitDir(%s) = false for a linked worktree", wt)
+	}
+}

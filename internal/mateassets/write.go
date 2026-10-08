@@ -38,11 +38,12 @@ func Write(dir string, p Params) error {
 	return writeSkills(dir, p)
 }
 
-// writeSkills installs every SkillNames entry under dir, replacing whatever
-// is there. Skills are generated content like the manual, not the Mate's own
-// memory, so they are rewritten on every start rather than preserved.
+// writeSkills installs every skill of p.Skills() under dir, replacing
+// whatever is there. Skills are generated content like the manual, not the
+// Mate's own memory, so they are rewritten on every start rather than
+// preserved.
 func writeSkills(dir string, p Params) error {
-	for _, name := range SkillNames {
+	for _, name := range p.Skills() {
 		data, err := RenderSkill(name, p)
 		if err != nil {
 			return err

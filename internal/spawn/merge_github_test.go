@@ -146,7 +146,7 @@ func TestGitHubMergeMergesThePullRequestAndFinishesTheCrew(t *testing.T) {
 			if !strings.HasPrefix(meta[crewstate.MetaPRSync], "skipped: ") {
 				t.Fatalf("pr_sync = %q: the fixture has no origin, so the checkout must be left alone with a reason", meta[crewstate.MetaPRSync])
 			}
-			if exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop"), res.Branch); err != nil || exists {
+			if exists, err := gitx.New().BranchExists(context.Background(), w.RepoDir("shop/shop"), res.Branch); err != nil || exists {
 				t.Fatalf("the branch survived: %v, %v", exists, err)
 			}
 		})

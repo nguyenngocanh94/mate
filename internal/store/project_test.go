@@ -16,7 +16,7 @@ import (
 func newProjectWorkspace(t *testing.T) *store.Workspace {
 	t.Helper()
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w
@@ -25,7 +25,7 @@ func newProjectWorkspace(t *testing.T) *store.Workspace {
 func TestStoreProjectAddLoadSave(t *testing.T) {
 	w := newWorkspace(t)
 
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 
@@ -33,7 +33,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
-	want := []store.RepoConfig{{Name: "shop", Path: "shop", DefaultBranch: store.DefaultBranch}}
+	want := []store.RepoConfig{{Name: "shop", Path: "shop/shop", DefaultBranch: store.DefaultBranch}}
 	if !reflect.DeepEqual(cfg.Repos, want) {
 		t.Fatalf("defaults not applied: %+v", cfg)
 	}
@@ -66,7 +66,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 		t.Fatalf("projects = %+v, want one shop entry", refs)
 	}
 
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); !errors.Is(err, store.ErrProjectExists) {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); !errors.Is(err, store.ErrProjectExists) {
 		t.Fatalf("duplicate AddProject: err = %v, want ErrProjectExists", err)
 	}
 
@@ -148,11 +148,11 @@ func TestStoreAddProjectRejectsBadConfig(t *testing.T) {
 		proj string
 		cfg  store.ProjectConfig
 	}{
-		{"invalid name", "Shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}},
+		{"invalid name", "Shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}},
 		{"empty repo path", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: ""}}}},
-		{"invalid repo name", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "Api", Path: "shop"}}}},
-		{"repo name twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop"}, {Name: "a", Path: "blog"}}}},
-		{"repo path twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop"}, {Name: "b", Path: "./shop"}}}},
+		{"invalid repo name", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "Api", Path: "shop/shop"}}}},
+		{"repo name twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop/shop"}, {Name: "a", Path: "shop/blog"}}}},
+		{"repo path twice", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Name: "a", Path: "shop/shop"}, {Name: "b", Path: "./shop/shop"}}}},
 		{"repo outside workspace", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: outside}}}},
 		{"repo escaping with ..", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "../elsewhere"}}}},
 		{"repo is the root", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "."}}}},
@@ -172,7 +172,7 @@ func TestStoreAddProjectRejectsBadConfig(t *testing.T) {
 
 func TestStoreRepoNeedNotBeADirectChild(t *testing.T) {
 	w := newWorkspace(t)
-	nested := filepath.Join(w.Root(), "group", "blog")
+	nested := filepath.Join(w.Root(), "blog", "group", "blog")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -188,8 +188,8 @@ func TestStoreRepoNeedNotBeADirectChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repo.Path != "group/blog" || repo.Name != "blog" {
-		t.Fatalf("repo = %+v, want path group/blog named blog", repo)
+	if repo.Path != "blog/group/blog" || repo.Name != "blog" {
+		t.Fatalf("repo = %+v, want path blog/group/blog named blog", repo)
 	}
 	if w.RepoDir(repo.Path) != nested {
 		t.Fatalf("RepoDir = %q, want %q", w.RepoDir(repo.Path), nested)
@@ -198,7 +198,7 @@ func TestStoreRepoNeedNotBeADirectChild(t *testing.T) {
 
 func TestStoreAutoFlag(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,10 +232,10 @@ func TestStoreAutoFlag(t *testing.T) {
 // carries them loads, and the next save drops them.
 func TestProjectDropsRemovedModeAndYolo(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatal(err)
 	}
-	old := "repos:\n    - name: shop\n      path: shop\n      default_branch: main\nmode: github\nyolo: true\n"
+	old := "repos:\n    - name: shop\n      path: shop/shop\n      default_branch: main\nmode: github\nyolo: true\n"
 	if err := os.WriteFile(w.ProjectFile("shop"), []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestProjectDropsRemovedModeAndYolo(t *testing.T) {
 
 func TestUpdateCrewMetaKeepsEveryOtherKey(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.UpdateCrewMeta("shop", "k3", map[string]string{"a": "b"}); err == nil {

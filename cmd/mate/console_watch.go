@@ -43,9 +43,10 @@ func consoleWatcher(dir string, deps spawn.Deps) (*watch.Watcher, error) {
 		return nil, err
 	}
 	return watch.New(ws, watch.Deps{
-		Runtime: deps.Runtime,
-		Handle:  consoleCrewHandle(ws, deps),
-		Session: consoleSession(ws, deps),
+		Runtime:  deps.Runtime,
+		Handle:   consoleCrewHandle(ws, deps),
+		Session:  consoleSession(ws, deps),
+		Observer: deps.Observer,
 	}), nil
 }
 
@@ -70,9 +71,10 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 			return nil, nil, err
 		}
 		watcher = watch.New(ws, watch.Deps{
-			Runtime: deps.Runtime,
-			Handle:  consoleCrewHandle(ws, deps),
-			Session: consoleSession(ws, deps),
+			Runtime:  deps.Runtime,
+			Handle:   consoleCrewHandle(ws, deps),
+			Session:  consoleSession(ws, deps),
+			Observer: deps.Observer,
 		})
 		return watcher, nil, nil
 	}
@@ -93,6 +95,7 @@ func consoleWatcherWithTimeline(dir string, deps spawn.Deps) (*watch.Watcher, *d
 		Runtime:  deps.Runtime,
 		Handle:   consoleCrewHandle(ws, deps),
 		Session:  consoleSession(ws, deps),
+		Observer: deps.Observer,
 		Timeline: ingest,
 		// The same *timeline.Ingester also implements watch.BudgetChecker
 		// (mvp.md M5 task 27): it already holds the writable db.DB and the
@@ -220,6 +223,7 @@ func crewHealth(h watch.Health) query.CrewHealth {
 		QuietFor:     h.QuietFor,
 		ComposerFor:  h.ComposerFor,
 		ObservedAt:   h.ObservedAt,
+		Source:       h.Source,
 	}
 }
 

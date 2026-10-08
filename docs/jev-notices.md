@@ -1,6 +1,6 @@
 # Thử Jev để đọc notice trong terminal
 
-Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Tính năng mặc định tắt và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh.
+Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Action mặc định tắt khi workspace chưa đặt key, và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh. Với `MATE_JEV=on` hoặc `observer`, Jev còn là bộ quan sát pane (mục "Bộ quan sát" bên dưới); chỉ có key thì chưa.
 
 ## Bật bản thử
 
@@ -14,7 +14,7 @@ MATE_JEV=on
 MATE_JEV_API_KEY_FILE=~/.config/mate/jev-trial-api-key
 ```
 
-`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Đặt `MATE_JEV=off` hoặc bỏ dòng để tắt; mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
+`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Có key mà không đặt `MATE_JEV` thì chỉ action bật, như `MATE_JEV=fixture`; `MATE_JEV=on` hoặc `observer` bật cả action lẫn bộ quan sát, `MATE_JEV=off` tắt cả hai (bảng ở mục "Bộ quan sát"); mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
 
 ## Kết quả có ý nghĩa gì?
 
@@ -37,8 +37,23 @@ Sheet ghi thời điểm capture và confidence từ model. Confidence không ph
 - Một action đọc tối đa 40 dòng cuối qua adapter Herdr hiện có, gửi tối đa 8 KiB UTF-8 text tới TypeSafe. Nguồn đọc có thể là recent output, không đảm bảo là viewport hiện tại. API key được dùng cho header xác thực.
 - Loại ANSI/control sequence, che key của chính client và một số mẫu credential phổ biến. Đây là redaction tốt nhất có thể theo pattern, **không bảo đảm loại hết dữ liệu riêng tư**. Phần terminal gửi đi vẫn có thể chứa prompt, đường dẫn, code hoặc output. Chỉ bật cho nội dung bạn đồng ý gửi tới TypeSafe.
 - Dùng `jev-1.13.0` cố định, endpoint HTTPS cố định; không theo redirect, không tự retry; deadline chung 8 giây cho đọc pane và gọi API. Response lỗi, nhãn ngoài enum hoặc phân phối xác suất sai bị từ chối.
-- Không ghi màn hình, response hoặc key vào state/log của mate. Result chỉ nằm trong sheet hiện tại. Không cache, không background polling, không ghi nhãn vào timeline/inbox.
-- Jev không tham gia composer classifier, sender, receipts, incidents, quota dispatch hoặc task state. Nó không tự nhấn Enter, cấp quyền hay đóng dialog. **Bản thử này chưa sửa lỗi probe hiện tại.**
+- Với action notice: không ghi màn hình, response hoặc key vào state/log của mate. Result chỉ nằm trong sheet hiện tại. Action không cache, không background polling, không ghi nhãn vào timeline/inbox.
+- Action notice không tham gia composer classifier, sender, receipts, incidents, quota dispatch hoặc task state. Nó không tự nhấn Enter, cấp quyền hay đóng dialog. Bộ quan sát (mục dưới) là đường khác, có cache, gọi nền và có đi vào sender; xem mục đó.
+
+## Bộ quan sát
+
+Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), `MATE_JEV=on` hoặc `observer` cùng một file key đọc được bật chain làm bộ quan sát pane (Jev trước, fixture classifier là fallback). Chỉ đặt `MATE_JEV_API_KEY_FILE` mà không đặt `MATE_JEV` thì như hôm nay: action Explain notice bật, pane vẫn do fixture đọc. Mặc định sẽ chuyển sang chain khi evidence của lần chạy thật một ngày đã được commit. Giá trị `MATE_JEV`:
+
+| `MATE_JEV` | Action Explain notice | Bộ quan sát pane |
+| --- | --- | --- |
+| `on`, `observer` | bật | chain: Jev trước, fixture khi Jev không chắc |
+| không đặt (có key), `fixture` | bật | fixture, không request nào cho pane |
+| `off` | tắt | fixture, không request nào tới Jev |
+| giá trị khác | tắt, báo lỗi | fixture |
+
+Không có `MATE_JEV_API_KEY_FILE` thì bộ quan sát là fixture. Nếu `MATE_JEV` đặt `on`, `observer` hay `fixture` mà thiếu key, hoặc file key không đọc được, hoặc `MATE_JEV_THRESHOLD` sai, lệnh in một dòng `Jev disabled: …` (console để trên status line) và chạy tiếp với fixture. Không đặt cả `MATE_JEV` lẫn key thì im lặng, như workspace chưa từng bật Jev.
+
+Khi chain bật, **pane của Mate và Crew đi ra TypeSafe mỗi lần màn hình đổi**, không chỉ khi người dùng chọn action: từ observer của console, `mate send`, `mate brief append`, `mate state`, bước settle của `mate start`, `mate refresh`, `crew spawn`, `crew relaunch`, `review`, các lần gửi của outbox và autopilot (kể cả stow), watcher của `mate pr`, `mate mate stop` và `mate project remove`. Observer của console chỉ hỏi về một màn hình đã đứng yên qua một vòng poll (hash bằng hash của vòng trước): pane đổi mỗi vòng, như pane đang bận vẽ lại spinner, chỉ được fixture đọc và không tốn request nào; pane đứng yên tốn một request cho mỗi màn hình, rồi giữ câu trả lời. Vòng chờ của stow hỏi khi hash màn hình đổi. Observer của console hỏi trong nền, tối đa một request đang bay mỗi crew, nên vòng poll 5 giây không bao giờ chờ deadline 8 giây của Jev: pane đứng yên giữ quan sát của Jev; màn hình mới được fixture đọc ngay trong vòng (health ghi nguồn `fixture`), câu trả lời của Jev thay nó ở vòng sau nếu màn hình vẫn là màn hình đã hỏi, và bị bỏ nếu màn hình đã đổi. `mate send` và settle vẫn hỏi đồng bộ vì chúng vốn chờ. Sau 3 request lỗi liên tiếp, chain ngừng hỏi Jev 60 giây (mọi quan sát trong lúc đó là của fixture, lý do `jev: circuit open`), rồi thử lại một request: thành công thì đóng, lỗi thì chờ thêm 60 giây; `.mate/jev.log` ghi đúng một dòng `breaker open` khi mở và một dòng `breaker closed` khi đóng. Cache 60 giây chỉ để dùng lại câu trả lời khi cùng một màn hình được đọc lại trong một phút (settle, stow, nhiều lệnh liên tiếp). Nội dung gửi đi giống action ở trên (40 dòng cuối, 8 KiB, che key và credential theo pattern), thêm đánh dấu chữ mờ. Jev hỏi trước, fixture classifier là fallback: Jev lỗi hay confidence dưới `MATE_JEV_THRESHOLD` (mặc định `0.85`, chỉ nhận số trong `[0, 1]`) thì dùng nguyên quan sát của fixture; fixture nhận ra một dialog khởi động thì fixture thắng. Trên trục composer Jev chỉ được phủ quyết: composer là đọc của fixture, trừ khi fixture đọc trống mà Jev chắc là có draft hay đang bận; Jev không bao giờ làm một composer thành trống. Gửi, receipt của stow và incident `stale` quyết định trên đọc của fixture (`Observation.Deterministic`). Enter vẫn chỉ đi sau khi so chuỗi trực tiếp, phím dialog chỉ sau khi fixture xác nhận highlight. Mỗi request ghi một dòng vào `.mate/jev.log` (thời điểm, harness, 12 ký tự hash màn hình, latency, nguồn được dùng, nhãn Jev, `fixture=` là composer fixture đọc trên cùng màn hình, `caller=` là ai hỏi (`watch`, `send`, `settle`, `stow`, `-` khi không ghi), `used=` là câu trả lời của Jev có nằm trong quan sát chain trả về hay không, lý do fallback; không có nội dung màn hình hay key); `go run ./scripts/jeveval -log <workspace>/.mate/jev.log` in số request, latency p50/p95, số lần fallback, số lần Jev và fixture đọc composer khác nhau, và số câu trả lời được dùng / không dùng, kèm số request theo caller. `used=yes` là chain đã dùng câu trả lời; watch vẫn có thể bỏ nó nếu pane đổi trong lúc Jev đang trả lời, và log không thấy việc đó. Mục "Dữ liệu và giới hạn" ở trên mô tả action notice và vẫn đúng cho action; bộ quan sát theo mục này.
 
 ## Phương án tiến tới probe tổng quát
 
@@ -59,5 +74,13 @@ MATE_LIVE=1 MATE_JEV_API_KEY_FILE="$HOME/.config/mate/jev-trial-api-key" \
 ```
 
 Live test gửi các fixture **giả lập** trong `internal/notice/testdata/notices.json`, không đọc pane/workspace của người dùng. Biến môi trường `MATE_JEV_API_KEY_FILE` ở đây chỉ dành cho live test; console chỉ đọc `.mate/.env`. Kết quả đầu tiên: [evidence 2026-09-27](evidence/jev-notices-2026-09-27.md). Đây không phải live acceptance của toàn bộ luồng Herdr → console → API.
+
+Bộ quan sát không có live acceptance trong `make check`: unit test chạy từ cassette, không gọi mạng. Bằng chứng của nó là một ngày chạy thật trên workspace của captain với chain bật. Sau ngày đó:
+
+```sh
+go run ./scripts/jeveval -log <workspace>/.mate/jev.log
+```
+
+in số request, latency p50/p95, số lần fallback theo lý do, số câu trả lời được dùng / không dùng theo caller và số lần circuit mở. Ghi kết quả, kèm phiên bản harness và số crew đã chạy, vào `docs/evidence/jev-observer-live-<ngày>.md`. Chưa chạy thì không có file đó; không tạo file evidence trống.
 
 Hợp đồng request/response theo [TypeSafe API reference](https://docs.typesafe.ai/api); hạn chế model theo [Jev jaggedness](https://docs.typesafe.ai/model-jaggedness/jev-1.13).

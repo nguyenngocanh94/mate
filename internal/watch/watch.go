@@ -17,6 +17,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -42,7 +43,7 @@ type Runtime interface {
 	// ReadAgentStyled, not ReadAgent: the health column reports the
 	// composer state, and telling a harness's own faint suggestion from a
 	// person's unsubmitted line needs the attributes
-	// (internal/send/classify.go's faintPlaceholder).
+	// (internal/screen/fixture/classify.go's faintPlaceholder).
 	ReadAgentStyled(ctx context.Context, handle runtime.AgentHandle, source harness.ReadSource, lines int) (string, error)
 }
 
@@ -134,6 +135,12 @@ type Deps struct {
 	// StaleAfter is the quiet period that opens `stale`; zero means
 	// DefaultStaleAfter.
 	StaleAfter time.Duration
+	// Observer reads each pane snapshot that differs from the last one it
+	// read; the health column is its Observation's composer, kept while the
+	// pane does not change. It is asked in the background, so a slow answer
+	// never holds the poll loop (observe.go). Nil means the fixture
+	// observer (internal/screen/fixture), asked in the round.
+	Observer screen.Observer
 }
 
 func (d Deps) now() time.Time {
@@ -199,6 +206,9 @@ type Watcher struct {
 	runtimeNoticeAt time.Time
 	cancel          context.CancelFunc
 	done            chan struct{}
+
+	// observing counts the observer calls in flight (observe.go).
+	observing sync.WaitGroup
 }
 
 // observation is what the previous polls established about one crew.
@@ -221,6 +231,14 @@ type observation struct {
 	// clock instead.
 	composer      send.ComposerState
 	composerSince time.Time
+	// observed is the hash of the snapshot composer was read from, empty
+	// before the observer has read one.
+	observed string
+	// reading is the observer's reading of the snapshot observed names.
+	reading reading
+	// asking is the observer call in flight for this crew, nil when none
+	// (observe.go).
+	asking *asking
 }
 
 // New builds an observer over a workspace. It does not poll until Start or
@@ -249,8 +267,9 @@ func (w *Watcher) Start(ctx context.Context) {
 	go w.run(runCtx)
 }
 
-// Stop ends the polling goroutine and waits for the round in flight. It is
-// safe to call on a Watcher that was never started.
+// Stop ends the polling goroutine and waits for the round in flight and
+// for the observer calls it started, which the cancelled context ends. It
+// is safe to call on a Watcher that was never started.
 func (w *Watcher) Stop() {
 	w.mu.Lock()
 	cancel, done := w.cancel, w.done
@@ -261,6 +280,7 @@ func (w *Watcher) Stop() {
 	}
 	cancel()
 	<-done
+	w.AwaitObserver()
 }
 
 func (w *Watcher) run(ctx context.Context) {
@@ -425,28 +445,45 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	}
 	hash := screenHash(screen)
 	paneMoved := obs.screen != "" && obs.screen != hash
+	held := obs.screen == hash
 	obs.screen = hash
 	if paneMoved {
 		obs.changedAt = now
 	}
 
-	composer := send.ClassifyComposer(screens, screen).State
+	// The observer is asked only about a snapshot it has not read and the
+	// pane has held for a poll: a pane that has not changed keeps its last
+	// reading, so a still pane costs one observer call, and a pane that
+	// changes every poll costs none (docs/plans/jev-observer-2026-10-08.md
+	// section 4.3).
+	// A screen the observer could not read is not a reading: the round ends
+	// without a verdict, as for a pane that could not be read, and the next
+	// round asks again.
+	read, err := w.composer(ctx, obs, screens, screen, hash, held)
+	if err != nil {
+		return err
+	}
+	composer := read.composer
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer
 		obs.composerSince = now
 	}
 	quiet := now.Sub(obs.changedAt)
 
+	// The stale incident is decided on the fixture's own reading
+	// (Deterministic): Jev calling a still pane busy neither keeps it from
+	// opening nor resolves it. The column shows the observer's composer.
+	deterministic := read.deterministic
 	switch {
 	case open[incidentKey{ref, box.IncidentStale}]:
-		if reason, ok := staleCleared(paneMoved, statusMoved, composer); ok {
+		if reason, ok := staleCleared(paneMoved, statusMoved, deterministic); ok {
 			if err := w.resolveIncident(ref, box.IncidentStale, now, open, reason); err != nil {
 				return err
 			}
 		}
-	case quiet >= w.deps.staleAfter() && composer != send.StateBusy && !waiting(obs.verb):
+	case quiet >= w.deps.staleAfter() && deterministic != send.StateBusy && !waiting(obs.verb):
 		text := fmt.Sprintf("no status line and no pane change for %s; composer %s",
-			quiet.Round(time.Second), composer)
+			quiet.Round(time.Second), send.ComposerLabel(deterministic))
 		if obs.verb != "" {
 			text += fmt.Sprintf("; last status verb %s", obs.verb)
 		}
@@ -458,6 +495,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	results[ref] = Health{
 		AgentPresent: true,
 		Composer:     composer,
+		Source:       read.source,
 		QuietFor:     quiet,
 		ComposerFor:  now.Sub(obs.composerSince),
 		ObservedAt:   now,

@@ -144,6 +144,13 @@ func parseSent(line string) (SentEntry, bool) {
 	return SentEntry{Time: ts, Source: fields[1], Target: fields[2], Text: fields[3]}, true
 }
 
+// AppendJevLog appends one line to `.mate/jev.log` under the same exclusive
+// lock as the other logs. The line is the chain's (internal/screen/chain
+// LogLine); newlines in it become spaces.
+func (w *Workspace) AppendJevLog(line string) error {
+	return w.appendLine(w.JevLog(), oneLine(line))
+}
+
 // appendLine writes line plus a newline to path in one O_APPEND write, holding
 // an exclusive lock for the write.
 func (w *Workspace) appendLine(path, line string) error {

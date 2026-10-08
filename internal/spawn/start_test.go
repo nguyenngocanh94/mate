@@ -426,7 +426,7 @@ func TestStartMateForAProjectWithNoRepo(t *testing.T) {
 // its absolute path and its own default branch.
 func TestStartMateForAProjectWithTwoRepos(t *testing.T) {
 	w := newWorkspace(t, "shop")
-	api := filepath.Join(w.Root(), "api")
+	api := filepath.Join(w.ProjectHome("shop"), "api")
 	if err := os.MkdirAll(api, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestStartMateForAProjectWithTwoRepos(t *testing.T) {
 	}
 	manual := startedManual(t, w)
 	for _, row := range []string{
-		"| `shop` | `" + w.RepoDir("shop") + "` | `main` |",
+		"| `shop` | `" + w.RepoDir("shop/shop") + "` | `main` |",
 		"| `api` | `" + api + "` | `develop` |",
 	} {
 		if !strings.Contains(manual, row) {

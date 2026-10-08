@@ -30,7 +30,7 @@ func twoRepoCLIWorkspace(t *testing.T) (*store.Workspace, string) {
 	}
 	var repos []store.RepoConfig
 	for _, name := range []string{"api", "web"} {
-		dir := filepath.Join(w.Root(), "shop-"+name)
+		dir := filepath.Join(w.ProjectHome("shop"), "shop-"+name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +61,7 @@ func twoRepoCLIWorkspace(t *testing.T) (*store.Workspace, string) {
 }
 
 func cliRepo(w *store.Workspace, name string) string {
-	return filepath.Join(w.Root(), "shop-"+name)
+	return filepath.Join(w.ProjectHome("shop"), "shop-"+name)
 }
 
 func cliHead(t *testing.T, repo, rev string) string {

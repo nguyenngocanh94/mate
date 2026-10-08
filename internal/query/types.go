@@ -33,6 +33,9 @@ type Snapshot struct {
 	// Harnesses are the harnesses the binary launches, in registration
 	// order (Harnesses.List): what a UI offers and how it draws each.
 	Harnesses []Harness
+	// Tools are the console keys of the tools the binary drives, in
+	// registration order: what a UI binds and draws on its key line.
+	Tools []ToolBinding
 	// Warnings lists every Unknown field in the tree, in tree order. Empty
 	// means every field either read successfully or is legitimately absent -
 	// it does not mean the snapshot is fresh.
@@ -295,6 +298,9 @@ type CrewHealth struct {
 	// ObservedAt is when the observation was made. It is not the snapshot's
 	// AsOf: the observer polls on its own interval, so this can be older.
 	ObservedAt time.Time
+	// Source is the observer whose reading Composer is ("fixture", "jev"),
+	// empty when none was named.
+	Source string
 }
 
 // CrewComposer is the composer state of a Crew's pane, as internal/send

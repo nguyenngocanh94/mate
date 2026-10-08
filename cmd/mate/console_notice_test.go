@@ -27,7 +27,7 @@ func TestConsoleNoticeReadsOnlySelectedAgent(t *testing.T) {
 			f := newBoxFixture(t)
 			f.rt.SetReadOutput(f.mate, "Only 10% remains\n❯")
 			f.rt.SetReadOutput(f.crew, "New update available\n›")
-			before, _ := query.Load(context.Background(), f.ws, consoleHarnesses())
+			before, _ := query.Load(context.Background(), f.ws, consoleHarnesses(), consoleTools())
 			callsBefore := len(f.rt.Calls)
 			count := 0
 			classifier := noticeFunc(func(ctx context.Context, screen string) (notice.Result, error) {
@@ -54,7 +54,7 @@ func TestConsoleNoticeReadsOnlySelectedAgent(t *testing.T) {
 					t.Fatalf("mutating runtime call: %s", call)
 				}
 			}
-			after, _ := query.Load(context.Background(), f.ws, consoleHarnesses())
+			after, _ := query.Load(context.Background(), f.ws, consoleHarnesses(), consoleTools())
 			before.AsOf = after.AsOf
 			if !reflect.DeepEqual(before, after) {
 				t.Fatal("notice action changed workspace state")

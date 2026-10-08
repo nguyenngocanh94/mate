@@ -32,7 +32,7 @@ func TestStateOfCrewGathersTheInputs(t *testing.T) {
 		}
 		want := crewstate.Result{
 			State:  crewstate.StateSpawned,
-			Health: crewstate.Health{Kind: crewstate.HealthIdle, Detail: "composer empty"},
+			Health: crewstate.Health{Kind: crewstate.HealthIdle, Detail: "composer empty", Source: "fixture"},
 		}
 		if got != want {
 			t.Fatalf("got = %+v, want %+v", got, want)
@@ -65,7 +65,7 @@ func TestStateOfCrewGathersTheInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("stateOfCrew: %v", err)
 		}
-		if want := "state: needs-decision · health: idle (composer empty)"; got.Line() != want {
+		if want := "state: needs-decision · health: idle (composer empty) · via fixture"; got.Line() != want {
 			t.Fatalf("Line() = %q, want %q", got.Line(), want)
 		}
 	})

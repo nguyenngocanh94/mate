@@ -57,8 +57,9 @@ func TestAStaleBindingIsDrawnApartFromALiveOne(t *testing.T) {
 }
 
 // The observer's reading of a crew's pane is detail's "pane" field, in the
-// words that fit; an agent Herdr no longer has is unmistakable, and no
-// observation draws no field at all.
+// words that fit, naming Jev when its answer is in the reading; an agent
+// Herdr no longer has is unmistakable, and no observation draws no field at
+// all.
 func TestTheObserversHealthIsTheCrewsPaneField(t *testing.T) {
 	base := sampleTree().Projects[0].Crews[1]
 	cases := []struct {
@@ -70,6 +71,8 @@ func TestTheObserversHealthIsTheCrewsPaneField(t *testing.T) {
 		{"busy", query.KnownField(query.CrewHealth{AgentPresent: true, Composer: query.ComposerBusy, ComposerFor: 12 * time.Second}), "busy 12s"},
 		{"idle", query.KnownField(query.CrewHealth{AgentPresent: true, Composer: query.ComposerEmpty, QuietFor: 4 * time.Minute}), "idle 4m"},
 		{"unclear", query.KnownField(query.CrewHealth{AgentPresent: true, Composer: query.ComposerUnknown}), "unclear"},
+		{"read by jev", query.KnownField(query.CrewHealth{AgentPresent: true, Composer: query.ComposerBusy, ComposerFor: 12 * time.Second,
+			Source: "jev"}), "busy 12s · via jev"},
 		{"none", query.AbsentField[query.CrewHealth]("the observer has not seen this crew"), ""},
 	}
 	for _, tc := range cases {
@@ -85,6 +88,9 @@ func TestTheObserversHealthIsTheCrewsPaneField(t *testing.T) {
 			}
 			if !strings.Contains(line, tc.want) {
 				t.Fatalf("pane field = %q, want %q", line, tc.want)
+			}
+			if tc.health.Value.Source != "jev" && strings.Contains(line, "via") {
+				t.Fatalf("pane field = %q names the fixture's reading", line)
 			}
 		})
 	}

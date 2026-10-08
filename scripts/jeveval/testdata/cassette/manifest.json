@@ -1,0 +1,457 @@
+{
+  "model": "jev-1.13.0",
+  "date": "2026-10-08",
+  "prompt": "6ea1f2de62e5",
+  "entries": [
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_busy.txt",
+      "request_sha256": "343a6ee346f4d004331afeea9c861d2ec284a4031e1ecba0590ec83806f7748d",
+      "latency_ms": 677
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_busy_queued.txt",
+      "request_sha256": "4581fc6e42954f6ac7a9951244714ac65cc7756a0dc427217778c4dd165c5965",
+      "latency_ms": 234
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_empty.txt",
+      "request_sha256": "e3a994c24d205677180774b72fd4f741e65f6fc7ddd15185ee39740c6d39ef61",
+      "latency_ms": 253
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_ghost_suggestion.ansi",
+      "request_sha256": "78aeff2e47cc55a0989dcf33766c13cfb5e49896e63d2ed726fb15159164dd62",
+      "latency_ms": 241
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_idle_quoting_codex_busy.ansi",
+      "request_sha256": "306852a74b433c76f2507aac711f865e957e3ed3794911787189639bdfff5a5d",
+      "latency_ms": 238
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_pending.txt",
+      "request_sha256": "254513b0f9f8fb1886e1a5b74292199d70cc43247eb7b3e32e17dc3caafba9e3",
+      "latency_ms": 266
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash.txt",
+      "request_sha256": "9f3d1db405981fb8b32bd4c5bf858389d21dafedbf84f3b9a7f986626813ea5c",
+      "latency_ms": 239
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash_80x24.txt",
+      "request_sha256": "764de29c436d8cae5602118fe1850ea2fb2cff266939cd0033163d4304119c1d",
+      "latency_ms": 236
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_startup_splash_pending.txt",
+      "request_sha256": "5fd58b485b72e3def76ff3d9d38d2f013e9cd93f49c9d63397beac17a16bbaa5",
+      "latency_ms": 214
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/claude_trust_dialog.txt",
+      "request_sha256": "38071c9a7a04cc4c7c77322ad2db9273e690224d03f058de057c47ba136de24c",
+      "latency_ms": 237
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_after_turn_v157.txt",
+      "request_sha256": "1ecb4cc2e91637cefde1e0a17d99a07ea50d290540be3cfd5502c4e20eb87791",
+      "latency_ms": 262
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_busy.txt",
+      "request_sha256": "8184d3fccd7a99085bef8ecbea43faebc1f96978ed6a7e67d32ba52327bdf1ae",
+      "latency_ms": 237
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_busy_visible_v157.txt",
+      "request_sha256": "2565ef50ca2e2556d1d0e8cc1681c1008a9a79254ed94f8e7c5da029bb38bcc0",
+      "latency_ms": 234
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_empty.txt",
+      "request_sha256": "0b2dbb238a2291929636742eed14ddc36a50ce9247906a634838ea8137bbeaaf",
+      "latency_ms": 308
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_empty_v157.txt",
+      "request_sha256": "6ff75b77e5c124d05fd1b4eff5f2700cf240953c13c81039d3251c3c5bc29b9e",
+      "latency_ms": 238
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_modal.txt",
+      "request_sha256": "d0a95bf5bb887153db06051c0800a61e767ccc638901be654fed61dcfab1f659",
+      "latency_ms": 239
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_pending.txt",
+      "request_sha256": "d8b9897392d3f4351a36ce6cde551eae8b9f33c9c9784f89a7ff02c1406b5e7c",
+      "latency_ms": 212
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_pending_v157.txt",
+      "request_sha256": "9763f1461dd644e56fe37cb8185fd062c5531f8fdabe9413494fdc80d075e82f",
+      "latency_ms": 263
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_slash_popup.txt",
+      "request_sha256": "e6e00cea4b7c3113f0889273c60f5f7b2d62806cd1a7d48a2e3e1cbed67b9119",
+      "latency_ms": 225
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_trust_dialog.txt",
+      "request_sha256": "33e3ea1f40198b59131bedb661865d605442745b50c94e84ded885910c1d3cb2",
+      "latency_ms": 231
+    },
+    {
+      "file": "internal/screen/fixture/testdata/screens/codex_trust_dialog_v157.txt",
+      "request_sha256": "1d642d1c42a1bc5c20763c8c1d50c17e155e87bef5c06802d2f6da3343bfc8b0",
+      "latency_ms": 298
+    },
+    {
+      "file": "internal/harness/claude/testdata/startup/claude-2.1.270-ready.txt",
+      "request_sha256": "21e0806e12d61cd76578e85dda2b7ae7504d0400fe85bb6d5caa17678364835a",
+      "latency_ms": 261
+    },
+    {
+      "file": "internal/harness/claude/testdata/startup/claude-2.1.270-trust-dialog-accept-selected.txt",
+      "request_sha256": "747bb2cd4d0bfc27f8172776f367ee83ea4c5d574387834718141a5779dba712",
+      "latency_ms": 219
+    },
+    {
+      "file": "internal/harness/claude/testdata/startup/claude-2.1.270-trust-dialog.txt",
+      "request_sha256": "7ab696cb6f4254ed986005f4dee10e28a80336b1a261eff7c5ee9a02ea8eb558",
+      "latency_ms": 225
+    },
+    {
+      "file": "internal/harness/claude/testdata/startup/claude-2.1.282-ready.txt",
+      "request_sha256": "6de928b36b507c1bd0a2de6344d8d3b8f4ad0b4ecc7ee388608d191d519c8400",
+      "latency_ms": 217
+    },
+    {
+      "file": "internal/harness/claude/testdata/startup/claude-2.1.285-bypass-dialog.txt",
+      "request_sha256": "74ff0e503630186e8f7cd6718c55c5655edc83679a7b729d65529d0b727af816",
+      "latency_ms": 219
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-hooks-review.txt",
+      "request_sha256": "4c209ed22976416d972692aa9e60bcfe872a2c71649dfa68d95646eef28e95c3",
+      "latency_ms": 247
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-ready.txt",
+      "request_sha256": "ce562e07a3d68789b676759e6623c5a12593fbda3f62fc7246c9884d4cbf43c9",
+      "latency_ms": 229
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-resume-ready.txt",
+      "request_sha256": "38ba5fe64004eb14804fce71a616884d9dc05657c3bd1957ffc123611a743e47",
+      "latency_ms": 276
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-resume-update-dialog.txt",
+      "request_sha256": "90efed8f7b3cdb1d93edd80270d9a6b8a85c91f531d38126993638133700dc66",
+      "latency_ms": 220
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-trust-dialog-quit-selected.txt",
+      "request_sha256": "c5c4977a1f2c5d981dc9f7368d0e7d8a7ce6b2c1f268971e89e8182b3d12b25e",
+      "latency_ms": 235
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.154.0-trust-dialog.txt",
+      "request_sha256": "8d161f1b215c10e3ca23e277e6bb77e46656e961305694c359457b29daa3cfa3",
+      "latency_ms": 240
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-closed-ready.txt",
+      "request_sha256": "7c4aba83dcd6c5ea99e041d5fc01ed84eea2ddb4a69fe6c92859cd957a1fec42",
+      "latency_ms": 238
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-review-two.txt",
+      "request_sha256": "303da5bdac63eff89349bc6e824607755969e44c94d23cb175173a35c7125583",
+      "latency_ms": 214
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-review.txt",
+      "request_sha256": "2b506c649daefb3276adeb4602cbe7233bfdbcdb1448f3333f5e28aee074efe3",
+      "latency_ms": 223
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-own-truncated.txt",
+      "request_sha256": "a99179058a6a22ef539f31d9adebead3cb1dd26c89e35b9c50e2683ba8d6d9bd",
+      "latency_ms": 233
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-own-wrapped.txt",
+      "request_sha256": "3b926a1ea90f178c17c175a5e8b516da5f532c8f2f91a269e13b88b0fa0c812d",
+      "latency_ms": 287
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-own.txt",
+      "request_sha256": "5c7cdea07d03bd7f5845781be6afee0725264fea6eecbf254c345a5449302571",
+      "latency_ms": 231
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-two-all-trusted.txt",
+      "request_sha256": "d906cd0b9c5fd18227134a6592e3d85ecd4891d715e2c332e646663c86cd5700",
+      "latency_ms": 239
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-two-foreign-selected.txt",
+      "request_sha256": "d6acc3ff976c89ca21c2eb2aab57c117a42fabe11463b132cd0b6f7d4862db37",
+      "latency_ms": 217
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-two-own-selected.txt",
+      "request_sha256": "dfca93f7b3dc6dfa2cfaed5e76f72d2e840f4842156c1dd94b4a946685032613",
+      "latency_ms": 238
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-sessionstart-two-own-trusted.txt",
+      "request_sha256": "ac2ed3982db271d6e4603ce7b85b66f31aae230978f8365976870aa7225fe0c7",
+      "latency_ms": 228
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-table-review-two.txt",
+      "request_sha256": "e1ff49bd713fb4a3f5b777a731aa9872b3e0c62b0507a7bbf2b53f29e3ba1eaa",
+      "latency_ms": 269
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-table-review.txt",
+      "request_sha256": "120210c7ba8670c75c0633b883b3f0753952daa9252997cb81124bd3a9dd4336",
+      "latency_ms": 222
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-hooks-table-trusted.txt",
+      "request_sha256": "546138d788acf83331e2532a4c724190d5faa092a2ead22f5858cbc37bc4d672",
+      "latency_ms": 236
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-ready.txt",
+      "request_sha256": "0af7ff1aa21af9556947a8a6df86bcf837bc0bbba82ae6511c5aa262a0d849e4",
+      "latency_ms": 217
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-trust-dialog-quit-selected.txt",
+      "request_sha256": "b3215c2ea9790dccc22139c89e874fcea64bc63af2994b64734fef017e902bd0",
+      "latency_ms": 241
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex-0.156.1-trust-dialog.txt",
+      "request_sha256": "d440106a06e6093fb3b5fcd753ee010211b0ed69134481d1048abbac91e922e0",
+      "latency_ms": 260
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex_update_banner_ready.txt",
+      "request_sha256": "0e82f52f37f356c21125e44b3d758a3cfba48459775c3cbf001bb4d7263f109b",
+      "latency_ms": 221
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex_update_dialog.txt",
+      "request_sha256": "2a5fe1fa865af4625abcbbc3c455595ba88120c5c2aa85732b445c737324b3ba",
+      "latency_ms": 243
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex_update_dialog_after_enter.txt",
+      "request_sha256": "fe6e8feb1f6654b1a60e4c8e9c4ddbf006abd6dc0e3687b7b7322981ee25d64f",
+      "latency_ms": 232
+    },
+    {
+      "file": "internal/harness/codex/testdata/startup/codex_update_dialog_skip_selected.txt",
+      "request_sha256": "98addfdfedbb66028b8b34db704038c46396dadf266624e7da361a1f84d5ac29",
+      "latency_ms": 254
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run1-after-ctrl-u.txt",
+      "request_sha256": "7314d73f49204a5a97e29e5225925ebcaa514a92b5f53ba91cadf924dba320cb",
+      "latency_ms": 236
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run1-busy-1.txt",
+      "request_sha256": "fb910fb606c6b7cd6b9dd990a8b578d4e30e56a9d982541ddeb0b674835a18df",
+      "latency_ms": 254
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run1-busy-10.txt",
+      "request_sha256": "4fd1e3fa5b8fe10dc4a5ea580bac9d755e60d5e88a3e960305caedfc207f478c",
+      "latency_ms": 226
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run1-busy-3.txt",
+      "request_sha256": "6af05443aef4570daee97a275057ecf4712dcf1ff29bc9a5331eb79816ac2986",
+      "latency_ms": 252
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run1-empty-composer.visible.txt",
+      "request_sha256": "0212f024674defb56d0e4a69617f44ee7fad376bba2c154b0d94e6e78736ac17",
+      "latency_ms": 222
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run2-resume-startup.txt",
+      "request_sha256": "0a395c598a9a98f5797ac03eae0341ab757b821f8b33e7cba1505f3d6ca5af34",
+      "latency_ms": 259
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run3-sessid-startup.txt",
+      "request_sha256": "edb77d09e9cd45ab91ea9c2313989323e2934b34181e15e76b04934d9f1422b0",
+      "latency_ms": 231
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run6-draft.recent-unwrapped.txt",
+      "request_sha256": "c0559b2941b20ce9c3a32fa82e5bdf643b18597d5b14ebc9a8694e2febec21e8",
+      "latency_ms": 222
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run6-draft.visible.txt",
+      "request_sha256": "b25108c7ff16599cfa7a45dd94e435023084e0f53dcf1c230993a9f4a3ed2b4f",
+      "latency_ms": 237
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run6-idle-after-turn.visible.txt",
+      "request_sha256": "e1c730be68f4be73605f349fda517d617ff8fb6f37ac671886d5cc29de44a048",
+      "latency_ms": 275
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run8-busy-reads.visible.txt",
+      "request_sha256": "61813854b265d4b8fce8bccbc031eeb99a91a812eb65c7f882788bd352288eb3",
+      "latency_ms": 218
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/run8-offline-startup.txt",
+      "request_sha256": "3dde30ed81268b35729cc5524334123e2512d1f9dc06ce859c96f42ebd90b98c",
+      "latency_ms": 281
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/trust-c5-after-session-trust.visible.txt",
+      "request_sha256": "011410005a1dff7a2f7794847d87370431270d45fd34e93c22ca17f1b4232756",
+      "latency_ms": 234
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/trust-c5-dialog-third-option.visible.txt",
+      "request_sha256": "1dde389c6f9c93990f5cbc7bf4378cd9b1913ea68d62e6a8d28261394fef274e",
+      "latency_ms": 255
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/trust-c5-no-approve-startup.txt",
+      "request_sha256": "c04d290949fb3e368d9f62996fbee967ccb6755bc5dfead0faecaad520f71e43",
+      "latency_ms": 221
+    },
+    {
+      "file": "internal/harness/pi/testdata/screens/trust-c5-startup.txt",
+      "request_sha256": "a0309cd2b0a2140e1a7418d6692c84d350d2085e05069c3f0e14c8e18f57ee1e",
+      "latency_ms": 234
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/busy-responding.txt",
+      "request_sha256": "818cc18f7584df249b788763c728a59348af7286e59ab6e989c2ff4a489b6684",
+      "latency_ms": 279
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/busy-thinking.txt",
+      "request_sha256": "6df076f734f9beed0d789f2aac8121f6f54c6e1c354021753e32eafd73de050a",
+      "latency_ms": 246
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/busy-waiting.txt",
+      "request_sha256": "467c02eec75f6f6cf4ef7f01fac032b7807ceaaf5040c1da4703527dc407d898",
+      "latency_ms": 230
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/draft-pong.txt",
+      "request_sha256": "f499797a62d1ff8e344e7ca2c1950eb4a4dd9de527f0e83d6f889176d77fdc33",
+      "latency_ms": 221
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/empty.txt",
+      "request_sha256": "9c476c2b08e5e90e4d51e392b2506090ff297d96e9c6f2b21b49df345ff9238e",
+      "latency_ms": 229
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/idle-after-turn.txt",
+      "request_sha256": "99ce64cac07c3a43f863ea62ec33d481861f761ea42aef302bf367c4f9600d4e",
+      "latency_ms": 228
+    },
+    {
+      "file": "internal/harness/grok/testdata/screens/resume.txt",
+      "request_sha256": "66ef1374843b8e143530d0a33dec11a72c1a9876e15dc3049dd1e57707a5ef6f",
+      "latency_ms": 284
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#codex_warning_footer",
+      "request_sha256": "bf2554b28ef01adc3afe80058160df7d39aa1b42686cce65d789748167fbcc5d",
+      "latency_ms": 212
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#claude_warning_reworded",
+      "request_sha256": "a607837825c0933cdd53a8e2f42b8ec316b05e7183f632677b65de52d763c5de",
+      "latency_ms": 232
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#codex_exhausted",
+      "request_sha256": "3a16b0eab2e02d94fe0ded0299ad06aaac47d1656972ca096aafef733b3a5659",
+      "latency_ms": 274
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#claude_exhausted_reworded",
+      "request_sha256": "e0cb3f822b5a35b1aa84201c3f397504e24bcac1d53926dc5a2d7d746284aeb6",
+      "latency_ms": 259
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#login",
+      "request_sha256": "557fb11252afb0de20ffef6e3e2c1af6f8330e82d27f02ea8ddba86ef8cc67ab",
+      "latency_ms": 242
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#permission",
+      "request_sha256": "63850ff56ac322bb32d0022ec9e5fdb405caeecf78c3a97188fd899302749075",
+      "latency_ms": 252
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#trust_reworded",
+      "request_sha256": "f7e165f1012fd625021c513bdcc5d47008e4090ab16c044715f56cfe80238bc6",
+      "latency_ms": 243
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#update",
+      "request_sha256": "a469770a603875b665458e74a3d0d611e678814ea173c16790fdaaecc0f3b990",
+      "latency_ms": 233
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#busy",
+      "request_sha256": "d69f1fd6795ca7f80768609c916160d5cefde6c6e58f740bfce59aef3a7bac35",
+      "latency_ms": 238
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#quoted_error",
+      "request_sha256": "b1e19623e7d5d7ce35d2b6ae6d4fd20e3e214624543ead3121a87bdc919d5dfd",
+      "latency_ms": 228
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#unknown_dialog",
+      "request_sha256": "cdb1103300467eea229f4a062547a6e974782bebbb4f9fc30c29194afef539cf",
+      "latency_ms": 245
+    },
+    {
+      "file": "internal/notice/testdata/notices.json#draft_injection",
+      "request_sha256": "74626ee6e9e3104de0ad8f44fd981ef5660be2b2a0eb881eebbd07c76d3ea8ec",
+      "latency_ms": 237
+    },
+    {
+      "file": "scripts/jeveval/testdata/screens/claude_injection_draft_says_empty.txt",
+      "request_sha256": "68211c600975a2ce01174d15cb0a6411f9c0f94dae6d6726007522200a73ae11",
+      "latency_ms": 239
+    },
+    {
+      "file": "scripts/jeveval/testdata/screens/claude_injection_empty_after_trust.txt",
+      "request_sha256": "ddb1c727b13dafa3a3e9715aba975528d8e3f2e50448c7c15ae0b53640bc9f26",
+      "latency_ms": 221
+    },
+    {
+      "file": "scripts/jeveval/testdata/screens/codex_injection_busy_output_says_empty.txt",
+      "request_sha256": "07d6967f11e74e3933d9b9c4039a92981a344931d0ab331ade998037b58bf0c2",
+      "latency_ms": 246
+    }
+  ]
+}

@@ -14,8 +14,8 @@ import (
 
 func TestCmdProjectAddListRemove(t *testing.T) {
 	ws := t.TempDir()
-	repoA := filepath.Join(ws, "shop")
-	repoB := filepath.Join(ws, "blog")
+	repoA := filepath.Join(ws, "shop", "shop")
+	repoB := filepath.Join(ws, "blog", "blog")
 	for _, r := range []string{repoA, repoB} {
 		if err := os.MkdirAll(r, 0o755); err != nil {
 			t.Fatal(err)
@@ -116,7 +116,7 @@ func TestCmdProjectAddFlagsAfterPositionalArgs(t *testing.T) {
 	if err := cmdInit([]string{ws}, &out, &errw); err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	repo := filepath.Join(ws, "shop")
+	repo := filepath.Join(ws, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestCmdProjectAddRejectsDuplicateName(t *testing.T) {
 	if err := cmdInit([]string{ws}, &out, &errw); err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	repo := filepath.Join(ws, "shop")
+	repo := filepath.Join(ws, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestCmdProjectAddDefaultBranchOverride(t *testing.T) {
 	if err := cmdInit([]string{ws}, &out, &errw); err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	repo := filepath.Join(ws, "shop")
+	repo := filepath.Join(ws, "shop", "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -335,19 +335,19 @@ func TestCmdProjectAddWithoutRepo(t *testing.T) {
 // TestCmdProjectRepoAddListRemove walks a project from no repo to two and
 // back to one through the CLI.
 func TestCmdProjectRepoAddListRemove(t *testing.T) {
-	ws := initProjectWorkspace(t, "services/api", "web")
+	ws := initProjectWorkspace(t, "shop/services/api", "shop/web")
 	var out, errw bytes.Buffer
 	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
-	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "services/api")}, &out, &errw); err != nil {
+	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "shop/services/api")}, &out, &errw); err != nil {
 		t.Fatalf("repo add api: %v", err)
 	}
-	if !strings.Contains(out.String(), "added repo api to project shop: path=services/api default-branch=main") {
+	if !strings.Contains(out.String(), "added repo api to project shop: path=shop/services/api default-branch=main") {
 		t.Fatalf("repo add output = %q", out.String())
 	}
-	if err := cmdProjectRepo([]string{"add", "shop", filepath.Join(ws, "web"), "--name", "frontend", "--default-branch", "trunk", "--workspace", ws}, &out, &errw); err != nil {
+	if err := cmdProjectRepo([]string{"add", "shop", filepath.Join(ws, "shop/web"), "--name", "frontend", "--default-branch", "trunk", "--workspace", ws}, &out, &errw); err != nil {
 		t.Fatalf("repo add web: %v", err)
 	}
 
@@ -359,12 +359,12 @@ func TestCmdProjectRepoAddListRemove(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &rows); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	want := []repoRow{{Name: "api", Path: "services/api", DefaultBranch: "main"}, {Name: "frontend", Path: "web", DefaultBranch: "trunk"}}
+	want := []repoRow{{Name: "api", Path: "shop/services/api", DefaultBranch: "main"}, {Name: "frontend", Path: "shop/web", DefaultBranch: "trunk"}}
 	if len(rows) != 2 || rows[0] != want[0] || rows[1] != want[1] {
 		t.Fatalf("repo list = %+v, want %+v", rows, want)
 	}
 
-	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "web")}, &out, &errw); !errors.Is(err, store.ErrRepoExists) {
+	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, "shop/web")}, &out, &errw); !errors.Is(err, store.ErrRepoExists) {
 		t.Fatalf("adding web twice: err = %v, want ErrRepoExists", err)
 	}
 
@@ -375,14 +375,14 @@ func TestCmdProjectRepoAddListRemove(t *testing.T) {
 	if !strings.Contains(out.String(), "not touched") {
 		t.Fatalf("remove output = %q", out.String())
 	}
-	if _, err := os.Stat(filepath.Join(ws, "services/api", ".git")); err != nil {
+	if _, err := os.Stat(filepath.Join(ws, "shop/services/api", ".git")); err != nil {
 		t.Fatalf("repo remove touched the repository: %v", err)
 	}
 	out.Reset()
 	if err := cmdProjectRepo([]string{"list", "--workspace", ws, "shop"}, &out, &errw); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "services/api") || !strings.Contains(out.String(), "frontend") {
+	if strings.Contains(out.String(), "shop/services/api") || !strings.Contains(out.String(), "frontend") {
 		t.Fatalf("repo list after remove = %q", out.String())
 	}
 }

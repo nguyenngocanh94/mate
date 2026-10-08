@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
 // A Mate adds a repo to its own project with one mate command (docs/mvp.md
-// task 59): by URL, cloned into the workspace, and an empty repo is given
+// task 59): by URL, cloned into the project's directory, and an empty repo is given
 // the first commit a Crew needs to branch from.
 
 func gitIdentity(t *testing.T) {
@@ -57,7 +60,7 @@ func TestRepoAddClonesAnEmptyRemoteAndGivesItAFirstCommit(t *testing.T) {
 	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + remote}, &out, &errw); err != nil {
 		t.Fatalf("repo add by url: %v\n%s", err, errw.String())
 	}
-	clone := filepath.Join(ws, "backend")
+	clone := filepath.Join(ws, "shop", "backend")
 	if _, err := os.Stat(filepath.Join(clone, ".git")); err != nil {
 		t.Fatalf("no clone at %s: %v", clone, err)
 	}
@@ -67,7 +70,7 @@ func TestRepoAddClonesAnEmptyRemoteAndGivesItAFirstCommit(t *testing.T) {
 	for _, want := range []string{
 		"cloned file://" + remote + " into backend",
 		"backend had no commit; made an empty first commit on main so crews can branch from it (nothing was pushed)",
-		"added repo backend to project shop: path=backend default-branch=main",
+		"added repo backend to project shop: path=shop/backend default-branch=main",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output does not say %q:\n%s", want, out.String())
@@ -90,7 +93,7 @@ func TestRepoAddLeavesARepoWithHistoryAlone(t *testing.T) {
 	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + remote, "--name", "api"}, &out, &errw); err != nil {
 		t.Fatalf("repo add: %v\n%s", err, errw.String())
 	}
-	if got := commitCount(t, filepath.Join(ws, "api")); got != "1" {
+	if got := commitCount(t, filepath.Join(ws, "shop", "api")); got != "1" {
 		t.Fatalf("clone has %s commits, want the remote's one", got)
 	}
 	if strings.Contains(out.String(), "first commit") {
@@ -104,7 +107,7 @@ func TestRepoAddRefusesToCloneOverSomething(t *testing.T) {
 	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(ws, "backend"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(ws, "shop", "backend"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + bareRepo(t, false)}, &out, &errw)
@@ -136,5 +139,121 @@ func TestGitURLRecognisesRemotesNotPaths(t *testing.T) {
 		if got := repoNameFromURL(in); got != want {
 			t.Errorf("repoNameFromURL(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestProjectAddMakesTheDirectoryAndRepoAddFillsIt is plan test 7 and the
+// tree of docs/mvp.md section 3: `project add` makes `<root>/<project>/`,
+// with or without a repo, a URL is cloned into it, and nothing else appears
+// at the workspace root.
+func TestProjectAddMakesTheDirectoryAndRepoAddFillsIt(t *testing.T) {
+	gitIdentity(t)
+	ws := initProjectWorkspace(t)
+	var out, errw bytes.Buffer
+	for _, name := range []string{"shop", "notes"} {
+		if err := cmdProjectAdd([]string{"--workspace", ws, name}, &out, &errw); err != nil {
+			t.Fatal(err)
+		}
+		if fi, err := os.Stat(filepath.Join(ws, name)); err != nil || !fi.IsDir() {
+			t.Fatalf("project add %s did not make %s: %v", name, filepath.Join(ws, name), err)
+		}
+	}
+	if err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + bareRepo(t, true)}, &out, &errw); err != nil {
+		t.Fatalf("repo add by url: %v\n%s", err, errw.String())
+	}
+	if _, err := os.Stat(filepath.Join(ws, "shop", "backend", ".git")); err != nil {
+		t.Fatalf("the clone is not under the project directory: %v", err)
+	}
+	entries, err := os.ReadDir(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var top []string
+	for _, e := range entries {
+		top = append(top, e.Name())
+	}
+	if strings.Join(top, " ") != ".mate notes shop" {
+		t.Fatalf("workspace root holds %v, want .mate, notes and shop", top)
+	}
+}
+
+// TestRepoAddRefusesAPathOutsideTheProject: a repo by path must already be
+// under the project's directory, and the refusal says where to move it.
+func TestRepoAddRefusesAPathOutsideTheProject(t *testing.T) {
+	ws := initProjectWorkspace(t, "loose", "blog/web")
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	w, err := store.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"loose", "blog/web"} {
+		err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", filepath.Join(ws, rel)}, &out, &errw)
+		want := "repo " + rel + " must live under " + w.ProjectHome("shop") + "; move it there, or run mate migrate on an old workspace"
+		if !errors.Is(err, store.ErrRepoOutsideProject) || !strings.Contains(err.Error(), want) {
+			t.Fatalf("repo add %s = %v, want ErrRepoOutsideProject %q", rel, err, want)
+		}
+	}
+	if err := cmdProjectAdd([]string{"--workspace", ws, "blog", filepath.Join(ws, "loose")}, &out, &errw); !errors.Is(err, store.ErrRepoOutsideProject) {
+		t.Fatalf("project add blog with a repo outside blog/ = %v, want ErrRepoOutsideProject", err)
+	}
+}
+
+// TestRepoAddOnTheOldLayoutClonesNothing: a workspace not yet migrated does
+// not open, so no clone is made and no directory is left behind.
+func TestRepoAddOnTheOldLayoutClonesNothing(t *testing.T) {
+	ws := initProjectWorkspace(t)
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	w, err := store.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(w.WorkspaceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(w.WorkspaceFile(), []byte(strings.Replace(string(raw), "layout: 2\n", "", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + bareRepo(t, true)}, &out, &errw)
+	if !errors.Is(err, store.ErrLayoutOld) || err.Error() != "this workspace has the old layout (repos beside .mate); run mate migrate first" {
+		t.Fatalf("repo add on the old layout = %v, want ErrLayoutOld", err)
+	}
+	for _, dir := range []string{filepath.Join(ws, "shop", "backend"), filepath.Join(ws, "backend")} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Fatalf("a refused repo add left a clone at %s: %v", dir, err)
+		}
+	}
+}
+
+// TestRepoAddRefusedWritesNothingIntoTheRepo: a repo with no commit outside
+// the project's directory is refused before the empty first commit, so the
+// captain's repo is left as it was.
+func TestRepoAddRefusedWritesNothingIntoTheRepo(t *testing.T) {
+	gitIdentity(t)
+	ws := initProjectWorkspace(t)
+	var out, errw bytes.Buffer
+	if err := cmdProjectAdd([]string{"--workspace", ws, "shop"}, &out, &errw); err != nil {
+		t.Fatal(err)
+	}
+	loose := filepath.Join(ws, "loose")
+	if err := os.MkdirAll(loose, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGitOrFatal(t, loose, "init", "-q", "-b", "main")
+	err := cmdProjectRepo([]string{"add", "--workspace", ws, "shop", loose}, &out, &errw)
+	if !errors.Is(err, store.ErrRepoOutsideProject) {
+		t.Fatalf("repo add of a repo outside shop/ = %v, want ErrRepoOutsideProject", err)
+	}
+	if n, _ := runGit(loose, "rev-list", "--count", "--all"); n != "0" {
+		t.Fatalf("the refused repo has %s commit(s): repo add wrote into it", n)
+	}
+	if strings.Contains(out.String(), "had no commit") {
+		t.Fatalf("repo add said it made a commit:\n%s", out.String())
 	}
 }

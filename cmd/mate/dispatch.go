@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|tasks|beads|task-triage|checkpoint|pr|events|reindex|usage|dashboard|console|--version> ...")
+			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|tool|checkpoint|pr|events|reindex|usage|dashboard|console|migrate|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -80,12 +80,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdBacklog(args[1:], stdout, stderr)
 	case "pr":
 		return cmdPR(args[1:], stdout, stderr)
-	case "tasks":
-		return cmdTasks(args[1:], stdout, stderr)
-	case "beads":
-		return cmdBeads(args[1:], stdout, stderr)
-	case "task-triage":
-		return cmdTaskTriage(args[1:], stdout, stderr)
+	case "tool":
+		return cmdTool(args[1:], stdout, stderr)
 	case "events":
 		return cmdEvents(args[1:], stdout, stderr)
 	case "reindex":
@@ -98,6 +94,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdConsoleLaunch(args[1:], stdout, stderr)
 	case "pane":
 		return cmdPane(args[1:], stdout, stderr)
+	case "migrate":
+		return cmdMigrate(args[1:], stdout, stderr)
 	}
 	// A single argument naming an existing directory is a workspace to open.
 	if len(args) == 1 && isDir(args[0]) {
@@ -183,6 +181,19 @@ func resolveWorkspace(flagVal string) (*store.Workspace, error) {
 		return nil, err
 	}
 	return store.Open(dir)
+}
+
+// resolveStopWorkspace is resolveWorkspace for `mate crew stop` and `mate
+// mate stop` alone: it opens a workspace on the old layout too
+// (store.OpenForMigrate), because mate migrate refuses while a crew is open
+// or a Mate runs and names these two commands as the way out. Neither
+// writes a repo path. Every other command stays on resolveWorkspace.
+func resolveStopWorkspace(flagVal string) (*store.Workspace, error) {
+	dir, err := findWorkspaceDir(flagVal)
+	if err != nil {
+		return nil, err
+	}
+	return store.OpenForMigrate(dir)
 }
 
 // findWorkspaceDir resolves the workspace directory per docs/mvp.md task 04:

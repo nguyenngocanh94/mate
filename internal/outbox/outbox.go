@@ -48,6 +48,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -107,6 +109,9 @@ type Deps struct {
 	Sleeper     Sleeper
 	Interval    time.Duration
 	WedgedAfter time.Duration
+	// Observer reads the Mate's pane before a delivery is typed
+	// (send.Deps.Observer). Nil means the fixture observer.
+	Observer screen.Observer
 }
 
 func (d Deps) now() time.Time {
@@ -128,6 +133,13 @@ func (d Deps) sleep(ctx context.Context, dur time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 func (d Deps) interval() time.Duration {
@@ -467,7 +479,7 @@ func (s *Sender) deliver(ctx context.Context, project string, item store.OutboxI
 	if s.withdrawn(project, item) {
 		return send.Report{}, errWithdrawn
 	}
-	deps := send.Deps{Runtime: s.deps.Runtime, Harnesses: s.deps.Harnesses}
+	deps := send.Deps{Runtime: s.deps.Runtime, Harnesses: s.deps.Harnesses, Observer: s.deps.Observer}
 	if s.deps.Sleeper != nil {
 		deps.Sleep = s.deps.sleep
 	}

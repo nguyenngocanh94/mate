@@ -168,3 +168,82 @@ func TestClassifyRejectsEmptyInputsAndRemovesOwnKey(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The API rounds every probability to two decimals, so a distribution may
+// sum to 0.99 or 1.01; one that is off by more than the rounding is refused.
+func TestClassifyAcceptsTwoDecimalRounding(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		warning, none float64
+		accept        bool
+	}{
+		{"sums to 0.99", 0.95, 0.04, true},
+		{"sums to 1.01", 0.95, 0.06, true},
+		{"sums to 0.9", 0.85, 0.05, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := validResponse()
+			p := resp["answers"].(map[string]any)["notice"].(map[string]any)["probabilities"].(map[string]float64)
+			p["quota_warning"], p["none"] = tc.warning, tc.none
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(resp) }))
+			defer srv.Close()
+			c := New("test-key")
+			c.endpoint = srv.URL
+			got, err := c.Classify(context.Background(), "Only 10% remains")
+			if tc.accept && (err != nil || got.Label != "quota_warning") {
+				t.Fatalf("refused: %+v, %v", got, err)
+			}
+			if !tc.accept && err == nil {
+				t.Fatalf("accepted a distribution off by more than rounding: %+v", got)
+			}
+		})
+	}
+}
+
+// Ask sends the body its caller builds, from a screen with the key already
+// removed, and hands back the answer unvalidated; a refusal echoes nothing.
+func TestAskPostsTheBuiltBodyWithoutTheKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.Header.Get("Authorization") != "Bearer test-key" || string(body) != "built: export VALUE=[redacted]" {
+			t.Errorf("request %q", body)
+		}
+		_, _ = w.Write([]byte(`{"answers":{}}`))
+	}))
+	defer srv.Close()
+	c := New("test-key")
+	c.endpoint = srv.URL
+	got, err := c.Ask(context.Background(), "export VALUE=test-key", func(screen string) ([]byte, error) {
+		return []byte("built: " + screen), nil
+	})
+	if err != nil || string(got) != `{"answers":{}}` {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if _, err := New("").Ask(context.Background(), "screen", func(s string) ([]byte, error) { return []byte(s), nil }); err == nil {
+		t.Fatal("missing key accepted")
+	}
+}
+
+// roundTrip is an http.RoundTripper from a function.
+type roundTrip func(*http.Request) (*http.Response, error)
+
+func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A client on another transport still posts to the pinned endpoint and
+// still does not follow a redirect.
+func TestWithTransportKeepsEndpointAndRedirectRule(t *testing.T) {
+	var urls []string
+	c := New("test-key").WithTransport(roundTrip(func(r *http.Request) (*http.Response, error) {
+		urls = append(urls, r.URL.String())
+		h := http.Header{}
+		h.Set("Location", "https://elsewhere.example/")
+		return &http.Response{StatusCode: http.StatusTemporaryRedirect, Header: h, Body: io.NopCloser(strings.NewReader("private test-key")), Request: r}, nil
+	}))
+	_, err := c.Ask(context.Background(), "screen", func(s string) ([]byte, error) { return []byte(s), nil })
+	if err == nil || strings.Contains(err.Error(), "private") {
+		t.Fatalf("redirect answer: %v", err)
+	}
+	if len(urls) != 1 || urls[0] != "https://api.typesafe.ai/v1/systemone" {
+		t.Fatalf("requests went to %v", urls)
+	}
+}

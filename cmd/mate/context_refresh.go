@@ -117,7 +117,7 @@ func contextRefresh(ctx context.Context, w *store.Workspace, deps spawn.Deps, pr
 		if automatic {
 			return false, nil
 		}
-		return false, fmt.Errorf("refresh postponed: Mate composer is %s", composer.State)
+		return false, fmt.Errorf("refresh postponed: Mate composer is %s", send.ComposerLabel(composer.State))
 	}
 	nonce := rand.Text()
 	req := map[string]string{"nonce": nonce, "session": session, "attempted_at": now.UTC().Format(time.RFC3339Nano)}

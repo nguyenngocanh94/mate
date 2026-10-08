@@ -12,6 +12,7 @@ const (
 	workspaceDocName  = "WORKSPACE.md"
 	pricingFileName   = "pricing.yaml"
 	envFileName       = ".env"
+	jevLogName        = "jev.log"
 	projectsDirName   = "projects"
 	projectFileName   = "project.yaml"
 	projectDocName    = "PROJECT.md"
@@ -63,12 +64,25 @@ func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pr
 // it holds switches and paths, never a secret itself.
 func (w *Workspace) EnvFile() string { return filepath.Join(w.StateDir(), envFileName) }
 
+// JevLog is `<root>/.mate/jev.log`: one line per request the Jev observer
+// chain sent (internal/screen/chain), only while `.mate/.env` turns the
+// chain on (a readable key, MATE_JEV not off or fixture). It never holds
+// screen text or a key.
+func (w *Workspace) JevLog() string { return filepath.Join(w.StateDir(), jevLogName) }
+
 // ProjectsDir is `<root>/.mate/projects`.
 func (w *Workspace) ProjectsDir() string { return filepath.Join(w.StateDir(), projectsDirName) }
 
 // ProjectDir is `<root>/.mate/projects/<project>`.
 func (w *Workspace) ProjectDir(project string) string {
 	return filepath.Join(w.ProjectsDir(), project)
+}
+
+// ProjectHome is `<root>/<project>`, the project's own directory: the user's,
+// not mate's state. Every repo of the project lives under it (docs/mvp.md
+// section 3). Mate's state for the project stays in ProjectDir.
+func (w *Workspace) ProjectHome(project string) string {
+	return filepath.Join(w.root, project)
 }
 
 // ProjectFile is `projects/<project>/project.yaml`.

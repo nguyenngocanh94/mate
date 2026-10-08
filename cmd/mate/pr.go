@@ -14,7 +14,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/prwatch"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -83,7 +82,7 @@ func cmdPRWatch(args []string, stdout, stderr io.Writer) error {
 	}
 
 	if *runFlag {
-		return runPRWatch(w, project, crew, url, stdout)
+		return runPRWatch(w, project, crew, url, stdout, stderr)
 	}
 
 	// A merged pull request is over for good. A closed one is watched
@@ -114,8 +113,10 @@ func cmdPRWatch(args []string, stdout, stderr io.Writer) error {
 }
 
 // runPRWatch is the detached child: it records its own pid, watches until
-// the pull request ends or it is signalled, and removes its pid file.
-func runPRWatch(w *store.Workspace, project, crew, url string, stdout io.Writer) error {
+// the pull request ends or it is signalled, and removes its pid file. A Jev
+// configuration problem goes to stderr, which the detached child appends to
+// its log as it does stdout.
+func runPRWatch(w *store.Workspace, project, crew, url string, stdout, stderr io.Writer) error {
 	pid := os.Getpid()
 	if err := prwatch.WritePID(w, project, crew, pid); err != nil {
 		return err
@@ -127,7 +128,7 @@ func runPRWatch(w *store.Workspace, project, crew, url string, stdout io.Writer)
 		WS:     w,
 		GH:     ghClient,
 		Git:    gitx.New(),
-		Outbox: consoleOutbox(w, spawn.LiveDeps(harnesses)),
+		Outbox: consoleOutbox(w, liveDeps(w, stderr)),
 		Log:    stdout,
 	}
 	if err := prwatch.Watch(ctx, deps, project, crew, url); err != nil {

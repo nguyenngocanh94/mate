@@ -11,7 +11,7 @@ import (
 
 func TestCrewSendReceiptSurvivesFailureAndSerializesWriters(t *testing.T) {
 	w := newWorkspace(t)
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.WriteCrewMeta("shop", "k3", map[string]string{"agent": "crew-k3"}); err != nil {

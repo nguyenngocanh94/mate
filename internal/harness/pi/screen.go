@@ -20,6 +20,9 @@ import (
 // the source is fixed rather than retried.
 type piScreen struct{}
 
+// Kind implements harness.ScreenProfile.
+func (piScreen) Kind() harness.Kind { return KindPi }
+
 // ReadSource implements ScreenProfile.
 func (piScreen) ReadSource() harness.ReadSource { return harness.ReadVisible }
 

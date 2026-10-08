@@ -349,7 +349,7 @@ func settleAndRecord(ctx context.Context, w *store.Workspace, deps Deps, project
 	if err != nil {
 		return StartResult{}, err
 	}
-	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, profile, deps.startupPromptTimeout(), deps.sleep(), trusted...)
+	settled, err := settleStartupPrompt(ctx, deps.Runtime, handle, profile, deps.observer(), deps.startupPromptTimeout(), deps.sleep(), trusted...)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -481,6 +481,7 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		MatevBin:         binary,
 		MateDir:          mateDir,
 		CrewsDir:         w.CrewsDir(project),
+		ToolSkills:       mateassets.ToolSkillsFrom(deps.Tools),
 	})
 }
 

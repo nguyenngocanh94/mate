@@ -32,7 +32,7 @@ type diffFixture struct {
 func newDiffFixture(t *testing.T) diffFixture {
 	t.Helper()
 	w := liveCrewWorkspace(t, "shop")
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	// A file to change, so a diff has something to show that is not the
 	// empty initial commit.
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("shop\n"), 0o644); err != nil {

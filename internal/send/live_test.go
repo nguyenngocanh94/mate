@@ -79,7 +79,7 @@ func TestLiveSendToClaudeThreeCases(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 
-	repo := filepath.Join(w.Root(), "shop")
+	repo := filepath.Join(w.ProjectHome("shop"), "shop")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -231,6 +231,15 @@ func helpOnScreen(screen string) bool {
 		}
 	}
 	return false
+}
+
+// screenOf is the screen profile catalog.Default() registers for a kind.
+func screenOf(kind harness.Kind) harness.ScreenProfile {
+	profile, err := catalog.Default().Lookup(kind)
+	if err != nil {
+		panic(err)
+	}
+	return profile.Screen()
 }
 
 // waitForComposer blocks until the pane classifies as want, so the next step

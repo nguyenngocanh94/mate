@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/db"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/timeline"
 	"github.com/nguyenngocanh94/mate/internal/timeline/scene"
@@ -278,7 +277,7 @@ func cmdReindex(args []string, stdout, stderr io.Writer) error {
 	// its agent is still listed (measured 2026-09-20 on a real workspace).
 	// A Herdr that is not running just leaves the fallback in charge.
 	if err := timeline.New(w, handle, timeline.Deps{
-		SessionRef: consoleSessionRef(w, spawn.LiveDeps(harnesses)),
+		SessionRef: consoleSessionRef(w, baseDeps()),
 		Harnesses:  harnesses,
 	}).Reindex(ctx); err != nil {
 		return err

@@ -226,3 +226,21 @@ func TestResultLine(t *testing.T) {
 		t.Fatalf("Line() = %q, want %q", noDetail.Line(), want)
 	}
 }
+
+// TestResultLineNamesTheObserverThatReadThePane: a health read off a pane
+// ends with the observer that read it; a health no pane was read for (no
+// agent, agent gone) names none.
+func TestResultLineNamesTheObserverThatReadThePane(t *testing.T) {
+	read := crewstate.Decide(crewstate.Input{Observation: crewstate.Observation{
+		AgentRecorded: true, AgentFound: true, Composer: crewstate.ComposerEmpty, Source: "fixture",
+	}})
+	if want := "state: spawned · health: idle (composer empty) · via fixture"; read.Line() != want {
+		t.Fatalf("Line() = %q, want %q", read.Line(), want)
+	}
+	gone := crewstate.Decide(crewstate.Input{Observation: crewstate.Observation{
+		AgentRecorded: true, AgentFound: false, Source: "fixture",
+	}})
+	if want := "state: spawned · health: agent-gone (the recorded agent is not in herdr)"; gone.Line() != want {
+		t.Fatalf("Line() = %q, want %q", gone.Line(), want)
+	}
+}

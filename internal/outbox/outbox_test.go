@@ -15,6 +15,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -67,7 +68,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatalf("store.Init: %v", err)
 	}
-	repo := filepath.Join(ws.Root(), project)
+	repo := filepath.Join(ws.ProjectHome(project), project)
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -529,5 +530,32 @@ func TestMaintenanceHoldsQueuedDeliveryUntilRefreshEnds(t *testing.T) {
 	got, err = sender.Attempt(context.Background(), project)
 	if err != nil || !got.Delivered {
 		t.Fatalf("lost queue after refresh: %+v %v", got, err)
+	}
+}
+
+// seesBusy reads every pane as a turn in flight, whatever is on it.
+type seesBusy struct{ calls int }
+
+func (o *seesBusy) Observe(context.Context, harness.ScreenProfile, string) (screen.Observation, error) {
+	o.calls++
+	return screen.Observation{Composer: screen.ComposerBusy, Evidence: "the observer says busy", Dialog: screen.DialogNone,
+		Highlight: -1, Confidence: 1, Source: "jev"}, nil
+}
+
+// A delivery reads the Mate's pane through Deps.Observer: an observer that
+// says busy holds the line back from a pane that shows an empty composer.
+func TestADeliveryReadsThePaneThroughTheObserver(t *testing.T) {
+	f := newFixture(t)
+	observer := &seesBusy{}
+	deps := f.deps()
+	deps.Observer = observer
+	s := outbox.New(f.ws, deps)
+	f.assign(s, "crews/k3.status@0", resolveLine)
+	f.drain(s)
+	if typed := f.typed(); len(typed) != 0 || observer.calls != 1 {
+		t.Fatalf("typed %#v after %d observations, want the observer's busy to hold the line", typed, observer.calls)
+	}
+	if items := f.items(); len(items) != 1 || !strings.Contains(items[0].LastRefusal, "the observer says busy") {
+		t.Fatalf("outbox = %+v, want the refusal to quote the observer", items)
 	}
 }

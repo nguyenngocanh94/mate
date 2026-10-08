@@ -53,7 +53,7 @@ func cmdProjectRepoAdd(args []string, stdout, stderr io.Writer) error {
 	}
 	shown := repoPath
 	if isGitURL(repoPath) {
-		cloned, err := cloneRepo(stdout, w.Root(), repoPath, *nameFlag)
+		cloned, err := cloneRepo(stdout, w.ProjectHome(project), repoPath, *nameFlag)
 		if err != nil {
 			return fmt.Errorf("project repo add %s: %w", project, err)
 		}
@@ -66,6 +66,11 @@ func cmdProjectRepoAdd(args []string, stdout, stderr io.Writer) error {
 	repo, err := repoConfigFor(absRepo, shown, *nameFlag, *defaultBranchFlag)
 	if err != nil {
 		return err
+	}
+	// Refused before the empty first commit: a repo mate will not register
+	// is left exactly as it was.
+	if err := w.CheckAddRepo(project, repo); err != nil {
+		return fmt.Errorf("project repo add %s: %w", project, err)
 	}
 	made, err := ensureFirstCommit(absRepo, repo.DefaultBranch)
 	if err != nil {

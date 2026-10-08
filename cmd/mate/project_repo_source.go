@@ -11,7 +11,8 @@ import (
 
 // A repo can be added to a Project by URL as well as by path (docs/mvp.md
 // task 59), so a Mate sets up its own Project with mate commands alone: the
-// clone lands in the workspace root, and a repo with no commit at all is
+// clone lands in the project's directory, `<root>/<project>/` (docs/mvp.md
+// section 3), and a repo with no commit at all is
 // given an empty first one, which `crew spawn` needs to branch from. Neither
 // step ever pushes.
 
@@ -43,24 +44,26 @@ func repoNameFromURL(url string) string {
 	return strings.TrimSuffix(path, ".git")
 }
 
-// cloneRepo clones url into root/<name> and returns that directory. It
-// refuses a destination that already exists, whatever is in it: a repo the
-// captain keeps there is theirs, and cloning beside it under another name is
-// the caller's choice to make with --name.
-func cloneRepo(stdout io.Writer, root, url, name string) (string, error) {
+// cloneRepo clones url into dir/<name>, dir being the project's directory,
+// and returns that directory. It refuses a destination that already exists,
+// whatever is in it: a repo the captain keeps there is theirs, and cloning
+// beside it under another name is the caller's choice to make with --name.
+func cloneRepo(stdout io.Writer, dir, url, name string) (string, error) {
 	if name == "" {
 		name = repoNameFromURL(url)
 	}
 	if name == "" || name == "." || name == ".." || strings.ContainsRune(name, filepath.Separator) {
 		return "", fmt.Errorf("cannot name a clone of %s; pass --name", url)
 	}
-	dest := filepath.Join(root, name)
+	dest := filepath.Join(dir, name)
 	if _, err := os.Lstat(dest); err == nil {
-		return "", fmt.Errorf("%s already exists in the workspace; add it by path, or pass --name to clone under another name", name)
+		return "", fmt.Errorf("%s already exists in %s; add it by path, or pass --name to clone under another name", name, dir)
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	if _, err := runGit(root, "clone", "--quiet", "--", url, dest); err != nil {
+	// git makes dir if the captain removed it since `project add`; running
+	// from its parent, the workspace root, works either way.
+	if _, err := runGit(filepath.Dir(dir), "clone", "--quiet", "--", url, dest); err != nil {
 		return "", fmt.Errorf("clone %s: %w", url, err)
 	}
 	fmt.Fprintf(stdout, "cloned %s into %s\n", url, name)

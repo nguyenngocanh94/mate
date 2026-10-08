@@ -13,6 +13,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/query"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -23,7 +24,7 @@ import (
 // vocabulary of section 4b): one deterministic line about a crew, two
 // columns wide -
 //
-//	state: <the crew's declared state> · health: <what the runtime looks like>
+//	state: <the crew's declared state> · health: <what the runtime looks like> · via <observer>
 //
 // The state comes from the record and the health from a live look, and they
 // are kept apart on purpose: a crew is `wait-mate` because it said so, not
@@ -48,7 +49,7 @@ func cmdState(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	result, err := stateOfCrew(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), fs.Arg(1))
+	result, err := stateOfCrew(context.Background(), w, liveDeps(w, stderr), fs.Arg(0), fs.Arg(1))
 	if err != nil {
 		return err
 	}
@@ -139,10 +140,18 @@ func stateOfCrew(ctx context.Context, w *store.Workspace, deps spawn.Deps, proje
 		screen, err := deps.Runtime.ReadAgentStyled(ctx, resolved.Handle, resolved.Screen.ReadSource(), send.DefaultLines)
 		switch {
 		case err == nil:
-			cls := send.ClassifyComposer(resolved.Screen, screen)
+			observer := deps.Observer
+			if observer == nil {
+				observer = fixture.New()
+			}
+			observed, err := observer.Observe(ctx, resolved.Screen, screen)
+			if err != nil {
+				return crewstate.Result{}, err
+			}
 			in.AgentFound = true
-			in.Composer = composerReading(cls.State)
-			in.Evidence = cls.Evidence
+			in.Composer = composerReading(observed.Composer)
+			in.Evidence = observed.Evidence
+			in.Source = observed.Source
 		case runtime.IsAgentNotFound(err):
 			in.AgentFound = false
 		default:

@@ -124,7 +124,7 @@ func newEnv(t *testing.T, gh ...github.Result) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, ws: ws, repo: filepath.Join(root, "shop"), origin: filepath.Join(t.TempDir(), "origin.git")}
+	e := &env{t: t, ws: ws, repo: filepath.Join(root, "shop", "shop"), origin: filepath.Join(t.TempDir(), "origin.git")}
 	run(t, root, "init", "--bare", "-b", "main", e.origin)
 	if err := os.MkdirAll(e.repo, 0o755); err != nil {
 		t.Fatal(err)
@@ -140,7 +140,7 @@ func newEnv(t *testing.T, gh ...github.Result) *env {
 	run(t, other, "push", "origin", "main")
 	e.mergeSHA = run(t, other, "rev-parse", "HEAD")
 
-	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop", DefaultBranch: "main"}}}); err != nil {
+	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop/shop", DefaultBranch: "main"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := ws.WriteCrewMeta(project, crew, map[string]string{"state": "spawned", "branch": "mate/k3", "task": "x"}); err != nil {

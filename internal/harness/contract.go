@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"time"
+
+	"github.com/nguyenngocanh94/mate/internal/capability"
 )
 
 // The harness contract (docs/plans/harness-registry-2026-09-30.md, section
@@ -106,6 +108,10 @@ type Launcher interface {
 // PR 1 reshapes the composer half into an observation the core's policy
 // decides from.
 type ScreenProfile interface {
+	// Kind is the harness whose screens these are, the same as its
+	// Profile's Kind.
+	Kind() Kind
+
 	// ReadSource is the pane read this harness's screens were measured
 	// through. Every read of its pane uses it, so what is classified is
 	// what was measured.
@@ -302,45 +308,31 @@ type QuotaProvider interface {
 	QuotaLane() string
 }
 
-// CapStatus is what is known about one capability of one harness. The words
-// are the ones the TUI probe plan uses (tui-probe-redesign-2026-09-27.md,
-// section 5.1), so the two plans share one vocabulary.
-type CapStatus string
+// Cap, CapStatus and Evidence are internal/capability's, which the tool
+// registry shares (docs/plans/workspace-layout-and-tools-2026-10-08.md,
+// section 5.2). The names stay here so every harness and call site reads
+// as it did.
+type (
+	// CapStatus is what is known about one capability of one harness.
+	CapStatus = capability.CapStatus
+	// Cap is one capability's declaration; Impl is set exactly when Status
+	// is CapVerified.
+	Cap[T any] = capability.Cap[T]
+	// Evidence is what a verified capability rests on.
+	Evidence = capability.Evidence
+)
 
 const (
 	// CapUndeclared is the zero value: the harness never answered. It is
 	// always a bug.
-	CapUndeclared CapStatus = ""
+	CapUndeclared = capability.Undeclared
 	// CapVerified means measured on a named harness version; Impl is set.
-	CapVerified CapStatus = "verified"
+	CapVerified = capability.Verified
 	// CapUnsupported means the harness does not have it; Reason says why.
-	CapUnsupported CapStatus = "unsupported"
+	CapUnsupported = capability.Unsupported
 	// CapUnknown means not measured yet; Reason says what is missing.
-	CapUnknown CapStatus = "unknown"
+	CapUnknown = capability.Unknown
 )
-
-// Cap is one capability's declaration. Impl is set exactly when Status is
-// CapVerified: code still being measured belongs in tests and labs, not
-// under an unknown capability.
-type Cap[T any] struct {
-	Status   CapStatus
-	Impl     T
-	Evidence Evidence
-	Reason   string
-}
-
-// Verified reports whether the capability can be used.
-func (c Cap[T]) Verified() bool { return c.Status == CapVerified }
-
-// Evidence is what a verified capability rests on.
-type Evidence struct {
-	// Version is the harness version it was measured on.
-	Version string
-	// Measured is when.
-	Measured string
-	// Proof names the test, capture or record that shows it.
-	Proof string
-}
 
 // ExitCommand is a GracefulStopper that types one line.
 type ExitCommand string
