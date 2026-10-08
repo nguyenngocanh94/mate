@@ -5,7 +5,7 @@ description: Read when recording requested work, choosing ready tasks, dispatchi
 
 # Project work in Beads
 
-Use `/usr/local/bin/mate beads shop -- <bd arguments>` for the project's tracker. This wrapper selects `.mate/projects/shop/.beads/`, serializes embedded Dolt access and refreshes the viewer export. All repos in this project share that tracker. Add `--workspace /ws` before `--` when outside the workspace. The installed `bd <command> --help` is the flag reference.
+Use `/usr/local/bin/mate beads shop -- <bd arguments>` for the project's tracker. This wrapper selects `/ws/shop/.beads/`, serializes embedded Dolt access and refreshes the viewer export. All repos in this project share that tracker. Add `--workspace /ws` before `--` when outside the workspace. The installed `bd <command> --help` is the flag reference.
 
 1. Read `/usr/local/bin/mate beads shop -- list --limit 30 --json` before recording a request; reuse matching work. Create a goal with `create --title "<goal>" --type epic --json`, then work with `create --title "<work>" --type task --parent <epic-id> --description "<contract>" --json`. Use one task per repo when delivery spans repos. Beads IDs are durable; preserve them in briefs and follow-ups.
 2. Select work with `ready --limit 10 --json`; inspect the candidate with `show <id> --json`. Ready work the captain asked for is yours to dispatch now, under the decision-authority and crew-dispatch rules; work nobody asked for is a proposal to the captain. For graph triage, `/usr/local/bin/mate task-triage shop` runs `bv --robot-triage --brief`; the output is advice, and `bd ready`/`update --claim` establish current readiness and ownership. Interactive `mate tasks` and bare `bv` belong to the captain's terminal.

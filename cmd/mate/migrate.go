@@ -42,7 +42,7 @@ func cmdMigrate(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	live := spawn.LiveDeps(harnesses)
+	live := liveDeps()
 	spec, err := spawn.SessionSpec(live, w)
 	if err != nil {
 		return err

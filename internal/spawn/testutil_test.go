@@ -16,6 +16,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/tool"
+	toolcatalog "github.com/nguyenngocanh94/mate/internal/tool/catalog"
 )
 
 // newWorkspace creates a workspace with one registered git project. It is
@@ -55,6 +57,7 @@ func fakeDeps(t *testing.T, rt *runtime.Fake) spawn.Deps {
 	t.Helper()
 	return spawn.Deps{
 		Harnesses:            catalog.Default(),
+		Tools:                toolRegistry(t),
 		Runtime:              rt,
 		Names:                rt.Names,
 		ConfigHome:           t.TempDir(),
@@ -143,4 +146,15 @@ func readMeta(t *testing.T, w *store.Workspace, project string) map[string]strin
 		t.Fatalf("ReadMateMeta: %v", err)
 	}
 	return meta
+}
+
+// toolRegistry is the binary's tools, so a started Mate installs their
+// skills as it does live.
+func toolRegistry(t *testing.T) tool.Registry {
+	t.Helper()
+	r, err := tool.NewRegistry(toolcatalog.Default()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
 }

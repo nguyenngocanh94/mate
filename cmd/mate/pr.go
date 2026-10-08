@@ -14,7 +14,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/prwatch"
-	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -127,7 +126,7 @@ func runPRWatch(w *store.Workspace, project, crew, url string, stdout io.Writer)
 		WS:     w,
 		GH:     ghClient,
 		Git:    gitx.New(),
-		Outbox: consoleOutbox(w, spawn.LiveDeps(harnesses)),
+		Outbox: consoleOutbox(w, liveDeps()),
 		Log:    stdout,
 	}
 	if err := prwatch.Watch(ctx, deps, project, crew, url); err != nil {

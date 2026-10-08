@@ -66,7 +66,7 @@ func cmdMateStart(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := spawn.StartMate(context.Background(), w, spawn.LiveDeps(harnesses), req)
+	res, err := spawn.StartMate(context.Background(), w, liveDeps(), req)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return mateStop(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
+	return mateStop(context.Background(), w, liveDeps(), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
 }
 
 // mateStop is cmdMateStop's core, over any deps, for tests.
@@ -184,7 +184,7 @@ func cmdMateStatus(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	status, err := spawn.MateStatus(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0))
+	status, err := spawn.MateStatus(context.Background(), w, liveDeps(), fs.Arg(0))
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func cmdMateRefresh(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	changed, err := contextRefresh(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), false)
+	changed, err := contextRefresh(context.Background(), w, liveDeps(), fs.Arg(0), false)
 	if err != nil {
 		return err
 	}

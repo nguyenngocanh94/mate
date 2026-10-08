@@ -151,10 +151,12 @@ type Recall interface {
 type Skill interface {
 	// SkillName is the skill's directory name: "task-management".
 	SkillName() string
-	// SkillMarkdown is the skill's SKILL.md.
+	// SkillMarkdown is the skill's SKILL.md, as a text/template the
+	// manual's parameters fill (internal/mateassets.Params): the mate
+	// binary, the project, the workspace.
 	SkillMarkdown() string
-	// ManualSection is the tool's section of a Mate's AGENTS.md; empty
-	// when it needs none.
+	// ManualSection is the tool's section of a Mate's AGENTS.md, written
+	// as it is in the manual's list of skills; empty when it needs none.
 	ManualSection() string
 }
 
