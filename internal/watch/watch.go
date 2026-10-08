@@ -18,7 +18,6 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/screen"
-	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -138,16 +137,10 @@ type Deps struct {
 	StaleAfter time.Duration
 	// Observer reads each pane snapshot that differs from the last one it
 	// read; the health column is its Observation's composer, kept while the
-	// pane does not change. Nil means the fixture observer
-	// (internal/screen/fixture).
+	// pane does not change. It is asked in the background, so a slow answer
+	// never holds the poll loop (observe.go). Nil means the fixture
+	// observer (internal/screen/fixture), asked in the round.
 	Observer screen.Observer
-}
-
-func (d Deps) observer() screen.Observer {
-	if d.Observer != nil {
-		return d.Observer
-	}
-	return fixture.New()
 }
 
 func (d Deps) now() time.Time {
@@ -213,6 +206,9 @@ type Watcher struct {
 	runtimeNoticeAt time.Time
 	cancel          context.CancelFunc
 	done            chan struct{}
+
+	// observing counts the observer calls in flight (observe.go).
+	observing sync.WaitGroup
 }
 
 // observation is what the previous polls established about one crew.
@@ -238,6 +234,9 @@ type observation struct {
 	// observed is the hash of the snapshot composer was read from, empty
 	// before the observer has read one.
 	observed string
+	// asking is the observer call in flight for this crew, nil when none
+	// (observe.go).
+	asking *asking
 }
 
 // New builds an observer over a workspace. It does not poll until Start or
@@ -266,8 +265,9 @@ func (w *Watcher) Start(ctx context.Context) {
 	go w.run(runCtx)
 }
 
-// Stop ends the polling goroutine and waits for the round in flight. It is
-// safe to call on a Watcher that was never started.
+// Stop ends the polling goroutine and waits for the round in flight and
+// for the observer calls it started, which the cancelled context ends. It
+// is safe to call on a Watcher that was never started.
 func (w *Watcher) Stop() {
 	w.mu.Lock()
 	cancel, done := w.cancel, w.done
@@ -278,6 +278,7 @@ func (w *Watcher) Stop() {
 	}
 	cancel()
 	<-done
+	w.AwaitObserver()
 }
 
 func (w *Watcher) run(ctx context.Context) {
@@ -450,17 +451,12 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	// The observer is asked only about a snapshot it has not read: a pane
 	// that has not changed keeps its last reading, so a still pane costs
 	// no observer call (docs/plans/jev-observer-2026-10-08.md section 4.3).
-	composer := obs.composer
-	if obs.observed != hash {
-		observed, err := w.deps.observer().Observe(ctx, screens, screen)
-		if err != nil {
-			// A screen the observer could not read is not a reading: the
-			// round ends without a verdict, as for a pane that could not
-			// be read, and the next round asks again.
-			return err
-		}
-		obs.observed = hash
-		composer = observed.Composer
+	// A screen the observer could not read is not a reading: the round ends
+	// without a verdict, as for a pane that could not be read, and the next
+	// round asks again.
+	composer, err := w.composer(ctx, obs, screens, screen, hash)
+	if err != nil {
+		return err
 	}
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer

@@ -8,7 +8,8 @@
 //     (runtime.Adapter.InspectAgent, runtime.IsAgentNotFound)?
 //   - What is the pane showing (runtime.Adapter.ReadAgentStyled read by
 //     the screen.Observer in Deps, asked only when the screen's hash
-//     changed), and has that screen changed since last time?
+//     changed, in the background so a slow observer never holds the poll),
+//     and has that screen changed since last time?
 //   - Has the crew appended anything to `crews/<id>.status`?
 //
 // From those it opens and resolves incidents in `incidents.log`. It writes
