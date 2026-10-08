@@ -149,3 +149,8 @@ Quan hệ: PR 1 trùng chỗ với probe-TUI PR 1 (tách quan sát khỏi policy
 - Một bản harness mới (lần tới Claude Code hoặc Codex tự cập nhật) không làm crew chết ở settle: evidence ghi lại lần đầu điều đó xảy ra sau khi bật.
 - Không hành động không đảo ngược nào có đường đi từ Observation của Jev mà không qua so chuỗi hoặc xác nhận highlight; test ratchet đếm call site của `Observe` trong `send` và `spawn` và kiểm từng chỗ có bước kiểm chứng sau nó.
 - `mate state` và console nói rõ nguồn của mỗi quan sát.
+
+Chưa làm (ghi 2026-10-08, sau review cuối nhánh `feat/jev-observer`):
+
+- Trục Notice chưa nối vào `send` hay `watch`: Observation mang nhãn notice của Jev, nhưng không policy nào đọc nó.
+- Settle vẫn chỉ trả về khi fixture đọc ra màn hình sẵn sàng (`Startup` là `Ready`), nên một bản harness mới đổi màn hình sẵn sàng vẫn làm settle kẹt; Jev chỉ thêm tên dialog nó thấy vào lời từ chối. Tiêu chí thứ hai ở trên vì thế chưa đạt bằng nhánh này.

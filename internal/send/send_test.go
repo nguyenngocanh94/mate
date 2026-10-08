@@ -3,6 +3,8 @@ package send_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -563,5 +565,25 @@ func TestComposerLabelCallsADraftPending(t *testing.T) {
 		if got := send.ComposerLabel(state); got != want {
 			t.Errorf("ComposerLabel(%q) = %q, want %q", state, got, want)
 		}
+	}
+}
+
+// A dialog the observer names is refused before anything is typed: the
+// fixture reads Codex's directory-trust dialog as one.
+func TestSendRefusesADialog(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile(filepath.Join("..", "harness", "codex", "testdata", "startup", "codex-0.156.1-trust-dialog.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt := &scripted{screens: []string{string(data)}}
+	deps, _ := testDeps(rt)
+	deps.Observer = fixture.New()
+	_, err = send.Send(context.Background(), deps, target(), codex.KindCodex, "say PONG", send.Options{})
+	if !errors.Is(err, send.ErrDialogOpen) || !strings.Contains(err.Error(), "a dialog is open: trust; nothing typed") {
+		t.Fatalf("err = %v, want the dialog refusal", err)
+	}
+	if len(rt.typed) != 0 || len(rt.keys) != 0 {
+		t.Fatalf("typed %#v, keys %v under a dialog", rt.typed, rt.keys)
 	}
 }

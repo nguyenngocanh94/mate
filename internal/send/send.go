@@ -81,6 +81,9 @@ var (
 	// ErrSubmissionUnconfirmed means input may have arrived, but neither a
 	// cleared composer nor an idle-to-busy transition proves submission.
 	ErrSubmissionUnconfirmed = errors.New("submission unconfirmed; do not retype")
+	// ErrDialogOpen is a dialog the observer names over the pane. Nothing
+	// was typed.
+	ErrDialogOpen = errors.New("a dialog is open over the pane")
 	// ErrPaneChanged is a pane that showed something else by the time the
 	// observer had read it. Nothing was typed, and the send may be retried.
 	ErrPaneChanged = errors.New("pane changed while it was being read")
@@ -285,6 +288,14 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		return report, sendError(observability.CodeStateConflict, ErrPaneChanged,
 			"pane changed while it was being read; nothing typed",
 			map[string]any{"screen_tail": ScreenTail(StripSGR(again), tailLines)})
+	}
+	// Nothing is typed under a dialog the observer names. A screen it
+	// cannot say has or lacks one, with no composer read off it either, is
+	// refused below as an unknown screen, as it always was.
+	if d := observed.Dialog; d != screenpkg.DialogNone && d != "" && (d != screenpkg.DialogUnknown || before.State != StateUnknown) {
+		return report, sendError(observability.CodeStateConflict, ErrDialogOpen,
+			fmt.Sprintf("a dialog is open: %s; nothing typed", d),
+			map[string]any{"dialog": string(d), "screen_tail": ScreenTail(StripSGR(screen), tailLines)})
 	}
 	if opts.ResumePending && (before.State != StatePending || !pendingMatches(screens, screen, payload)) {
 		return report, sendError(observability.CodeStateConflict, ErrSubmissionUnconfirmed,
