@@ -20,9 +20,9 @@ type Health struct {
 	// means Herdr said it does not have it; a lookup that failed produces
 	// no Health at all rather than a false here.
 	AgentPresent bool
-	// Composer is what send.ClassifyComposer read off the pane. It is
-	// send.StateUnknown when the agent is gone or the screen could not be
-	// classified.
+	// Composer is the composer of the Observation the observer read off
+	// the pane (Deps.Observer). It is send.StateUnknown when the agent is
+	// gone or the screen could not be classified.
 	Composer send.ComposerState
 	// QuietFor is how long the pane's contents and the crew's status file
 	// have both been unchanged, measured from the first poll that saw this

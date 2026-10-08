@@ -14,6 +14,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
@@ -457,5 +459,55 @@ func TestSendRefusesAnUnregisteredKind(t *testing.T) {
 	}
 	if rt.reads != 0 || len(rt.typed) != 0 {
 		t.Fatalf("reads %d, typed %v: the refusal must come before the pane is touched", rt.reads, rt.typed)
+	}
+}
+
+// observing is a screen.Observer that counts its calls and, when says is
+// set, answers with that observation instead of the fixture's.
+type observing struct {
+	calls int
+	says  *screen.Observation
+}
+
+func (o *observing) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
+	o.calls++
+	if o.says != nil {
+		return *o.says, nil
+	}
+	return fixture.New().Observe(ctx, profile, pane)
+}
+
+// TestSendDecidesFromTheObserverOnce: the readiness decision is the
+// Observer's reading, taken once before typing; the re-reads after each
+// enter compare the composer with the typed text and never ask it again.
+func TestSendDecidesFromTheObserverOnce(t *testing.T) {
+	t.Parallel()
+	rt := &scripted{
+		screens: []string{claudeScreen("")},
+		onType:  func(text string) []string { return []string{claudeScreen(text), claudeScreen("")} },
+	}
+	deps, _ := testDeps(rt)
+	obs := &observing{}
+	deps.Observer = obs
+	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if report.Presses != 2 || !report.Delivered() {
+		t.Fatalf("want delivery on the second enter: %+v", report)
+	}
+	if obs.calls != 1 {
+		t.Fatalf("observer called %d times, want once, before typing", obs.calls)
+	}
+
+	busy := &scripted{screens: []string{claudeScreen("")}}
+	bdeps, _ := testDeps(busy)
+	bdeps.Observer = &observing{says: &screen.Observation{Composer: screen.ComposerBusy, Evidence: "✻ Thinking…"}}
+	_, err = send.Send(context.Background(), bdeps, target(), claude.KindClaude, "say PONG", send.Options{})
+	if !errors.Is(err, send.ErrAgentBusy) || !strings.Contains(err.Error(), "(✻ Thinking…)") {
+		t.Fatalf("err = %v, want ErrAgentBusy quoting the observer's evidence", err)
+	}
+	if len(busy.typed) != 0 {
+		t.Fatalf("a send the observer called busy typed anyway: %#v", busy.typed)
 	}
 }

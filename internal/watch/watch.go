@@ -17,6 +17,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -134,6 +136,17 @@ type Deps struct {
 	// StaleAfter is the quiet period that opens `stale`; zero means
 	// DefaultStaleAfter.
 	StaleAfter time.Duration
+	// Observer reads each pane snapshot; the health column is its
+	// Observation's composer. Nil means the fixture observer
+	// (internal/screen/fixture).
+	Observer screen.Observer
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 func (d Deps) now() time.Time {
@@ -430,7 +443,13 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		obs.changedAt = now
 	}
 
-	composer := send.ClassifyComposer(screens, screen).State
+	observed, err := w.deps.observer().Observe(ctx, screens, screen)
+	if err != nil {
+		// A screen the observer could not read is not a reading: the round
+		// ends without a verdict, as for a pane that could not be read.
+		return err
+	}
+	composer := observed.Composer
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer
 		obs.composerSince = now

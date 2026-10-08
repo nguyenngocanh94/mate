@@ -12,6 +12,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/claude"
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	scr "github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 )
 
@@ -448,5 +450,51 @@ func TestStartMateRefusesAnUpdateDialogItAlreadyAnswered(t *testing.T) {
 	}
 	if strings.Join(pane.sent(), ",") != "down,down,enter" {
 		t.Fatalf("presses = %v, want the one answer and nothing after it", pane.sent())
+	}
+}
+
+// highlightUnseen is the fixture observer with the dialog highlight
+// withheld: it names the same dialog but never sees the highlight on the
+// option mate would confirm.
+type highlightUnseen struct{ calls int }
+
+func (o *highlightUnseen) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	o.calls++
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Highlight = -1
+	return obs, err
+}
+
+// The settle reads the dialog and its highlight through the Observer: with
+// the highlight withheld it refuses to confirm the Claude trust dialog even
+// on the capture where the accept option is selected, and presses only the
+// select key from the profile's measured answer.
+func TestStartMateConfirmsOnlyTheHighlightTheObserverSees(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	observer := &highlightUnseen{}
+	deps.Observer = observer
+	rt.NextStartupScreen = screen(t, "claude-2.1.270-trust-dialog.txt")
+	accepted := screen(t, "claude-2.1.270-trust-dialog-accept-selected.txt")
+	rt.OnSendKeys = func(handle runtime.AgentHandle, keys []string) {
+		if keys[0] == "down" {
+			rt.SetReadOutput(handle, accepted)
+		}
+	}
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "the highlight is not on") {
+		t.Fatalf("err = %v, want a refusal to confirm a highlight the observer did not see", err)
+	}
+	var keys []string
+	for _, sent := range rt.SentKeys {
+		keys = append(keys, sent.Keys...)
+	}
+	if strings.Join(keys, ",") != "down" {
+		t.Fatalf("presses = %v, want the select press and nothing else", keys)
+	}
+	if observer.calls != 2 {
+		t.Fatalf("observer read %d screens, want the dialog and the re-read after the select press", observer.calls)
 	}
 }

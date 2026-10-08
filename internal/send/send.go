@@ -31,6 +31,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
 // Marker is the sentinel every line mate sends on its own initiative
@@ -102,6 +104,18 @@ type Deps struct {
 	// BeforeType persists an attempt after readiness checks and before any
 	// bytes are sent. A failure prevents typing. Recovery never calls it.
 	BeforeType func() error
+	// Observer reads the pane once, before anything is typed, and the
+	// send's policy decides from that Observation. Nil means the fixture
+	// observer (internal/screen/fixture). The re-reads after typing never
+	// ask it: they compare the composer with the typed text directly.
+	Observer screen.Observer
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 // Defaults measured by firstmate and carried over unchanged (bin/fm-send.sh,
@@ -241,7 +255,11 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	if err != nil {
 		return report, err
 	}
-	before := ClassifyComposer(screens, screen)
+	observed, err := deps.observer().Observe(ctx, screens, screen)
+	if err != nil {
+		return report, err
+	}
+	before := Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}
 	report.Before = before
 	report.Steps = append(report.Steps, Step{What: "classify", State: before.State, Evidence: before.Evidence})
 	if opts.ResumePending && (before.State != StatePending || !pendingMatches(screens, screen, payload)) {

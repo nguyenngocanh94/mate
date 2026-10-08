@@ -10,6 +10,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 )
 
 // Startup-prompt settlement, ported from v1's ADR 0028. Measured 2026-09-14
@@ -121,11 +122,16 @@ var startupDialogs = map[harness.StartupScreen]string{
 // when a select press does not move the highlight onto the accept option, or
 // when the dialog is still on screen after the confirm press.
 //
+// observer reads every snapshot: the dialog on screen is its Observation's
+// Startup, and a dialog is confirmed only when its Highlight is the option
+// the harness's StartupAnswer confirms. The keys themselves are always the
+// profile's measured StartupAnswer.
+//
 // trusted names the hooks mate itself installed for this launch (a Codex
 // Mate's SessionStart hook). Codex's hook review is walked, and those hooks
 // trusted, only when every hook the review lists is one of them; with none,
 // the review is refused at once.
-func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
+func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, profile harness.Profile, observer screen.Observer, budget time.Duration, sleep sleeper, trusted ...harness.OwnHook) (Settlement, error) {
 	if sleep == nil {
 		sleep = sleepCtx
 	}
@@ -138,7 +144,11 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 		if err != nil {
 			return settled, err
 		}
-		class := screens.ClassifyStartup(screen)
+		observed, err := observer.Observe(ctx, screens, screen)
+		if err != nil {
+			return settled, err
+		}
+		class := observed.Startup
 		if class == harness.StartupScreenReady {
 			return settled, nil
 		}
@@ -178,7 +188,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 				return settled, startupRefusal(handle, kind, screen,
 					fmt.Sprintf("%s drew more than %d startup dialogs in one launch; mate stops answering rather than press keys in a loop", kind, startupMaxDialogs))
 			}
-			presses, err := answerStartupDialog(ctx, rt, handle, kind, screens, class, what, sleep)
+			presses, err := answerStartupDialog(ctx, rt, handle, kind, screens, observer, class, what, sleep)
 			settled.Presses = append(settled.Presses, presses...)
 			if err != nil {
 				return settled, err
@@ -202,7 +212,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 // and Codex's update highlight opens on "1. Update now", so this order is the
 // difference between settling the pane and killing the agent or starting a
 // package install under it.
-func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
+func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime.AgentHandle, kind harness.Kind, screens harness.ScreenProfile, observer screen.Observer, dialog harness.StartupScreen, what string, sleep sleeper) ([]string, error) {
 	answer, err := screens.StartupAnswer(dialog)
 	if err != nil {
 		return nil, err
@@ -231,7 +241,11 @@ func answerStartupDialog(ctx context.Context, rt runtime.Adapter, handle runtime
 			return presses, err
 		}
 	}
-	if !screens.StartupTargetSelected(dialog, screen) {
+	observed, err := observer.Observe(ctx, screens, screen)
+	if err != nil {
+		return presses, err
+	}
+	if observed.Startup != dialog || observed.Highlight != answer.Target {
 		return presses, startupRefusal(handle, kind, screen,
 			fmt.Sprintf("%s %s: after pressing %s the highlight is not on %q; refusing to confirm a selection mate cannot see", kind, what, strings.Join(answer.SelectKeys, ", "), answer.TargetLabel))
 	}

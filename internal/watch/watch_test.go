@@ -13,6 +13,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/harnesstest"
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 	"github.com/nguyenngocanh94/mate/internal/watch"
@@ -643,4 +644,48 @@ func TestPollCountsHowLongTheComposerHasBeenBusy(t *testing.T) {
 	if h, _ := f.health("k3"); h.Composer != send.StateEmpty || h.ComposerFor != 0 {
 		t.Fatalf("after going idle: %+v, want an empty composer with ComposerFor reset", h)
 	}
+}
+
+// observerSays is a screen.Observer that answers every screen with one
+// observation, or fails.
+type observerSays struct {
+	obs   screen.Observation
+	err   error
+	calls int
+}
+
+func (o *observerSays) Observe(context.Context, harness.ScreenProfile, string) (screen.Observation, error) {
+	o.calls++
+	return o.obs, o.err
+}
+
+// The health column is the Observer's reading of the pane, not a
+// classifier the observer calls on its own: an observer that says busy over
+// an idle-looking screen keeps the crew from going stale, and one that
+// cannot read the screen ends the round with no verdict.
+func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
+	f := newFixture(t)
+	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerBusy, Source: "test"}}
+	deps := f.deps()
+	deps.Observer = says
+	f.w = watch.New(f.ws, deps)
+	f.appendStatus("k3", "working: running the suite")
+
+	f.poll()
+	f.clock.advance(10 * time.Minute)
+	f.poll()
+	f.assertIncidents()
+	if h, _ := f.health("k3"); h.Composer != send.StateBusy {
+		t.Fatalf("health composer = %q, want the observer's busy", h.Composer)
+	}
+	if says.calls != 2 {
+		t.Fatalf("observer called %d times, want once per round", says.calls)
+	}
+
+	says.err = errors.New("observer could not read the screen")
+	f.clock.advance(time.Minute)
+	if err := f.w.Poll(context.Background()); err == nil {
+		t.Fatal("a round whose screen the observer could not read reported no error")
+	}
+	f.assertIncidents()
 }

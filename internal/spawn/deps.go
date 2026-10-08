@@ -12,6 +12,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/process"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
 
@@ -129,6 +131,9 @@ type Deps struct {
 	// NewSessionID mints the Claude session uuid; tests make it
 	// deterministic. Nil means uuid.NewString.
 	NewSessionID func() string
+	// Observer reads the pane during the startup settle (settle.go). Nil
+	// means the fixture observer (internal/screen/fixture).
+	Observer screen.Observer
 }
 
 // LiveDeps is what the CLI uses: the real Herdr adapter over os/exec, and
@@ -210,6 +215,13 @@ func (d Deps) now() time.Time {
 		return d.Now()
 	}
 	return time.Now().UTC()
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 func (d Deps) sleep() sleeper {
