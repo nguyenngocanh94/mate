@@ -35,7 +35,7 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 5. Hai chế độ giao tiếp: tự động (mặc định, từ M18) và giám sát, xem mục 5.
 6. Persistence cho giao tiếp và trạng thái là file phẳng trong `.mate/`, không SQLite. Chỉ console sửa state; Crew chỉ append vào `.status`. Từ M5 có thêm `.mate/mate.db` (SQLite thuần Go) nhưng chỉ là kho dẫn xuất cho timeline, xây lại được từ file và transcript bằng `mate reindex`; mất DB không mất việc.
 7. Console TUI copy từ `internal/ui/console` của v1, giữ stream mode nhúng pane Mate.
-8. Trạng thái agent của Herdr (`idle/blocked/done`) là screen scraping, chỉ dùng làm tín hiệu phụ, không bao giờ dùng để kết luận task xong.
+8. Trạng thái agent của Herdr (`idle/blocked/done`) là screen scraping, chỉ dùng làm tín hiệu phụ, không bao giờ dùng để kết luận task xong. Pane cũng chỉ là tín hiệu, đi qua observer (`internal/screen`: `fixture`, hoặc `jev` trước `fixture` khi workspace có key Jev); bằng chứng một dòng đã gửi vẫn là hook echo trong `sent.log`, không phải một Observation.
 9. Token monitor làm sau MVP, nhưng `.meta` ghi `transcript=` và `session_id=` từ ngày đầu.
 10. Tên binary và CLI là `mate`, thư mục state `.mate/`, prefix biến môi trường `MATE_`.
 
@@ -569,6 +569,10 @@ internal/query/          kiểu DTO console cần, backend mới điền
 internal/store/          đọc ghi .mate/, khoá append, layout, ranh giới đường dẫn
 internal/box/            gộp status + sent.log + incident thành view
 internal/send/           gửi một dòng vào pane agent qua Herdr, kiểm chứng composer
+internal/screen/         Observation và Observer: quan sát cấu trúc của một pane, không verdict
+internal/screen/fixture/ observer tất định bọc ScreenProfile của harness; mặc định khi không có key Jev
+internal/screen/jev/     observer qua Jev (TypeSafe): prompt ghim, cassette cho unit test
+internal/screen/chain/   Jev trước, fixture khi Jev không chắc; dedup 60 giây, breaker, `.mate/jev.log`
 internal/watch/          observer và triage
 internal/autopilot/      daemon chế độ tự động: digest 90 giây, xếp vào outbox của Mate
 internal/outbox/         hàng đợi `mate/.outbox`, người gửi duy nhất vào composer Mate, `wedged`
@@ -1142,4 +1146,4 @@ Captain yêu cầu 2026-10-03: trang Task cần một card cho thấy các bư�
 
 ### Thử nghiệm: Jev notice advisor
 
-Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
+Bật theo từng workspace trong `.mate/.env` (`MATE_JEV=on`, `MATE_JEV_API_KEY_FILE=<file key ngoài workspace>`; console không đọc biến môi trường của process): trên Mate/Crew có binding active, `a` → `e` gọi Jev để giải thích notice trong tối đa 40 dòng cuối terminal. Chỉ hiển thị gợi ý có thời điểm capture; không đổi composer, task state, incident, send hay receipt. Không gọi API khi refresh. Lỗi cấu hình/API không ảnh hưởng observer và sender. Đây là bản thử thủ công để đánh giá semantic classification, chưa thay probe. Từ 2026-10-08, workspace có key thì Jev còn là bộ quan sát pane qua `internal/screen/chain` (quyết định 8: tín hiệu, không phải bằng chứng); `MATE_JEV=fixture` hay `off` tắt nó. Hướng dẫn và phương án tiếp theo: [jev-notices.md](jev-notices.md).
