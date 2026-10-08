@@ -47,8 +47,9 @@ var observeSites = []struct {
 		"!screens.StartupTargetSelected(dialog, plain)"}},
 	// The stow line itself goes through send.Send; the restart after it
 	// waits for the turn's end, and on the composer alone only after two
-	// empty looks in a row.
-	{file: "outbox/stow.go", fn: "composer", via: map[string]string{"Stow": "empties >= 2"}},
+	// looks in a row the fixture reads as empty (empty: Deterministic, which
+	// Jev cannot make empty).
+	{file: "outbox/stow.go", fn: "composer", via: map[string]string{"Stow": "empty(c)"}},
 }
 
 // observeCall is one Observe call: the function it is in and its offset.

@@ -20,15 +20,20 @@ type asking struct {
 	err  error
 }
 
-// reading is the composer an observer read off one snapshot, and which
-// observer read it ("fixture", "jev", ...).
+// reading is the composer an observer read off one snapshot, the
+// fixture's own reading of it (screen.Observation.Deterministic), and
+// which observer read it ("fixture", "jev", ...). composer is for display;
+// deterministic is what the stale incident is decided on.
 type reading struct {
-	composer send.ComposerState
-	source   string
+	composer      send.ComposerState
+	deterministic send.ComposerState
+	source        string
 }
 
-// fixtureSource is the Source the fixture observer stamps.
-const fixtureSource = "fixture"
+// readingOf is what one Observation says, for the health column.
+func readingOf(obs screen.Observation) reading {
+	return reading{composer: obs.Composer, deterministic: obs.Deterministic, source: obs.Source}
+}
 
 // composer is the crew's composer for this round, read off the snapshot
 // whose hash is hash.
@@ -57,7 +62,7 @@ func (w *Watcher) composer(ctx context.Context, obs *observation, screens harnes
 		if err != nil {
 			return reading{}, err
 		}
-		obs.observed, obs.reading = hash, reading{observed.Composer, fixtureSource}
+		obs.observed, obs.reading = hash, readingOf(observed)
 		return obs.reading, nil
 	}
 	if a := obs.asking; a != nil {
@@ -68,7 +73,7 @@ func (w *Watcher) composer(ctx context.Context, obs *observation, screens harnes
 				if a.err != nil {
 					return reading{}, a.err
 				}
-				obs.observed, obs.reading = hash, reading{a.obs.Composer, a.obs.Source}
+				obs.observed, obs.reading = hash, readingOf(a.obs)
 			}
 		default:
 		}
@@ -83,7 +88,7 @@ func (w *Watcher) composer(ctx context.Context, obs *observation, screens harnes
 	if err != nil {
 		return reading{}, err
 	}
-	return reading{interim.Composer, fixtureSource}, nil
+	return readingOf(interim), nil
 }
 
 // ask starts the observer call for one snapshot, bounded by notice.Timeout

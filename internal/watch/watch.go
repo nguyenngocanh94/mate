@@ -467,16 +467,20 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 	}
 	quiet := now.Sub(obs.changedAt)
 
+	// The stale incident is decided on the fixture's own reading
+	// (Deterministic): Jev calling a still pane busy neither keeps it from
+	// opening nor resolves it. The column shows the observer's composer.
+	deterministic := read.deterministic
 	switch {
 	case open[incidentKey{ref, box.IncidentStale}]:
-		if reason, ok := staleCleared(paneMoved, statusMoved, composer); ok {
+		if reason, ok := staleCleared(paneMoved, statusMoved, deterministic); ok {
 			if err := w.resolveIncident(ref, box.IncidentStale, now, open, reason); err != nil {
 				return err
 			}
 		}
-	case quiet >= w.deps.staleAfter() && composer != send.StateBusy && !waiting(obs.verb):
+	case quiet >= w.deps.staleAfter() && deterministic != send.StateBusy && !waiting(obs.verb):
 		text := fmt.Sprintf("no status line and no pane change for %s; composer %s",
-			quiet.Round(time.Second), send.ComposerLabel(composer))
+			quiet.Round(time.Second), send.ComposerLabel(deterministic))
 		if obs.verb != "" {
 			text += fmt.Sprintf("; last status verb %s", obs.verb)
 		}

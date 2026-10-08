@@ -679,12 +679,14 @@ func (o *observerSays) Observe(context.Context, harness.ScreenProfile, string) (
 }
 
 // The health column is the Observer's reading of the pane, not a
-// classifier the observer calls on its own: an observer that says busy over
-// an idle-looking screen keeps the crew from going stale, and one that
-// cannot read the screen ends the round that learns it with no verdict.
+// classifier the observer calls on its own; the stale incident is the
+// fixture's (Deterministic): an observer that says busy over a pane the
+// fixture reads as empty shows busy and still lets the still crew go stale,
+// and one that cannot read the screen ends the round that learns it with
+// no verdict.
 func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	f := newFixture(t)
-	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerBusy, Source: "test"}}
+	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerBusy, Deterministic: screen.ComposerEmpty, Source: "jev"}}
 	deps := f.deps()
 	deps.Observer = says
 	f.w = watch.New(f.ws, deps)
@@ -694,9 +696,12 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	f.w.AwaitObserver()
 	f.clock.advance(10 * time.Minute)
 	f.poll()
-	f.assertIncidents()
-	if h, _ := f.health("k3"); h.Composer != send.StateBusy {
-		t.Fatalf("health composer = %q, want the observer's busy", h.Composer)
+	f.assertIncidents("k3 stale open")
+	if text := f.incidents()[0].Text; !strings.Contains(text, "; composer empty") {
+		t.Fatalf("incident text = %q, want the fixture's empty composer", text)
+	}
+	if h, _ := f.health("k3"); h.Composer != send.StateBusy || h.Source != "jev" {
+		t.Fatalf("health %+v, want the observer's busy shown", h)
 	}
 	if says.calls != 1 {
 		t.Fatalf("observer called %d times over one unchanged screen, want once", says.calls)
@@ -710,7 +715,9 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	if err := f.w.Poll(context.Background()); err == nil {
 		t.Fatal("a round whose screen the observer could not read reported no error")
 	}
-	f.assertIncidents()
+	// The pane moved, which resolves the incident; the unread screen
+	// concludes nothing else.
+	f.assertIncidents("k3 stale open", "k3 stale resolved")
 }
 
 // The observer is asked only when the pane's snapshot changes: three polls
