@@ -100,6 +100,20 @@ const (
 	MetaPRSync = "pr_sync"
 )
 
+// MetaDelivery is how a crew's work lands (docs/mvp.md M19), chosen by the
+// Mate at spawn and baked into the crew's brief: DeliveryLocal or DeliveryPR.
+// A crew recorded before M19 has none and reads as DeliveryLocal.
+const MetaDelivery = "delivery"
+
+const (
+	// DeliveryLocal lands the crew's branch on the primary checkout with a
+	// fast-forward; nothing is pushed.
+	DeliveryLocal = "local"
+	// DeliveryPR has the crew push its branch and open a pull request; a
+	// merge on GitHub, or `mate merge` (gh pr merge), lands it.
+	DeliveryPR = "pr"
+)
+
 // The values of MetaPRState.
 const (
 	PRStateOpen   = "open"

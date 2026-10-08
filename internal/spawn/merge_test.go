@@ -23,19 +23,9 @@ import (
 
 // mergeFixture spawns one crew over the fake runtime and returns the
 // workspace, the deps and the spawn result.
-func mergeFixture(t *testing.T, yolo bool) (*store.Workspace, spawn.Deps, spawn.CrewResult) {
+func mergeFixture(t *testing.T) (*store.Workspace, spawn.Deps, spawn.CrewResult) {
 	t.Helper()
 	w := crewWorkspace(t, "shop")
-	if yolo {
-		cfg, err := w.LoadProject("shop")
-		if err != nil {
-			t.Fatal(err)
-		}
-		cfg.Yolo = true
-		if err := w.SaveProject("shop", cfg); err != nil {
-			t.Fatal(err)
-		}
-	}
 	rt := runtime.NewFake()
 	deps := fakeDeps(t, rt)
 	res, err := spawn.SpawnCrew(context.Background(), w, deps, spawn.SpawnCrewRequest{
@@ -94,7 +84,7 @@ func headOf(t *testing.T, w *store.Workspace, rev string) string {
 }
 
 func TestMergeCrewLandsTheBranchAndFinishesTheCrew(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	before := headOf(t, w, "main")
 	tip := headOf(t, w, res.Branch)
@@ -144,7 +134,7 @@ func TestMergeCrewLandsTheBranchAndFinishesTheCrew(t *testing.T) {
 }
 
 func TestMergeCrewRefusesAnUnknownCrew(t *testing.T) {
-	w, deps, _ := mergeFixture(t, false)
+	w, deps, _ := mergeFixture(t)
 	_, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k9", spawn.CallerUser)
 	if err == nil || !strings.Contains(err.Error(), "no crew k9 is recorded") {
 		t.Fatalf("err = %v, want a refusal naming the unknown crew", err)
@@ -152,7 +142,7 @@ func TestMergeCrewRefusesAnUnknownCrew(t *testing.T) {
 }
 
 func TestMergeCrewRefusesAClosedCrew(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	if _, err := spawn.StopCrew(context.Background(), w, deps, "shop", "k3", false); err != nil {
 		t.Fatalf("StopCrew: %v", err)
 	}
@@ -164,14 +154,16 @@ func TestMergeCrewRefusesAClosedCrew(t *testing.T) {
 	}
 }
 
-func TestMergeCrewRefusesTheMateWhileYoloIsOff(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+// A Mate merges only work an independent review passed (docs/mvp.md M19):
+// without a reviewed commit it is refused, and nothing changes.
+func TestMergeCrewRefusesAnUnreviewedMateMerge(t *testing.T) {
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	before := headOf(t, w, "main")
 
 	_, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerMate)
-	if err == nil || !strings.Contains(err.Error(), "merge refused: yolo is off for shop; the captain merges") {
-		t.Fatalf("err = %v, want the yolo refusal in the manual's own words", err)
+	if err == nil || !strings.Contains(err.Error(), "merge refused: the Mate merges only reviewed work") {
+		t.Fatalf("err = %v, want the review refusal", err)
 	}
 	assertNothingChanged(t, w, res, before)
 
@@ -182,14 +174,15 @@ func TestMergeCrewRefusesTheMateWhileYoloIsOff(t *testing.T) {
 	}
 }
 
-func TestMergeCrewLetsTheMateMergeWhenYoloIsOn(t *testing.T) {
-	w, deps, res := mergeFixture(t, true)
+func TestMergeCrewLetsTheMateMergeReviewedWork(t *testing.T) {
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	tip := headOf(t, w, res.Branch)
+	base := headOf(t, w, "main")
 
-	out, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerMate)
+	out, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerMate, spawn.ReviewedCommit{Head: tip, Base: base})
 	if err != nil {
-		t.Fatalf("MergeCrew as the Mate under yolo: %v", err)
+		t.Fatalf("MergeCrew as the Mate with a review: %v", err)
 	}
 	if got := headOf(t, w, "main"); got != tip {
 		t.Fatalf("main = %s, want the branch tip %s", got, tip)
@@ -200,9 +193,9 @@ func TestMergeCrewLetsTheMateMergeWhenYoloIsOn(t *testing.T) {
 }
 
 func TestMergeCrewAlwaysRefusesACrew(t *testing.T) {
-	// A crew may never land its own branch, whatever yolo says: yolo is
-	// the captain delegating to the Mate, not to the crew.
-	w, deps, res := mergeFixture(t, true)
+	// A crew may never land its own branch: the merge follows a review of
+	// its work, which is never the crew's own.
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	before := headOf(t, w, "main")
 
@@ -214,7 +207,7 @@ func TestMergeCrewAlwaysRefusesACrew(t *testing.T) {
 }
 
 func TestMergeCrewRefusesADirtyCrewWorktreeNamingTheCount(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	if err := os.WriteFile(filepath.Join(res.Worktree, "scratch.txt"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -229,7 +222,7 @@ func TestMergeCrewRefusesADirtyCrewWorktreeNamingTheCount(t *testing.T) {
 }
 
 func TestMergeCrewRefusesABranchWithNoCommits(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	before := headOf(t, w, "main")
 
 	_, err := spawn.MergeCrew(context.Background(), w, deps, "shop", "k3", spawn.CallerUser)
@@ -240,7 +233,7 @@ func TestMergeCrewRefusesABranchWithNoCommits(t *testing.T) {
 }
 
 func TestMergeCrewRefusesADivergedBranchWithNeedsRebase(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	// The default branch moves on: the crew's branch is no longer a
 	// fast-forward. mvp.md's M4 decisions call this needs-rebase and are
@@ -267,7 +260,7 @@ func TestMergeCrewRefusesADivergedBranchWithNeedsRebase(t *testing.T) {
 }
 
 func TestMergeCrewRefusesWhenThePrimaryRepoIsNotOnTheDefaultBranch(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	repo := w.RepoDir("shop")
 	git(t, repo, "checkout", "-q", "-b", "captain-scratch")
@@ -281,7 +274,7 @@ func TestMergeCrewRefusesWhenThePrimaryRepoIsNotOnTheDefaultBranch(t *testing.T)
 }
 
 func TestMergeCrewRefusesADirtyPrimaryRepo(t *testing.T) {
-	w, deps, res := mergeFixture(t, false)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "feature\n")
 	repo := w.RepoDir("shop")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("captain was here\n"), 0o644); err != nil {
@@ -323,7 +316,7 @@ func TestCallerFromEnvDefaultsToTheCaptain(t *testing.T) {
 }
 
 func TestMergeCrewRejectsAStaleIndependentReview(t *testing.T) {
-	w, deps, res := mergeFixture(t, true)
+	w, deps, res := mergeFixture(t)
 	commitInWorktree(t, res.Worktree, "feature.txt", "first\n")
 	before, reviewed := headOf(t, w, "main"), headOf(t, w, res.Branch)
 	commitInWorktree(t, res.Worktree, "feature.txt", "unreviewed\n")

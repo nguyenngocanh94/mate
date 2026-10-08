@@ -469,8 +469,6 @@ func prepareMateDir(w *store.Workspace, deps Deps, project string, cfg store.Pro
 		ProjectName:      project,
 		WorkspaceRoot:    w.Root(),
 		Repos:            repos,
-		Mode:             cfg.Mode,
-		Yolo:             cfg.Yolo,
 		Harness:          string(profile.Kind()),
 		Harnesses:        harnesses,
 		SkillsDir:        profile.Info().SkillsDir,
@@ -594,7 +592,7 @@ func ensureProjectWorkspace(ctx context.Context, deps Deps, session runtime.Sess
 // (harness.Launcher.PaneEnv).
 //
 // MATE_CALLER is how `mate merge` knows a Mate typed it and applies the
-// project's `yolo` rule (docs/mvp.md M4 decisions), and MATE_AGENT_ROLE is
+// rule that a Mate merges only reviewed work (docs/mvp.md M19), and MATE_AGENT_ROLE is
 // how `mate send` records a line as the Mate's. A harness's pane env is
 // pinned whichever harness the Mate runs on, because the Mate's own `mate
 // crew spawn` launches Crews of any of them and this process finds their

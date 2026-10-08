@@ -1,8 +1,8 @@
 {{- /*
 Adapted from firstmate's .agents/skills/ask-user-authority/SKILL.md at
 795e4b58. Deviations, each forced by a mate constraint:
-- firstmate decides no-mistakes "ask-user findings"; mate has no pipeline
-  (local-only, docs/mvp.md decision 2), so the same procedure is applied to
+- firstmate decides no-mistakes "ask-user findings"; mate has no pipeline,
+  so the same procedure is applied to
   what the Mate actually decides: a Crew's needs-decision (resolve:/digest:)
   and the Mate's own review of a wait-mate.
 - "## Captain's intent" / "## Firstmate spec" become the M7 sections
@@ -15,13 +15,12 @@ Adapted from firstmate's .agents/skills/ask-user-authority/SKILL.md at
 */ -}}
 ---
 name: decision-authority
-description: Who decides a Crew's question or a hand-back, you or the captain. Load it before answering a `resolve:` line, before acting on a `needs-decision` or `wait-mate` item of a `digest:` line, and before accepting or correcting any Crew's `wait-mate`. It decides by the brief's accepted contract, never by the Crew's wording or the project's `yolo` flag.
+description: Who decides a Crew's question or a hand-back, you or the captain. Load it before answering a `resolve:` line, before acting on a `needs-decision` or `wait-mate` item of a `digest:` line, and before accepting or correcting any Crew's `wait-mate`. It decides by the brief's accepted contract, never by the Crew's wording.
 ---
 
 # decision-authority
 
 This skill is the single owner of the decision policy for a Crew's question (`needs-decision`) and for what you find when you review a Crew's hand-back (`wait-mate`).
-Decision authority is determined by the criteria below, not by `yolo`: `yolo` only lets you merge.
 You always apply this judgment, decide what is unambiguous toward the accepted contract, and escalate only what is genuinely ambiguous, expanding, or destructive.
 
 The Crew never decides a choice that belongs above it.

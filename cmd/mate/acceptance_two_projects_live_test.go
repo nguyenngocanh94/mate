@@ -56,11 +56,13 @@ const (
 // captain hands the question to the Mate with `[assign]`, the Mate escalates
 // it (the checkout page is the captain's choice), the captain answers in the
 // Mate's pane, the Mate relays it to the Crew, the Crew hands back, the Mate reports the branch ready and does
-// not land it, and the captain merges from the Console. Then a scout task,
+// not land it - the captain's standing word in its memory is that they merge
+// shop's work themselves - and the captain merges from the Console. Then a scout task,
 // which ends in a report the Mate summarises and the captain tells it to
 // close.
 //
-// `blog` runs in auto mode with `yolo` on. The captain types one ship
+// `blog` runs in auto mode, where the Mate lands reviewed work itself
+// (docs/mvp.md M19). The captain types one ship
 // request that needs no decision and then touches nothing: the daemon
 // delivers what is new, the Mate reviews and lands the branch itself, and
 // the only `Source: user` line in that project's whole log is the request.
@@ -112,14 +114,13 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	if err := w.AddProject("blog", store.ProjectConfig{Repos: []store.RepoConfig{{Path: blog, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject blog: %v", err)
 	}
-	// `mate project yolo blog on`, through the command itself: the flag
-	// is read out of project.yaml when the Mate's manual is rendered, so it
-	// has to be on before that Mate starts.
-	if err := run([]string{"project", "yolo", "blog", "on", "--workspace", root}, os.Stdout, os.Stderr); err != nil {
-		t.Fatalf("project yolo blog on: %v", err)
+	// shop's captain merges shop's work themselves: a standing word in the
+	// Mate's memory, which recall hands it before its first turn.
+	if err := run([]string{"remember", "shop", "--captain", "--source", "captain", "I merge shop's work myself from the console; report it ready and leave it unmerged.", "--workspace", root}, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("remember shop --captain: %v", err)
 	}
 	if w, err = store.Open(root); err != nil {
-		t.Fatalf("store.Open after yolo: %v", err)
+		t.Fatalf("store.Open after remember: %v", err)
 	}
 
 	shopBefore := strings.TrimSpace(gitOut(t, shop, "rev-parse", "main"))
@@ -215,7 +216,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 		dumpProject(t, w, "blog")
 	})
 
-	// ---------- blog: auto mode, yolo on ----------
+	// ---------- blog: auto mode, the Mate lands it ----------
 	//
 	// The blog request is typed first and then left entirely alone, so the
 	// project runs beside the shop half on the console's own clock rather
@@ -327,14 +328,14 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	})
 	t.Logf("shop/%s handed back: %s", ship, handback.Text)
 
-	// The Mate reports and does not land it: yolo is off for shop.
+	// The Mate reports and does not land it: the captain merges shop's work.
 	report := waitForSentAfter(t, ctx, w, "shop", beforeHandback, 6*time.Minute, func(e store.SentEntry) bool {
 		return e.Source == store.SourceMate && e.Target == store.SourceUser &&
 			(strings.Contains(e.Text, shipBranch) || strings.Contains(strings.ToLower(e.Text), "ready"))
 	})
 	t.Logf("shop Mate → captain: %s", report.Text)
 	if now := strings.TrimSpace(gitOut(t, shop, "rev-parse", "main")); now != shopBefore {
-		t.Fatalf("shop's main moved to %s before the captain merged; the Mate landed a branch with yolo off", now)
+		t.Fatalf("shop's main moved to %s before the captain merged; the Mate landed a branch the captain merges", now)
 	}
 	if meta, metaErr := w.ReadCrewMeta("shop", ship); metaErr != nil {
 		t.Fatalf("ReadCrewMeta: %v", metaErr)
@@ -415,7 +416,7 @@ func TestLiveAcceptanceTwoProjects(t *testing.T) {
 	waitForCrewState(t, ctx, w, "blog", blogCrew, spawn.CrewStateFinished, 8*time.Minute, blogPane)
 	blogAfter := strings.TrimSpace(gitOut(t, blog, "rev-parse", "main"))
 	if blogAfter == blogBefore {
-		t.Fatalf("blog's main is still %s; nothing was landed under yolo", blogBefore)
+		t.Fatalf("blog's main is still %s; nothing was landed by the Mate", blogBefore)
 	}
 	t.Logf("blog commits landed on main:\n%s", gitOut(t, blog, "log", "--format=%h %s", blogBefore+"..main"))
 	blogReadme := gitOut(t, blog, "show", "main:README.md")

@@ -41,7 +41,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	fs := flag.NewFlagSet("crew spawn", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness `+harnessChoices(harness.RoleCrew, "|")+`] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]`)
+		fmt.Fprintln(stderr, `usage: mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--deliver local|pr] [--workspace <dir>] [--harness `+harnessChoices(harness.RoleCrew, "|")+`] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]`)
 	}
 	workspaceFlag := fs.String("workspace", "", "workspace directory")
 	scoutFlag := fs.Bool("scout", false, "a scout: the brief has ## Deliverable and the crew writes a report instead of committing")
@@ -50,6 +50,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 	effortFlag := fs.String("effort", "", "reasoning effort: low, medium, high, xhigh or max (default: the harness's own)")
 	briefFlag := fs.String("brief", "", "file holding the task text, or - to read it from stdin")
 	repoFlag := fs.String("repo", "", "the project repo the crew works in (required when the project has several)")
+	deliverFlag := fs.String("deliver", "", "how a ship's work lands: local (fast-forward on the primary checkout, the default) or pr (push the branch and open a pull request; needs gh logged in and origin on GitHub)")
 	taskFlag := fs.String("task", "", "one line recorded as task= (default: the brief's first line)")
 	if err := fs.Parse(reorderArgs(fs, args)); err != nil {
 		return &usageError{err}
@@ -62,7 +63,7 @@ func cmdCrewSpawn(args []string, stdin io.Reader, stdout, stderr io.Writer) erro
 		fs.Usage()
 		return newUsageError("mate crew spawn: --brief is required")
 	}
-	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag, Scout: *scoutFlag, Repo: *repoFlag}
+	req := spawn.SpawnCrewRequest{Project: fs.Arg(0), Crew: fs.Arg(1), Task: *taskFlag, Scout: *scoutFlag, Repo: *repoFlag, Delivery: *deliverFlag}
 	if *briefFlag == "-" {
 		text, err := spawn.ReadBriefStdin(stdin)
 		if err != nil {
@@ -136,8 +137,8 @@ func writeCrewSpawnReport(stdout, stderr io.Writer, w *store.Workspace, res spaw
 	if res.EffortOmitted {
 		fmt.Fprintf(stderr, "note: %s does not take effort %s; it was recorded and left out of the launch\n", res.Harness, res.Effort)
 	}
-	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s%s, repo %s, branch %s, worktree %s)\n",
-		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, profileNote(res), res.Repo, res.Branch, res.Worktree)
+	fmt.Fprintf(stdout, "spawned %s/%s: agent %s in pane %s (harness %s%s, repo %s, branch %s%s, worktree %s)\n",
+		res.Project, res.Crew, res.Agent, res.Pane, res.Harness, profileNote(res), res.Repo, res.Branch, deliveryNote(res.Delivery), res.Worktree)
 	fmt.Fprintf(stdout, "brief %s\nstatus %s\n", res.BriefPath, res.StatusPath)
 	printTurnEnd(stdout, turnSpawnLine(res.Crew))
 }
@@ -362,6 +363,15 @@ func crewStopReport(project, crew string, res spawn.StopResult) string {
 }
 
 // profileNote is ", model m, effort e" for the axes a spawn set.
+// deliveryNote names a pull request delivery in the spawn line; the local
+// one is the default and goes unsaid.
+func deliveryNote(delivery string) string {
+	if delivery == crewstate.DeliveryPR {
+		return ", delivers a pull request"
+	}
+	return ""
+}
+
 func profileNote(res spawn.CrewResult) string {
 	out := ""
 	if res.Model != "" {

@@ -19,8 +19,9 @@ Spawn one Crew per task, and one Crew per repo:
 ```
 
 The first form spawns a ship; the second, with `--scout`, a scout, whose brief must carry a `## Deliverable` (section 4).
+A ship lands locally unless you add `--deliver pr`, which has it push its branch and open a pull request (`task-intake` says when).
 `--repo <repo>` names the one repo the Crew works in, from section 1's list or `mate project repo list {{.ProjectName}}`: required when the project has two or more repos, and optional with one, where it defaults to that one; pass it anyway, so the record says which.
-With no repo at all there is nothing to spawn into: tell the captain, ask them to add the repo (section 1), and keep the task under Queued in `{{.BacklogFile}}` until they have.
+With no repo at all there is nothing to spawn into: add the repo yourself when the captain named it (section 1); otherwise ask which repo it is, in one sentence, and keep the task under Queued in `{{.BacklogFile}}` until you know.
 A request split across repos (section 5) is one spawn per repo, each with its own id, brief and `--repo`.
 When one depends on the other, spawn the one it depends on and queue the other with `blocked-by: <id>` until that branch has landed; otherwise spawn both in the same turn.
 

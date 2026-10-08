@@ -116,7 +116,7 @@ func isDir(path string) bool {
 // cmdProject dispatches `mate project <add|list|remove>`.
 func cmdProject(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return newUsageError("usage: mate project <add|list|remove|repo|yolo|mode|facts> ...")
+		return newUsageError("usage: mate project <add|list|remove|repo|facts> ...")
 	}
 	switch args[0] {
 	case "facts":
@@ -129,10 +129,10 @@ func cmdProject(args []string, stdout, stderr io.Writer) error {
 		return cmdProjectRemove(args[1:], stdout, stderr)
 	case "repo":
 		return cmdProjectRepo(args[1:], stdout, stderr)
-	case "yolo":
-		return cmdProjectYolo(args[1:], stdout, stderr)
-	case "mode":
-		return cmdProjectMode(args[1:], stdout, stderr)
+	case "yolo", "mode":
+		// Removed by docs/mvp.md M19; a Mate still quoting an old manual is
+		// told what replaced them rather than "unknown subcommand".
+		return newUsageErrorf("mate project %s was removed: the Mate picks each crew's delivery with `mate crew spawn --deliver local|pr` and merges reviewed work with `mate merge <project> <crew> --review <reviewer>`", args[0])
 	default:
 		return newUsageErrorf("unknown project subcommand %q", args[0])
 	}

@@ -58,7 +58,7 @@ func TestCmdProjectAddListRemove(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("want header + 2 rows, got %d lines: %q", len(lines), text)
 	}
-	if !strings.HasPrefix(lines[0], "NAME") || !strings.Contains(lines[0], "REPOS") || !strings.Contains(lines[0], "MODE") || !strings.Contains(lines[0], "YOLO") {
+	if !strings.HasPrefix(lines[0], "NAME") || !strings.Contains(lines[0], "REPOS") {
 		t.Fatalf("header row = %q", lines[0])
 	}
 	if !strings.Contains(text, "shop") || !strings.Contains(text, "blog") {
@@ -78,9 +78,6 @@ func TestCmdProjectAddListRemove(t *testing.T) {
 		t.Fatalf("want 2 rows, got %d: %+v", len(rows), rows)
 	}
 	for _, r := range rows {
-		if r.Mode != store.ModeLocalOnly {
-			t.Fatalf("mode = %q, want %q", r.Mode, store.ModeLocalOnly)
-		}
 		if len(r.Repos) != 1 || r.Repos[0].Name != r.Name || r.Repos[0].DefaultBranch != "main" {
 			t.Fatalf("repos = %+v, want one repo named %s on main", r.Repos, r.Name)
 		}
@@ -128,7 +125,7 @@ func TestCmdProjectAddFlagsAfterPositionalArgs(t *testing.T) {
 	// The Go flag package normally stops parsing at the first positional
 	// argument; --workspace here comes after <name> <repo-path>, which must
 	// still be honoured.
-	if err := cmdProjectAdd([]string{"shop", repo, "--workspace", ws, "--yolo"}, &out, &errw); err != nil {
+	if err := cmdProjectAdd([]string{"shop", repo, "--workspace", ws, "--budget-usd", "5"}, &out, &errw); err != nil {
 		t.Fatalf("add with trailing flags: %v", err)
 	}
 
@@ -140,8 +137,8 @@ func TestCmdProjectAddFlagsAfterPositionalArgs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject: %v", err)
 	}
-	if !cfg.Yolo {
-		t.Fatal("--yolo after positional args was not applied")
+	if cfg.Budget == nil || cfg.Budget.ProjectUSD != 5 {
+		t.Fatalf("--budget-usd after positional args was not applied: %+v", cfg.Budget)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/brief"
 	"github.com/nguyenngocanh94/mate/internal/config"
 	"github.com/nguyenngocanh94/mate/internal/crewstate"
+	"github.com/nguyenngocanh94/mate/internal/github"
 	"github.com/nguyenngocanh94/mate/internal/gitx"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/mateassets"
@@ -47,6 +48,8 @@ const (
 	// MetaKind is the task's shape, "ship" or "scout" (brief.Kind). A crew
 	// spawned before it was recorded has none; CrewIsScout reads its brief.
 	MetaKind = "kind"
+	// MetaDelivery is crewstate.MetaDelivery: `local` or `pr`.
+	MetaDelivery = crewstate.MetaDelivery
 	// MetaState is the crew's declared state (mvp.md section 4b). Only the
 	// app writes it, and only three values ever land in it: `spawned` at
 	// spawn, `finished` or `failed` at `crew stop`, and `failed` when a
@@ -111,6 +114,11 @@ type SpawnCrewRequest struct {
 	// Repo names the project repo the crew works in (`--repo`). Empty means
 	// the project's one repo; a project with several must be told which.
 	Repo string
+	// Delivery is how a ship's work lands, the Mate's choice for this crew
+	// (docs/mvp.md M19, `--deliver`): crewstate.DeliveryLocal (empty means
+	// it) or crewstate.DeliveryPR. A scout delivers a report and takes only
+	// local.
+	Delivery string
 }
 
 // CrewResult is what a successful spawn established. Every field except the
@@ -134,6 +142,8 @@ type CrewResult struct {
 	// Repo is the name of the project repo the crew works in.
 	Repo   string
 	Branch string
+	// Delivery is crewstate.DeliveryLocal or crewstate.DeliveryPR.
+	Delivery string
 	// Worktree and BriefPath are absolute; the meta records the worktree
 	// relative to the workspace root.
 	Worktree   string
@@ -211,6 +221,10 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	if err != nil {
 		return CrewResult{}, err
 	}
+	delivery, err := spawnDelivery(req)
+	if err != nil {
+		return CrewResult{}, err
+	}
 	harnessKind := req.Harness
 	if harnessKind == "" {
 		if harnessKind, err = deps.defaultHarness(w.Defaults().CrewHarness, harness.RoleCrew); err != nil {
@@ -252,6 +266,14 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	task := oneLineTask(req.Task, briefText)
 
 	repo := w.RepoDir(repoCfg.Path)
+	// A pull request needs gh and a GitHub origin for this one repo; checked
+	// before anything exists, so a refusal leaves no trace.
+	if delivery == crewstate.DeliveryPR {
+		if err := github.CheckRepos(ctx, deps.GitHub, deps.git(), []github.Repo{{Name: repoCfg.Name, Path: repo}}); err != nil {
+			return CrewResult{}, observability.WrapError(observability.CodeUsage,
+				"crew spawn refused --deliver pr, nothing was created", err)
+		}
+	}
 	branch := CrewBranchPrefix + crew
 	worktree := w.WorktreeDir(project, crew)
 	lease := WorktreeLease{Repo: repo, Path: worktree, Branch: branch, Base: repoCfg.DefaultBranch}
@@ -280,7 +302,7 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 		branch:           branch,
 		worktree:         worktree,
 		repoCfg:          repoCfg,
-		github:           cfg.Mode == store.ModeGitHub,
+		delivery:         delivery,
 	})
 	if err != nil {
 		saga.compensate(ctx)
@@ -289,6 +311,22 @@ func SpawnCrew(ctx context.Context, w *store.Workspace, deps Deps, req SpawnCrew
 	}
 	result.StaleMeta = staleMeta
 	return result, nil
+}
+
+// spawnDelivery is the request's delivery, defaulted and checked: a scout
+// only delivers its report, so a pull request is a ship's alone.
+func spawnDelivery(req SpawnCrewRequest) (string, error) {
+	switch req.Delivery {
+	case "", crewstate.DeliveryLocal:
+		return crewstate.DeliveryLocal, nil
+	case crewstate.DeliveryPR:
+		if req.Scout {
+			return "", errUsage("crew spawn: a scout delivers a report and pushes nothing; --deliver pr is for a ship")
+		}
+		return crewstate.DeliveryPR, nil
+	default:
+		return "", errUsage(fmt.Sprintf("crew spawn: --deliver wants %s or %s, got %q", crewstate.DeliveryLocal, crewstate.DeliveryPR, req.Delivery))
+	}
 }
 
 // recordFailedSpawn writes `state=failed` over whatever the crew record is,
@@ -356,8 +394,9 @@ type crewPlan struct {
 	branch           string
 	worktree         string
 	repoCfg          store.RepoConfig
-	// github is the project's delivery mode being `github`.
-	github bool
+	// delivery is the Mate's choice for this crew, crewstate.DeliveryLocal
+	// or crewstate.DeliveryPR.
+	delivery string
 	// resumeID is the harness session a relaunch resumes; empty is a fresh
 	// session.
 	resumeID string
@@ -475,6 +514,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		MetaWorktree:   filepath.ToSlash(relWorktree),
 		MetaBranch:     plan.branch,
 		MetaKind:       planKind(plan).String(),
+		MetaDelivery:   plan.delivery,
 		store.MetaRepo: plan.repoCfg.Name,
 		MetaSessionID:  sessionID,
 		MetaTranscript: "",
@@ -510,6 +550,7 @@ func spawnInWorktree(ctx context.Context, w *store.Workspace, deps Deps, saga *c
 		SessionID:       sessionID,
 		Repo:            plan.repoCfg.Name,
 		Branch:          plan.branch,
+		Delivery:        plan.delivery,
 		Worktree:        plan.worktree,
 		BriefPath:       briefPath,
 		StatusPath:      statusPath,
@@ -738,7 +779,7 @@ func renderCrewBrief(w *store.Workspace, deps Deps, plan crewPlan) ([]byte, erro
 		return nil, err
 	}
 	return mateassets.RenderBrief(mateassets.BriefParams{
-		GitHub:             plan.github,
+		PR:                 plan.delivery == crewstate.DeliveryPR,
 		MateBin:            binary,
 		Project:            plan.project,
 		Crew:               plan.crew,

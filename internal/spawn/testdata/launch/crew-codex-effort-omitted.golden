@@ -87,9 +87,10 @@ MATE_CALLER=crew
 
 == files the launch created or changed ==
 
---- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta mode=-rw-r--r-- bytes=298 ---
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3.meta mode=-rw-r--r-- bytes=313 ---
 agent=crew-k3
 branch=mate/k3
+delivery=local
 effort=max
 harness=codex
 kind=ship
@@ -111,8 +112,8 @@ worktree=.worktrees/shop-k3
 (empty)
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3.status ---
 
---- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7634 ---
-(rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
+--- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md mode=-rw-r--r-- bytes=7631 ---
+(rendered asset) sha256=505770feff408f56e5e65ed30a966e9e28210c19c1a92765f3fa7c1425dabd55
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/brief.md ---
 
 --- created {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json mode=-rw------- bytes=2357 ---
@@ -191,17 +192,17 @@ worktree=.worktrees/shop-k3
     {
       "path": "embedded:crew/brief.md.tmpl",
       "role": "crew_prompt_template",
-      "sha256": "4023dd889036197525b999fbb5bbd57d9ae797dc5a918cc06d212df0abe09e39",
-      "bytes": 11740,
+      "sha256": "1b10a9c702bc91e12723188c1d6b2b11d12d1ae15f9629721a9771e29c96af88",
+      "bytes": 11559,
       "state": "configured"
     }
   ],
-  "fingerprint": "1209769aefbc51968891e5a2dbea292fb6236223133af139650e7dd695088fd4"
+  "fingerprint": "3338a43a1fc1a1b42746150b1e85a4bc8264c463e35ca6db89d12ac600072189"
 }
 --- end {{WORKSPACE}}/.mate/projects/shop/crews/k3/harness-profile.json ---
 
---- created {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md mode=-rw-r--r-- bytes=7634 ---
-(rendered asset) sha256=2690efe120e3d0388a217ad4d149dcc9af605e13c1f47cc10caf767dfb4c46fe
+--- created {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md mode=-rw-r--r-- bytes=7631 ---
+(rendered asset) sha256=505770feff408f56e5e65ed30a966e9e28210c19c1a92765f3fa7c1425dabd55
 --- end {{WORKSPACE}}/.worktrees/shop-k3/AGENTS.override.md ---
 
 --- created {{WORKSPACE}}/.worktrees/shop-k3/README.md mode=-rw-r--r-- bytes=5 ---

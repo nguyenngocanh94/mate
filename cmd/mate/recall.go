@@ -230,11 +230,7 @@ func recallLive(w *store.Workspace, project string, cfg store.ProjectConfig, now
 	if w.Auto(project) {
 		mode = "auto"
 	}
-	yolo := "off"
-	if cfg.Yolo {
-		yolo = "on"
-	}
-	fmt.Fprintf(&b, "mode: %s · yolo %s\n", mode, yolo)
+	fmt.Fprintf(&b, "mode: %s\n", mode)
 
 	fmt.Fprintf(&b, "crews (mate backlog %s):\n", project)
 	if err := printBacklog(w, project, false, now, &b); err != nil {

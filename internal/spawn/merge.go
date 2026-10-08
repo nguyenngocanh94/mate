@@ -21,7 +21,7 @@ import (
 //
 // The default is deliberately the captain: an environment mate did not
 // create is somebody typing, and the rule the variable exists for - a Mate
-// may not merge while `yolo` is off - must never be skipped because a
+// may not merge unreviewed work - must never be skipped because a
 // variable was missing. Missing means "not a Mate", and a Mate always has
 // the variable because spawn put it there.
 const (
@@ -75,7 +75,7 @@ type MergeResult struct {
 	Merged bool
 	// Stop is the teardown StopCrew performed. Its State is `finished`.
 	Stop StopResult
-	// PullRequest is the pull request merged on GitHub (the github mode),
+	// PullRequest is the pull request merged on GitHub (a pull request crew),
 	// and Sync what happened to the primary checkout afterwards.
 	PullRequest string
 	Sync        string
@@ -121,7 +121,8 @@ func mergeRefusal(code observability.Code, msg string) error {
 //
 //  1. the crew is unknown, or already closed (`finished`/`failed`);
 //  2. a Crew is typing - a crew never merges its own branch;
-//  3. a Mate is typing and the project's `yolo` is off - the captain merges;
+//  3. a Mate is typing without a reviewed commit - the Mate merges only what
+//     an independent review passed (`--review`, docs/mvp.md M19);
 //  4. the crew's worktree is dirty - uncommitted work is not in the branch,
 //     and merging would land a different change than the one reviewed;
 //  5. the branch carries no commit the default branch does not have;
@@ -184,16 +185,16 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	}
 	out.DefaultBranch = repoCfg.DefaultBranch
 
-	// 2 & 3. Who is typing. A crew is refused outright; a Mate is refused
-	// while `yolo` is off, in the wording the manual quotes back.
+	// 2 & 3. Who is typing. A crew is refused outright; a Mate merges only
+	// a revision an independent review passed. The captain is never gated.
 	switch NormaliseCaller(caller) {
 	case CallerCrew:
 		return MergeResult{}, mergeRefusal(observability.CodePermission,
-			"a crew cannot merge its own branch; the captain merges, or the Mate does when yolo is on")
+			"a crew cannot merge its own branch; the Mate merges it after an independent review passes, or the captain does")
 	case CallerMate:
-		if !cfg.Yolo {
+		if len(reviewed) == 0 {
 			return MergeResult{}, mergeRefusal(observability.CodePermission,
-				fmt.Sprintf("yolo is off for %s; the captain merges", project))
+				fmt.Sprintf("the Mate merges only reviewed work; run `mate review %s %s <reviewer>`, and once it passes `mate merge %s %s --review <reviewer>`", project, crew, project, crew))
 		}
 	}
 
@@ -217,9 +218,9 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 		}
 	}
 
-	// In the github mode the branch is landed by merging its pull request on
-	// GitHub, under the same caller rules as above (docs/mvp.md M18).
-	if cfg.Mode == store.ModeGitHub {
+	// A crew that delivers through a pull request is landed by merging it
+	// on GitHub, under the same caller rules as above (docs/mvp.md M18, M19).
+	if meta[MetaDelivery] == crewstate.DeliveryPR || strings.TrimSpace(meta[crewstate.MetaPRURL]) != "" {
 		return mergePullRequest(ctx, w, deps, repoCfg, repo, out, meta, reviewed)
 	}
 
@@ -319,9 +320,10 @@ func MergeCrew(ctx context.Context, w *store.Workspace, deps Deps, project, crew
 	return out, nil
 }
 
-// mergePullRequest is MergeCrew in the github mode: `gh pr merge` instead of
-// a fast-forward, then the same teardown. The caller rules were applied
-// before it is reached, so a crew and a Mate under yolo off never get here.
+// mergePullRequest is MergeCrew for a crew that delivers through a pull
+// request: `gh pr merge` instead of a fast-forward, then the same teardown.
+// The caller rules were applied before it is reached, so a crew and an
+// unreviewed Mate merge never get here.
 //
 // Every refusal below changes nothing either: the crew has no pull request
 // recorded, it is not open any more, or the reviewed commit is no longer the

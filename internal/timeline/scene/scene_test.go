@@ -338,7 +338,7 @@ var cases = []sceneCase{
 		},
 	},
 	{
-		name: "the Mate reviews when it reads a crew's diff, and lands the work itself under yolo",
+		name: "the Mate reviews when it reads a crew's diff, and lands the work itself after a review",
 		build: func(s *script) {
 			s.add(0, KindMateStarted, mateID, "", "harness", "claude")
 			s.add(1, KindTurnStarted, mateID, "")

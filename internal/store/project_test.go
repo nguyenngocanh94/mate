@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/store"
@@ -33,7 +34,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 		t.Fatalf("LoadProject: %v", err)
 	}
 	want := []store.RepoConfig{{Name: "shop", Path: "shop", DefaultBranch: store.DefaultBranch}}
-	if !reflect.DeepEqual(cfg.Repos, want) || cfg.Mode != store.ModeLocalOnly || cfg.Yolo {
+	if !reflect.DeepEqual(cfg.Repos, want) {
 		t.Fatalf("defaults not applied: %+v", cfg)
 	}
 
@@ -43,7 +44,6 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 		}
 	}
 
-	cfg.Yolo = true
 	cfg.Repos[0].DefaultBranch = "trunk"
 	if err := w.SaveProject("shop", cfg); err != nil {
 		t.Fatalf("SaveProject: %v", err)
@@ -52,7 +52,7 @@ func TestStoreProjectAddLoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProject after save: %v", err)
 	}
-	if !reloaded.Yolo || reloaded.Repos[0].DefaultBranch != "trunk" {
+	if reloaded.Repos[0].DefaultBranch != "trunk" {
 		t.Fatalf("round trip lost fields: %+v", reloaded)
 	}
 
@@ -157,7 +157,6 @@ func TestStoreAddProjectRejectsBadConfig(t *testing.T) {
 		{"repo escaping with ..", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "../elsewhere"}}}},
 		{"repo is the root", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "."}}}},
 		{"repo inside state dir", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: ".mate/projects"}}}},
-		{"unsupported mode", "shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}, Mode: "remote"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -229,21 +228,27 @@ func TestStoreAutoFlag(t *testing.T) {
 	}
 }
 
-// The github mode (docs/mvp.md M18) is the second delivery mode, and it
-// survives a save and a load.
-func TestProjectModeGitHubRoundTrips(t *testing.T) {
+// M19 removed the project's `mode` and `yolo`: a project.yaml that still
+// carries them loads, and the next save drops them.
+func TestProjectDropsRemovedModeAndYolo(t *testing.T) {
 	w := newWorkspace(t)
-	cfg := store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}
-	if err := w.AddProject("shop", cfg); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop"}}}); err != nil {
 		t.Fatal(err)
 	}
-	cfg.Mode = store.ModeGitHub
-	if err := w.SaveProject("shop", cfg); err != nil {
-		t.Fatalf("SaveProject github: %v", err)
+	old := "repos:\n    - name: shop\n      path: shop\n      default_branch: main\nmode: github\nyolo: true\n"
+	if err := os.WriteFile(w.ProjectFile("shop"), []byte(old), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	got, err := w.LoadProject("shop")
-	if err != nil || got.Mode != store.ModeGitHub {
-		t.Fatalf("LoadProject = %+v, %v; want mode github", got, err)
+	cfg, err := w.LoadProject("shop")
+	if err != nil || len(cfg.Repos) != 1 {
+		t.Fatalf("LoadProject = %+v, %v; want the one repo", cfg, err)
+	}
+	if err := w.SaveProject("shop", cfg); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := os.ReadFile(w.ProjectFile("shop"))
+	if strings.Contains(string(saved), "mode:") || strings.Contains(string(saved), "yolo:") {
+		t.Fatalf("saved project.yaml kept a removed field:\n%s", saved)
 	}
 }
 

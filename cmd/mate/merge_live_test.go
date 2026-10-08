@@ -28,7 +28,7 @@ import (
 // mergeLiveWorkspace is the fixture both tests start from: a lab-session
 // workspace with one real git project on `main`, carrying one commit so a
 // branch can be taken from it.
-func mergeLiveWorkspace(t *testing.T, session string, yolo bool) *store.Workspace {
+func mergeLiveWorkspace(t *testing.T, session string) *store.Workspace {
 	t.Helper()
 	root := t.TempDir()
 	w, err := store.Init(root, workspaceDefaults())
@@ -49,7 +49,7 @@ func mergeLiveWorkspace(t *testing.T, session string, yolo bool) *store.Workspac
 	}
 	runGitOrFatal(t, repo, "add", "README.md")
 	runGitOrFatal(t, repo, "commit", "-m", "readme")
-	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}, Yolo: yolo}); err != nil {
+	if err := w.AddProject("shop", store.ProjectConfig{Repos: []store.RepoConfig{{Path: repo, DefaultBranch: "main"}}}); err != nil {
 		t.Fatalf("AddProject: %v", err)
 	}
 	return w
@@ -175,7 +175,7 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 	requireConsoleLive(t)
 	session, configHome := consoleLiveLab(t)
 
-	w := mergeLiveWorkspace(t, session, false)
+	w := mergeLiveWorkspace(t, session)
 	deps, rt := mergeLiveDeps(t, session, configHome)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
@@ -239,22 +239,23 @@ func TestLiveMergeFromConsoleFinishesTheCrew(t *testing.T) {
 	assertMergedAndFinished(t, w, "shop", "k3", crewRes.Branch, crewRes.Worktree)
 }
 
-// TestLiveMateMergesUnderYolo is the Mate's half: on a project with `yolo`
-// on and auto mode on, a real Claude Mate receives the daemon's digest of a
-// crew's `wait-mate`, reviews it, and lands the branch itself with
-// `mate merge` - which closes the crew as part of the merge.
+// TestLiveMateMergesReviewedWork is the Mate's half: with auto mode on, a
+// real Claude Mate receives the daemon's digest of a crew's `wait-mate`,
+// has it reviewed independently, and lands the branch itself with
+// `mate merge --review` - which closes the crew as part of the merge
+// (docs/mvp.md M19: no `yolo`, the review is the gate).
 //
 // The wiring is task 19/20's (consolePilot's daemon over the real Herdr
 // adapter). Nothing in this test merges anything: the only way `main` can
 // carry the crew's commit at the end is that the Mate ran the command.
-func TestLiveMateMergesUnderYolo(t *testing.T) {
+func TestLiveMateMergesReviewedWork(t *testing.T) {
 	requireConsoleLive(t)
 	session, configHome := consoleLiveLab(t)
 
-	w := mergeLiveWorkspace(t, session, true)
+	w := mergeLiveWorkspace(t, session)
 	deps, rt := mergeLiveDeps(t, session, configHome)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	t.Cleanup(func() {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -269,15 +270,13 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 	}
 	t.Logf("Mate %s is running on %s in pane %s", mateRes.Agent, mateRes.Harness, mateRes.Pane)
 
-	// The manual the Mate just read must carry the yolo value this project
-	// actually has: it is rendered at start, which is why `project yolo`
-	// tells a reader a running Mate learns it at the next restart.
+	// The manual the Mate just read must let it land reviewed work itself.
 	manual, err := os.ReadFile(filepath.Join(w.MateDir("shop"), "AGENTS.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(manual), "`yolo` flag is currently `true`") {
-		t.Fatal("the rendered manual does not tell the Mate that yolo is on")
+	if !strings.Contains(string(manual), "--review") {
+		t.Fatal("the rendered manual does not tell the Mate to merge with --review")
 	}
 
 	if err := w.SetAuto("shop", true); err != nil {
@@ -323,7 +322,7 @@ func TestLiveMateMergesUnderYolo(t *testing.T) {
 		}
 		return screen
 	}
-	waitForCrewState(t, ctx, w, "shop", "k3", spawn.CrewStateFinished, 5*time.Minute, mateTail)
+	waitForCrewState(t, ctx, w, "shop", "k3", spawn.CrewStateFinished, 10*time.Minute, mateTail)
 
 	assertMergedAndFinished(t, w, "shop", "k3", crewRes.Branch, crewRes.Worktree)
 

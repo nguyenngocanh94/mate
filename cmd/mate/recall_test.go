@@ -127,7 +127,7 @@ func TestRecallPrintsSection12Point5InOrder(t *testing.T) {
 	}
 	mustOrder(t, out,
 		// 1: mode, the backlog table, inbox, outbox.
-		"mode: manual · yolo off", "crews (mate backlog shop):", "ID  STATE", "k1  spawned", "5 open, 1 closed",
+		"mode: manual\n", "crews (mate backlog shop):", "ID  STATE", "k1  spawned", "5 open, 1 closed",
 		"inbox: 3 unresolved", `stuck, quiet too long: "no status for 15m"`, `k3 needs an answer: "choose red or blue for the button" (crews/k3.status)`, `k4 wait-mate: "ready in branch mate/k4" (crews/k4.status)`,
 		"outbox: nothing queued",
 		// 2: facts with head.

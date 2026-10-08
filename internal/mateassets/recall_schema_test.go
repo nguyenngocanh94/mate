@@ -8,7 +8,8 @@ import (
 
 // TestManualBootstrapIsRecall holds section 3 to task 37: a session start
 // is the `mate recall` digest, not a list of files to read one by one,
-// and the M7 onboarding-scout rule and the after-compaction rule stay in it.
+// and the M7 onboarding-scout rule (dispatched by the Mate since M19) and
+// the after-compaction rule stay in it.
 func TestManualBootstrapIsRecall(t *testing.T) {
 	p := fixedParams()
 	sec := section(t, renderedManual(t), "## 3. Bootstrap checklist")
@@ -18,7 +19,7 @@ func TestManualBootstrapIsRecall(t *testing.T) {
 		"`# mate recall shop`",
 		"`recall cut to fit`",
 		"`ABSENT`",
-		"propose a short onboarding scout",
+		"Dispatch a short onboarding scout",
 		"If you cannot name every In flight crew and every Held question from your context, run `" + p.MatevBin + " recall shop` before you act on anything.",
 		"`⟦mate⟧ stow:`",
 	} {

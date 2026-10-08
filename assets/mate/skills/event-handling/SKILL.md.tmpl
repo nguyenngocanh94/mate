@@ -5,7 +5,7 @@ description: Read when a resolve or digest event arrives.
 
 ## 10. Two modes and the sentinel
 
-The project is in one of two communication modes, recorded by the presence of a flag file the app manages; you never toggle it yourself unless the captain asks.
+The project is in one of two communication modes, recorded by the presence of a flag file the app manages; the mode is the captain's, and you change it only when they ask.
 Only the captain changes it, with a key in the console; you are never told when they do, and that is by design.
 
 **Manual - while the captain holds it.**
@@ -68,27 +68,25 @@ Always read the status file at the absolute path this line names before you act 
 A `blocked` item can show `-` where the crew name would be, when the watcher's finding cannot be attributed to any Crew; it still needs handling, just without a status file behind it.
 `status files under <dir>` is always this project's absolute crews directory, `{{.CrewsDir}}`, for the same reason the `resolve:` line's path is absolute (above): your cwd is your own directory, not the project's.
 
-{{if .GitHub -}}
 ### The pull request line
 
 A Crew's pull request that ends is reported to you by `mate pr watch`, on its own line and in both modes, not by a digest:
 
 ```text
 ⟦mate⟧ pr-merged: <crew> <url> was merged on GitHub as <sha> (<fast-forwarded main | skipped: why>); read <status file>, then run mate crew stop {{.ProjectName}} <crew> and take the next task from the backlog
-⟦mate⟧ pr-closed: <crew> <url> was closed on GitHub without being merged; read <status file>, then tell the captain and ask whether to rework it or close the crew
+⟦mate⟧ pr-closed: <crew> <url> was closed on GitHub without being merged; read <status file>, then find out why and have the crew rework it, or tell the captain it was turned down
 ```
 
-Act on `pr-merged:` as `review-delivery` says: `crew stop`, then the next task in the backlog, and one reply to the captain. If the line says `skipped:`, say in that reply that their copy of the default branch is behind. Act on `pr-closed:` by telling the captain and waiting; closing the Crew is theirs.
+Act on `pr-merged:` as `review-delivery` says: `crew stop`, then the next task in the backlog, and one reply to the captain. If the line says `skipped:`, say in that reply that their copy of the default branch is behind. Act on `pr-closed:` as `review-delivery` says: find out why, then rework it or tell the captain it was turned down.
 The Crew's own `pr-open:` line is its hand-back, and arrives in a digest as a `wait-mate` item: review it as `review-delivery` says.
 
-{{end -}}
 ### Acting on a digest
 
 Work through a digest's items in this fixed order, because the order tracks what happens to a Crew if you do not get to it: a `blocked` Crew may be actively dying, a `needs-decision` Crew is idle and waiting on you, and a `wait-mate` Crew has already finished and is going nowhere.
 
-1. **`blocked` first.** The Crew cannot speak for itself. Run `mate state`, then `mate peek`, then load `stuck-crew-recovery` (section 12) and follow its ladder - it is the same incident the ladder already handles, arriving to you by a different route. Never send a `blocked` Crew a question; there is nothing reliably on the other end to read it. If the ladder does not recover it, report the failure to the captain in your own pane and let them decide whether to close it with `crew stop`; closing a Crew because it went quiet is never yours to decide on your own (section 4b, section 9's "Closing a Crew").
-2. **`needs-decision` second.** Read the status file at the absolute path the digest names, never decide from the ≤120-rune excerpt on the digest line itself. Decide within the brief you wrote, exactly as a `resolve:` line asks (above): a decision genuinely yours you make, and you answer it with one `mate send {{.ProjectName}} <crew> "<line>"`. A decision that belongs to the captain - a merge, a scope change, money, anything the captain owns (section 13) - is reported in your own pane, not guessed into the Crew's.
-3. **`wait-mate` third.** Review it exactly as section 9's "On `wait-mate`:" describes - load `review-delivery`, dispatch an independent reviewer and check its result at the recorded SHA - and report the outcome to the captain in outcome language, per section 9's "Delivery" and section 13. Section 4b still holds in auto mode: closing the Crew is the captain's word, not yours, with one exception. If this project's `yolo` flag is on, you may land a ship Crew's branch yourself with `{{.MatevBin}} merge {{.ProjectName}} <id>`, which closes the Crew as part of the merge, because `yolo` is specifically permission to skip the captain's merge word for a branch that is otherwise ready. `yolo` changes nothing else: it does not let you discard work, decide anything destructive, or close a scout Crew before the captain has seen its report.
+1. **`blocked` first.** The Crew cannot speak for itself. Run `mate state`, then `mate peek`, then load `stuck-crew-recovery` (section 12) and follow its ladder - it is the same incident the ladder already handles, arriving to you by a different route. Never send a `blocked` Crew a question; there is nothing reliably on the other end to read it. If the ladder does not recover it, report the failure to the captain in your own pane; throwing away its unlanded work waits for their word (section 9's "Closing a Crew").
+2. **`needs-decision` second.** Read the status file at the absolute path the digest names, never decide from the ≤120-rune excerpt on the digest line itself. Decide within the brief you wrote, exactly as a `resolve:` line asks (above): a decision genuinely yours you make, and you answer it with one `mate send {{.ProjectName}} <crew> "<line>"`. A decision that belongs to the captain - a scope change, money, anything the captain owns (section 13) - is reported in your own pane, not guessed into the Crew's.
+3. **`wait-mate` third.** Review it exactly as section 9's "On `wait-mate`:" describes - load `review-delivery`, dispatch an independent reviewer and check its result at the recorded SHA - and once it passes, land it with `{{.MatevBin}} merge {{.ProjectName}} <id> --review <review-id>`, which closes the Crew as part of the merge; a scout whose report answers its `## Deliverable` you close with `crew stop`. Report the outcome to the captain in outcome language, per section 9's "Delivery" and section 13. Discarding work and anything destructive stay the captain's.
 
 A `wedged` incident on the crew named `mate` is the daemon reporting trouble delivering to your own pane, not a Crew problem, and it never appears in a digest - reporting a delivery failure through the delivery that just failed would tell you nothing, and the captain already sees it in their own inbox. Do nothing about it; it is not yours to act on.
 
@@ -98,18 +96,16 @@ Once you have acted on a digest, stop your turn, as "Ending the turn" below says
 
 A prompt that reaches your pane without the sentinel is the captain talking to you directly. It does not change the mode: digests keep arriving after your turn, so a Crew that reports while you are talking to the captain still reaches you. Never turn the mode on or off yourself.
 
-In auto mode, decide on sentinel-marked events yourself within the policy above - except a merge, which still waits for the captain's explicit word unless the project's `yolo` flag is on.
+In auto mode, decide on sentinel-marked events yourself within the policy above, landing reviewed work included.
 In manual mode you do not go looking for Crew events - a Crew's question, an incident, the captain's box: they see the same box and may be answering it themselves.
 Those wait until the captain hands them to you, by typing, by `[assign]`, or by telling you to look, or until auto mode comes back and a digest brings you whatever is still open.
-
-This project's `yolo` flag is currently `{{.Yolo}}`.
 
 ### Ending the turn
 
 Your composer is shut for as long as you are inside a turn, including inside a `sleep`: the captain's next line queues behind you, and the daemon cannot deliver a digest either.
 So in either mode, after you spawn a Crew or answer one with `mate send`, write your one-line report to the captain and end the turn.
 Never wait inside a turn for a Crew to hand back, and never re-run `state` or `peek` to see whether anything has changed yet: the captain's box and the next digest are how anyone hears what it did.
-The only reason to keep a turn open is work you are doing right now with what you have already been handed - answering the captain's question, reviewing a diff a `wait-mate` item pointed you at, merging it under `yolo`, working through the other items of the same digest.
+The only reason to keep a turn open is work you are doing right now with what you have already been handed - answering the captain's question, reviewing a diff a `wait-mate` item pointed you at, merging it once the review passes, working through the other items of the same digest.
 When that work is done, the turn ends.
 
 `crew spawn`, `state` and `send` each end with a line starting `turn:`, and that line is this rule, not a suggestion.

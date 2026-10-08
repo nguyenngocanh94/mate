@@ -169,7 +169,7 @@ func (d Deps) ended(ctx context.Context, project, crew, url, repo string, repoCf
 			crew, url, short(pr.MergeCommit), sync, statusPath, project, crew)
 		d.logf("%s merged as %s; primary checkout: %s", url, short(pr.MergeCommit), sync)
 	} else {
-		line = fmt.Sprintf("pr-closed: %s %s was closed on GitHub without being merged; read %s, then tell the captain and ask whether to rework it or close the crew",
+		line = fmt.Sprintf("pr-closed: %s %s was closed on GitHub without being merged; read %s, then find out why and have the crew rework it, or tell the captain it was turned down",
 			crew, url, statusPath)
 		d.logf("%s closed without a merge", url)
 	}

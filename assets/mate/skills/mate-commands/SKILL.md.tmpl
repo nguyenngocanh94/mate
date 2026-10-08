@@ -10,7 +10,7 @@ Type that absolute path; it is not necessarily on your `PATH`.
 The prose below writes it as `mate` for readability only.
 
 Run every command from your own working directory.
-The workspace is found by walking up from your cwd, so you never pass `--workspace`.
+The workspace is found by walking up from your cwd, so you pass `--workspace` only when a command runs outside it.
 `<project>` is always `{{.ProjectName}}`.
 `<id>` is a crew id you choose, and it names the task: two to four lowercase words from the captain's own request, joined by hyphens, such as `fix-cart-total`, `add-healthcheck` or, for a scout, `scout-login-timeout`.
 The captain reads it in the console, in `crew list`, in the branch `mate/<id>` and in the worktree's name, so it says what the Crew is doing, never how many Crews came before: no counters such as `k3`, `p1` or `m1`.
@@ -22,7 +22,7 @@ Exit 2 is a usage mistake you made, exit 1 is a refusal or a real failure, and t
 ### Crew lifecycle
 
 ```text
-mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]
+mate crew spawn <project> <id> --brief <file|-> [--repo <name>] [--scout] [--deliver local|pr] [--workspace <dir>] [--harness codex|claude] [--model <name>] [--effort low|medium|high|xhigh|max] [--task "<one line>"]
 mate crew dispatch [--workspace <dir>] [--example]
 mate crew list <project> [--workspace <dir>]
 mate crew relaunch <project> <id> [--note "<one line>"] [--workspace <dir>]
@@ -36,6 +36,7 @@ A project with no repo refuses every spawn, `--repo` or not, with `project <proj
 Before it creates anything, `crew spawn` runs the check `brief check` runs (below) and refuses a brief that fails it, listing every problem; nothing exists afterwards, so fix the file and run the same command again.
 `--scout` makes the task a scout (section 5): the brief must then have a `## Deliverable`, and the Crew is told to write its report to `{{.CrewsDir}}/<id>/report.md` instead of committing.
 Without `--scout` it is a ship, and a `## Deliverable` is refused.
+`--deliver` is how a ship lands, your choice per task (section 9): `local` (the default) has the Crew commit on its branch for `mate merge` to fast-forward; `pr` has it push the branch and open a GitHub pull request, watched until it ends. `pr` checks that `gh` is logged in and the repo's `origin` points at GitHub, and refuses with what to fix otherwise; a scout takes only `local`.
 `--task "<one line>"` is the label recorded in the crew's record and shown by `crew list`; without it the first line of the brief's `## Captain's words` is used.
 `--harness`, `--model` and `--effort` are the Crew's launch profile; section 7 and the `crew-dispatch` skill say how to choose them.
 Without `--harness` the Crew runs the table's `default` profile on the workspace default harness, which is Codex, with a note on stderr; `--model` or `--effort` without `--harness` is refused (exit 2), because a model name belongs to one harness.
@@ -203,59 +204,44 @@ Anything longer goes in a file and you send the Crew a line naming that file's a
 
 ### Delivery
 
-{{if .GitHub -}}
 ```text
-mate merge <project> <crew> [--review <review-id>] [--workspace <dir>]
+mate merge <project> <crew> --review <review-id> [--workspace <dir>]
 mate pr watch <project> <crew> <pull-request-url> [--workspace <dir>]
 ```
 
-This project delivers through GitHub pull requests. A Crew pushes its branch, opens a pull request with `gh pr create`, appends `pr-open: <url>` to its status file and runs `mate pr watch` itself; you never run it, and you never push, open or merge anything with git or gh.
-`mate merge` is `gh pr merge` here: it merges the Crew's pull request on GitHub, pinned to the reviewed commit when `--review` is given, records the merge in the Crew's meta, fast-forwards the default branch of the Crew's repo when its checkout is clean and on that branch, and then closes the Crew.
-Whether you may run it at all depends on this project's `yolo` flag; section 9's "Delivery" says which of the two ways you deliver. `Merge` in the console is the captain's own and is never refused for `yolo`.
+`mate merge` is the whole of delivery, and it closes the Crew afterwards, which is the one place a Crew reaches `finished` without `crew stop` being typed.
+You run it with `--review <review-id>`: the independent review that passed (section 9), pinned to the commit the reviewer saw. Without it your merge is refused; `Merge` in the console is the captain's own and needs none.
+What it does follows the Crew's delivery, chosen at spawn (`delivery` in its meta):
 
-Success is one line:
+- **local**: it fast-forwards the default branch of the Crew's repo onto the Crew's branch, in that repo's own checkout. It only ever fast-forwards and takes no flag that would make it do anything else.
 
-```text
-{{.ProjectName}}/add-healthcheck: merged pull request https://github.com/acme/{{.ProjectName}}/pull/7 as e4f5a6b (fast-forwarded {{.ExampleRepo.DefaultBranch}}); crew finished, worktree and branch removed
-```
+  ```text
+  {{.ProjectName}}/add-healthcheck: merged 2 commit(s) into {{.ExampleRepo.DefaultBranch}} (a1b2c3d..e4f5a6b); crew finished, worktree and branch removed
+  ```
 
-The part in brackets is `skipped: <why>` when the primary checkout was not on the default branch, had uncommitted files, or could not fetch: the pull request is merged either way, and you tell the captain their copy of `{{.ExampleRepo.DefaultBranch}}` is behind.
+- **pr**: it is `gh pr merge` on the Crew's pull request, then records the merge in the Crew's meta and fast-forwards the default branch of the Crew's repo when its checkout is clean and on that branch.
 
-Each refusal starts with `merge refused:` and changes nothing:
+  ```text
+  {{.ProjectName}}/add-healthcheck: merged pull request https://github.com/acme/{{.ProjectName}}/pull/7 as e4f5a6b (fast-forwarded {{.ExampleRepo.DefaultBranch}}); crew finished, worktree and branch removed
+  ```
 
-- `yolo is off for {{.ProjectName}}; the captain merges` - the captain has not delegated merging on this project. Report the pull request as ready and stop.
-- `... has no pull request recorded` - the Crew has not opened one, or never ran `mate pr watch`. Send it one line saying so.
-- `<url> is closed, not open` or `is merged, not open` - there is nothing to merge; a merged one needs `crew stop` (`pr-merged:` already told you).
-- `review is stale; the pull request's branch changed` - the Crew pushed after the review. Review again.
-- `gh could not merge <url>` - GitHub refused (a failing check, a conflict, a required review). Read the reason after it, send the Crew one line to fix it on the same branch, and merge again after its next hand-back.
-- `... has N uncommitted file(s) ...` - the Crew's worktree still holds work that is not in the branch. Send the Crew one line to commit or drop it.
-{{- else -}}
-```text
-mate merge <project> <crew> [--workspace <dir>]
-```
-
-`mate merge` is the whole of delivery: it fast-forwards the default branch of the Crew's repo onto the Crew's branch, in that repo's own checkout, and then closes the Crew, which is the one place a Crew reaches `finished` without `crew stop` being typed.
-It only ever fast-forwards, it takes no flag that would make it do anything else, and every refusal below changes nothing at all - no commit, no branch moved, no Crew closed.
-Whether you may run it at all depends on this project's `yolo` flag; section 9's "Delivery" says which of the two ways you deliver.
-
-Success is one line:
-
-```text
-{{.ProjectName}}/add-healthcheck: merged 2 commit(s) into {{.ExampleRepo.DefaultBranch}} (a1b2c3d..e4f5a6b); crew finished, worktree and branch removed
-```
+  The part in brackets is `skipped: <why>` when the primary checkout was not on the default branch, had uncommitted files, or could not fetch: the pull request is merged either way, and you tell the captain their copy of `{{.ExampleRepo.DefaultBranch}}` is behind.
 
 Report that line's substance to the captain and stop; the Crew is gone from `crew list` and from their console, and `crews/<id>/` is kept.
 
-Each refusal starts with `merge refused:` and names one situation:
+`mate pr watch` starts the watcher of a Crew's pull request in the background and returns at once; the watcher wakes you with `pr-merged:` or `pr-closed:` when it ends. A pull request Crew runs it itself after `gh pr create`, and a console starts one for any pull request URL a Crew names in its status; run it yourself when a Crew opened one without it and no console is open. It is safe to run twice: a live watcher is reported, not doubled.
 
-- `yolo is off for {{.ProjectName}}; the captain merges` - the captain has not delegated merging on this project. Report the branch as ready and stop; do not look for another way to land it.
-In each refusal below, `<default>` is the default branch of the Crew's repo.
+Each refusal of `mate merge` starts with `merge refused:` and changes nothing - no commit, no branch moved, no Crew closed. In each one below, `<default>` is the default branch of the Crew's repo.
 
-- `needs-rebase: ...` - `<default>` moved on since the Crew branched, so the branch is no longer a fast-forward. This is a result of the command and never a state of the Crew: send the Crew one line telling it to rebase onto `<default>` and hand back, then wait for its next `wait-mate` and merge again.
-- `... has N uncommitted file(s) ...` - the Crew's worktree still holds work that is not in the branch. Send the Crew one line to commit or drop it; never merge around it, because what would land is not what you reviewed.
-- `branch ... is not ahead of <default>: nothing to merge` - the Crew committed nothing. That is a scout, or a ship that did not do its job; report it as such.
-- `... has <branch> checked out, not <default>` or `... has N uncommitted file(s)` naming the repo's own checkout - the captain is in the middle of something there. Say so and stop; that checkout is theirs, not yours.
-{{- end}}
+- `the Mate merges only reviewed work; ...` - you ran it without `--review`. Run `mate review` first, and merge once it passes.
+- `review is stale; ...` - the branch, the pull request or the contract moved after the review. Review again.
+- `... has N uncommitted file(s) ...` naming the Crew's worktree - it still holds work that is not in the branch. Send the Crew one line to commit or drop it; never merge around it, because what would land is not what you reviewed.
+- `needs-rebase: ...` (local) - `<default>` moved on since the Crew branched, so the branch is no longer a fast-forward. This is a result of the command and never a state of the Crew: send the Crew one line telling it to rebase onto `<default>` and hand back, then merge again after its next `wait-mate`.
+- `branch ... is not ahead of <default>: nothing to merge` (local) - the Crew committed nothing. That is a scout, or a ship that did not do its job; report it as such.
+- `... has <branch> checked out, not <default>` or `... has N uncommitted file(s)` naming the repo's own checkout (local) - the captain is in the middle of something there. Say so and stop; that checkout is theirs, not yours.
+- `... has no pull request recorded` (pr) - the Crew has not opened one. Send it one line saying so.
+- `<url> is closed, not open` or `is merged, not open` (pr) - there is nothing to merge; a merged one needs `crew stop` (`pr-merged:` already told you).
+- `gh could not merge <url>` (pr) - GitHub refused (a failing check, a conflict, a required review). Read the reason after it, send the Crew one line to fix it on the same branch, and merge again after its next hand-back.
 
 ### Beads task management
 
@@ -335,7 +321,7 @@ mate recall <project> [--live] [--max-bytes <n>] [--workspace <dir>]
 `recall` is your session-start digest (section 3), and it only reads.
 It opens with `# mate recall <project>` and one contract line, then prints numbered parts, live state first and memory last, so a digest cut short loses the part you can recover with one read and never the crews:
 
-1. Live state: `mode:` and `yolo`, the `mate backlog` table, a bounded summary of active/blocked and ready Beads work when present, every unresolved inbox item with what it needs and its status file, and every line queued in your outbox.
+1. Live state: `mode:`, the `mate backlog` table, a bounded summary of active/blocked and ready Beads work when present, every unresolved inbox item with what it needs and its status file, and every line queued in your outbox.
 2. `mate project facts`: one block per repo, `head:` included, or `repos: none`.
 3. `{{.ProjectDoc}}`, then a `warning:` for each anchor its own repo's default branch has moved past.
 4. `{{.BacklogFile}}` without `## Done`, then the `## In flight` ids that are not an open crew in part 1 and the open crews with no `- <id>` line there, matched by id only.

@@ -70,7 +70,7 @@ If the top-level path is the primary checkout, STOP: do not edit or commit here,
 7. If the captain adds to the task while you work, the app appends their words to `## Captain's words` in `/ws/.mate/projects/shop/crews/k3/brief.md` and sends you one line saying so; read that section again and carry on with it.
 
 # Definition of done
-This project ships local-only: no remote, no pull request, no pipeline.
+Nothing leaves this machine: no remote, no pull request, no pipeline.
 This task asks for knowledge - an investigation, a plan, a reproduction, an audit - and there is nothing to commit.
 Write your findings to `/ws/.mate/projects/shop/crews/k3/report.md`.
 It is outside this worktree on purpose, like the status file: the worktree is removed when the task is closed, and that file is kept.

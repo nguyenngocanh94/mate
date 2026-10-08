@@ -43,7 +43,7 @@ const (
 	legacyFailed  = "failed"
 )
 
-// The pull request verbs of the github mode (docs/mvp.md M18). A crew writes
+// The pull request verbs (docs/mvp.md M18, M19). A crew writes
 // `pr-open:` when it opens its pull request; `mate pr watch` writes
 // `pr-merged:` or `pr-closed:` when it ends. All three parse as State
 // wait-mate - the crew is handed back and waiting on the Mate - and keep the

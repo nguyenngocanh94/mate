@@ -140,7 +140,7 @@ func newEnv(t *testing.T, gh ...github.Result) *env {
 	run(t, other, "push", "origin", "main")
 	e.mergeSHA = run(t, other, "rev-parse", "HEAD")
 
-	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop", DefaultBranch: "main"}}, Mode: store.ModeGitHub}); err != nil {
+	if err := ws.AddProject(project, store.ProjectConfig{Repos: []store.RepoConfig{{Path: "shop", DefaultBranch: "main"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := ws.WriteCrewMeta(project, crew, map[string]string{"state": "spawned", "branch": "mate/k3", "task": "x"}); err != nil {

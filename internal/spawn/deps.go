@@ -114,7 +114,7 @@ type Deps struct {
 	// BriefDeliveryTimeout bounds the wait for a crew pane to leave idle
 	// after the brief prompt. Zero means DefaultBriefDeliveryTimeout.
 	BriefDeliveryTimeout time.Duration
-	// GitHub is the `gh` the github mode merges pull requests with
+	// GitHub is the `gh` pull request delivery merges and checks with
 	// (docs/mvp.md M18). The zero value is the real gh.
 	GitHub github.Client
 	// Git runs the crew worktree commands. The zero value is the real git.

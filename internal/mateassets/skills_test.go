@@ -26,33 +26,6 @@ func TestRenderSkillGolden(t *testing.T) {
 	}
 }
 
-// TestRenderSkillGitHubGolden pins the skills that differ in the github mode
-// (docs/mvp.md M18); TestRenderSkillGolden pins them in local-only.
-func TestRenderSkillGitHubGolden(t *testing.T) {
-	p := fixedParams()
-	p.Mode = "github"
-	for _, name := range []string{"review-delivery", "mate-commands", "event-handling", "task-intake", "brief-writing"} {
-		t.Run(name, func(t *testing.T) {
-			got, err := RenderSkill(name, p)
-			if err != nil {
-				t.Fatal(err)
-			}
-			compareGolden(t, filepath.Join("testdata", "skills", name+"-github.SKILL.md.golden"), got)
-			if loc := unexpandedPattern.FindIndex(got); loc != nil {
-				t.Fatalf("rendered skill %s has an unexpanded template marker at byte %d", name, loc[0])
-			}
-			checkForbidden(t, name+"/SKILL.md", got)
-			local, err := RenderSkill(name, fixedParams())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(got) == string(local) {
-				t.Errorf("skill %s renders the same in both modes", name)
-			}
-		})
-	}
-}
-
 func TestRenderSkillUnknownName(t *testing.T) {
 	if _, err := RenderSkill("no-such-skill", fixedParams()); err == nil {
 		t.Fatal("RenderSkill accepted an unknown skill name")
