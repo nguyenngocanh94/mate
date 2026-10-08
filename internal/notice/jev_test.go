@@ -168,3 +168,34 @@ func TestClassifyRejectsEmptyInputsAndRemovesOwnKey(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The API rounds every probability to two decimals, so a distribution may
+// sum to 0.99 or 1.01; one that is off by more than the rounding is refused.
+func TestClassifyAcceptsTwoDecimalRounding(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		warning, none float64
+		accept        bool
+	}{
+		{"sums to 0.99", 0.95, 0.04, true},
+		{"sums to 1.01", 0.95, 0.06, true},
+		{"sums to 0.9", 0.85, 0.05, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := validResponse()
+			p := resp["answers"].(map[string]any)["notice"].(map[string]any)["probabilities"].(map[string]float64)
+			p["quota_warning"], p["none"] = tc.warning, tc.none
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(resp) }))
+			defer srv.Close()
+			c := New("test-key")
+			c.endpoint = srv.URL
+			got, err := c.Classify(context.Background(), "Only 10% remains")
+			if tc.accept && (err != nil || got.Label != "quota_warning") {
+				t.Fatalf("refused: %+v, %v", got, err)
+			}
+			if !tc.accept && err == nil {
+				t.Fatalf("accepted a distribution off by more than rounding: %+v", got)
+			}
+		})
+	}
+}

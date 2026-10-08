@@ -131,13 +131,21 @@ func (c *Client) Classify(ctx context.Context, screen string) (Result, error) {
 		}
 		sum += p
 	}
-	if math.Abs(sum-1) > .001 || response.Usage.Input < 0 || response.Usage.Output < 0 {
+	// The API rounds each probability to two decimals, so their sum drifts
+	// from one by up to half a cent per label; anything further is not a
+	// distribution (docs/evidence/jev-observer-2026-10-08.md: 6 of 90
+	// answers summed to 0.99).
+	if math.Abs(sum-1) > roundingTolerance(len(criteria)) || response.Usage.Input < 0 || response.Usage.Output < 0 {
 		return Result{}, invalid
 	}
 	return Result{Label: a.Choice, Confidence: *a.Confidence, InputTokens: response.Usage.Input, OutputTokens: response.Usage.Output}, nil
 }
 
 func probability(p float64) bool { return !math.IsNaN(p) && !math.IsInf(p, 0) && p >= 0 && p <= 1 }
+
+// roundingTolerance is how far n probabilities, each rounded to two
+// decimals, may sum away from one.
+func roundingTolerance(n int) float64 { return 0.005*float64(n) + 1e-9 }
 
 var credentials = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`),
