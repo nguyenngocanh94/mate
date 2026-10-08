@@ -12,14 +12,20 @@ type tasksDoneMsg struct {
 	err     error
 }
 
-func (m Model) beginTasks() (Model, tea.Cmd) {
-	project := m.modeTarget()
+// keyProject is the project a project key names: the box item's when the
+// box has focus, otherwise the one open or selected (modeTarget).
+func (m Model) keyProject() string {
 	if m.focus == paneBox {
 		items := m.boxItems()
 		if sel := m.boxSelection(items); sel >= 0 {
-			project = items[sel].project
+			return items[sel].project
 		}
 	}
+	return m.modeTarget()
+}
+
+func (m Model) beginTasks() (Model, tea.Cmd) {
+	project := m.keyProject()
 	if project == "" {
 		m.msg = errMsg("Select a project to open Beads Viewer")
 		return m, nil

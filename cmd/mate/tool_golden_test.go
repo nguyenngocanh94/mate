@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/tool"
+	"github.com/nguyenngocanh94/mate/internal/tool/fresh"
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
@@ -20,22 +22,26 @@ import (
 // is a behaviour change; rerun with MATE_UPDATE_GOLDEN=1 only when that
 // change is intended, and read the golden diff before committing it.
 
-// TestReviewFreshArgvGolden drives `e` the way the Console does: the
-// columns are planned by newConsoleColumns from a getenv, which finds
-// Fresh only in the getenv's XDG_BIN_HOME (the process PATH has no fresh),
-// and consoleReview then hands the review tab its command - Fresh on
+// TestReviewFreshArgvGolden drives `e` the way the Console does, over a
+// registry of Fresh's profile (fresh.New()): the columns are planned by
+// newConsoleColumns from a getenv, which finds Fresh only in the getenv's
+// XDG_BIN_HOME (the process PATH has no fresh), and consoleToolView then
+// hands the review tab the command Fresh's Viewer builds - Fresh on
 // report.md when the crew wrote one, on the crew's folder when not. With no
-// Fresh found, newConsoleColumns plans no review tab, and `e` says how to
-// install it.
+// Fresh found, `e` says how to install it.
 //
 // /opt/homebrew/bin is one of findTool's fixed directories and is read
 // from the real disk, so a fake getenv cannot hide a Fresh installed
-// there: the not-installed case starts from the columns newConsoleColumns
-// returns without Fresh (review == "") rather than from the lookup.
+// there: the not-installed case swaps the columns' findTool for one that
+// finds nothing rather than relying on the lookup.
 func TestReviewFreshArgvGolden(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	spawnFakeCrew(t, w, deps, "shop", "k3")
 	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
+	reg, err := tool.NewRegistry(fresh.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	xdg := t.TempDir()
 	if err := os.WriteFile(filepath.Join(xdg, "fresh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
@@ -46,20 +52,22 @@ func TestReviewFreshArgvGolden(t *testing.T) {
 	getenv := func(k string) string { return env[k] }
 
 	rec := newRecordingColumns(t)
-	planned, err := newConsoleColumns(rec.h, getenv)
+	planned, err := newConsoleColumns(rec.h, getenv, reg)
 	if err != nil {
 		t.Fatalf("newConsoleColumns: %v", err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(planned.dir) })
-	rec.editor, rec.env = planned.editor, planned.env
+	rec.findTool, rec.env = planned.findTool, planned.env
 
 	normalize := placeholders(map[string]string{w.Root(): "{{WORKSPACE}}", xdg: "{{XDG_BIN_HOME}}"})
 	var got strings.Builder
-	fmt.Fprintf(&got, "== fresh in XDG_BIN_HOME, not on PATH\neditor: %s\nreview tab: %v\n\n", normalize(planned.editor), planned.review != "")
+	_, tab := planned.tabs[roleReview]
+	fmt.Fprintf(&got, "== fresh in XDG_BIN_HOME, not on PATH\neditor: %s\nreview tab: %v\n\n", normalize(planned.findTool("fresh")), tab)
 
+	view := consoleToolView(w, rec.consoleColumns, reg)
 	show := func(name string) {
 		t.Helper()
-		if err := consoleReview(w, rec.consoleColumns)(context.Background(), target); err != nil {
+		if err := view(context.Background(), "e", target); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		shown := rec.of(roleReview)
@@ -72,8 +80,8 @@ func TestReviewFreshArgvGolden(t *testing.T) {
 	}
 	show("report.md")
 
-	rec.review = ""
-	err = consoleReview(w, rec.consoleColumns)(context.Background(), target)
+	rec.findTool = func(string) string { return "" }
+	err = view(context.Background(), "e", target)
 	fmt.Fprintf(&got, "== fresh not installed\nerror: %v\n", err)
 
 	checkToolGolden(t, "review-fresh-argv.golden", got.String())

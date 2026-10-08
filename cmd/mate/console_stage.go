@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -16,47 +17,75 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/spawn"
 	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/tool"
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
 // consoleColumns are the Console's surfaces (docs/mvp.md M13): the stage
-// column, which shows the agent of the row Enter was pressed on, and the
-// review tab, which `e` opens on a crew's report. The review is a tab in
-// the same window: a column left Fresh about half the window, and a
-// separate window covered the console. Each surface runs `mate pane serve`
-// for its whole life; the Console tells it what to show over its socket,
-// and the host never re-splits a column or opens a second review tab.
+// column, which shows the agent of the row Enter was pressed on, and a tab
+// per tool role the tool registry binds a key to - the review tab, which
+// `e` opens on a crew's report - and the tasks tab. A tool opens in a tab
+// in the same window: a column left the editor about half the window, and
+// a separate window covered the console. Each surface runs `mate pane
+// serve` for its whole life; the Console tells it what to show over its
+// socket, and the host never re-splits a column or opens a second tab of a
+// role.
 type consoleColumns struct {
 	h host.Host
-	// cols is the stage column. reviewCol is the program of the review
-	// tab; its Role is empty when Fresh is not installed.
-	cols      []host.Column
-	reviewCol host.Column
-	tasksCol  host.Column
-	dir       string
-	stage     string
-	review    string // "" when Fresh is not installed
-	tasks     string
-	editor    string
-	herdr     string
+	// cols is the stage column.
+	cols     []host.Column
+	tasksCol host.Column
+	// tabs are the tool tabs by role, one per Role a tool binding names,
+	// planned whether or not the tool is installed: a missing binary is
+	// said when its key is pressed (tool.Viewer.Argv) and on the status
+	// line when the Console opens (missingTools).
+	tabs  map[string]toolTab
+	dir   string
+	stage string
+	tasks string
+	herdr string
+	// findTool is a tool binary's absolute path, "" when it is not
+	// installed: the seam tool.Viewer.Argv resolves binaries through.
+	findTool func(string) string
 	// env is what every column's program gets over the pane's own: the
 	// Console's PATH.
 	env []string
 }
 
-// newConsoleColumns plans the surfaces for this Console: the stage column
-// always, the review tab when the Fresh editor (`fresh`) is installed.
-func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns, error) {
+// toolTab is one tool tab: the program the host runs in it, and the
+// socket that program listens on.
+type toolTab struct {
+	col    host.Column
+	socket string
+}
+
+// newConsoleColumns plans the surfaces for this Console: the stage column,
+// the tasks tab, and a tab for each role tools binds a key to.
+func newConsoleColumns(h host.Host, getenv func(string) string, tools tool.Registry) (*consoleColumns, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("find the mate binary: %w", err)
 	}
+	roles := toolRoles(tools)
+	sockets := []string{roleStage + ".sock", roleTasks + ".sock"}
+	for _, role := range roles {
+		sockets = append(sockets, role+".sock")
+	}
 	// A short directory: a unix socket path is limited to about 100 bytes.
-	dir, err := panerun.SocketDir("mate-cols-", roleStage+".sock", roleReview+".sock", roleTasks+".sock")
+	dir, err := panerun.SocketDir("mate-cols-", sockets...)
 	if err != nil {
 		return nil, err
 	}
-	c := &consoleColumns{h: h, dir: dir, stage: filepath.Join(dir, roleStage+".sock"), herdr: findTool(getenv, "herdr")}
+	c := &consoleColumns{
+		h: h, dir: dir, stage: filepath.Join(dir, roleStage+".sock"), herdr: findTool(getenv, "herdr"),
+		tabs: map[string]toolTab{},
+		findTool: func(name string) string {
+			if p := findTool(getenv, name); filepath.IsAbs(p) {
+				return p
+			}
+			return ""
+		},
+	}
 	if path := getenv("PATH"); path != "" {
 		c.env = []string{"PATH=" + path}
 	}
@@ -67,16 +96,54 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 	c.cols = []host.Column{column(roleStage, c.stage)}
 	c.tasks = filepath.Join(dir, roleTasks+".sock")
 	c.tasksCol = column(roleTasks, c.tasks)
-	if editor := findTool(getenv, "fresh"); filepath.IsAbs(editor) {
-		c.editor, c.review = editor, filepath.Join(dir, roleReview+".sock")
-		c.reviewCol = column(roleReview, c.review)
+	for _, role := range roles {
+		socket := filepath.Join(dir, role+".sock")
+		c.tabs[role] = toolTab{col: column(role, socket), socket: socket}
 	}
 	return c, nil
 }
 
+// toolRoles are the roles tools binds keys to, each once, in binding
+// order.
+func toolRoles(tools tool.Registry) []string {
+	var roles []string
+	for _, b := range tools.Bindings() {
+		if !slices.Contains(roles, b.Role) {
+			roles = append(roles, b.Role)
+		}
+	}
+	return roles
+}
+
+// missingTools is a status-line notice for each tool with a console key
+// whose binaries findTool does not find: the key, the tool and how to
+// install it.
+func (c *consoleColumns) missingTools(tools tool.Registry) []string {
+	var notices []string
+	seen := map[tool.Name]bool{}
+	for _, b := range tools.Bindings() {
+		if seen[b.Tool] {
+			continue
+		}
+		seen[b.Tool] = true
+		p, err := tools.Lookup(b.Tool)
+		if err != nil {
+			continue
+		}
+		info := p.Info()
+		for _, bin := range info.Binaries {
+			if c.findTool(bin) == "" {
+				notices = append(notices, fmt.Sprintf("%s %s needs %s: %s", b.Key, b.Label, info.Title, info.Install))
+				break
+			}
+		}
+	}
+	return notices
+}
+
 // toolDirs are where installers put a CLI when a pane's PATH, which
 // starts from login's, may not reach it: herdr's installer uses
-// ~/.local/bin (or $XDG_BIN_HOME), Homebrew (Fresh) the other two.
+// ~/.local/bin (or $XDG_BIN_HOME), Homebrew the other two.
 func toolDirs(getenv func(string) string) []string {
 	dirs := []string{getenv("XDG_BIN_HOME")}
 	if home := getenv("HOME"); home != "" {
@@ -154,12 +221,16 @@ func (c *consoleColumns) waitSend(ctx context.Context, socket string, cmd paneru
 // a variable so a test need not wait it out.
 var columnStartWait = 5 * time.Second
 
-// close ends both columns, and with them their panes: the next Console
-// lays out its own.
+// close ends every column and tab, and with them their panes: the next
+// Console lays out its own.
 func (c *consoleColumns) close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	for _, s := range []string{c.stage, c.review, c.tasks} {
+	sockets := []string{c.stage, c.tasks}
+	for _, t := range c.tabs {
+		sockets = append(sockets, t.socket)
+	}
+	for _, s := range sockets {
 		if s != "" {
 			_ = panerun.Send(ctx, s, panerun.Command{Exit: true})
 		}
@@ -187,32 +258,89 @@ func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) conso
 	}
 }
 
-// consoleReview is the Console's `e` seam: a tab beside the Console runs
-// Fresh on that crew's report. A nil columns yields a nil ReviewFunc.
-func consoleReview(ws *store.Workspace, c *consoleColumns) console.ReviewFunc {
+// consoleToolView is the Console's seam for the tool keys of the snapshot
+// (`e`: the crew's report): the tool bound to key on the target's row
+// builds its command (tool.Viewer.Argv), and that tool's tab beside the
+// Console runs it. A nil columns yields a nil ToolViewFunc.
+func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry) console.ToolViewFunc {
 	if c == nil {
 		return nil
 	}
-	return func(ctx context.Context, target console.StageTarget) error {
-		if c.review == "" {
-			return fmt.Errorf("a crew's report needs the Fresh editor: brew install fresh-editor")
-		}
-		if target.Kind != console.StageCrew || target.ID == "" || target.ProjectID == "" {
-			return fmt.Errorf("e opens a crew's report")
-		}
-		dir, file, err := reviewReport(ws, target)
+	return func(ctx context.Context, key string, target console.StageTarget) error {
+		b, err := toolBinding(tools, key, target)
 		if err != nil {
-			return fmt.Errorf("report: %w", err)
+			return err
 		}
-		argv := []string{c.editor, dir}
-		if file != "" {
-			argv = []string{c.editor, file}
+		p, err := tools.Lookup(b.Tool)
+		if err != nil {
+			return err
 		}
-		if err := c.showTab(ctx, panerun.Command{Argv: argv, Dir: dir, Env: c.env}); err != nil {
-			return fmt.Errorf("report: %w", err)
+		tab, ok := c.tabs[b.Role]
+		if !ok {
+			return fmt.Errorf("%s: the console has no %s tab", b.Label, b.Role)
+		}
+		vctx, err := viewerContext(ws, target)
+		if err != nil {
+			return fmt.Errorf("%s: %w", b.Label, err)
+		}
+		// Argv's error is the tool's own sentence: how to install it.
+		argv, err := p.Capabilities().Viewer.Impl.Argv(vctx, c.findTool)
+		if err != nil {
+			return err
+		}
+		dir := vctx.CrewDir
+		if dir == "" {
+			dir = vctx.ProjectDir
+		}
+		if err := c.showRoleTab(ctx, tab.col, tab.socket, panerun.Command{Argv: argv, Dir: dir, Env: c.env}); err != nil {
+			return fmt.Errorf("%s: %w", b.Label, err)
 		}
 		return nil
 	}
+}
+
+// toolBinding is the binding of key on the target's row: a crew target is
+// a crew row, a target with only a project a project row. A key bound on
+// another row only says where it acts.
+func toolBinding(tools tool.Registry, key string, target console.StageTarget) (tool.Binding, error) {
+	var scope tool.BindScope
+	switch {
+	case target.Kind == console.StageCrew && target.ID != "" && target.ProjectID != "":
+		scope = tool.ScopeCrew
+	case target.Kind == "" && target.ID == "" && target.ProjectID != "":
+		scope = tool.ScopeProject
+	}
+	var other *tool.Binding
+	for _, b := range tools.Bindings() {
+		if b.Key != key {
+			continue
+		}
+		if b.Scope == scope {
+			return b, nil
+		}
+		if other == nil {
+			other = &b
+		}
+	}
+	if other != nil {
+		return tool.Binding{}, fmt.Errorf("%s opens a %s's %s", key, other.Scope, other.Label)
+	}
+	return tool.Binding{}, fmt.Errorf("no tool bound to %s", key)
+}
+
+// viewerContext is what a tool opens on for target: the project, and for a
+// crew its folder and report.md (reviewReport).
+func viewerContext(ws *store.Workspace, target console.StageTarget) (tool.ViewerContext, error) {
+	vctx := tool.ViewerContext{ProjectDir: filepath.Join(ws.Root(), target.ProjectID)}
+	if target.Kind != console.StageCrew {
+		return vctx, nil
+	}
+	dir, file, err := reviewReport(ws, target)
+	if err != nil {
+		return tool.ViewerContext{}, err
+	}
+	vctx.CrewDir, vctx.ReportPath = dir, file
+	return vctx, nil
 }
 
 // herdrSession refuses to attach to an agent whose Herdr session is not up.
@@ -258,17 +386,12 @@ func herdrDown(session string) error {
 		fmt.Sprintf("herdr is not running; start or resume the Mate with s to bring it back (session %s)", session))
 }
 
-// showTab tells the review tab what to run. A tab that is gone - never
-// opened, or closed - is opened, and asked again. A tab whose runner died
-// under a pane the host keeps is closed and opened again; that does not
-// touch the stage column. A tab already showing is brought to the front
-// after the file changes.
-func (c *consoleColumns) showTab(ctx context.Context, cmd panerun.Command) error {
-	return c.showRoleTab(ctx, c.reviewCol, c.review, cmd)
-}
-
-// showRoleTab opens/reuses only the requested surface, leaving other tabs
-// and the agent stage intact.
+// showRoleTab tells the tab of col's role what to run, leaving other tabs
+// and the agent stage intact. A tab that is gone - never opened, or closed
+// - is opened, and asked again. A tab whose runner died under a pane the
+// host keeps is closed and opened again; that does not touch the stage
+// column. A tab already showing is brought to the front after what it
+// shows changes.
 func (c *consoleColumns) showRoleTab(ctx context.Context, col host.Column, socket string, cmd panerun.Command) error {
 	err := panerun.Send(ctx, socket, cmd)
 	if !errors.Is(err, panerun.ErrGone) {
@@ -311,7 +434,7 @@ func consoleTasks(ws *store.Workspace, c *consoleColumns) console.TasksFunc {
 	}
 }
 
-// reviewReport is where `e` opens Fresh: the crew's own folder
+// reviewReport is what a crew key opens its tool on: the crew's own folder
 // (`crews/<id>/`, the one that crew worked in), and report.md inside it
 // when the crew has written one. The folder stays after the crew stops.
 func reviewReport(ws *store.Workspace, target console.StageTarget) (dir, file string, err error) {

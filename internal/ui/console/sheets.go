@@ -359,7 +359,7 @@ var keyTable = [][2]string{
 	{"s", "start the mate"},
 	{"m", "flip its mode"},
 	{"y", "copy"},
-	{"e", "crew report"},
+	toolKeyRows,
 	{"t", "project tasks"},
 	{"l", "box: whole log"},
 	{"r", "refresh"},
@@ -371,14 +371,37 @@ var keyTable = [][2]string{
 	{"shift+drag", "select text"},
 }
 
-func (m Model) keysSheetLines(p framePlan) []gline {
-	kw := 0
+// toolKeyRows marks where keyRows draws the snapshot's tool keys.
+var toolKeyRows = [2]string{"", "tool keys"}
+
+// keyRows is keyTable with the tool keys of the snapshot in their place,
+// each as "<scope> <label>": "e  crew report". A fixed row whose key a tool
+// binds is the tool's now, and is dropped.
+func (m Model) keyRows() [][2]string {
+	out := make([][2]string, 0, len(keyTable)+len(m.tree.Tools))
 	for _, k := range keyTable {
+		if k == toolKeyRows {
+			for _, b := range m.tree.Tools {
+				out = append(out, [2]string{b.Key, b.Scope + " " + b.Label})
+			}
+			continue
+		}
+		if !m.toolBound(k[0]) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func (m Model) keysSheetLines(p framePlan) []gline {
+	rows := m.keyRows()
+	kw := 0
+	for _, k := range rows {
 		kw = maxInt(kw, cells(k[0]))
 	}
 	kw = minInt(kw+2, p.w/3)
-	out := make([]gline, 0, len(keyTable))
-	for _, k := range keyTable {
+	out := make([]gline, 0, len(rows))
+	for _, k := range rows {
 		key := k[0]
 		if m.g.Name == "ascii" {
 			key = strings.NewReplacer("↑ ↓", "^ v", "▸", "+", "·", ".").Replace(key)

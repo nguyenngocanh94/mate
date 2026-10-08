@@ -245,10 +245,11 @@ type Model struct {
 	// stage is the host-pane attach (docs/mvp.md M10). Enter and a click on
 	// a Mate/Crew row call it and stay on the tree. nil means no host pane.
 	stage StageFunc
-	// review is `e`: a tab beside the Console opens that crew's report.
-	// nil means there is no host tab to open.
-	review ReviewFunc
-	tasks  TasksFunc
+	// toolView is the tool keys of Snapshot.Tools (`e`: a crew's report),
+	// each opening its tool in a tab beside the Console. nil means there is
+	// no host tab to open.
+	toolView ToolViewFunc
+	tasks    TasksFunc
 	// noHost says how to get a next pane while stage is nil; blank means
 	// the default advice.
 	noHost string
@@ -440,10 +441,11 @@ func (m Model) WithStage(fn StageFunc) Model {
 	return m
 }
 
-// WithReview installs `e`. A nil function means there is no host tab, and
-// `e` says so rather than opening a report here.
-func (m Model) WithReview(fn ReviewFunc) Model {
-	m.review = fn
+// WithToolView installs the tool keys the snapshot binds (Snapshot.Tools).
+// A nil function means there is no host tab, and a tool key says so rather
+// than opening anything here.
+func (m Model) WithToolView(fn ToolViewFunc) Model {
+	m.toolView = fn
 	return m
 }
 

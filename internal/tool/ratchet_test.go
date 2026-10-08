@@ -39,7 +39,7 @@ import (
 // test fails if the count rises above it. When the count falls, lower this
 // constant to the new count in the same change, so the ground gained is
 // kept.
-const toolRatchetCeiling = 6
+const toolRatchetCeiling = 5
 
 // ratchetToolNames is every spelling of a tool name a literal can carry:
 // the executables, Beads' directory, and Fresh's Homebrew formula.

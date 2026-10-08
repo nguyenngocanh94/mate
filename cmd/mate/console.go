@@ -155,7 +155,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 	}
 	var columns *consoleColumns
 	if h != nil {
-		if columns, err = newConsoleColumns(h, os.Getenv); err != nil {
+		if columns, err = newConsoleColumns(h, os.Getenv, tools); err != nil {
 			addNotice("no next pane: " + err.Error())
 		} else {
 			defer columns.close()
@@ -170,8 +170,10 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 					addNotice("no next pane: " + err.Error())
 				}
 			}
-			if !layoutFailed && columns.review == "" {
-				addNotice("a crew's report needs the Fresh editor: brew install fresh-editor")
+			if !layoutFailed {
+				for _, n := range columns.missingTools(tools) {
+					addNotice(n)
+				}
 			}
 		}
 	}
@@ -189,7 +191,7 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithNoticeClassifier(noticeClient != nil).
 		WithContext(ctx).
 		WithStage(consoleStage(ws, deps, columns)).
-		WithReview(consoleReview(ws, columns)).
+		WithToolView(consoleToolView(ws, columns, tools)).
 		WithTasks(consoleTasks(ws, columns)).
 		WithNoHostHint(host.NoHostHint(os.Getenv)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).

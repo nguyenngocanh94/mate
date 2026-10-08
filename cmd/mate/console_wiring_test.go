@@ -212,9 +212,17 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 }
 
-// recordingColumns is a Console's stage column and review tab with a
-// recorder listening on each socket in place of `mate pane serve`: what
-// each surface was told to show, in order.
+// roleReview is the tab the report viewer's key binding names; rolePlan
+// is a project-scoped fake tool's (planTool).
+const (
+	roleReview = "review"
+	rolePlan   = "plan"
+)
+
+// recordingColumns is a Console's stage column, review tab and tasks tab
+// with a recorder listening on each socket in place of `mate pane serve`:
+// what each surface was told to show, in order. Its findTool finds every
+// binary under /opt.
 type recordingColumns struct {
 	*consoleColumns
 	mu          sync.Mutex
@@ -245,7 +253,7 @@ func (l layoutCounter) Close(_ context.Context, roles ...string) error {
 
 func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Helper()
-	dir, err := panerun.SocketDir("mc", "stage.sock", "review.sock", "tasks.sock", "absent.sock")
+	dir, err := panerun.SocketDir("mc", "stage.sock", "review.sock", "plan.sock", "tasks.sock", "absent.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,12 +261,16 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	r := &recordingColumns{shown: map[string][]panerun.Command{}}
 	r.consoleColumns = &consoleColumns{
 		h: layoutCounter{n: &r.layouts, closed: &r.closedRoles, fronts: &r.fronts}, dir: dir,
-		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
-		tasks:     filepath.Join(dir, "tasks.sock"),
-		reviewCol: host.Column{Role: roleReview}, tasksCol: host.Column{Role: roleTasks},
-		editor: "/opt/fresh", herdr: "/opt/herdr",
+		stage: filepath.Join(dir, "stage.sock"), tasks: filepath.Join(dir, "tasks.sock"),
+		tasksCol: host.Column{Role: roleTasks},
+		tabs: map[string]toolTab{
+			roleReview: {col: host.Column{Role: roleReview}, socket: filepath.Join(dir, "review.sock")},
+			rolePlan:   {col: host.Column{Role: rolePlan}, socket: filepath.Join(dir, "plan.sock")},
+		},
+		herdr:    "/opt/herdr",
+		findTool: func(name string) string { return "/opt/" + name },
 	}
-	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.review, roleTasks: r.tasks} {
+	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.tabs[roleReview].socket, rolePlan: r.tabs[rolePlan].socket, roleTasks: r.tasks} {
 		ln, err := net.Listen("unix", socket)
 		if err != nil {
 			t.Fatal(err)
@@ -343,6 +355,9 @@ func TestConsoleStageNilHostIsNil(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	if consoleStage(w, deps, nil) != nil {
 		t.Fatal("consoleStage(nil) must be nil")
+	}
+	if consoleToolView(w, nil, tools) != nil {
+		t.Fatal("consoleToolView(nil) must be nil")
 	}
 }
 
@@ -487,16 +502,15 @@ func TestConsoleReviewMakesTheTabForACrew(t *testing.T) {
 	spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
 	absent := filepath.Join(rec.dir, "absent.sock")
-	live := rec.review
-	rec.review = absent
-	rec.reviewCol = host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}
+	live := rec.tabs[roleReview].socket
+	rec.tabs[roleReview] = toolTab{col: host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}, socket: absent}
 	var opened []host.Column
 	var laid [][]host.Column
 	rec.h = reviewHost{
 		layout: func(cols []host.Column) { laid = append(laid, cols) },
 		open:   func(col host.Column) { opened = append(opened, col); _ = os.Symlink(live, absent) },
 	}
-	if err := consoleReview(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
+	if err := consoleToolView(w, rec.consoleColumns, tools)(context.Background(), "e", console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
 	if len(laid) != 0 {
@@ -517,9 +531,8 @@ func TestConsoleReviewRemakesATabWhoseRunnerDied(t *testing.T) {
 	spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
 	dead := filepath.Join(rec.dir, "dead-review.sock")
-	live := rec.review
-	rec.review = dead
-	rec.reviewCol = host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}
+	live := rec.tabs[roleReview].socket
+	rec.tabs[roleReview] = toolTab{col: host.Column{Role: roleReview, Argv: []string{"/bin/mate", "pane", "serve", "--role", roleReview}}, socket: dead}
 	prev := columnStartWait
 	columnStartWait = 100 * time.Millisecond
 	t.Cleanup(func() { columnStartWait = prev })
@@ -534,7 +547,7 @@ func TestConsoleReviewRemakesATabWhoseRunnerDied(t *testing.T) {
 			}
 		},
 	}
-	if err := consoleReview(w, rec.consoleColumns)(context.Background(), console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
+	if err := consoleToolView(w, rec.consoleColumns, tools)(context.Background(), "e", console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}); err != nil {
 		t.Fatal(err)
 	}
 	if opened != 2 || !slices.Equal(closed, []string{roleReview}) || len(rec.of(roleReview)) != 1 || len(rec.of(roleStage)) != 0 {
@@ -578,7 +591,8 @@ func TestConsoleReviewOpensTheCrewReport(t *testing.T) {
 	w, deps := consoleFixture(t, "shop")
 	res := spawnFakeCrew(t, w, deps, "shop", "k3")
 	rec := newRecordingColumns(t)
-	fn := consoleReview(w, rec.consoleColumns)
+	view := consoleToolView(w, rec.consoleColumns, tools)
+	fn := func(ctx context.Context, target console.StageTarget) error { return view(ctx, "e", target) }
 	target := console.StageTarget{Kind: console.StageCrew, ID: "k3", ProjectID: "shop"}
 	ctx := context.Background()
 
@@ -634,9 +648,12 @@ func TestConsoleReviewOpensTheCrewReport(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no folder") {
 		t.Fatalf("missing crew: %v, want no folder", err)
 	}
-	rec.review = ""
+	rec.findTool = func(string) string { return "" }
 	err = fn(ctx, target)
 	if err == nil || !strings.Contains(err.Error(), "brew install fresh-editor") {
 		t.Fatalf("no fresh: %v", err)
+	}
+	if len(rec.of(roleReview)) != 3 {
+		t.Fatal("the tab was told to run a tool that is not installed")
 	}
 }

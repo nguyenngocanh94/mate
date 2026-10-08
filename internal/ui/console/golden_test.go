@@ -321,10 +321,16 @@ func unknownMate(reason string) query.MateNode {
 	}
 }
 
+// reportKey is the tool key the binary binds today: `e` on a crew row,
+// opening the review tab. The Console reads it from the snapshot, as it
+// reads the harnesses.
+var reportKey = query.ToolBinding{Key: "e", Label: "report", Scope: "crew", Role: "review", Tool: "viewer"}
+
 func sampleTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Harnesses:   testHarnesses,
+		Tools:       []query.ToolBinding{reportKey},
 		Workspace: query.KnownField(query.WorkspaceValue{
 			Name: "acme", Root: "/Users/dev/work/acme",
 		}),

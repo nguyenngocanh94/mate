@@ -74,7 +74,7 @@ func TestConsoleTasksOpensAndReusesIndependentTab(t *testing.T) {
 	live := rec.tasks
 	absent := filepath.Join(rec.dir, "absent.sock")
 	rec.tasks = absent
-	rec.editor, rec.review = "", "" // No Fresh installation is needed.
+	rec.findTool = func(string) string { return "" } // No tool installation is needed.
 	opened := 0
 	rec.h = reviewHost{layout: func([]host.Column) { t.Fatal("tasks changed stage layout") }, open: func(col host.Column) {
 		opened++

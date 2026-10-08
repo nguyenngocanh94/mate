@@ -28,8 +28,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.onActionDone(msg)
 	case stageDoneMsg:
 		return m.onStageDone(msg), nil
-	case reviewDoneMsg:
-		return m.onReviewDone(msg), nil
+	case toolViewDoneMsg:
+		return m.onToolViewDone(msg), nil
 	case tasksDoneMsg:
 		if msg.err != nil {
 			m.msg = errMsg(oneLine(msg.err.Error()))

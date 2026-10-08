@@ -57,7 +57,7 @@ func (m Model) onBoxKey(key string) (Model, tea.Cmd) {
 	case "a":
 		return m.beginBoxAssign(items[sel])
 	case "e":
-		return m.beginReview()
+		return m.beginToolView("e")
 	}
 	return m, nil
 }

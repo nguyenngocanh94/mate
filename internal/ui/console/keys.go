@@ -69,6 +69,10 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.keysOpen = true
 		return m.relayout(), nil
 	case "t":
+		// t opens Beads Viewer through TasksFunc until a tool binds it.
+		if m.toolBound("t") {
+			return m.beginToolView("t")
+		}
 		return m.beginTasks()
 	case "tab":
 		return m.onTab(), nil
@@ -102,7 +106,7 @@ func (m Model) onListKey(key string) (tea.Model, tea.Cmd) {
 	case "m":
 		return m.beginModeToggle(m.modeTarget())
 	case "e":
-		return m.beginReview()
+		return m.beginToolView("e")
 	case "y":
 		if r, ok := m.selectedRow(); ok {
 			if v, ok := m.rowCopyValue(r); ok {
@@ -156,7 +160,7 @@ func (m Model) onDetailKey(key string) (tea.Model, tea.Cmd) {
 		m.detailSel = clampInt(m.detailSel+1, 0, max0(n-1))
 		return m, nil
 	case "e":
-		return m.beginReview()
+		return m.beginToolView("e")
 	case "y":
 		if v, ok := m.detailCopy(); ok {
 			return m.copyText(v)
