@@ -1,0 +1,171 @@
+package screen_test
+
+import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+)
+
+// observeSites is every call to an Observer's Observe in the packages that
+// act on a pane - send, spawn, outbox - each with the deterministic check
+// that stands between the Observation and the key it leads to.
+//
+// The ratchet guards the plan's criterion (docs/plans/
+// jev-observer-2026-10-08.md section 9): no irreversible action follows
+// from Jev's Observation without passing a string compare or a highlight
+// confirmation. A new call site, a moved one or a removed verifier fails
+// TestEveryObserveCallSiteHasItsVerifier; the fix is a row here naming the
+// check that guards the new site, never a row without one.
+//
+// verifier is source text that must follow the call in the same function.
+// When the call is in a helper that returns the reading (via names its
+// caller), the verifier must follow every call to the helper in that
+// caller instead.
+var observeSites = []struct {
+	file, fn, via, verifier string
+}{
+	// The line is typed only into a composer the observer read, and an
+	// Enter after the first goes only while the composer holds exactly the
+	// typed text.
+	{file: "send/send.go", fn: "Send", verifier: "pendingMatches(screens, screen, payload)"},
+	// A startup dialog is answered only by answerStartupDialog, below.
+	{file: "spawn/settle.go", fn: "settleStartupPrompt", verifier: "answerStartupDialog("},
+	// The confirm key goes only when the highlight is on the option the
+	// harness's StartupAnswer confirms (the fixture's Highlight, from
+	// StartupTargetSelected).
+	{file: "spawn/settle.go", fn: "answerStartupDialog", verifier: "observed.Highlight != answer.Target"},
+	// The stow line itself goes through send.Send; the restart after it
+	// waits for the turn's end, and on the composer alone only after two
+	// empty looks in a row.
+	{file: "outbox/stow.go", fn: "composer", via: "Stow", verifier: "empties >= 2"},
+}
+
+// observeCall is one Observe call: the function it is in and its offset.
+type observeCall struct {
+	file, fn string
+	offset   int
+}
+
+func TestEveryObserveCallSiteHasItsVerifier(t *testing.T) {
+	files := map[string]*parsedFile{}
+	var calls []observeCall
+	for _, pkg := range []string{"send", "spawn", "outbox"} {
+		names, err := filepath.Glob(filepath.Join("..", pkg, "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range names {
+			if strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			f := parse(t, name)
+			rel := pkg + "/" + filepath.Base(name)
+			files[rel] = f
+			for _, fn := range f.funcs {
+				ast.Inspect(fn.Body, func(n ast.Node) bool {
+					if call, ok := n.(*ast.CallExpr); ok {
+						if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Observe" {
+							calls = append(calls, observeCall{file: rel, fn: fn.Name.Name, offset: f.fset.Position(call.Pos()).Offset})
+						}
+					}
+					return true
+				})
+			}
+		}
+	}
+
+	var got, want []string
+	for _, c := range calls {
+		got = append(got, c.file+" "+c.fn)
+	}
+	for _, s := range observeSites {
+		want = append(want, s.file+" "+s.fn)
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("Observe is called at %d sites %q; the ratchet names %d %q. Name the deterministic check after each new site in observeSites",
+			len(got), got, len(want), want)
+	}
+
+	for _, site := range observeSites {
+		f := files[site.file]
+		if site.via == "" {
+			for _, c := range calls {
+				if c.file == site.file && c.fn == site.fn {
+					f.mustFollow(t, site.fn, c.offset, site.verifier)
+				}
+			}
+			continue
+		}
+		caller := f.funcs[site.via]
+		if caller == nil {
+			t.Fatalf("%s: no function %s calls %s", site.file, site.via, site.fn)
+		}
+		n := 0
+		ast.Inspect(caller.Body, func(node ast.Node) bool {
+			if call, ok := node.(*ast.CallExpr); ok && callsNamed(call, site.fn) {
+				n++
+				f.mustFollow(t, site.via, f.fset.Position(call.Pos()).Offset, site.verifier)
+			}
+			return true
+		})
+		if n == 0 {
+			t.Errorf("%s: %s does not call %s", site.file, site.via, site.fn)
+		}
+	}
+}
+
+// callsNamed reports whether call calls a function or method named name.
+func callsNamed(call *ast.CallExpr, name string) bool {
+	switch f := call.Fun.(type) {
+	case *ast.Ident:
+		return f.Name == name
+	case *ast.SelectorExpr:
+		return f.Sel.Name == name
+	}
+	return false
+}
+
+type parsedFile struct {
+	name  string
+	src   []byte
+	fset  *token.FileSet
+	funcs map[string]*ast.FuncDecl
+}
+
+func parse(t *testing.T, name string) *parsedFile {
+	t.Helper()
+	src, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, name, src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &parsedFile{name: name, src: src, fset: fset, funcs: map[string]*ast.FuncDecl{}}
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+			f.funcs[fn.Name.Name] = fn
+		}
+	}
+	return f
+}
+
+// mustFollow fails unless verifier appears in fn's body after offset.
+func (f *parsedFile) mustFollow(t *testing.T, fn string, offset int, verifier string) {
+	t.Helper()
+	end := f.fset.Position(f.funcs[fn].Body.End()).Offset
+	if !strings.Contains(string(f.src[offset:end]), verifier) {
+		line := f.fset.Position(f.fset.File(f.funcs[fn].Pos()).Pos(offset)).Line
+		t.Errorf("%s:%d: %s reads the pane and no %q follows it", f.name, line, fn, verifier)
+	}
+}
