@@ -245,7 +245,7 @@ func (l layoutCounter) Close(_ context.Context, roles ...string) error {
 
 func newRecordingColumns(t *testing.T) *recordingColumns {
 	t.Helper()
-	dir, err := panerun.SocketDir("mc", "stage.sock", "review.sock", "absent.sock")
+	dir, err := panerun.SocketDir("mc", "stage.sock", "review.sock", "tasks.sock", "absent.sock")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,9 +254,11 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	r.consoleColumns = &consoleColumns{
 		h: layoutCounter{n: &r.layouts, closed: &r.closedRoles, fronts: &r.fronts}, dir: dir,
 		stage: filepath.Join(dir, "stage.sock"), review: filepath.Join(dir, "review.sock"),
+		tasks:     filepath.Join(dir, "tasks.sock"),
+		reviewCol: host.Column{Role: roleReview}, tasksCol: host.Column{Role: roleTasks},
 		editor: "/opt/fresh", herdr: "/opt/herdr",
 	}
-	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.review} {
+	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.review, roleTasks: r.tasks} {
 		ln, err := net.Listen("unix", socket)
 		if err != nil {
 			t.Fatal(err)

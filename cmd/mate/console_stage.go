@@ -32,9 +32,11 @@ type consoleColumns struct {
 	// tab; its Role is empty when Fresh is not installed.
 	cols      []host.Column
 	reviewCol host.Column
+	tasksCol  host.Column
 	dir       string
 	stage     string
 	review    string // "" when Fresh is not installed
+	tasks     string
 	editor    string
 	herdr     string
 	// env is what every column's program gets over the pane's own: the
@@ -50,7 +52,7 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 		return nil, fmt.Errorf("find the mate binary: %w", err)
 	}
 	// A short directory: a unix socket path is limited to about 100 bytes.
-	dir, err := panerun.SocketDir("mate-cols-", roleStage+".sock", roleReview+".sock")
+	dir, err := panerun.SocketDir("mate-cols-", roleStage+".sock", roleReview+".sock", roleTasks+".sock")
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +65,8 @@ func newConsoleColumns(h host.Host, getenv func(string) string) (*consoleColumns
 		return host.Column{Role: role, Argv: []string{exe, "pane", "serve", "--role", role, "--socket", socket, "--owner", owner}}
 	}
 	c.cols = []host.Column{column(roleStage, c.stage)}
+	c.tasks = filepath.Join(dir, roleTasks+".sock")
+	c.tasksCol = column(roleTasks, c.tasks)
 	if editor := findTool(getenv, "fresh"); filepath.IsAbs(editor) {
 		c.editor, c.review = editor, filepath.Join(dir, roleReview+".sock")
 		c.reviewCol = column(roleReview, c.review)
@@ -155,7 +159,7 @@ var columnStartWait = 5 * time.Second
 func (c *consoleColumns) close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	for _, s := range []string{c.stage, c.review} {
+	for _, s := range []string{c.stage, c.review, c.tasks} {
 		if s != "" {
 			_ = panerun.Send(ctx, s, panerun.Command{Exit: true})
 		}
@@ -260,27 +264,51 @@ func herdrDown(session string) error {
 // touch the stage column. A tab already showing is brought to the front
 // after the file changes.
 func (c *consoleColumns) showTab(ctx context.Context, cmd panerun.Command) error {
-	err := panerun.Send(ctx, c.review, cmd)
+	return c.showRoleTab(ctx, c.reviewCol, c.review, cmd)
+}
+
+// showRoleTab opens/reuses only the requested surface, leaving other tabs
+// and the agent stage intact.
+func (c *consoleColumns) showRoleTab(ctx context.Context, col host.Column, socket string, cmd panerun.Command) error {
+	err := panerun.Send(ctx, socket, cmd)
 	if !errors.Is(err, panerun.ErrGone) {
 		if err != nil {
 			return err
 		}
-		return c.h.Front(ctx, roleReview)
+		return c.h.Front(ctx, col.Role)
 	}
-	if err := c.h.Tab(ctx, c.reviewCol); err != nil {
+	if err := c.h.Tab(ctx, col); err != nil {
 		return err
 	}
-	err = c.waitSend(ctx, c.review, cmd)
+	err = c.waitSend(ctx, socket, cmd)
 	if !errors.Is(err, panerun.ErrGone) {
 		return err
 	}
-	if err := c.h.Close(ctx, roleReview); err != nil {
+	if err := c.h.Close(ctx, col.Role); err != nil {
 		return err
 	}
-	if err := c.h.Tab(ctx, c.reviewCol); err != nil {
+	if err := c.h.Tab(ctx, col); err != nil {
 		return err
 	}
-	return c.waitSend(ctx, c.review, cmd)
+	return c.waitSend(ctx, socket, cmd)
+}
+
+func consoleTasks(ws *store.Workspace, c *consoleColumns) console.TasksFunc {
+	if c == nil {
+		return nil
+	}
+	return func(ctx context.Context, project string) error {
+		if _, err := ws.BeadsDir(project); err != nil {
+			return err
+		}
+		exe, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		return c.showRoleTab(ctx, c.tasksCol, c.tasks, panerun.Command{
+			Argv: []string{exe, "tasks", project, "--workspace", ws.Root()}, Dir: ws.Root(), Env: c.env,
+		})
+	}
 }
 
 // reviewReport is where `e` opens Fresh: the crew's own folder

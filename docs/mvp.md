@@ -17,6 +17,15 @@ Mate là một harness interactive (Claude Code, Codex, pi, Grok) chạy trong m
 Người dùng nói chuyện với Mate bằng cách gõ vào pane đó, xem qua stream mode của console.
 Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` hoặc spawn Crew.
 
+### Task management: Beads + Beads Viewer (2026-10-07)
+
+- Beads (`bd`) là nguồn dữ liệu duy nhất cho epic/task, hierarchy, dependency, priority và trạng thái `open`, `in_progress`, `blocked`, `deferred`, `closed`. Một tracker tại `.mate/projects/<p>/.beads/` cho mọi repo của project; project không cần repo git.
+- `t` trong Console mở/reuse tab Tasks chạy Beads Viewer (`bv`), cùng cơ chế tab như code/report viewer; dùng được khi chưa có Mate, Crew hay Fresh. `mate tasks <project>` mở cùng viewer độc lập. Viewer có list/detail, tree, Kanban và dependency graph; tạo/sửa/claim/close qua CLI Beads, không sửa trực tiếp export của viewer.
+- `mate beads <project> [--workspace <dir>] -- <bd arguments>` chọn đúng tracker, khởi tạo khi cần (`--skip-agents --skip-hooks`), khoá theo project cho embedded Dolt và export atomic sau mỗi lệnh (kể cả lỗi có thể đã ghi một phần). `mate tasks <project> --init|--list|--json` khởi tạo/đọc; `mate task-triage <project>` chạy robot triage cho agent.
+- `.beads/issues.jsonl` là projection cho viewer, không phải nguồn dữ liệu hoặc bản backup Dolt. `bv` tự reload khi CLI đổi export; Ctrl+r/F5 refresh khi dùng `bd` trực tiếp. Skill `task-management` hướng dẫn Mate dùng wrapper và Beads để chọn ready work, claim, ghi dependency, liên kết Crew và chấp nhận giao hàng. Recall đọc tối đa 10 active/blocked và 10 ready qua `bd`, timeout 3s; không khởi tạo tracker chỉ vì recall.
+- Crew bàn giao `wait-mate` không close Beads task. Mate/người dùng chỉ close sau khi ship landed hoặc captain chấp nhận scout. `backlog.md` giữ cam kết/câu hỏi/ghi chú Crew; epic/task thuộc Beads.
+- Thay bản task manager tự viết chưa phát hành; bỏ `tasks.yaml`, `mate epic`, `mate task` và TUI CRUD riêng. Workspace thật chưa có dữ liệu bản thử. Nếu gặp `tasks.yaml` cũ, từ chối khởi tạo tracker trống và giữ file để chuyển dữ liệu có kiểm tra. Cài đặt, contract phiên bản và cách dùng: [beads.md](beads.md).
+
 ## 2. Quyết định đã chốt
 
 1. Mate chỉ điều phối và ra quyết định. Không sửa code, không tự khảo sát repo. Ràng buộc bằng cấu trúc (cwd không chứa code), không bằng lời dặn.

@@ -73,7 +73,8 @@ Every kind of knowledge has one owner. The recall digest frames these files; do 
 | Product decisions | PROJECT.md `## Captain's decisions`, dated and verbatim |
 | Preferences and authority boundaries | `/ws/.mate/projects/shop/mate/memory.md` `## Captain` |
 | Operational lessons about Crews, harnesses or mate | memory.md `## Lessons`; no repository facts or report copies |
-| Task state and promises | `/ws/.mate/projects/shop/mate/backlog.md`: `## In flight`, `## Held for the captain`, `## Queued`, `## Done` (10 most recent); reconcile against live crews |
+| Epic/task plan | Beads: `mate tasks shop --list`; edit through `mate beads` (skill `task-management`) |
+| Crew notes and promises | `/ws/.mate/projects/shop/mate/backlog.md`: `## In flight`, `## Held for the captain`, `## Queued`, `## Done` (10 most recent); reconcile against live crews |
 | Questions sent to captain | backlog.md `## Held for the captain`, verbatim with date and next action |
 | Code details | Repository AGENTS.md, committed by a Crew |
 | Task evidence | `/ws/.mate/projects/shop/crews/<id>/` brief, hand-back and report |
@@ -92,6 +93,7 @@ Load the operational skill when its trigger fires:
 - `diagnostic-reasoning` - before scoping a bug or acting on a diagnostic report.
 - `stow` - for stow/"ghi nhớ lại", a `⟦mate⟧ stow:` request, memory check problems, or a corrected task's closure.
 - `token-review` - when the captain asks which tasks cost too many tokens, why, or what skills and docs would make this project cheaper to run.
+- `task-management` - when recording requested work, choosing ready tasks, dispatching, tracking dependencies or accepting delivery in Beads.
 
 ## 3. Bootstrap checklist
 
@@ -129,6 +131,7 @@ Load `mate-commands` before this action. On harnesses without skills, read `/ws/
 ## 5. Task intake
 
 Preserve the captain's words verbatim. Delegate investigation to a scout; do not browse project files yourself. Each task belongs to one repo.
+Load `task-management` when recording or dispatching work and accepting delivery. Beads owns epic/task status; Crew state remains separate.
 
 Load `task-intake` before this action. On harnesses without skills, read `/ws/.mate/projects/shop/mate/.claude/skills/task-intake/SKILL.md`. Read only the relevant skill, not the whole reference set.
 

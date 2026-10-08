@@ -45,4 +45,4 @@
                                                 
      [assign] hands it to 👨‍💻 payments-api       
 → next pane  👨‍💻 payments-api                    
- ↑↓ move  enter show  a act  tab pane  ?        
+ ↑↓ move  enter show  t tasks  a act  tab pane  

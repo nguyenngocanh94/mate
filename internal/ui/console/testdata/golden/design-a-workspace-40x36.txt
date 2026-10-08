@@ -33,4 +33,4 @@
   🤖 Backfill ledger v2       [assign]  
      payments-api · decide · 6m         
 → next pane  👨‍💻 payments-api            
- ↑↓ move  enter open  a act  n new  ?   
+ ↑↓ move  enter open  t tasks  a act    

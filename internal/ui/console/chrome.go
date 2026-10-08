@@ -255,14 +255,14 @@ func (m Model) keyHints() []keyHint {
 	}
 	switch m.focus {
 	case paneDetail:
-		return []keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"enter", "show"}, {"esc", "list"}}
+		return []keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"esc", "list"}, {"t", "tasks"}, {"enter", "show"}}
 	case paneBox:
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "show crew"}, {"a", "assign"}, {"esc", ""}}
+		return []keyHint{{m.g.UpDown, "move"}, {"enter", "crew"}, {"a", "assign"}, {"t", "tasks"}, {"esc", ""}}
 	}
 	if m.cur().kind == frameWorkspace {
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "open"}, {"a", "act"}, {"n", "new"}, {"?", ""}}
+		return []keyHint{{m.g.UpDown, "move"}, {"enter", "open"}, {"t", "tasks"}, {"a", "act"}, {"n", "new"}, {"?", ""}}
 	}
-	return []keyHint{{m.g.UpDown, "move"}, {"enter", "show"}, {"a", "act"}, {"tab", "pane"}, {"?", ""}}
+	return []keyHint{{m.g.UpDown, "move"}, {"enter", "show"}, {"t", "tasks"}, {"a", "act"}, {"tab", "pane"}, {"?", ""}}
 }
 
 // crewByID resolves a Crew row against the Project frame it belongs to.

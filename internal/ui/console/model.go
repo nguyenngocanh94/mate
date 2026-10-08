@@ -248,6 +248,7 @@ type Model struct {
 	// review is `e`: a tab beside the Console opens that crew's report.
 	// nil means there is no host tab to open.
 	review ReviewFunc
+	tasks  TasksFunc
 	// noHost says how to get a next pane while stage is nil; blank means
 	// the default advice.
 	noHost string
@@ -443,6 +444,12 @@ func (m Model) WithStage(fn StageFunc) Model {
 // `e` says so rather than opening a report here.
 func (m Model) WithReview(fn ReviewFunc) Model {
 	m.review = fn
+	return m
+}
+
+// WithTasks installs the project plan tab opened by `t`.
+func (m Model) WithTasks(fn TasksFunc) Model {
+	m.tasks = fn
 	return m
 }
 

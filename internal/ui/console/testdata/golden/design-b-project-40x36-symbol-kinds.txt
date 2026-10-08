@@ -33,4 +33,4 @@
      k3 · decide · 6m                   
      Plan ready: backfill ledger_v2 in …
 → next pane  ◆  payments-api            
- ↑↓ move  enter show  a act  tab pane  ?
+ ↑↓ move  enter show  t tasks  a act    

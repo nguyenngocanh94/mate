@@ -218,7 +218,17 @@ In each refusal below, `<default>` is the default branch of the Crew's repo.
 - `branch ... is not ahead of <default>: nothing to merge` - the Crew committed nothing. That is a scout, or a ship that did not do its job; report it as such.
 - `... has <branch> checked out, not <default>` or `... has N uncommitted file(s)` naming the repo's own checkout - the captain is in the middle of something there. Say so and stop; that checkout is theirs, not yours.
 
-### Backlog
+### Beads task management
+
+```text
+mate tasks <project> [--list|--json|--init] [--workspace <dir>]
+mate beads <project> [--workspace <dir>] -- <bd arguments>
+mate task-triage <project> [--workspace <dir>]
+```
+
+Load `task-management` when recording work, choosing ready tasks, dispatching, tracking dependencies or accepting delivery. `mate beads` selects the project's shared Beads tracker and updates the viewer export after each command. `mate tasks` without flags opens the interactive Beads Viewer for the captain; agents use `--list`, `--json` or `task-triage`. `--init` initializes the tracker if absent and refreshes the export. Beads owns task records; the export is a generated view.
+
+### Live crew backlog
 
 ```text
 mate backlog <project> [--all] [--workspace <dir>]
@@ -286,7 +296,7 @@ mate recall <project> [--live] [--max-bytes <n>] [--workspace <dir>]
 `recall` is your session-start digest (section 3), and it only reads.
 It opens with `# mate recall <project>` and one contract line, then prints numbered parts, live state first and memory last, so a digest cut short loses the part you can recover with one read and never the crews:
 
-1. Live state: `mode:` and `yolo`, the `mate backlog` table, every unresolved inbox item with what it needs and its status file, and every line queued in your outbox.
+1. Live state: `mode:` and `yolo`, the `mate backlog` table, a bounded summary of active/blocked and ready Beads work when present, every unresolved inbox item with what it needs and its status file, and every line queued in your outbox.
 2. `mate project facts`: one block per repo, `head:` included, or `repos: none`.
 3. `/ws/.mate/projects/shop/PROJECT.md`, then a `warning:` for each anchor its own repo's default branch has moved past.
 4. `/ws/.mate/projects/shop/mate/backlog.md` without `## Done`, then the `## In flight` ids that are not an open crew in part 1 and the open crews with no `- <id>` line there, matched by id only.

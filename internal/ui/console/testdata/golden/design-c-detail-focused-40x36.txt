@@ -33,4 +33,4 @@
      k3 · decide · 6m                   
      Plan ready: backfill ledger_v2 in …
 → next pane  👨‍💻 payments-api            
- ↑↓ field  y copy  enter show  esc list 
+ ↑↓ field  y copy  esc list  t tasks    
