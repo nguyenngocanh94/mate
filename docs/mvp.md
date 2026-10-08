@@ -43,12 +43,14 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 
 ```text
 <workspace>/
-├── shop/                                 repo git thật, Mate không cwd vào đây
-├── blog/
+├── shop/                                 thư mục project, của người dùng; Mate không cwd vào đây
+│   ├── backend/                          repo git thật
+│   └── web/                              repo git thật
+├── notes/                                project chưa có repo: vẫn có thư mục
 ├── .worktrees/
 │   └── shop-k3/                          git worktree của crew k3, branch mate/k3
 └── .mate/
-    ├── workspace.yaml                    projects, herdr session name, defaults
+    ├── workspace.yaml                    layout: 2, projects, herdr session name, defaults
     ├── WORKSPACE.md                      quy tắc của người dùng cho mọi Mate
     ├── CREW.md                           quy tắc của người dùng cho mọi Crew, nối cuối mọi brief (M7)
     ├── pricing.yaml                      bảng giá token, dùng sau
@@ -87,7 +89,8 @@ Mate không có code trong cwd; muốn biết gì về repo thì gọi `mate` ho
 
 Quy ước:
 
-- Repo nằm ngang hàng với `.mate/`, không bắt buộc nằm trong thư mục con nào.
+- Project là một thư mục thật `<workspace>/<project>/`, tên bằng tên project (2026-10-08). Mọi repo của project nằm dưới thư mục đó, con trực tiếp hay lồng sâu (`shop/services/api`); `repos[].path` vẫn tương đối gốc workspace và store từ chối path ngoài thư mục project. `mate project add <p>` tạo thư mục nếu chưa có; `mate project repo add <p> <url>` clone vào `<p>/<tên>`. `.mate/projects/<p>/` vẫn là state của mate.
+- `workspace.yaml` ghi `layout: 2`; thiếu `layout:` là 1, layout cũ với repo ngang hàng `.mate/`. Workspace layout cũ vẫn mở và đọc được, status line nói `old layout: run mate migrate`; `crew spawn`, `project repo add` và `project add` kèm repo bị từ chối tới khi chạy `mate migrate`.
 - Một project có từ không tới nhiều repo; một repo thuộc tối đa một project (M9).
 - Worktree gom ở `.worktrees/<project>-<crew>/`. Codex vẫn hỏi trust cho worktree mới (đo 2026-09-17), nên spawn luôn chạy settle step.
 - `.meta` là `key=value` mỗi dòng một khoá. `.status` là text thuần `state: một dòng`.
