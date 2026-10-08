@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/nguyenngocanh94/mate/internal/notice"
+	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 )
 
 // manifest is the run a cassette was recorded from.
@@ -92,13 +93,13 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 
 	rows := make([]Row, 0, len(corpus))
 	var notRecorded []string
-	m := manifest{Model: notice.Model, Date: time.Now().Format("2006-01-02"), Prompt: promptHash()}
+	m := manifest{Model: notice.Model, Date: time.Now().Format("2006-01-02"), Prompt: jev.PromptHash()}
 	for _, s := range corpus {
-		body, err := requestBody(prepare(s.Text, key))
+		body, err := jev.RequestBody(jev.Prepare(s.Text, key))
 		if err != nil {
 			return err
 		}
-		row := Row{Screen: s, Hash: hashOf(body)}
+		row := Row{Screen: s, Hash: jev.HashOf(body)}
 		var data []byte
 		if replay {
 			e, ok := recorded[row.Hash]
@@ -146,7 +147,7 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 		// fails validation is in the cassette and is re-judged on replay.
 		m.Entries = append(m.Entries, manifestEntry{File: s.File, Request: row.Hash, LatencyMS: row.LatencyMS, Error: row.Err})
 		if row.Err == "" {
-			row.Resp, err = parse(data)
+			row.Resp, err = jev.Parse(data)
 			if err != nil {
 				row.Err = "invalid answer: " + err.Error()
 			}
@@ -349,7 +350,7 @@ func report(w io.Writer, m manifest, rows []Row) {
 		}
 	}
 	fmt.Fprintf(w, "- Failed requests or invalid answers: %d.\n", errs)
-	fmt.Fprintf(w, "- Valid answers whose probabilities sum to one only within the API's two-decimal rounding (notice.Client would refuse them): %d.\n", rounded)
+	fmt.Fprintf(w, "- Valid answers whose probabilities sum to one only within the API's two-decimal rounding (notice.Client refused them until it allowed for the rounding): %d.\n", rounded)
 	fmt.Fprintf(w, "- Scored answers below confidence 0.85: %d.\n", below)
 	// What the plan's chain would have taken from Jev at its proposed
 	// threshold: only answers at or above it, the rest going to fixtures.

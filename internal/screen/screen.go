@@ -102,7 +102,9 @@ type Observation struct {
 	// "jev" or "chain".
 	Source string
 	// Reason says why Composer or Dialog is Unknown. It is empty when
-	// neither is.
+	// neither is, except from the jev observer, which always names its
+	// composer and dialog answers with their confidences here so a caller
+	// can say which one fell short.
 	Reason string
 }
 

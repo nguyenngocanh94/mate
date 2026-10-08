@@ -11,17 +11,19 @@ import (
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
+	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
 // Axis is the part of the observation a screen's deterministic label speaks
-// to. Every request asks Jev all three; a screen is scored on its own axis.
-type Axis string
+// to: one of the three questions every request asks Jev. A screen is scored
+// on its own axis.
+type Axis = jev.Axis
 
 const (
-	AxisComposer Axis = "composer"
-	AxisDialog   Axis = "dialog"
-	AxisNotice   Axis = "notice"
+	AxisComposer = jev.AxisComposer
+	AxisDialog   = jev.AxisDialog
+	AxisNotice   = jev.AxisNotice
 )
 
 // Screen is one corpus entry: a captured (or, for injections, hand-built)

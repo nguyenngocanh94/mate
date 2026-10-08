@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
@@ -70,70 +71,18 @@ func TestInjectionScreensClassifyAsBriefed(t *testing.T) {
 	}
 }
 
-// What leaves the machine keeps faint text as markers and nothing else of
-// the terminal's attributes, and the key never.
-func TestPrepareMarksFaintAndRedactsKey(t *testing.T) {
-	ghost := "❯ \x1b[0m\x1b[2mUse checkout-express.html\x1b[0m\n\x1b[38;2;255;255;255mtyped\x1b[0m sk-test123 KEY"
-	got := prepare(ghost, "KEY")
-	want := "❯ " + faintOpen + "Use checkout-express.html" + faintClose + "\ntyped [redacted] [redacted]"
-	if got != want {
-		t.Fatalf("prepare = %q, want %q", got, want)
-	}
-	if plain := "› hello\n  78% context left"; prepare(plain, "") != plain {
-		t.Fatalf("a plain screen changed: %q", prepare(plain, ""))
-	}
-}
-
 // The measured ghost-suggestion capture reaches Jev with its suggestion
 // marked faint, the evidence ClassifyComposer reads it by.
 func TestGhostSuggestionCaptureIsMarked(t *testing.T) {
 	for _, s := range corpus(t) {
 		if strings.HasSuffix(s.File, "_ghost_suggestion.ansi") {
-			if !strings.Contains(prepare(s.Text, ""), faintOpen+"Use checkout-express.html"+faintClose) {
-				t.Fatalf("composer line not marked faint:\n%s", prepare(s.Text, ""))
+			if !strings.Contains(jev.Prepare(s.Text, ""), jev.FaintOpen+"Use checkout-express.html"+jev.FaintClose) {
+				t.Fatalf("composer line not marked faint:\n%s", jev.Prepare(s.Text, ""))
 			}
 			return
 		}
 	}
 	t.Fatal("ghost suggestion capture not in the corpus")
-}
-
-func TestRequestBodyIsStable(t *testing.T) {
-	a, err := requestBody("screen")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, _ := requestBody("screen")
-	if !bytes.Equal(a, b) || hashOf(a) != hashOf(b) {
-		t.Fatal("same screen, different request")
-	}
-	if !bytes.Contains(a, []byte(`"model":"jev-1.13.0"`)) {
-		t.Fatalf("model not pinned: %s", a)
-	}
-}
-
-func TestParseRefusesMalformedAnswers(t *testing.T) {
-	ok := `{"model":"jev-1.13.0","usage":{"input_tokens":1,"output_tokens":1},"answers":{` +
-		`"composer":{"type":"choice","choice":"busy","confidence":0.9,"probabilities":{"empty":0.05,"draft":0.02,"busy":0.9,"none":0.02,"unknown":0.01}},` +
-		`"dialog":{"type":"choice","choice":"none","confidence":1,"probabilities":{"none":1,"trust":0,"update":0,"hooks_review":0,"permission":0,"other":0,"unknown":0}},` +
-		`"notice":{"type":"choice","choice":"none","confidence":1,"probabilities":{"quota_warning":0,"quota_exhausted":0,"auth_required":0,"permission_required":0,"update_notice":0,"none":1,"unknown":0}}}}`
-	r, err := parse([]byte(ok))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r.Answers[AxisComposer].Choice != "busy" || r.Answers[AxisDialog].Choice != "none" {
-		t.Fatalf("parsed %+v", r)
-	}
-	for name, bad := range map[string]string{
-		"other model":     strings.Replace(ok, "jev-1.13.0", "jev-latest", 1),
-		"label outside":   strings.Replace(ok, `"choice":"busy"`, `"choice":"idle"`, 1),
-		"not most likely": strings.Replace(ok, `"choice":"busy"`, `"choice":"empty"`, 1),
-		"missing answer":  strings.Replace(ok, `"dialog"`, `"dialogue"`, 1),
-	} {
-		if _, err := parse([]byte(bad)); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
 }
 
 // The committed cassette replays without the network, whatever was

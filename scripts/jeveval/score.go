@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/screen/jev"
 	"github.com/nguyenngocanh94/mate/internal/send"
 )
 
@@ -53,7 +54,7 @@ type Row struct {
 	Hash      string
 	LatencyMS int64
 	Err       string
-	Resp      Response
+	Resp      jev.Response
 }
 
 // Scored reports whether the screen has a deterministic label on its axis.
