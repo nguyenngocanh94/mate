@@ -75,6 +75,7 @@ func load(ctx context.Context, ws *store.Workspace, harnesses Harnesses, tools [
 		}),
 		Harnesses: append([]Harness(nil), harnesses.List...),
 		Tools:     append([]ToolBinding(nil), tools...),
+		Layout:    ws.Layout(),
 	}
 	for _, ref := range ws.Projects() {
 		if err := ctx.Err(); err != nil {

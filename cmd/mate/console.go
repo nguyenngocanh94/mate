@@ -177,6 +177,9 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 			}
 		}
 	}
+	if n := consoleLayoutNotice(ws); n != "" {
+		addNotice(n)
+	}
 	// A Jev configuration problem is said on the same status line, after
 	// any pane message; the console stays usable either way.
 	noticeClient, noticeErr := consoleNoticeClient(ws)
@@ -219,6 +222,17 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		}
 	}
 	return nil
+}
+
+// consoleLayoutNotice is the status line's word on a workspace still on the
+// old layout, repos beside `.mate/` (docs/mvp.md section 3): it opens and
+// reads, but a crew spawn or a repo add waits for `mate migrate`. A
+// workspace on layout 2 has nothing to say.
+func consoleLayoutNotice(ws *store.Workspace) string {
+	if ws.LayoutOld() {
+		return "old layout: run mate migrate"
+	}
+	return ""
 }
 
 // consoleTerminalFiles requires the caller's own stdout to be a real
