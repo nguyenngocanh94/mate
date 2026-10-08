@@ -24,9 +24,12 @@ type Health struct {
 	// the pane (Deps.Observer). It is send.StateUnknown when the agent is
 	// gone or the screen could not be classified.
 	Composer send.ComposerState
-	// Source is the observer that read Composer: "fixture", or "jev" once
-	// Jev's answer for the snapshot on the pane has arrived (observe.go).
-	// Empty when no pane was read.
+	// Source is the Source of the Observation Composer was taken from:
+	// "fixture" for the fixture observer's reading, and the chain's own
+	// Source ("jev" when any of Jev's answer is in it, "fixture" when the
+	// chain fell back) once the configured observer's answer for the
+	// snapshot on the pane has arrived (observe.go). Empty when no pane was
+	// read.
 	Source string
 	// QuietFor is how long the pane's contents and the crew's status file
 	// have both been unchanged, measured from the first poll that saw this

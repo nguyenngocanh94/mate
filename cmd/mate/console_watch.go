@@ -223,6 +223,7 @@ func crewHealth(h watch.Health) query.CrewHealth {
 		QuietFor:     h.QuietFor,
 		ComposerFor:  h.ComposerFor,
 		ObservedAt:   h.ObservedAt,
+		Source:       h.Source,
 	}
 }
 

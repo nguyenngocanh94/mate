@@ -295,6 +295,9 @@ type CrewHealth struct {
 	// ObservedAt is when the observation was made. It is not the snapshot's
 	// AsOf: the observer polls on its own interval, so this can be older.
 	ObservedAt time.Time
+	// Source is the observer whose reading Composer is ("fixture", "jev"),
+	// empty when none was named.
+	Source string
 }
 
 // CrewComposer is the composer state of a Crew's pane, as internal/send

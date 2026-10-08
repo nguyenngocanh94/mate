@@ -158,14 +158,14 @@ func TestWithCrewHealthLeavesUnobservedCrewsAlone(t *testing.T) {
 		},
 	}}}
 	observed := map[watch.CrewRef]watch.Health{
-		{Project: "shop", Crew: "k3"}: {AgentPresent: true, Composer: send.StateBusy, QuietFor: 3 * time.Second},
+		{Project: "shop", Crew: "k3"}: {AgentPresent: true, Composer: send.StateBusy, QuietFor: 3 * time.Second, Source: "jev"},
 		// A crew of another project with the same id must not leak across.
 		{Project: "blog", Crew: "k9"}: {AgentPresent: false, Composer: send.StateUnknown},
 	}
 
 	out := withCrewHealth(snap, observed)
 	k3 := out.Projects[0].Crews[0].Health
-	if !k3.IsKnown() || k3.Value.Composer != query.ComposerBusy || k3.Value.QuietFor != 3*time.Second {
+	if !k3.IsKnown() || k3.Value.Composer != query.ComposerBusy || k3.Value.QuietFor != 3*time.Second || k3.Value.Source != "jev" {
 		t.Fatalf("k3 health = %+v, want the observation", k3)
 	}
 	if k9 := out.Projects[0].Crews[1].Health; k9.State != query.Absent {
