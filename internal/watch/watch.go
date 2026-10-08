@@ -136,8 +136,9 @@ type Deps struct {
 	// StaleAfter is the quiet period that opens `stale`; zero means
 	// DefaultStaleAfter.
 	StaleAfter time.Duration
-	// Observer reads each pane snapshot; the health column is its
-	// Observation's composer. Nil means the fixture observer
+	// Observer reads each pane snapshot that differs from the last one it
+	// read; the health column is its Observation's composer, kept while the
+	// pane does not change. Nil means the fixture observer
 	// (internal/screen/fixture).
 	Observer screen.Observer
 }
@@ -234,6 +235,9 @@ type observation struct {
 	// clock instead.
 	composer      send.ComposerState
 	composerSince time.Time
+	// observed is the hash of the snapshot composer was read from, empty
+	// before the observer has read one.
+	observed string
 }
 
 // New builds an observer over a workspace. It does not poll until Start or
@@ -443,13 +447,21 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		obs.changedAt = now
 	}
 
-	observed, err := w.deps.observer().Observe(ctx, screens, screen)
-	if err != nil {
-		// A screen the observer could not read is not a reading: the round
-		// ends without a verdict, as for a pane that could not be read.
-		return err
+	// The observer is asked only about a snapshot it has not read: a pane
+	// that has not changed keeps its last reading, so a still pane costs
+	// no observer call (docs/plans/jev-observer-2026-10-08.md section 4.3).
+	composer := obs.composer
+	if obs.observed != hash {
+		observed, err := w.deps.observer().Observe(ctx, screens, screen)
+		if err != nil {
+			// A screen the observer could not read is not a reading: the
+			// round ends without a verdict, as for a pane that could not
+			// be read, and the next round asks again.
+			return err
+		}
+		obs.observed = hash
+		composer = observed.Composer
 	}
-	composer := observed.Composer
 	if obs.composerSince.IsZero() || composer != obs.composer {
 		obs.composer = composer
 		obs.composerSince = now

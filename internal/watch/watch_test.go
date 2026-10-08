@@ -697,14 +697,58 @@ func TestWatchReadsTheComposerThroughTheObserver(t *testing.T) {
 	if h, _ := f.health("k3"); h.Composer != send.StateBusy {
 		t.Fatalf("health composer = %q, want the observer's busy", h.Composer)
 	}
-	if says.calls != 2 {
-		t.Fatalf("observer called %d times, want once per round", says.calls)
+	if says.calls != 1 {
+		t.Fatalf("observer called %d times over one unchanged screen, want once", says.calls)
 	}
 
 	says.err = errors.New("observer could not read the screen")
+	f.setScreen(codexBusyScreen)
 	f.clock.advance(time.Minute)
 	if err := f.w.Poll(context.Background()); err == nil {
 		t.Fatal("a round whose screen the observer could not read reported no error")
 	}
 	f.assertIncidents()
+}
+
+// The observer is asked only when the pane's snapshot changes: three polls
+// of the same screen are one observation, a new screen is the next, and a
+// screen the observer could not read is asked about again.
+func TestWatchObservesOnlyWhenTheScreenChanges(t *testing.T) {
+	f := newFixture(t)
+	says := &observerSays{obs: screen.Observation{Composer: screen.ComposerEmpty, Source: "test"}}
+	deps := f.deps()
+	deps.Observer = says
+	f.w = watch.New(f.ws, deps)
+	f.appendStatus("k3", "working: running the suite")
+
+	for range 3 {
+		f.poll()
+		f.clock.advance(5 * time.Second)
+	}
+	if says.calls != 1 {
+		t.Fatalf("observer called %d times over three polls of one screen, want 1", says.calls)
+	}
+	if h, _ := f.health("k3"); h.Composer != send.StateEmpty {
+		t.Fatalf("health composer = %q, want the kept reading", h.Composer)
+	}
+
+	f.setScreen(codexBusyScreen)
+	says.obs.Composer = screen.ComposerBusy
+	f.poll()
+	if h, _ := f.health("k3"); says.calls != 2 || h.Composer != send.StateBusy {
+		t.Fatalf("after the screen changed: %d calls, composer %q; want 2 and the new reading", says.calls, h.Composer)
+	}
+
+	f.setScreen(codexIdleScreen)
+	says.err = errors.New("observer could not read the screen")
+	f.clock.advance(5 * time.Second)
+	if err := f.w.Poll(context.Background()); err == nil {
+		t.Fatal("no error from a screen the observer could not read")
+	}
+	says.err = nil
+	f.clock.advance(5 * time.Second)
+	f.poll()
+	if says.calls != 4 {
+		t.Fatalf("observer called %d times, want the unread screen asked about again", says.calls)
+	}
 }
