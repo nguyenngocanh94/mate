@@ -1,7 +1,7 @@
 # Phương án Jev làm bộ quan sát trạng thái agent
 
 - Ngày: 2026-10-08.
-- Trạng thái: nháp, chờ captain duyệt. Chưa có PR nào.
+- Trạng thái: đã làm trên nhánh `feat/jev-observer`, chưa merge; chờ captain xác nhận việc vượt gate PR 0 và lần chạy thật một ngày. Commit theo PR: PR 0 `039420e`, `b47bb8d`, `180ac70`; PR 1 `0bf8fbe`..`7fb1136`; PR 2 `f952b3a`..`5e2b1e8`; PR 3 `7e8dc1b`..`30b9f94`; vòng sửa sau review cuối tiếp theo `30b9f94`.
 - Baseline đo: `517f425` trên `main`; Jev `jev-1.13.0` qua TypeSafe; bản thử `internal/notice` (174 dòng) và evidence [jev-notices-2026-09-27](../evidence/jev-notices-2026-09-27.md); hướng dẫn [jev-notices.md](../jev-notices.md).
 - Liên quan: [registry harness](harness-registry-2026-09-30.md) mục 3.2 (`ScreenProfile`), [probe TUI](tui-probe-redesign-2026-09-27.md) mục 5 và 6 (tách quan sát khỏi policy). Phương án này là một implementation của chỗ hai phương án đó đã đặt.
 - Spec cần cập nhật: [MVP](../mvp.md) quyết định 8 (tín hiệu phụ), mục 4 (đọc crew), mục 7 (số đo), mục 10.
