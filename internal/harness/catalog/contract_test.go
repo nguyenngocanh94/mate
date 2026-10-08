@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/nguyenngocanh94/mate/internal/capability"
 	"github.com/nguyenngocanh94/mate/internal/harness"
 	"github.com/nguyenngocanh94/mate/internal/harness/catalog"
 	"github.com/nguyenngocanh94/mate/internal/send"
@@ -40,67 +40,25 @@ func eachProfile(t *testing.T, run func(t *testing.T, p harness.Profile)) {
 	}
 }
 
-// capDecl is one Capabilities field with its implementation erased.
-type capDecl struct {
-	name     string
-	status   harness.CapStatus
-	hasImpl  bool
-	evidence harness.Evidence
-	reason   string
-}
-
-// declarations reads every field of Capabilities by reflection, so a field
-// added to the contract is checked here without anyone listing it.
-func declarations(t *testing.T, c harness.Capabilities) []capDecl {
+// declarations reads every field of Capabilities by reflection
+// (capability.Declarations), so a field added to the contract is checked
+// here without anyone listing it.
+func declarations(t *testing.T, c harness.Capabilities) []capability.Declaration {
 	t.Helper()
-	v := reflect.ValueOf(c)
-	var out []capDecl
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		impl := f.FieldByName("Impl")
-		if !impl.IsValid() || impl.Kind() != reflect.Interface {
-			t.Fatalf("Capabilities.%s is not a Cap[T] over an interface", v.Type().Field(i).Name)
-		}
-		out = append(out, capDecl{
-			name:     v.Type().Field(i).Name,
-			status:   f.FieldByName("Status").Interface().(harness.CapStatus),
-			hasImpl:  !impl.IsNil(),
-			evidence: f.FieldByName("Evidence").Interface().(harness.Evidence),
-			reason:   f.FieldByName("Reason").String(),
-		})
+	decls, err := capability.Declarations(c)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return out
+	return decls
 }
 
 // Item 1: no capability is undeclared; Impl is set exactly when verified;
-// verified rests on evidence, unsupported and unknown on a reason.
+// verified rests on evidence, unsupported and unknown on a reason. The rule
+// is capability.Check, which the tool catalog's suite holds its tools to.
 func TestContractCapabilitiesDeclared(t *testing.T) {
 	eachProfile(t, func(t *testing.T, p harness.Profile) {
-		decls := declarations(t, p.Capabilities())
-		if len(decls) == 0 {
-			t.Fatal("Capabilities has no fields; the reflection read nothing")
-		}
-		for _, d := range decls {
-			switch d.status {
-			case harness.CapUndeclared:
-				t.Errorf("%s is undeclared: every harness answers every capability", d.name)
-				continue
-			case harness.CapVerified, harness.CapUnsupported, harness.CapUnknown:
-			default:
-				t.Errorf("%s has status %q, not one of verified, unsupported, unknown", d.name, d.status)
-				continue
-			}
-			verified := d.status == harness.CapVerified
-			if d.hasImpl != verified {
-				t.Errorf("%s is %s with Impl set = %v: Impl is set exactly when verified", d.name, d.status, d.hasImpl)
-			}
-			if verified {
-				if d.evidence.Version == "" || d.evidence.Measured == "" || d.evidence.Proof == "" {
-					t.Errorf("%s is verified without full evidence (version, when, proof): %+v", d.name, d.evidence)
-				}
-			} else if strings.TrimSpace(d.reason) == "" {
-				t.Errorf("%s is %s without a reason", d.name, d.status)
-			}
+		if err := capability.Check(p.Capabilities()); err != nil {
+			t.Error(err)
 		}
 	})
 }
@@ -234,8 +192,8 @@ func TestContractLauncherBuildsEachRole(t *testing.T) {
 		if err != nil {
 			var missing []string
 			for _, d := range declarations(t, p.Capabilities()) {
-				if d.status != harness.CapVerified && strings.Contains(err.Error(), d.name) {
-					missing = append(missing, d.name)
+				if d.Status != harness.CapVerified && strings.Contains(err.Error(), d.Name) {
+					missing = append(missing, d.Name)
 				}
 			}
 			if len(missing) == 0 {
