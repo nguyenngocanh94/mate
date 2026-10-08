@@ -535,3 +535,33 @@ func TestStartMateRefusesWhenTheDialogChangesUnderTheSelectPress(t *testing.T) {
 		t.Fatalf("presses = %v, want the select press and nothing else", keys)
 	}
 }
+
+// jevNamesADialog is the chain's reading of a screen the profile does not
+// recognise when Jev, sure of itself, names a dialog on it: Jev's Dialog,
+// the fixture's Startup and no highlight.
+type jevNamesADialog struct{}
+
+func (jevNamesADialog) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Dialog, obs.Highlight, obs.Confidence, obs.Source = scr.DialogHooksReview, -1, 0.95, "jev"
+	return obs, err
+}
+
+// Jev naming a dialog the harness profile does not recognise presses
+// nothing: the settle refuses as for any unrecognised screen, and says
+// what Jev saw.
+func TestStartMateRefusesAScreenOnlyJevNames(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = jevNamesADialog{}
+	rt.NextStartupScreen = "welcome to something nobody measured\nplease choose:\n  a) yes\n  b) no\n"
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "startup screen not recognised") || !strings.Contains(err.Error(), "· jev says hooks-review") {
+		t.Fatalf("err = %v, want the unrecognised-screen refusal naming Jev's dialog", err)
+	}
+	if len(rt.SentKeys) != 0 {
+		t.Fatalf("keys %v were pressed into a screen only Jev named", rt.SentKeys)
+	}
+}

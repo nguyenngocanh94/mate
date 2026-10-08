@@ -197,12 +197,21 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 			// dialog or the composer.
 		} else if time.Now().After(deadline) {
 			return settled, startupRefusal(handle, kind, screen,
-				fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not a measured startup dialog; mate refuses to press keys into a screen it cannot name", kind, budget.Round(time.Millisecond)))
+				fmt.Sprintf("%s startup screen not recognised after %s: not the empty composer and not a measured startup dialog; mate refuses to press keys into a screen it cannot name%s", kind, budget.Round(time.Millisecond), jevSays(observed)))
 		}
 		if err := sleep(ctx, startupPollInterval); err != nil {
 			return settled, err
 		}
 	}
+}
+
+// jevSays is what Jev named the dialog on a screen the harness profile
+// could not, for the refusal: Jev's word is reported, never acted on.
+func jevSays(observed screen.Observation) string {
+	if observed.Source != "jev" {
+		return ""
+	}
+	return " · jev says " + string(observed.Dialog)
 }
 
 // answerStartupDialog performs one dialog's measured sequence for one

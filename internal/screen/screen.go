@@ -98,8 +98,9 @@ type Observation struct {
 	// observer says 1 when the harness profile recognised the screen and 0
 	// when it did not.
 	Confidence float64
-	// Source names the observer that made this observation: "fixture",
-	// "jev" or "chain".
+	// Source names the observer that made this observation: "fixture" or
+	// "jev". The chain (internal/screen/chain) writes the source of the
+	// reading it returned.
 	Source string
 	// Reason says why Composer or Dialog is Unknown. It is empty when
 	// neither is, except from the jev observer, which always names its
