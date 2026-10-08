@@ -208,7 +208,7 @@ func settleStartupPrompt(ctx context.Context, rt runtime.Adapter, handle runtime
 // jevSays is what Jev named the dialog on a screen the harness profile
 // could not, for the refusal: Jev's word is reported, never acted on.
 func jevSays(observed screen.Observation) string {
-	if observed.Source != "jev" {
+	if observed.Source != "jev" || observed.Dialog == screen.DialogNone {
 		return ""
 	}
 	return " · jev says " + string(observed.Dialog)

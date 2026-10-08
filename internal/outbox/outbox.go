@@ -49,6 +49,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/observability"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/screen"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -132,6 +133,13 @@ func (d Deps) sleep(ctx context.Context, dur time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+func (d Deps) observer() screen.Observer {
+	if d.Observer != nil {
+		return d.Observer
+	}
+	return fixture.New()
 }
 
 func (d Deps) interval() time.Duration {

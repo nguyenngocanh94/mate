@@ -565,3 +565,28 @@ func TestStartMateRefusesAScreenOnlyJevNames(t *testing.T) {
 		t.Fatalf("keys %v were pressed into a screen only Jev named", rt.SentKeys)
 	}
 }
+
+// jevSeesNoDialog is the chain's reading when Jev, sure of itself, sees no
+// dialog on a screen the profile does not recognise.
+type jevSeesNoDialog struct{}
+
+func (jevSeesNoDialog) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (scr.Observation, error) {
+	obs, err := fixture.New().Observe(ctx, profile, pane)
+	obs.Dialog, obs.Confidence, obs.Source = scr.DialogNone, 0.95, "jev"
+	return obs, err
+}
+
+// Jev seeing no dialog adds nothing to the refusal: "jev says none" names
+// no dialog.
+func TestStartMateRefusalNamesNoDialogJevDidNotSee(t *testing.T) {
+	w := newWorkspace(t, "shop")
+	rt := runtime.NewFake()
+	deps := fakeDeps(t, rt)
+	deps.Observer = jevSeesNoDialog{}
+	rt.NextStartupScreen = "welcome to something nobody measured\nplease choose:\n  a) yes\n  b) no\n"
+
+	_, err := spawn.StartMate(context.Background(), w, deps, spawn.StartRequest{Project: "shop"})
+	if err == nil || !strings.Contains(err.Error(), "startup screen not recognised") || strings.Contains(err.Error(), "jev says") {
+		t.Fatalf("err = %v, want the plain unrecognised-screen refusal", err)
+	}
+}

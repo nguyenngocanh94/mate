@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
@@ -171,4 +175,73 @@ func TestCallSitesReadThroughTheDepsObserver(t *testing.T) {
 			t.Fatalf("health %+v, want the observer's busy", h)
 		}
 	})
+}
+
+// callersOf maps each function in this package's non-test files to the
+// package-level calls it makes, as "pkg.Name" or "Name".
+func callersOf(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+	fset := token.NewFileSet()
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]map[string]bool{}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			calls := map[string]bool{}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				switch f := call.Fun.(type) {
+				case *ast.Ident:
+					calls[f.Name] = true
+				case *ast.SelectorExpr:
+					if x, ok := f.X.(*ast.Ident); ok {
+						calls[x.Name+"."+f.Sel.Name] = true
+					}
+				}
+				return true
+			})
+			out[fn.Name.Name] = calls
+		}
+	}
+	return out
+}
+
+// Every command that reads a pane builds its deps with liveDeps, so it
+// observes through what `.mate/.env` configures. spawn.LiveDeps alone is
+// left only where no pane is read (status, stop, peek, merge, reindex),
+// and in the console, which sets the observer itself.
+func TestCommandsThatReadAPaneUseTheConfiguredObserver(t *testing.T) {
+	calls := callersOf(t)
+	for _, fn := range []string{"cmdSend", "cmdBriefAppend", "cmdMateStart", "cmdMateRefresh", "cmdMateStop", "cmdProjectRemove",
+		"cmdCrewSpawn", "cmdCrewRelaunch", "cmdReview", "cmdState", "runPRWatch"} {
+		if !calls[fn]["liveDeps"] {
+			t.Errorf("%s does not build its deps with liveDeps", fn)
+		}
+	}
+	readsNoPane := map[string]bool{"liveDeps": true, "runConsole": true, "cmdMateStatus": true, "cmdCrewStop": true,
+		"cmdPeek": true, "cmdMerge": true, "cmdReindex": true}
+	for fn, c := range calls {
+		if c["spawn.LiveDeps"] && !readsNoPane[fn] {
+			t.Errorf("%s builds spawn.LiveDeps without the configured observer", fn)
+		}
+	}
+	if !calls["runConsole"]["configuredObserver"] {
+		t.Error("the console does not set the configured observer")
+	}
 }

@@ -119,7 +119,7 @@ func cmdMateStop(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return mateStop(context.Background(), w, spawn.LiveDeps(harnesses), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
+	return mateStop(context.Background(), w, liveDeps(w, stderr), fs.Arg(0), spawn.CallerFromEnv(), *noStowFlag, stdout, stderr)
 }
 
 // mateStop is cmdMateStop's core, over any deps, for tests.

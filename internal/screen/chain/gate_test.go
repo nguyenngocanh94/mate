@@ -64,7 +64,7 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	ctx := context.Background()
 	counts := map[string]int{}
 	var dangerous []string
-	chained, noHarness := 0, 0
+	chained, noHarness, jevMissedDialog := 0, 0, 0
 	for _, s := range screens {
 		kind, ok := harnessOf(reg, s.File)
 		if !ok {
@@ -99,6 +99,9 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 			counts["safer-side"]++
 		default:
 			counts["fixture ("+logged.Fallback+")"]++
+			if logged.Fallback == chain.FallbackDialog && logged.Dialog == screen.DialogNone {
+				jevMissedDialog++
+			}
 		}
 		if obs.Composer == screen.ComposerEmpty && (det.Composer == screen.ComposerDraft || det.Composer == screen.ComposerBusy) {
 			dangerous = append(dangerous, fmt.Sprintf("%s: composer empty, fixture %s (%s)", s.File, det.Composer, obs.Reason))
@@ -112,13 +115,14 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	}
 	t.Logf("chain(jev cassette, fixture, 0.85) on %d harness screens (%d notice fixtures have no harness):", chained, noHarness)
 	t.Logf("  %-28s %3d", "jev", counts["jev"])
-	for _, k := range []string{"fixture (" + chain.FallbackThreshold + ")", "fixture (" + chain.FallbackDialog + ")", "fixture (" + chain.FallbackError + ")"} {
-		t.Logf("  %-28s %3d", k, counts[k])
-	}
+	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackThreshold+")", counts["fixture ("+chain.FallbackThreshold+")"])
+	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackDialog+")", counts["fixture ("+chain.FallbackDialog+")"])
+	t.Logf("  %-28s %3d", "  of which jev said none", jevMissedDialog)
+	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackError+")", counts["fixture ("+chain.FallbackError+")"])
 	t.Logf("  %-28s %3d", "safer-side", counts["safer-side"])
 	t.Logf("  %-28s %3d", "dangerous", len(dangerous))
-	if chained+noHarness != 90 {
-		t.Fatalf("%d screens, want the corpus's 90", chained+noHarness)
+	if chained != 78 || noHarness != 12 {
+		t.Fatalf("%d harness screens and %d without a harness, want the corpus's 78 and 12", chained, noHarness)
 	}
 	// A request the cassette cannot answer falls back to the fixture, which
 	// is never dangerous by this test's measure: the gate would pass

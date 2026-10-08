@@ -257,7 +257,8 @@ func Span(d time.Duration) string {
 	return d.Round(time.Second).String()
 }
 
-// composer classifies the Mate's composer from one styled read.
+// composer reads the Mate's composer from one styled read, through
+// Deps.Observer as a delivery does.
 func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind) (send.Classification, error) {
 	profile, err := s.deps.Harnesses.Lookup(kind)
 	if err != nil {
@@ -268,7 +269,11 @@ func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind 
 	if err != nil {
 		return send.Classification{}, err
 	}
-	return send.ClassifyComposer(screens, screen), nil
+	observed, err := s.deps.observer().Observe(ctx, screens, screen)
+	if err != nil {
+		return send.Classification{}, err
+	}
+	return send.Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}, nil
 }
 
 // answeredAfter reports whether sent.log has a line from the Mate after

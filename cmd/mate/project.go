@@ -217,7 +217,7 @@ func cmdProjectRemove(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return projectRemove(context.Background(), w, spawn.LiveDeps(harnesses), name, spawn.CallerFromEnv(), stdout, stderr)
+	return projectRemove(context.Background(), w, liveDeps(w, stderr), name, spawn.CallerFromEnv(), stdout, stderr)
 }
 
 // projectRemove is cmdProjectRemove's core, over any deps, for tests.

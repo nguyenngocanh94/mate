@@ -345,3 +345,24 @@ func TestStrictStowIgnoresMateMessagesToCrews(t *testing.T) {
 		t.Fatal("a crew message is not a Stop hook")
 	}
 }
+
+// The stow's own read of the Mate's composer goes through Deps.Observer: an
+// observer that says busy refuses a stow that needs an empty composer, on a
+// pane that shows one.
+func TestStowReadsThePaneThroughTheObserver(t *testing.T) {
+	f := newFixture(t)
+	observer := &seesBusy{}
+	d := f.deps()
+	d.Observer = observer
+	s := outbox.New(f.ws, d)
+	res, err := s.Stow(context.Background(), project, outbox.StowOptions{RequireEmpty: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome() != "not stowed: the Mate is mid-turn" || observer.calls != 1 {
+		t.Fatalf("result %q after %d observations, want the observer's busy", res.Outcome(), observer.calls)
+	}
+	if len(f.outboxItems()) != 0 || len(f.rt.SentText) != 0 {
+		t.Fatal("a refused stow queued or typed something")
+	}
+}
