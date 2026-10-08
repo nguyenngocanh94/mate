@@ -102,15 +102,6 @@ func claudeBusyScreen() string {
 	return "some transcript\n✶ Pollinating…\n" + rule + "\n❯ \n" + rule + "\n"
 }
 
-// screenOf is the screen profile catalog.Default() registers for a kind.
-func screenOf(kind harness.Kind) harness.ScreenProfile {
-	profile, err := catalog.Default().Lookup(kind)
-	if err != nil {
-		panic(err)
-	}
-	return profile.Screen()
-}
-
 func testDeps(rt send.Runtime) (send.Deps, *[]time.Duration) {
 	var slept []time.Duration
 	return send.Deps{
@@ -509,5 +500,16 @@ func TestSendDecidesFromTheObserverOnce(t *testing.T) {
 	}
 	if len(busy.typed) != 0 {
 		t.Fatalf("a send the observer called busy typed anyway: %#v", busy.typed)
+	}
+}
+
+// ComposerLabel keeps the word mate has always printed for the draft state.
+func TestComposerLabelCallsADraftPending(t *testing.T) {
+	for state, want := range map[send.ComposerState]string{
+		send.StateEmpty: "empty", send.StatePending: "pending", send.StateBusy: "busy", send.StateUnknown: "unknown",
+	} {
+		if got := send.ComposerLabel(state); got != want {
+			t.Errorf("ComposerLabel(%q) = %q, want %q", state, got, want)
+		}
 	}
 }

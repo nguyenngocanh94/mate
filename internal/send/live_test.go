@@ -233,6 +233,15 @@ func helpOnScreen(screen string) bool {
 	return false
 }
 
+// screenOf is the screen profile catalog.Default() registers for a kind.
+func screenOf(kind harness.Kind) harness.ScreenProfile {
+	profile, err := catalog.Default().Lookup(kind)
+	if err != nil {
+		panic(err)
+	}
+	return profile.Screen()
+}
+
 // waitForComposer blocks until the pane classifies as want, so the next step
 // starts from a state this test proved rather than assumed.
 func waitForComposer(ctx context.Context, t *testing.T, rt *runtime.Herdr, handle runtime.AgentHandle, want send.ComposerState) {

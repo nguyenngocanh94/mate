@@ -25,6 +25,17 @@ const (
 	StateUnknown = screen.ComposerUnknown
 )
 
+// ComposerLabel is the word mate prints for a composer state in its own
+// messages: the send summary, the stale incident text, refusals. The draft
+// state has always been printed "pending" there, and incidents.log keeps
+// that word, so it is mapped here rather than taken from the constant.
+func ComposerLabel(s ComposerState) string {
+	if s == StatePending {
+		return "pending"
+	}
+	return string(s)
+}
+
 // Classification is what the composer classifier saw and the line it saw
 // it on (fixture.Classification).
 type Classification = fixture.Classification

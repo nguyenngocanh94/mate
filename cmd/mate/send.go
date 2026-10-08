@@ -262,5 +262,5 @@ func composerLabel(s send.ComposerState) string {
 	if s == send.StateBusy {
 		return "working"
 	}
-	return string(s)
+	return send.ComposerLabel(s)
 }

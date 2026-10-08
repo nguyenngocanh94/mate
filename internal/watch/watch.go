@@ -465,7 +465,7 @@ func (w *Watcher) pollCrew(ctx context.Context, ref CrewRef, now time.Time,
 		}
 	case quiet >= w.deps.staleAfter() && composer != send.StateBusy && !waiting(obs.verb):
 		text := fmt.Sprintf("no status line and no pane change for %s; composer %s",
-			quiet.Round(time.Second), composer)
+			quiet.Round(time.Second), send.ComposerLabel(composer))
 		if obs.verb != "" {
 			text += fmt.Sprintf("; last status verb %s", obs.verb)
 		}

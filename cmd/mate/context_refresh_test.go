@@ -249,3 +249,23 @@ func TestCheckpointRequiresEveryOpenCrewInFlight(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A manual refresh over a Mate composer holding a draft is postponed in the
+// words it has always used: "pending", not the draft state's own value.
+func TestContextRefreshPostponesOverAPendingComposer(t *testing.T) {
+	w, deps := consoleFixture(t, "shop")
+	ctx := context.Background()
+	if _, err := spawn.StartMate(ctx, w, deps, spawn.StartRequest{Project: "shop"}); err != nil {
+		t.Fatal(err)
+	}
+	handle, _, err := spawn.MateHandle(ctx, w, deps, "shop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.Runtime.(*runtime.Fake).SetReadOutput(handle, claudePendingScreen)
+
+	changed, err := contextRefresh(ctx, w, deps, "shop", false)
+	if changed || err == nil || err.Error() != "refresh postponed: Mate composer is pending" {
+		t.Fatalf("refresh = %v, %v; want postponed with the composer called pending", changed, err)
+	}
+}

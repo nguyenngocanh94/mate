@@ -166,3 +166,18 @@ func TestCrewSendUsageErrors(t *testing.T) {
 		t.Fatalf("cmdSend with a bad --from: err = %v, want *usageError", err)
 	}
 }
+
+// A resumed send starts from the draft state, which the summary has always
+// called "pending" (send.StatePending is screen.ComposerDraft underneath).
+func TestSendSummaryLineCallsADraftPending(t *testing.T) {
+	report := send.Report{
+		Agent:   "crew-k3",
+		Resumed: true,
+		Presses: 1,
+		Before:  send.Classification{State: send.StatePending},
+		After:   send.Classification{State: send.StateEmpty},
+	}
+	if got, want := sendSummaryLine(report), "sent to crew-k3 (pending → resumed saved draft → enter ×1 → empty)"; got != want {
+		t.Fatalf("sendSummaryLine = %q, want %q", got, want)
+	}
+}

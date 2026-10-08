@@ -47,6 +47,25 @@ func TestWatchOpensStaleWhenNeitherPaneNorStatusMovesForTheThreshold(t *testing.
 	}
 }
 
+// A draft sitting in the composer is named "pending" in the incident text,
+// the word incidents.log has always carried for it.
+func TestWatchStaleTextCallsADraftPending(t *testing.T) {
+	f := newFixture(t)
+	f.appendStatus("k3", "working: reading the tests")
+	f.setScreen("› fix the flaky test\n\n  model · cwd\n")
+
+	f.poll()
+	if h, _ := f.health("k3"); h.Composer != send.StatePending {
+		t.Fatalf("health composer = %q, want the draft state", h.Composer)
+	}
+	f.clock.advance(4 * time.Minute)
+	f.poll()
+	f.assertIncidents("k3 stale open")
+	if text := f.incidents()[0].Text; !strings.Contains(text, "; composer pending") {
+		t.Fatalf("incident text = %q, want the composer called pending", text)
+	}
+}
+
 func TestWatchDoesNotOpenStaleBeforeTheThreshold(t *testing.T) {
 	f := newFixture(t)
 	f.appendStatus("k3", "working: reading the tests")
