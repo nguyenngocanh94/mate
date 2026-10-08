@@ -737,3 +737,69 @@ func TestMigrateWarnsWhenTheDirtyCheckFails(t *testing.T) {
 		t.Fatalf("Run printed:\n%s", out.String())
 	}
 }
+
+// TestMigrateRepairsTheCaptainsLinkedWorktrees: worktrees the captain made
+// with `git worktree add`, one beside the workspace and one inside the repo
+// that moves, belong to no crew; after the migrate git still works in both.
+func TestMigrateRepairsTheCaptainsLinkedWorktrees(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"web"}})
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	beside, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	beside = filepath.Join(beside, "side")
+	git(t, filepath.Join(root, "web"), "worktree", "add", "-q", "-b", "side", beside)
+	git(t, filepath.Join(root, "web"), "worktree", "add", "-q", "-b", "inner", filepath.Join(root, "web", ".wt", "inner"))
+
+	var out bytes.Buffer
+	sum, err := migrate.Run(context.Background(), w, deps, &out)
+	if err != nil {
+		t.Fatalf("Run: %v\n%s", err, out.String())
+	}
+	if len(sum.Warnings) != 0 || sum.Repaired != 2 {
+		t.Fatalf("repaired %d, warnings %q; want 2 and none\n%s", sum.Repaired, sum.Warnings, out.String())
+	}
+	for _, wt := range []string{beside, filepath.Join(root, "shop", "web", ".wt", "inner")} {
+		git(t, wt, "status", "--short")
+		if !attached(t, wt) {
+			t.Fatalf("%s is not attached after the migrate", wt)
+		}
+	}
+}
+
+// failRepair is real git except `git worktree repair`, which fails.
+type failRepair struct{ gitx.ExecRunner }
+
+func (f failRepair) Run(ctx context.Context, cmd gitx.Command) (gitx.Result, error) {
+	if len(cmd.Args) >= 2 && cmd.Args[0] == "worktree" && cmd.Args[1] == "repair" {
+		return gitx.Result{ExitCode: 1, Stderr: "fatal: repair refused"}, nil
+	}
+	return f.ExecRunner.Run(ctx, cmd)
+}
+
+// A linked worktree that cannot be re-attached does not stop the migrate:
+// it is a warning that names its path.
+func TestMigrateWarnsForALinkedWorktreeItCannotRepair(t *testing.T) {
+	w := oldWorkspace(t, project{"shop", []string{"web"}})
+	root := w.Root()
+	deps, _, _ := liveDeps(t)
+	deps.Git = gitx.Git{Runner: failRepair{}}
+	beside, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	beside = filepath.Join(beside, "side")
+	git(t, filepath.Join(root, "web"), "worktree", "add", "-q", "-b", "side", beside)
+
+	var out bytes.Buffer
+	sum, err := migrate.Run(context.Background(), w, deps, &out)
+	if err != nil || !sum.Layout {
+		t.Fatalf("Run: %v (layout %v)\n%s", err, sum.Layout, out.String())
+	}
+	if len(sum.Warnings) != 1 || !strings.Contains(sum.Warnings[0], "linked worktree "+beside+" ") ||
+		!strings.Contains(out.String(), "warning: linked worktree "+beside+" ") {
+		t.Fatalf("warnings %q, output\n%s\nwant one naming %s", sum.Warnings, out.String(), beside)
+	}
+}

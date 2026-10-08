@@ -152,13 +152,14 @@ func (e *RefusedError) Error() string {
 // Summary is what one run did, or for DryRun would do.
 type Summary struct {
 	Moves []Move
-	// Repaired is how many closed crews' worktrees were re-attached.
+	// Repaired is how many worktrees were re-attached: closed crews', and
+	// linked worktrees of a moved repo the captain made.
 	Repaired int
 	// Rewrote is how many briefs had a repo path rewritten.
 	Rewrote int
 	// Warnings are worktrees that could not be re-attached. They do not
-	// stop a migrate: the worktree is a closed crew's, and `git worktree
-	// repair` can be run on it later.
+	// stop a migrate: the worktree is a closed crew's or the captain's,
+	// and `git worktree repair` can be run on it later.
 	Warnings []string
 	// Layout is true once workspace.yaml says layout 2.
 	Layout bool
@@ -593,6 +594,9 @@ type executor struct {
 	briefs   map[string]bool
 	repaired int
 	warnings []string
+	// handled are the worktrees repairWorktrees looked at, which
+	// repairLinkedWorktrees leaves alone.
+	handled map[string]bool
 }
 
 func (ex *executor) log(m Move, step string) error {
@@ -646,8 +650,10 @@ func (ex *executor) move(m Move) error {
 	if err != nil {
 		return err
 	}
-	// 3. The closed crews' worktrees, whose links name the old path.
+	// 3. The closed crews' worktrees, whose links name the old path, then
+	// every other linked worktree the repo records: the captain's own.
 	ex.repairWorktrees(m, closed)
+	ex.repairLinkedWorktrees(m)
 	// 4. project.yaml.
 	if err := recordPath(ex.ws, m); err != nil {
 		return err
@@ -730,6 +736,7 @@ func (ex *executor) repairWorktrees(m Move, closed []crew) {
 		if _, err := os.Stat(wt); err != nil {
 			continue
 		}
+		ex.handle(wt)
 		if ok, err := ex.deps.Git.WorktreeAttached(ex.ctx, wt); err == nil && ok {
 			continue
 		}
@@ -739,6 +746,73 @@ func (ex *executor) repairWorktrees(m Move, closed []crew) {
 		}
 		if ok, err := ex.deps.Git.WorktreeAttached(ex.ctx, wt); err != nil || !ok {
 			ex.warnings = append(ex.warnings, fmt.Sprintf("worktree %s of crew %s/%s is still not attached after git worktree repair", wt, m.Project, c.id))
+			continue
+		}
+		ex.repaired++
+	}
+}
+
+func (ex *executor) handle(wt string) {
+	if ex.handled == nil {
+		ex.handled = map[string]bool{}
+	}
+	ex.handled[filepath.Clean(wt)] = true
+}
+
+// repairLinkedWorktrees re-attaches every linked worktree the moved repo
+// records in `<new>/.git/worktrees/*/gitdir` that is still on disk and that
+// repairWorktrees did not look at: worktrees the captain made with `git
+// worktree add`, whose `.git` file still names the old path. One inside
+// the repo moved with it and is looked for at its new path. A worktree
+// that cannot be re-attached is a warning naming its path.
+func (ex *executor) repairLinkedWorktrees(m Move) {
+	admin := filepath.Join(m.New, ".git", "worktrees")
+	entries, err := os.ReadDir(admin)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			ex.warnings = append(ex.warnings, fmt.Sprintf("the linked worktrees of repo %s of project %s were not checked: %v", m.Repo, m.Project, err))
+		}
+		return
+	}
+	// Which are detached is read before any repair: git repairs every
+	// link it can find from the repo in one go, so a later worktree may
+	// already be attached by the time its turn comes.
+	var detached []string
+	for _, e := range entries {
+		data, err := os.ReadFile(filepath.Join(admin, e.Name(), "gitdir"))
+		if err != nil {
+			continue
+		}
+		wt := filepath.Dir(strings.TrimSpace(string(data)))
+		if rest, ok := strings.CutPrefix(wt, m.Old+string(filepath.Separator)); ok {
+			wt = filepath.Join(m.New, rest)
+		}
+		wt = filepath.Clean(wt)
+		if ex.handled[wt] {
+			continue
+		}
+		if _, err := os.Stat(wt); err != nil {
+			// Gone: an entry for git worktree prune, not a worktree to
+			// re-attach.
+			continue
+		}
+		ex.handle(wt)
+		if ok, err := ex.deps.Git.WorktreeAttached(ex.ctx, wt); err == nil && ok {
+			continue
+		}
+		detached = append(detached, wt)
+	}
+	for _, wt := range detached {
+		if ok, err := ex.deps.Git.WorktreeAttached(ex.ctx, wt); err == nil && ok {
+			ex.repaired++
+			continue
+		}
+		if err := ex.deps.Git.RepairWorktree(ex.ctx, m.New, wt); err != nil {
+			ex.warnings = append(ex.warnings, fmt.Sprintf("linked worktree %s of repo %s could not be re-attached: %v; run git -C %s worktree repair %s", wt, m.Repo, oneLine(err), m.New, wt))
+			continue
+		}
+		if ok, err := ex.deps.Git.WorktreeAttached(ex.ctx, wt); err != nil || !ok {
+			ex.warnings = append(ex.warnings, fmt.Sprintf("linked worktree %s of repo %s is still not attached after git worktree repair", wt, m.Repo))
 			continue
 		}
 		ex.repaired++
