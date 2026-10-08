@@ -1,0 +1,45 @@
+== Command.Run ready --json
+name: bd
+args: ["init" "--prefix" "shop" "--skip-agents" "--skip-hooks" "--non-interactive"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1
+
+name: bd
+args: ["ready" "--json"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1
+
+name: bd
+args: ["export"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1
+
+== Data.Init
+name: bd
+args: ["init" "--prefix" "shop" "--skip-agents" "--skip-hooks" "--non-interactive"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1
+
+name: bd
+args: ["export"]
+dir:  {{WORKSPACE}}/shop
+env:  BEADS_DIR={{WORKSPACE}}/shop/.beads
+env:  BD_NON_INTERACTIVE=1
+env:  BV_NO_UPDATE_CHECK=1
+env:  BV_NO_GITIGNORE=1
+
+== Viewer.Argv
+name: bv
+args: ["--db" "{{WORKSPACE}}/shop/.beads"]
