@@ -1,0 +1,4 @@
+repos:
+    - name: shop
+      path: shop
+      default_branch: main

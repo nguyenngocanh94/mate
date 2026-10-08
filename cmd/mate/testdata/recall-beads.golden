@@ -1,0 +1,9 @@
+== two active, one ready
+Beads work (up to 10 active/blocked and 10 ready; mate tasks shop --list):
+  shop-a1 [in_progress P1] Wire the checkout button to the payment form
+  shop-b2 [blocked P0] Blocked on the payment provider's sandbox keys, Blocked on the payment provider's sandbox keys, Blocked on the payment p…
+  shop-c3 [ready P2] Add a Buy button to README.md
+
+== bd fails
+Beads: unreadable (bd: exit status 3: database is locked); run mate beads shop -- ready
+
