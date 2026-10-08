@@ -16,6 +16,8 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/memory"
 	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
+	"github.com/nguyenngocanh94/mate/internal/screen"
+	screenfixture "github.com/nguyenngocanh94/mate/internal/screen/fixture"
 	"github.com/nguyenngocanh94/mate/internal/send"
 	"github.com/nguyenngocanh94/mate/internal/store"
 )
@@ -364,5 +366,51 @@ func TestStowReadsThePaneThroughTheObserver(t *testing.T) {
 	}
 	if len(f.outboxItems()) != 0 || len(f.rt.SentText) != 0 {
 		t.Fatal("a refused stow queued or typed something")
+	}
+}
+
+// countingObserver reads every pane as the fixture observer does, and
+// counts the screens it was asked about.
+type countingObserver struct{ screens []string }
+
+func (o *countingObserver) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
+	o.screens = append(o.screens, pane)
+	return screenfixture.New().Observe(ctx, profile, pane)
+}
+
+// The stow's wait asks the observer only about a screen it has not read:
+// a Mate busy on one unchanged screen for twenty polls costs one
+// observation, and its composer back to empty one more, however many looks
+// the wait takes.
+func TestStowObservesOnlyWhenTheScreenChanges(t *testing.T) {
+	f := newFixture(t)
+	const codexEmpty = "› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	const codexBusy = "• Working (3s • esc to interrupt)\n\n› Ask Codex to do anything\n\n  gpt-5.6 · /m\n"
+	f.rt.SetReadOutput(f.handle, codexEmpty)
+	f.rt.OnSendText = func(h runtime.AgentHandle, _ string) { f.rt.SetReadOutput(h, codexBusy) }
+	sleeper := &tickSleeper{clock: f.clock, onSleep: func(n int) {
+		if n == 20 {
+			f.rt.SetReadOutput(f.handle, codexEmpty)
+		}
+	}}
+	observer := &countingObserver{}
+	d := f.deps()
+	d.Sleeper = sleeper
+	d.Observer = observer
+	d.Handle = func(context.Context, string) (runtime.AgentHandle, harness.Kind, error) {
+		return f.handle, codex.KindCodex, nil
+	}
+	res, err := outbox.New(f.ws, d).Stow(context.Background(), project, outbox.StowOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Stowed || sleeper.n < 21 {
+		t.Fatalf("result %+v after %d sleeps, want stowed once the composer was empty again", res, sleeper.n)
+	}
+	// The stow's first look (empty), the send's own look before typing
+	// (empty), then the busy screen once and the empty screen once.
+	want := []string{codexEmpty, codexEmpty, codexBusy, codexEmpty}
+	if fmt.Sprint(observer.screens) != fmt.Sprint(want) {
+		t.Fatalf("observed %d screens %q, want %d: %q", len(observer.screens), observer.screens, len(want), want)
 	}
 }

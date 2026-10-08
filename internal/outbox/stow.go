@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"strings"
@@ -111,7 +112,10 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		return done(StowResult{Reason: "the Mate was not running", Detail: oneLine(err)})
 	}
 	out.Agent = handle.Name
-	before, err := s.composer(ctx, handle, kind)
+	// One stow reads the pane every poll for up to the ceiling; a pane
+	// that has not changed keeps its last reading.
+	look := &stowLook{}
+	before, err := s.composer(ctx, handle, kind, look)
 	if err != nil {
 		return done(StowResult{Reason: "its pane could not be read (" + oneLine(err) + ")"})
 	}
@@ -197,7 +201,7 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 		if evidence != nil && evidence.EndsInTranscript() {
 			if transcript := s.mateTranscript(project); transcript != "" {
 				if data, err := os.ReadFile(transcript); err == nil && evidence.TranscriptTurnEnded(data, item.SentAt) {
-					if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
+					if c, err := s.composer(ctx, handle, kind, look); err == nil && c.State == send.StateEmpty {
 						return done(StowResult{Stowed: true})
 					}
 				}
@@ -217,12 +221,12 @@ func (s *Sender) Stow(ctx context.Context, project string, opts StowOptions) (St
 				return out, err
 			}
 			if ended {
-				if c, err := s.composer(ctx, handle, kind); err == nil && c.State == send.StateEmpty {
+				if c, err := s.composer(ctx, handle, kind, look); err == nil && c.State == send.StateEmpty {
 					return done(StowResult{Stowed: true})
 				}
 			}
 		}
-		c, err := s.composer(ctx, handle, kind)
+		c, err := s.composer(ctx, handle, kind, look)
 		switch {
 		case err != nil:
 			empties = 0
@@ -257,9 +261,23 @@ func Span(d time.Duration) string {
 	return d.Round(time.Second).String()
 }
 
+// stowLook is one stow's last reading of the Mate's composer and the hash
+// of the snapshot it was read from.
+type stowLook struct {
+	read bool
+	hash [sha256.Size]byte
+	c    send.Classification
+}
+
 // composer reads the Mate's composer from one styled read, through
-// Deps.Observer as a delivery does.
-func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind) (send.Classification, error) {
+// Deps.Observer as a delivery does. The observer is asked only about a
+// snapshot that differs from the last one look holds, as watch asks: the
+// stow's wait polls every couple of seconds for minutes, and a Mate whose
+// pane redraws nothing must not cost an observer call each time
+// (docs/plans/jev-observer-2026-10-08.md section 4.3). A snapshot the
+// observer could not read leaves look as it was, so it is asked about
+// again.
+func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind harness.Kind, look *stowLook) (send.Classification, error) {
 	profile, err := s.deps.Harnesses.Lookup(kind)
 	if err != nil {
 		return send.Classification{State: send.StateUnknown}, err
@@ -269,11 +287,17 @@ func (s *Sender) composer(ctx context.Context, handle runtime.AgentHandle, kind 
 	if err != nil {
 		return send.Classification{}, err
 	}
+	hash := sha256.Sum256([]byte(screen))
+	if look.read && look.hash == hash {
+		return look.c, nil
+	}
 	observed, err := s.deps.observer().Observe(ctx, screens, screen)
 	if err != nil {
 		return send.Classification{}, err
 	}
-	return send.Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}, nil
+	c := send.Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}
+	look.read, look.hash, look.c = true, hash, c
+	return c, nil
 }
 
 // answeredAfter reports whether sent.log has a line from the Mate after
