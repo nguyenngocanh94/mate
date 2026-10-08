@@ -33,10 +33,11 @@ var observeSites = []struct {
 	verifiers []string
 	via       map[string]string
 }{
-	// The line is typed only into a composer the observer read, and only
-	// while a fresh read shows the very snapshot it read: an observer can
-	// take seconds, and the pane may have moved on.
-	{file: "send/send.go", fn: "Send", verifiers: []string{"if again != screen"}},
+	// The line is typed only into a composer the observer read; when an
+	// observer other than the fixture read it, only while a fresh read the
+	// fixture classifies still shows a composer the send types into: that
+	// observer can take seconds, and the pane may have moved on.
+	{file: "send/send.go", fn: "Send", verifiers: []string{"stillTypeable("}},
 	// A startup dialog is answered only by answerStartupDialog, below.
 	{file: "spawn/settle.go", fn: "settleStartupPrompt", verifiers: []string{"answerStartupDialog("}},
 	// The confirm key goes only when the highlight is on the option the

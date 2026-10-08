@@ -276,19 +276,6 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 	before := Classification{State: observed.Composer, Evidence: observed.Evidence, Pending: observed.Draft}
 	report.Before = before
 	report.Steps = append(report.Steps, Step{What: "classify", State: before.State, Evidence: before.Evidence})
-	// An observer can take up to its deadline to answer (Jev's is
-	// notice.Timeout), so the Observation may be of a pane that has since
-	// moved on. The pane is read again, and anything but the snapshot that
-	// was observed is refused before a byte is typed; the caller may retry.
-	again, err := deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
-	if err != nil {
-		return report, err
-	}
-	if again != screen {
-		return report, sendError(observability.CodeStateConflict, ErrPaneChanged,
-			"pane changed while it was being read; nothing typed",
-			map[string]any{"screen_tail": ScreenTail(StripSGR(again), tailLines)})
-	}
 	// Nothing is typed under a dialog the observer names. A screen it
 	// cannot say has or lacks one, with no composer read off it either, is
 	// refused below as an unknown screen, as it always was.
@@ -327,6 +314,18 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		report.Resumed = true
 		report.Steps = append(report.Steps, Step{What: "resume", Detail: payload})
 	} else {
+		// An observer other than the fixture can take up to its deadline to
+		// answer (Jev's is notice.Timeout), so its Observation may be of a
+		// pane that has since moved on. The pane is read again and the
+		// fixture classifies it: a composer that is no longer one this send
+		// types into (empty, or busy when queueing) is refused before a byte
+		// is typed, and the caller may retry. The fixture observer is
+		// in-process, and its read-to-type gap is what it always was.
+		if observed.Source != fixture.Source {
+			if err := stillTypeable(ctx, deps, target, source, screens, opts); err != nil {
+				return report, err
+			}
+		}
 		if deps.BeforeType != nil {
 			if err := deps.BeforeType(); err != nil {
 				return report, err
@@ -411,6 +410,25 @@ func Send(ctx context.Context, deps Deps, target runtime.AgentHandle, kind harne
 		}
 	}
 	return report, nil
+}
+
+// stillTypeable reads the pane again and refuses with ErrPaneChanged unless
+// the fixture reads a composer the send may type into: empty, or busy when
+// the caller queues behind the turn.
+func stillTypeable(ctx context.Context, deps Deps, target runtime.AgentHandle, source harness.ReadSource, screens harness.ScreenProfile, opts Options) error {
+	again, err := deps.Runtime.ReadAgentStyled(ctx, target, source, opts.Lines)
+	if err != nil {
+		return err
+	}
+	// The fixture's own classifier: what fixture.Observe reads as
+	// Deterministic.
+	now := ClassifyComposer(screens, again).State
+	if now == StateEmpty || (opts.QueueWhileBusy && now == StateBusy) {
+		return nil
+	}
+	return sendError(observability.CodeStateConflict, ErrPaneChanged,
+		"pane changed while it was being read; nothing typed",
+		map[string]any{"composer": ComposerLabel(now), "screen_tail": ScreenTail(StripSGR(again), tailLines)})
 }
 
 // withDefaults fills the measured defaults, including the longer settle a

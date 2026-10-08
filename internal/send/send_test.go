@@ -25,8 +25,8 @@ import (
 
 // scripted is a send.Runtime whose pane shows a different screen at each
 // step. Screens are consumed one per ReadAgent, which is exactly how a send
-// observes a pane: once to decide, once more to see the pane held still
-// while it was observed, then once after every enter.
+// observes a pane: once to decide (and, when an observer other than the
+// fixture decided, once more before typing), then once after every enter.
 type scripted struct {
 	screens []string
 	reads   int
@@ -224,7 +224,7 @@ func TestSendRefusesABusyPaneUnlessTheCallerQueues(t *testing.T) {
 		t.Fatalf("err code = %v, want target_blocked", err)
 	}
 
-	queued := &scripted{screens: []string{claudeBusyScreen(), claudeBusyScreen(), claudeScreen("")}}
+	queued := &scripted{screens: []string{claudeBusyScreen(), claudeScreen("")}}
 	qdeps, _ := testDeps(queued)
 	report, err := send.Send(context.Background(), qdeps, target(), claude.KindClaude, "say PONG", send.Options{QueueWhileBusy: true})
 	if err != nil {
@@ -534,27 +534,95 @@ func TestSendRefusesAScreenOnlyJevCallsEmpty(t *testing.T) {
 	}
 }
 
-// An observer can take seconds to answer: a pane that shows something else
-// by then is refused with nothing typed, and the refusal says the send may
-// be tried again.
+// jevSaysComposer is Jev, sure of itself, reading every composer as one
+// state with no dialog over it.
+type jevSaysComposer screen.ComposerState
+
+func (j jevSaysComposer) Observe(context.Context, harness.ScreenProfile, string) (screen.Observation, error) {
+	return screen.Observation{Composer: screen.ComposerState(j), Deterministic: screen.ComposerUnknown, Dialog: screen.DialogNone,
+		Highlight: -1, Confidence: 0.99, Source: jev.Source}, nil
+}
+
+// An observer other than the fixture can take seconds to answer, so the
+// pane is read again before typing and classified by the fixture: still a
+// composer the send types into, the line goes; a draft by then is refused
+// with nothing typed, and the refusal says the send may be tried again. The
+// fixture path reads the pane once before typing, as it always has.
 func TestSendRefusesAPaneThatChangedWhileItWasObserved(t *testing.T) {
 	t.Parallel()
-	rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("a human started typing")}}
-	deps, _ := testDeps(rt)
-	report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
-	if !errors.Is(err, send.ErrPaneChanged) || !strings.Contains(err.Error(), "pane changed while it was being read; nothing typed") {
-		t.Fatalf("err = %v, want ErrPaneChanged", err)
+	chained := func(says screen.ComposerState) screen.Observer {
+		return chain.New(jevSaysComposer(says), fixture.New(), 0.85)
 	}
-	var coded *observability.Error
-	if !errors.As(err, &coded) || coded.Code != observability.CodeStateConflict {
-		t.Fatalf("err code = %v, want state_conflict", err)
+	// readsAtType records how many reads a send had made when it typed.
+	readsAtType := func(rt *scripted, at *int, after []string) func(string) []string {
+		return func(string) []string { *at = len(rt.lines); return after }
 	}
-	if len(rt.typed) != 0 || len(rt.keys) != 0 || report.Typed {
-		t.Fatalf("typed %#v, keys %v after the pane changed", rt.typed, rt.keys)
-	}
-	if len(rt.lines) != 2 {
-		t.Fatalf("%d reads, want the observed one and the one after it", len(rt.lines))
-	}
+
+	t.Run("chain, still empty: typed", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("")}}
+		var at int
+		rt.onType = readsAtType(rt, &at, []string{claudeScreen("")})
+		deps, _ := testDeps(rt)
+		deps.Observer = chained(screen.ComposerEmpty)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if err != nil || !report.Delivered() {
+			t.Fatalf("Send: %v, report %+v", err, report)
+		}
+		if at != 2 {
+			t.Fatalf("typed after %d reads, want the observed one and the re-read", at)
+		}
+	})
+
+	t.Run("chain, a draft by then: refused", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeScreen(""), claudeScreen("a human started typing")}}
+		deps, _ := testDeps(rt)
+		deps.Observer = chained(screen.ComposerEmpty)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if !errors.Is(err, send.ErrPaneChanged) || !strings.Contains(err.Error(), "pane changed while it was being read; nothing typed") {
+			t.Fatalf("err = %v, want ErrPaneChanged", err)
+		}
+		var coded *observability.Error
+		if !errors.As(err, &coded) || coded.Code != observability.CodeStateConflict {
+			t.Fatalf("err code = %v, want state_conflict", err)
+		}
+		if len(rt.typed) != 0 || len(rt.keys) != 0 || report.Typed || len(rt.lines) != 2 {
+			t.Fatalf("typed %#v, keys %v, %d reads after the pane changed", rt.typed, rt.keys, len(rt.lines))
+		}
+	})
+
+	t.Run("chain, busy and queueing: typed", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeBusyScreen(), claudeBusyScreen(), claudeScreen("")}}
+		deps, _ := testDeps(rt)
+		deps.Observer = chained(screen.ComposerBusy)
+		report, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{QueueWhileBusy: true})
+		if err != nil || len(rt.typed) != 1 || report.Before.State != send.StateBusy {
+			t.Fatalf("queued send: %v, typed %#v, before %+v", err, rt.typed, report.Before)
+		}
+	})
+
+	t.Run("chain, busy and not queueing: busy, not changed", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeBusyScreen(), claudeScreen("")}}
+		deps, _ := testDeps(rt)
+		deps.Observer = chained(screen.ComposerBusy)
+		_, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{})
+		if !errors.Is(err, send.ErrAgentBusy) || len(rt.lines) != 1 {
+			t.Fatalf("err = %v after %d reads, want ErrAgentBusy from the one read", err, len(rt.lines))
+		}
+	})
+
+	t.Run("fixture: one read before typing", func(t *testing.T) {
+		rt := &scripted{screens: []string{claudeScreen("")}}
+		var at int
+		rt.onType = readsAtType(rt, &at, []string{claudeScreen("")})
+		deps, _ := testDeps(rt)
+		deps.Observer = fixture.New()
+		if _, err := send.Send(context.Background(), deps, target(), claude.KindClaude, "say PONG", send.Options{}); err != nil {
+			t.Fatal(err)
+		}
+		if at != 1 {
+			t.Fatalf("typed after %d reads, want 1 as before the observer", at)
+		}
+	})
 }
 
 // ComposerLabel keeps the word mate has always printed for the draft state.
