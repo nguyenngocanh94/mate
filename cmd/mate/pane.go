@@ -21,12 +21,14 @@ import (
 const (
 	roleStage  = "stage"
 	roleReview = "review"
+	roleTasks  = "tasks"
 )
 
 // paneIdle is what each column says while it shows nothing.
 var paneIdle = map[string]string{
 	roleStage:  "mate · agent\r\n\r\nEnter on a Mate or Crew row in the console shows it here.",
 	roleReview: "mate · report\r\n\r\ne on a crew opens its report here.",
+	roleTasks:  "mate · tasks\r\n\r\nt on a project opens Beads Viewer here.",
 }
 
 // cmdPane dispatches `mate pane serve`, the program the Console's columns
@@ -34,19 +36,19 @@ var paneIdle = map[string]string{
 // out.
 func cmdPane(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || args[0] != "serve" {
-		return newUsageError("usage: mate pane serve --socket <path> --role stage|review [--owner <pid>]")
+		return newUsageError("usage: mate pane serve --socket <path> --role stage|review|tasks [--owner <pid>]")
 	}
 	fs := flag.NewFlagSet("pane serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	socket := fs.String("socket", "", "unix socket the Console sends to")
-	role := fs.String("role", "", "stage or review")
+	role := fs.String("role", "", "stage, review or tasks")
 	owner := fs.Int("owner", 0, "the Console's pid; the pane ends when it is gone")
 	if err := fs.Parse(args[1:]); err != nil {
 		return &usageError{err}
 	}
 	idle, ok := paneIdle[*role]
 	if *socket == "" || !ok {
-		return newUsageError("mate pane serve: --socket and --role stage|review are required")
+		return newUsageError("mate pane serve: --socket and --role stage|review|tasks are required")
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()

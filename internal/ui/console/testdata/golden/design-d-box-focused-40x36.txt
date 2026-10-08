@@ -33,4 +33,4 @@
                                         
                                         
 → next pane  👨‍💻 payments-api            
- ↑↓ move  enter show crew  a assign  esc
+ ↑↓ move  enter crew  a assign  t tasks 

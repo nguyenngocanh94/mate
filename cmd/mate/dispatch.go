@@ -35,7 +35,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		dir, err := findWorkspaceDir("")
 		if err != nil {
-			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|checkpoint|pr|events|reindex|usage|dashboard|console|--version> ...")
+			return newUsageError("usage: mate <workspace-dir> | mate <init|project|mate|crew|brief|remember|memory|recall|send|peek|state|diff|report|review|merge|backlog|tasks|beads|task-triage|checkpoint|pr|events|reindex|usage|dashboard|console|--version> ...")
 		}
 		return cmdConsole(dir, stdout, stderr)
 	}
@@ -80,6 +80,12 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return cmdBacklog(args[1:], stdout, stderr)
 	case "pr":
 		return cmdPR(args[1:], stdout, stderr)
+	case "tasks":
+		return cmdTasks(args[1:], stdout, stderr)
+	case "beads":
+		return cmdBeads(args[1:], stdout, stderr)
+	case "task-triage":
+		return cmdTaskTriage(args[1:], stdout, stderr)
 	case "events":
 		return cmdEvents(args[1:], stdout, stderr)
 	case "reindex":

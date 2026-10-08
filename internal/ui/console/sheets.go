@@ -360,6 +360,7 @@ var keyTable = [][2]string{
 	{"m", "flip its mode"},
 	{"y", "copy"},
 	{"e", "crew report"},
+	{"t", "project tasks"},
 	{"l", "box: whole log"},
 	{"r", "refresh"},
 	{"q", "quit"},

@@ -12,7 +12,6 @@
   status   running · 38m                
   repo     ~/src/payments-api           
   crews    2 live · 1 completed         
-  tokens   182k                         
 ─ keys ─────────────────────── any key ─
   ↑ ↓         move; fields in detail    
   enter       show in next pane         
@@ -24,6 +23,7 @@
   m           flip its mode             
   y           copy                      
   e           crew report               
+  t           project tasks             
   l           box: whole log            
   r           refresh                   
   q           quit                      

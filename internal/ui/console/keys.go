@@ -68,6 +68,8 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.keysOpen = true
 		return m.relayout(), nil
+	case "t":
+		return m.beginTasks()
 	case "tab":
 		return m.onTab(), nil
 	case "shift+tab":
