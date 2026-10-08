@@ -79,6 +79,9 @@ type Binding struct {
 	Scope BindScope
 	// Role is the socket name of the host pane the tool opens in.
 	Role string
+	// Tool is the tool the key belongs to. Registry.Bindings fills it from
+	// the profile's Name; a profile leaves it empty.
+	Tool Name
 }
 
 // BindScope is a row of the console tree a key acts on.

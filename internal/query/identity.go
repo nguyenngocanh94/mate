@@ -86,6 +86,9 @@ type ToolBinding struct {
 	Scope string
 	// Role is the socket name of the host pane the tool opens in.
 	Role string
+	// Tool is the registered name of the tool the key belongs to, which
+	// cmd/mate looks the tool up by when the key is pressed.
+	Tool string
 }
 
 // Mode is a Project's communication mode (mvp.md section 5). Manual is

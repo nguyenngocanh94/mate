@@ -4,11 +4,13 @@
 // (docs/plans/workspace-layout-and-tools-2026-10-08.md, section 5.1).
 package catalog
 
-import "github.com/nguyenngocanh94/mate/internal/tool"
+import (
+	"github.com/nguyenngocanh94/mate/internal/tool"
+	"github.com/nguyenngocanh94/mate/internal/tool/fresh"
+)
 
 // Default is every tool this binary drives, in the order the console and
-// a Mate's recall list them. No tool is registered yet: the plan's later
-// PRs move each one behind the registry.
+// a Mate's recall list them.
 func Default() []tool.Profile {
-	return nil
+	return []tool.Profile{fresh.New()}
 }

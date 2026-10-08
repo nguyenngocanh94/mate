@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -20,9 +21,16 @@ type Registry struct {
 	bindings []Binding
 }
 
+// ErrNoViewerImpl is a Viewer declared verified with no implementation.
+// The contract suite refuses it too (capability.Check); NewRegistry refuses
+// it by name rather than calling a nil Viewer.
+var ErrNoViewerImpl = errors.New("tool registry: a verified Viewer has no implementation")
+
 // NewRegistry registers profiles in the order given. A duplicate name, an
-// empty or non-canonical name, a binding with no key or an unknown scope,
-// and one key bound twice on one row of the console are refused.
+// empty or non-canonical name, a verified Viewer with no implementation, a
+// binding with no key or an unknown scope, and one key bound twice on one
+// row of the console are refused. Each binding is recorded with the name of
+// the tool that declares it.
 func NewRegistry(profiles ...Profile) (Registry, error) {
 	r := Registry{profiles: map[Name]Profile{}}
 	owner := map[Binding]Name{} // key and scope only
@@ -41,7 +49,11 @@ func NewRegistry(profiles ...Profile) (Registry, error) {
 		if !viewer.Verified() {
 			continue
 		}
+		if viewer.Impl == nil {
+			return Registry{}, fmt.Errorf("%w: %s", ErrNoViewerImpl, n)
+		}
 		for _, b := range viewer.Impl.Bindings() {
+			b.Tool = n
 			if b.Key == "" {
 				return Registry{}, fmt.Errorf("tool registry: %s binds a key with no key (label %q)", n, b.Label)
 			}
@@ -86,7 +98,7 @@ func (r Registry) Parse(s string) (Name, error) {
 func (r Registry) Names() []Name { return append([]Name(nil), r.order...) }
 
 // Bindings are the console keys of every tool whose Viewer is verified, in
-// registration order and each tool's own order.
+// registration order and each tool's own order, each with its Tool set.
 func (r Registry) Bindings() []Binding { return append([]Binding(nil), r.bindings...) }
 
 func (r Registry) list() string {

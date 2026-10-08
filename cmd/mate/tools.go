@@ -30,7 +30,7 @@ func consoleTools() []query.ToolBinding { return toolBindings(tools) }
 func toolBindings(r tool.Registry) []query.ToolBinding {
 	var out []query.ToolBinding
 	for _, b := range r.Bindings() {
-		out = append(out, query.ToolBinding{Key: b.Key, Label: b.Label, Scope: string(b.Scope), Role: b.Role})
+		out = append(out, query.ToolBinding{Key: b.Key, Label: b.Label, Scope: string(b.Scope), Role: b.Role, Tool: string(b.Tool)})
 	}
 	return out
 }

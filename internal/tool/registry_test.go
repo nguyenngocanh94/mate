@@ -1,6 +1,7 @@
 package tool_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -124,8 +125,11 @@ func TestBindingsComeFromVerifiedViewers(t *testing.T) {
 	unmeasured := fakeProfile{name: "gamma", bindings: []tool.Binding{{Key: "g", Label: "g", Scope: tool.ScopeCrew}}, viewer: capability.Unknown}
 	r := mustRegistry(t, viewing("alpha", report), unmeasured, fakeProfile{name: "delta"}, viewing("beta", tasks))
 	got := r.Bindings()
-	if len(got) != 2 || got[0] != report || got[1] != tasks {
-		t.Fatalf("Bindings() = %+v, want [%+v %+v]", got, report, tasks)
+	// The registry names the tool each key belongs to; a profile does not.
+	wantReport, wantTasks := report, tasks
+	wantReport.Tool, wantTasks.Tool = "alpha", "beta"
+	if len(got) != 2 || got[0] != wantReport || got[1] != wantTasks {
+		t.Fatalf("Bindings() = %+v, want [%+v %+v]", got, wantReport, wantTasks)
 	}
 	got[0].Key = "z"
 	if r.Bindings()[0].Key != "e" {
@@ -167,4 +171,30 @@ func TestNewRegistryRefusesMalformedBindings(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A profile that names another tool on its binding is overruled: the key
+// belongs to the tool that declares it.
+func TestBindingsNameTheirToolWhateverTheProfileSays(t *testing.T) {
+	b := tool.Binding{Key: "e", Label: "report", Scope: tool.ScopeCrew, Role: "review", Tool: "beta"}
+	if got := mustRegistry(t, viewing("alpha", b)).Bindings(); len(got) != 1 || got[0].Tool != "alpha" {
+		t.Fatalf("Bindings() = %+v, want the key owned by alpha", got)
+	}
+}
+
+// A Viewer declared verified with no implementation is refused by name
+// when the registry is built, rather than panicking on its bindings.
+func TestNewRegistryRefusesAVerifiedViewerWithNoImpl(t *testing.T) {
+	_, err := tool.NewRegistry(nilViewer{})
+	if !errors.Is(err, tool.ErrNoViewerImpl) || !strings.Contains(err.Error(), "alpha") {
+		t.Fatalf("NewRegistry = %v, want %v naming alpha", err, tool.ErrNoViewerImpl)
+	}
+}
+
+type nilViewer struct{}
+
+func (nilViewer) Name() tool.Name { return "alpha" }
+func (nilViewer) Info() tool.Info { return tool.Info{Name: "alpha"} }
+func (nilViewer) Capabilities() tool.Capabilities {
+	return tool.Capabilities{Viewer: capability.Cap[tool.Viewer]{Status: capability.Verified}}
 }

@@ -20,8 +20,8 @@ func TestConsoleToolsAreTheRegistrys(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []query.ToolBinding{
-		{Key: "a", Label: "alpha", Scope: "crew", Role: "alpha"},
-		{Key: "A", Label: "all alpha", Scope: "project", Role: "alpha-all"},
+		{Key: "a", Label: "alpha", Scope: "crew", Role: "alpha", Tool: "alpha"},
+		{Key: "A", Label: "all alpha", Scope: "project", Role: "alpha-all", Tool: "alpha"},
 	}
 	if got := toolBindings(r); !reflect.DeepEqual(got, want) {
 		t.Fatalf("toolBindings = %+v, want %+v", got, want)
