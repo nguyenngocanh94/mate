@@ -55,7 +55,7 @@ func TestMigrateCommandMovesAnOldWorkspace(t *testing.T) {
 	}
 	// Every command but mate migrate refuses the old layout.
 	var stdout, stderr bytes.Buffer
-	if code := mainRun([]string{"tool", "beads", "shop", "--init", "--workspace", root}, &stdout, &stderr); code != 1 || stderr.String() != "mate: this workspace has the old layout; run mate migrate with the previous mate release\n" {
+	if code := mainRun([]string{"tool", "beads", "shop", "--init", "--workspace", root}, &stdout, &stderr); code != 1 || stderr.String() != "mate: this workspace has the old layout (repos beside .mate); run mate migrate first\n" {
 		t.Fatalf("another command on the old layout: exit %d, stderr %q", code, stderr.String())
 	}
 	// mate migrate opens it. No herdr on PATH: the dry run asks no

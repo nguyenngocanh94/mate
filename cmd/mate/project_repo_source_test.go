@@ -221,7 +221,7 @@ func TestRepoAddOnTheOldLayoutClonesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cmdProjectRepo([]string{"add", "--workspace", ws, "shop", "file://" + bareRepo(t, true)}, &out, &errw)
-	if !errors.Is(err, store.ErrLayoutOld) || err.Error() != "this workspace has the old layout; run mate migrate with the previous mate release" {
+	if !errors.Is(err, store.ErrLayoutOld) || err.Error() != "this workspace has the old layout (repos beside .mate); run mate migrate first" {
 		t.Fatalf("repo add on the old layout = %v, want ErrLayoutOld", err)
 	}
 	for _, dir := range []string{filepath.Join(ws, "shop", "backend"), filepath.Join(ws, "backend")} {

@@ -40,7 +40,7 @@ const (
 
 // ErrLayoutOld is Open's refusal of a workspace still on layout 1: only
 // `mate migrate` reads one (OpenForMigrate).
-var ErrLayoutOld = errors.New("this workspace has the old layout; run mate migrate with the previous mate release")
+var ErrLayoutOld = errors.New("this workspace has the old layout (repos beside .mate); run mate migrate first")
 
 // ProjectRef is one row of the project list in workspace.yaml: the project
 // name. Its repos live in the project's own project.yaml (docs/mvp.md M9);

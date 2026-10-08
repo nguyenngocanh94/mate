@@ -2,6 +2,7 @@ package recovery
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -251,6 +252,42 @@ func TestRepairOwnerGivesACopyBesideTheOriginalItsOwnSession(t *testing.T) {
 	reopened, _ := store.Open(copyRoot)
 	if reopened.Session() == session || reopened.Session() != store.SessionName(w.Root()) {
 		t.Fatalf("copy session = %q, want its own name (original %q)", reopened.Session(), session)
+	}
+	if got := ownerOf(t, env, session); got != store.SessionName(orig.Root()) {
+		t.Fatalf("the original's marker changed to %q", got)
+	}
+}
+
+// An original still on the old layout, which only OpenForMigrate reads,
+// still holds its session: a copy beside it gets its own.
+func TestRepairOwnerGivesACopyBesideAnOldLayoutOriginalItsOwnSession(t *testing.T) {
+	orig := crewWorkspace(t, filepath.Join(t.TempDir(), "ws"))
+	session := orig.Session()
+	copyRoot := filepath.Join(t.TempDir(), "copy")
+	run(t, filepath.Dir(orig.Root()), "cp", "-R", orig.Root(), copyRoot)
+	raw, err := os.ReadFile(orig.WorkspaceFile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(orig.WorkspaceFile(), []byte(strings.Replace(string(raw), "layout: 2\n", "", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Open(orig.Root()); !errors.Is(err, store.ErrLayoutOld) {
+		t.Fatalf("the original is not on the old layout: %v", err)
+	}
+	w, err := store.Open(copyRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := envFor(t, w)
+	if err := runtime.ReclaimSessionOwner(env.ConfigHome, session, store.SessionName(orig.Root())); err != nil {
+		t.Fatal(err)
+	}
+	fixes := RepairOwner(env, orig.Root())
+	noErrors(t, fixes)
+	reopened, _ := store.Open(copyRoot)
+	if len(fixes) != 1 || reopened.Session() == session {
+		t.Fatalf("fixes = %+v, copy session = %q; want its own name beside the original %q", fixes, reopened.Session(), session)
 	}
 	if got := ownerOf(t, env, session); got != store.SessionName(orig.Root()) {
 		t.Fatalf("the original's marker changed to %q", got)

@@ -129,7 +129,7 @@ func TestOpenRefusesTheOldLayout(t *testing.T) {
 	w := newWorkspace(t)
 	writeOldLayout(t, w)
 
-	const msg = "this workspace has the old layout; run mate migrate with the previous mate release"
+	const msg = "this workspace has the old layout (repos beside .mate); run mate migrate first"
 	if _, err := store.Open(w.Root()); !errors.Is(err, store.ErrLayoutOld) || err.Error() != msg {
 		t.Fatalf("Open on the old layout = %v, want %q", err, msg)
 	}
