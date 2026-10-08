@@ -37,8 +37,8 @@ var ErrReservedRole = errors.New("tool registry: a binding takes a role mate own
 // NewRegistry registers profiles in the order given. A duplicate name, an
 // empty or non-canonical name, a verified Viewer with no implementation, a
 // binding with no key or an unknown scope, a binding to mate's own role,
-// and one key bound twice on one row of the console are refused. Each binding is recorded with the name of
-// the tool that declares it.
+// and one key bound twice on one row of the console are refused. Each
+// binding is recorded with the name of the tool that declares it.
 func NewRegistry(profiles ...Profile) (Registry, error) {
 	r := Registry{profiles: map[Name]Profile{}}
 	owner := map[Binding]Name{} // key and scope only
