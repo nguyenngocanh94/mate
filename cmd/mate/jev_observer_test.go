@@ -22,35 +22,49 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/ui/console"
 )
 
-// MATE_JEV=observer in `.mate/.env`, with a readable key and a threshold in
-// [0, 1], is the observer chain; anything else is the fixture observer
-// (nil), with one line saying why when the setting is a mistake.
+// The MATE_JEV value table (jevSettings): with a readable key, on,
+// observer and unset are the observer chain and the notice action; fixture
+// keeps the action and reads panes with the fixture observer (nil); off is
+// neither. Without a key, or on any mistake, the observer is the fixture's,
+// with one line saying why when the setting asked for Jev.
 func TestConfiguredObserver(t *testing.T) {
 	ws := noticeWorkspace(t)
 	key := filepath.Join(t.TempDir(), "key")
 	if err := os.WriteFile(key, []byte("test-key\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	keyLine := "MATE_JEV_API_KEY_FILE=" + key + "\n"
+	const (
+		noKey     = "Jev disabled: MATE_JEV_API_KEY_FILE is not set in .mate/.env"
+		badSwitch = "Jev disabled: MATE_JEV must be on, observer, fixture or off"
+		badLimit  = "Jev observer disabled: MATE_JEV_THRESHOLD must be a number from 0 to 1"
+	)
 	for _, tc := range []struct {
-		env     string
-		chained bool
-		err     string
+		env       string
+		chained   bool
+		noticed   bool
+		err       string
+		noticeErr string
 	}{
-		{"", false, ""},
-		{"MATE_JEV=off\nMATE_JEV_API_KEY_FILE=" + key + "\n", false, ""},
-		{"MATE_JEV=on\nMATE_JEV_API_KEY_FILE=" + key + "\n", false, ""},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\n", true, ""},
-		{"MATE_JEV=Observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=0.9\n", true, ""},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=0\n", true, ""},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=1\n", true, ""},
-		{"MATE_JEV=observer\n", false, "Jev disabled: MATE_JEV_API_KEY_FILE is not set in .mate/.env"},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=1.5\n", false,
-			"Jev observer disabled: MATE_JEV_THRESHOLD must be a number from 0 to 1"},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=high\n", false,
-			"Jev observer disabled: MATE_JEV_THRESHOLD must be a number from 0 to 1"},
-		{"MATE_JEV=observer\nMATE_JEV_API_KEY_FILE=" + key + "\nMATE_JEV_THRESHOLD=-0.1\n", false,
-			"Jev observer disabled: MATE_JEV_THRESHOLD must be a number from 0 to 1"},
-		{"MATE_JEV=maybe\nMATE_JEV_API_KEY_FILE=" + key + "\n", false, "Jev disabled: MATE_JEV must be on, observer or off"},
+		{env: ""},
+		{env: keyLine, chained: true, noticed: true},
+		{env: "MATE_JEV_API_KEY_FILE=" + filepath.Join(t.TempDir(), "missing") + "\n",
+			err: "Jev disabled: cannot read MATE_JEV_API_KEY_FILE", noticeErr: "Jev disabled: cannot read MATE_JEV_API_KEY_FILE"},
+		{env: "MATE_JEV=off\n" + keyLine},
+		{env: "MATE_JEV=OFF\n" + keyLine},
+		{env: "MATE_JEV=fixture\n" + keyLine, noticed: true},
+		{env: "MATE_JEV=fixture\n", noticeErr: noKey},
+		{env: "MATE_JEV=on\n" + keyLine, chained: true, noticed: true},
+		{env: "MATE_JEV=on\n", err: noKey, noticeErr: noKey},
+		{env: "MATE_JEV=observer\n" + keyLine, chained: true, noticed: true},
+		{env: "MATE_JEV=Observer\n" + keyLine + "MATE_JEV_THRESHOLD=0.9\n", chained: true, noticed: true},
+		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=0\n", chained: true, noticed: true},
+		{env: keyLine + "MATE_JEV_THRESHOLD=1\n", chained: true, noticed: true},
+		{env: "MATE_JEV=observer\n", err: noKey, noticeErr: noKey},
+		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=1.5\n", noticed: true, err: badLimit},
+		{env: keyLine + "MATE_JEV_THRESHOLD=high\n", noticed: true, err: badLimit},
+		{env: "MATE_JEV=observer\n" + keyLine + "MATE_JEV_THRESHOLD=-0.1\n", noticed: true, err: badLimit},
+		{env: "MATE_JEV=maybe\n" + keyLine, err: badSwitch, noticeErr: badSwitch},
 	} {
 		writeEnv(t, ws, tc.env)
 		observer, err := configuredObserver(ws)
@@ -60,19 +74,13 @@ func TestConfiguredObserver(t *testing.T) {
 		if got := errText(err); got != tc.err {
 			t.Errorf("%q: error %q, want %q", tc.env, got, tc.err)
 		}
-	}
-}
-
-// MATE_JEV=observer keeps the console's notice action, as MATE_JEV=on does.
-func TestObserverModeKeepsTheNoticeAction(t *testing.T) {
-	ws := noticeWorkspace(t)
-	key := filepath.Join(t.TempDir(), "key")
-	if err := os.WriteFile(key, []byte("test-key\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	writeEnv(t, ws, "MATE_JEV=observer\nMATE_JEV_API_KEY_FILE="+key+"\n")
-	if c, err := consoleNoticeClient(ws); c == nil || err != nil {
-		t.Fatalf("notice client %v, %v", c, err)
+		client, err := consoleNoticeClient(ws)
+		if (client != nil) != tc.noticed {
+			t.Errorf("%q: notice client %v, want one %v", tc.env, client, tc.noticed)
+		}
+		if got := errText(err); got != tc.noticeErr {
+			t.Errorf("%q: notice error %q, want %q", tc.env, got, tc.noticeErr)
+		}
 	}
 }
 

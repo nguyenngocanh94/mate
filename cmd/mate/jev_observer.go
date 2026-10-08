@@ -20,9 +20,10 @@ import (
 // fixture's reading (docs/plans/jev-observer-2026-10-08.md section 4.1).
 const defaultJevThreshold = 0.85
 
-// configuredObserver is the screen.Observer `.mate/.env` asks for. With
-// `MATE_JEV=observer` it is the chain - Jev first, the fixture observer when
-// Jev is unsure (internal/screen/chain) - logging every request to
+// configuredObserver is the screen.Observer `.mate/.env` asks for. Whenever
+// a readable key is set and `MATE_JEV` is not `off` or `fixture`
+// (jevSettings), it is the chain - Jev first, the fixture observer when Jev
+// is unsure (internal/screen/chain) - logging every request to
 // `.mate/jev.log`, with the threshold `MATE_JEV_THRESHOLD` sets. Otherwise,
 // and on any configuration problem, it is nil, which every Deps reads as the
 // fixture observer; the problem is the error, one line for the caller to

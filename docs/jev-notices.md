@@ -1,6 +1,6 @@
 # Thử Jev để đọc notice trong terminal
 
-Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Tính năng mặc định tắt và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh.
+Console có action **Explain notice (Jev)** cho Mate và Crew đang có binding active. Chọn agent, bấm `a`, rồi `e`. Kết quả mở trong sheet cuộn được; `Esc` đóng. Action mặc định tắt khi workspace chưa đặt key, và chỉ gọi API khi người dùng chọn action, không gọi theo mỗi lần refresh. Từ khi có key, Jev còn là bộ quan sát pane mặc định (mục "Bộ quan sát" bên dưới).
 
 ## Bật bản thử
 
@@ -14,7 +14,7 @@ MATE_JEV=on
 MATE_JEV_API_KEY_FILE=~/.config/mate/jev-trial-api-key
 ```
 
-`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Đặt `MATE_JEV=off` hoặc bỏ dòng để tắt; mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
+`MATE_JEV_API_KEY_FILE` chứa **đường dẫn**, không chứa key; `~/` được mở rộng, đường dẫn tương đối tính từ gốc workspace. Có key thì `MATE_JEV` không cần đặt: action và bộ quan sát cùng bật. `MATE_JEV=fixture` chỉ giữ action, `MATE_JEV=off` tắt cả hai (bảng ở mục "Bộ quan sát"); mở lại console để đọc `.env`. Nếu `.env` sai cú pháp, thiếu đường dẫn hay file key không đọc được, console vẫn chạy và báo Jev bị tắt ở status line.
 
 ## Kết quả có ý nghĩa gì?
 
@@ -40,9 +40,20 @@ Sheet ghi thời điểm capture và confidence từ model. Confidence không ph
 - Không ghi màn hình, response hoặc key vào state/log của mate. Result chỉ nằm trong sheet hiện tại. Không cache, không background polling, không ghi nhãn vào timeline/inbox.
 - Jev không tham gia composer classifier, sender, receipts, incidents, quota dispatch hoặc task state. Nó không tự nhấn Enter, cấp quyền hay đóng dialog. **Bản thử này chưa sửa lỗi probe hiện tại.**
 
-## Bộ quan sát: `MATE_JEV=observer`
+## Bộ quan sát
 
-Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), `MATE_JEV=observer` trong `.mate/.env` (cùng `MATE_JEV_API_KEY_FILE`) bật thêm bộ quan sát: **pane của Mate và Crew đi ra TypeSafe mỗi lần màn hình đổi**, không chỉ khi người dùng chọn action: từ observer của console, `mate send`, `mate brief append`, `mate state`, bước settle của `mate start`, `mate refresh`, `crew spawn`, `crew relaunch`, `review`, các lần gửi của outbox và autopilot (kể cả stow), watcher của `mate pr`, `mate mate stop` và `mate project remove`. Pane đứng yên không tốn request: observer của console chỉ hỏi khi hash màn hình đổi. Cache 60 giây chỉ để dùng lại câu trả lời khi cùng một màn hình được đọc lại trong một phút (settle, stow, nhiều lệnh liên tiếp). Nội dung gửi đi giống action ở trên (40 dòng cuối, 8 KiB, che key và credential theo pattern), thêm đánh dấu chữ mờ. Jev hỏi trước, fixture classifier là fallback: Jev lỗi hay confidence dưới `MATE_JEV_THRESHOLD` (mặc định `0.85`, chỉ nhận số trong `[0, 1]`) thì dùng nguyên quan sát của fixture; Jev nói composer trống mà fixture chắc có draft hay đang bận, hoặc fixture nhận ra một dialog khởi động, thì fixture thắng. Enter vẫn chỉ đi sau khi so chuỗi trực tiếp, phím dialog chỉ sau khi fixture xác nhận highlight. Mỗi request ghi một dòng vào `.mate/jev.log` (thời điểm, harness, 12 ký tự hash màn hình, latency, nguồn được dùng, nhãn Jev, lý do fallback; không có nội dung màn hình hay key); `go run ./scripts/jeveval -log <workspace>/.mate/jev.log` in số request, latency p50/p95 và số lần fallback. Các mục "Dữ liệu và giới hạn" ở trên mô tả `MATE_JEV=on`, vẫn giữ nguyên nghĩa: chỉ action notice.
+Từ 2026-10-08 ([phương án](plans/jev-observer-2026-10-08.md) mục 4.4), khi `.mate/.env` đặt `MATE_JEV_API_KEY_FILE` và file key đọc được, bộ quan sát pane là chain (Jev trước, fixture classifier là fallback) mà không cần đặt `MATE_JEV`. Giá trị `MATE_JEV`:
+
+| `MATE_JEV` | Action Explain notice | Bộ quan sát pane |
+| --- | --- | --- |
+| không đặt, `on`, `observer` | bật | chain: Jev trước, fixture khi Jev không chắc |
+| `fixture` | bật | fixture, không request nào cho pane |
+| `off` | tắt | fixture, không request nào tới Jev |
+| giá trị khác | tắt, báo lỗi | fixture |
+
+Không có `MATE_JEV_API_KEY_FILE` thì bộ quan sát là fixture. Nếu `MATE_JEV` đặt `on`, `observer` hay `fixture` mà thiếu key, hoặc file key không đọc được, hoặc `MATE_JEV_THRESHOLD` sai, lệnh in một dòng `Jev disabled: …` (console để trên status line) và chạy tiếp với fixture. Không đặt cả `MATE_JEV` lẫn key thì im lặng, như workspace chưa từng bật Jev.
+
+Khi chain bật, **pane của Mate và Crew đi ra TypeSafe mỗi lần màn hình đổi**, không chỉ khi người dùng chọn action: từ observer của console, `mate send`, `mate brief append`, `mate state`, bước settle của `mate start`, `mate refresh`, `crew spawn`, `crew relaunch`, `review`, các lần gửi của outbox và autopilot (kể cả stow), watcher của `mate pr`, `mate mate stop` và `mate project remove`. Pane đứng yên không tốn request: observer của console chỉ hỏi khi hash màn hình đổi. Cache 60 giây chỉ để dùng lại câu trả lời khi cùng một màn hình được đọc lại trong một phút (settle, stow, nhiều lệnh liên tiếp). Nội dung gửi đi giống action ở trên (40 dòng cuối, 8 KiB, che key và credential theo pattern), thêm đánh dấu chữ mờ. Jev hỏi trước, fixture classifier là fallback: Jev lỗi hay confidence dưới `MATE_JEV_THRESHOLD` (mặc định `0.85`, chỉ nhận số trong `[0, 1]`) thì dùng nguyên quan sát của fixture; Jev nói composer trống mà fixture chắc có draft hay đang bận, hoặc fixture nhận ra một dialog khởi động, thì fixture thắng. Enter vẫn chỉ đi sau khi so chuỗi trực tiếp, phím dialog chỉ sau khi fixture xác nhận highlight. Mỗi request ghi một dòng vào `.mate/jev.log` (thời điểm, harness, 12 ký tự hash màn hình, latency, nguồn được dùng, nhãn Jev, lý do fallback; không có nội dung màn hình hay key); `go run ./scripts/jeveval -log <workspace>/.mate/jev.log` in số request, latency p50/p95 và số lần fallback. Mục "Dữ liệu và giới hạn" ở trên mô tả action notice và vẫn đúng cho action; bộ quan sát theo mục này.
 
 ## Phương án tiến tới probe tổng quát
 

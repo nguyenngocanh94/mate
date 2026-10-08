@@ -65,8 +65,9 @@ func (w *Workspace) PricingFile() string { return filepath.Join(w.StateDir(), pr
 func (w *Workspace) EnvFile() string { return filepath.Join(w.StateDir(), envFileName) }
 
 // JevLog is `<root>/.mate/jev.log`: one line per request the Jev observer
-// chain sent (internal/screen/chain), only when `.mate/.env` sets
-// MATE_JEV=observer. It never holds screen text or a key.
+// chain sent (internal/screen/chain), only while `.mate/.env` turns the
+// chain on (a readable key, MATE_JEV not off or fixture). It never holds
+// screen text or a key.
 func (w *Workspace) JevLog() string { return filepath.Join(w.StateDir(), jevLogName) }
 
 // ProjectsDir is `<root>/.mate/projects`.

@@ -14,7 +14,7 @@
 // the run as dir/manifest.json; -replay answers from that cassette instead
 // of the network. -list prints the corpus and its labels without calling.
 // -log reads the observer chain's log instead (internal/screen/chain) and
-// prints the numbers a day with MATE_JEV=observer is measured by: requests,
+// prints the numbers a day with the chain on is measured by: requests,
 // latency p50/p95 and how many fell back to the fixture observer.
 package main
 

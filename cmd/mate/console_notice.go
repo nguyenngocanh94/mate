@@ -23,13 +23,12 @@ type noticeClassifier interface {
 }
 
 // The workspace's `.mate/.env` opts this console into remote classification:
-// `MATE_JEV=on` turns the action on for this workspace only (and so does
-// `MATE_JEV=observer`, which also observes every pane through Jev, see
-// jev_observer.go), and `MATE_JEV_API_KEY_FILE` names a key file, `~/` or
-// relative to the workspace root. The key is read here and stays in this
-// client; no key is added to spawned agents' environments. The process
-// environment is not consulted, so one workspace's switch never reaches
-// another's console.
+// `MATE_JEV_API_KEY_FILE` names a key file, `~/` or relative to the
+// workspace root, and with it the action is on unless `MATE_JEV=off` (the
+// values are jevSettings'). The key is read here and stays in this client;
+// no key is added to spawned agents' environments. The process environment
+// is not consulted, so one workspace's switch never reaches another's
+// console.
 func consoleNoticeClient(ws *store.Workspace) (*notice.Client, error) {
 	env, mode, err := jevSettings(ws)
 	if err != nil || mode == jevOff {
@@ -43,29 +42,41 @@ type jevMode int
 
 const (
 	jevOff jevMode = iota
-	// jevNotice is the console's Explain notice action alone.
+	// jevNotice is the console's Explain notice action alone, the panes
+	// read by the fixture observer.
 	jevNotice
 	// jevObserver is that action and the observer chain.
 	jevObserver
 )
 
-// jevSettings reads `.mate/.env` and its MATE_JEV switch.
+// jevSettings reads `.mate/.env` and its MATE_JEV switch:
+//
+//	off (false, 0, no)               nothing goes to Jev
+//	fixture                          the notice action; panes read by the fixture observer
+//	on, observer (true, 1, yes)      the notice action and the observer chain
+//	unset, with MATE_JEV_API_KEY_FILE  the same as on
+//	unset, no key file named         off, silently: a workspace that never set Jev up
+//
+// Any other value is a mistake, said in the error, and Jev stays off.
 func jevSettings(ws *store.Workspace) (map[string]string, jevMode, error) {
 	env, err := ws.LoadEnv()
 	if err != nil {
 		return nil, jevOff, fmt.Errorf("Jev disabled: %w", err)
 	}
-	if strings.EqualFold(strings.TrimSpace(env["MATE_JEV"]), "observer") {
+	switch value := strings.ToLower(strings.TrimSpace(env["MATE_JEV"])); value {
+	case "":
+		if env["MATE_JEV_API_KEY_FILE"] == "" {
+			return env, jevOff, nil
+		}
+		return env, jevObserver, nil
+	case "off", "false", "0", "no":
+		return env, jevOff, nil
+	case "fixture":
+		return env, jevNotice, nil
+	case "on", "observer", "true", "1", "yes":
 		return env, jevObserver, nil
 	}
-	on, err := envSwitch(env["MATE_JEV"])
-	if err != nil {
-		return nil, jevOff, errors.New("Jev disabled: MATE_JEV must be on, observer or off")
-	}
-	if on {
-		return env, jevNotice, nil
-	}
-	return env, jevOff, nil
+	return nil, jevOff, errors.New("Jev disabled: MATE_JEV must be on, observer, fixture or off")
 }
 
 // jevClient is the Jev client over the key file `.mate/.env` names.
@@ -85,18 +96,6 @@ func jevClient(ws *store.Workspace, env map[string]string) (*notice.Client, erro
 		return nil, errors.New("Jev disabled: invalid API key file")
 	}
 	return notice.New(key), nil
-}
-
-// envSwitch reads an on/off setting; unset is off, anything else is a
-// mistake worth a message rather than a silent default.
-func envSwitch(value string) (bool, error) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "off", "false", "0", "no":
-		return false, nil
-	case "on", "true", "1", "yes":
-		return true, nil
-	}
-	return false, errors.New("must be on or off")
 }
 
 // keyFilePath expands a leading `~/` and anchors a relative path at the
