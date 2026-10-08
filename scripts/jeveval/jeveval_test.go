@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,20 +25,20 @@ func corpus(t *testing.T) []Screen {
 }
 
 // The corpus is every labelled screen the brief names, read from where the
-// repo keeps it. A fixture added there grows these counts on purpose.
-func TestCorpusCountsPerSource(t *testing.T) {
+// repo keeps it. Counts are not pinned: a fixture added to any of these
+// dirs joins the corpus without failing the build.
+func TestCorpusCoversEverySource(t *testing.T) {
 	got := map[string]int{}
 	for _, s := range corpus(t) {
 		got[s.Source]++
 	}
-	want := map[string]int{sourceSend: 21, sourceStartup: 31, sourceScreens: 23, sourceNotice: 12, sourceInjection: 3}
-	for k, n := range want {
-		if got[k] != n {
-			t.Errorf("%s: %d screens, want %d", k, got[k], n)
+	for _, src := range []string{sourceSend, sourceStartup, sourceScreens, sourceNotice, sourceInjection} {
+		if got[src] == 0 {
+			t.Errorf("no screens from %s", src)
 		}
 	}
-	if len(got) != len(want) {
-		t.Errorf("sources %v, want %v", got, want)
+	if len(got) != 5 {
+		t.Errorf("sources %v", got)
 	}
 }
 
@@ -135,19 +136,55 @@ func TestParseRefusesMalformedAnswers(t *testing.T) {
 	}
 }
 
-// The committed cassette answers every screen of the current corpus with
-// the current questions, so a replay needs no network. A change to the
-// corpus or the questions must re-record it.
+// The committed cassette replays without the network, whatever was
+// added to the corpus since it was recorded.
 func TestCommittedCassetteReplays(t *testing.T) {
 	dir := filepath.Join("testdata", "cassette")
-	if _, err := os.Stat(filepath.Join(dir, "manifest.json")); err != nil {
-		t.Fatal("no committed cassette:", err)
-	}
 	var out bytes.Buffer
 	if err := run(&out, dir, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "### Summary") {
 		t.Fatalf("no report:\n%s", out.String())
+	}
+}
+
+// A screen the cassette has no answer for, as a newly added fixture would
+// be, is listed as not recorded; the replay still succeeds and scores the
+// rest.
+func TestReplayListsScreensNotRecorded(t *testing.T) {
+	src := filepath.Join("testdata", "cassette")
+	m, err := readManifestFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dropped := m.Entries[0]
+	m.Entries = m.Entries[1:]
+	dir := t.TempDir()
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range m.Entries {
+		raw, err := os.ReadFile(filepath.Join(src, e.Request+".json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, e.Request+".json"), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var out bytes.Buffer
+	if err := run(&out, dir, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "- not recorded: `"+dropped.File+"`") {
+		t.Fatalf("%s not listed as not recorded:\n%s", dropped.File, out.String())
+	}
+	if !strings.Contains(out.String(), "### Summary") {
+		t.Fatal("no report")
 	}
 }

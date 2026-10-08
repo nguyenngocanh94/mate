@@ -29,8 +29,10 @@ const (
 )
 
 // The three questions of one request, fixed before the first run. The
-// notice question is internal/notice's, copied verbatim (its criteria are
-// unexported), so that axis measures the client already shipped.
+// notice question's criteria and instructions are internal/notice's,
+// copied verbatim (they are unexported). Here it rides in one request with
+// the composer and dialog questions, where the shipped client asks it
+// alone, so this axis is not a measurement of that client as shipped.
 var questions = map[string]question{
 	string(AxisComposer): {
 		Criteria: map[string]string{

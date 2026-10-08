@@ -91,6 +91,7 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 
 	rows := make([]Row, 0, len(corpus))
+	var notRecorded []string
 	m := manifest{Model: notice.Model, Date: time.Now().Format("2006-01-02"), Prompt: promptHash()}
 	for _, s := range corpus {
 		body, err := requestBody(prepare(s.Text, key))
@@ -102,8 +103,14 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 		if replay {
 			e, ok := recorded[row.Hash]
 			if !ok {
-				return fmt.Errorf("%s: request %s is not in the cassette", s.File, row.Hash[:12])
+				// A screen added or changed since the recording: the
+				// cassette has no answer for it, and only a run with the
+				// key can give one. It is listed, not scored, so a new
+				// fixture never fails a replay.
+				notRecorded = append(notRecorded, s.File)
+				continue
 			}
+			delete(recorded, row.Hash)
 			row.LatencyMS, row.Err = e.LatencyMS, e.Error
 			if e.Error == "" {
 				data, err = os.ReadFile(filepath.Join(cassette, row.Hash+".json"))
@@ -161,7 +168,32 @@ func run(w io.Writer, cassette string, replay, list bool) error {
 		}
 	}
 	report(w, m, rows)
+	if replay {
+		var stale []string
+		for _, e := range recorded {
+			stale = append(stale, e.File)
+		}
+		slices.Sort(stale)
+		drift(w, notRecorded, stale)
+	}
 	return nil
+}
+
+// drift lists how the corpus moved since the cassette was recorded. It
+// prints nothing when the two agree.
+func drift(w io.Writer, notRecorded, stale []string) {
+	if len(notRecorded) == 0 && len(stale) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\n### Corpus drift since the recording")
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Re-record with the key to score these (`go run ./scripts/jeveval -cassette <dir>`).\n\n")
+	for _, f := range notRecorded {
+		fmt.Fprintf(w, "- not recorded: `%s`\n", f)
+	}
+	for _, f := range stale {
+		fmt.Fprintf(w, "- recorded, no longer in the corpus as recorded: `%s`\n", f)
+	}
 }
 
 // readKey reads the API key file; it never prints the key.
