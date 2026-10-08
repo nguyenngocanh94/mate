@@ -248,14 +248,13 @@ func TestToolKeyWordsComeFromTheSnapshot(t *testing.T) {
 	}
 }
 
-// t bound to a tool on a project row opens that tool, not the tasks seam.
-// Unbound, t is TasksFunc's, as before.
+// t opens whatever tool the snapshot binds to it on a project row, with
+// that tool's words.
 func TestTBoundToAToolOpensItOnTheProject(t *testing.T) {
 	tree := sampleTree()
-	tree.Tools = append(tree.Tools, query.ToolBinding{Key: "t", Label: "plan", Scope: "project", Role: "plan", Tool: "planner"})
+	tree.Tools = []query.ToolBinding{reportKey, {Key: "t", Label: "plan", Scope: "project", Role: "plan", Tool: "planner"}}
 	view := &toolSpy{}
-	m := loaded(t, tree, nil).WithToolView(view.fn).
-		WithTasks(func(context.Context, string) error { t.Fatal("t went to the tasks seam"); return nil })
+	m := loaded(t, tree, nil).WithToolView(view.fn)
 	want := m.modeTarget()
 	m, cmd := send(t, m, key("t"))
 	if cmd == nil {
@@ -279,5 +278,101 @@ func TestEnterWithoutAHostGivesTheHint(t *testing.T) {
 	m, _ = send(t, m, key("enter"))
 	if m.msg.text != "no next pane: over ssh, do this" {
 		t.Fatalf("message = %q, want the hint after the no-host line", m.msg.text)
+	}
+}
+
+// t names the project of the row it is pressed on, from the list, the
+// detail pane and the box; the box's is its item's project.
+func TestTOpensTheProjectOfListDetailAndBox(t *testing.T) {
+	for _, focus := range []pane{paneList, paneDetail} {
+		view := &toolSpy{}
+		m := loaded(t, sampleTree(), nil).WithToolView(view.fn)
+		m.focus = focus
+		want := m.modeTarget()
+		m, cmd := send(t, m, key("t"))
+		if cmd == nil {
+			t.Fatalf("focus %v: t returned no Cmd: %+v", focus, m.msg)
+		}
+		m, _ = send(t, m, cmd())
+		if len(view.calls) != 1 || view.keys[0] != "t" || view.calls[0] != (StageTarget{ProjectID: want}) ||
+			m.msg.text != "→ tasks · "+want || m.cur().kind != frameWorkspace {
+			t.Fatalf("focus %v: calls %+v, message %+v; want t on %s", focus, view.calls, m.msg, want)
+		}
+	}
+
+	m, _, _ := bxPayments(t, 80, 36)
+	m = bxFocusBox(t, m)
+	view := &toolSpy{}
+	m = m.WithToolView(view.fn)
+	items := m.boxItems()
+	want := items[m.boxSelection(items)].project
+	if _, cmd := send(t, m, key("t")); cmd == nil {
+		t.Fatal("t from the box returned no Cmd")
+	} else {
+		cmd()
+	}
+	if len(view.calls) != 1 || view.calls[0].ProjectID != want {
+		t.Fatalf("t from the box opened %+v, want project %s", view.calls, want)
+	}
+}
+
+// A tool's failure is said on the status line.
+func TestTFailureIsSaid(t *testing.T) {
+	view := &toolSpy{err: errors.New("host failed")}
+	m := projectFrame(t, sampleTree()).WithToolView(view.fn)
+	m, cmd := send(t, m, key("t"))
+	if cmd == nil {
+		t.Fatal("t on a project returned no Cmd")
+	}
+	m, _ = send(t, m, cmd())
+	if m.msg.text != "host failed" {
+		t.Fatalf("failure hidden: %+v", m.msg)
+	}
+}
+
+// t typed into a form is text, not a key.
+func TestTKeepsInputPriority(t *testing.T) {
+	view := &toolSpy{}
+	m := loaded(t, sampleTree(), nil).WithToolView(view.fn).beginNewProject()
+	m, _ = send(t, m, key("t"))
+	if !m.actionInputMode || len(view.calls) != 0 {
+		t.Fatal("t left the text form")
+	}
+}
+
+// With no tool bound to t, t says so, the key line offers no t, and
+// without a host tab a bound t says there is no next pane.
+func TestTUnboundOrHostlessSaysSo(t *testing.T) {
+	tree := sampleTree()
+	tree.Tools = []query.ToolBinding{reportKey}
+	m := projectFrame(t, tree).WithToolView((&toolSpy{}).fn)
+	m, cmd := send(t, m, key("t"))
+	if cmd != nil || m.msg.text != "no tool bound to t" {
+		t.Fatalf("unbound t: %+v", m.msg)
+	}
+	if slices.ContainsFunc(m.keyHints(), func(h keyHint) bool { return h.key == "t" }) {
+		t.Fatalf("key line offers an unbound t: %+v", m.keyHints())
+	}
+	m = projectFrame(t, sampleTree())
+	m, cmd = send(t, m, key("t"))
+	if cmd != nil || !strings.Contains(m.msg.text, "no next pane") {
+		t.Fatalf("hostless t: %+v", m.msg)
+	}
+}
+
+// The key sheet draws and yields only the keys the Console hands to a
+// tool: a binding on another key is never pressed through to its tool, so
+// it is not drawn, and the Console's own row for that key stays.
+func TestKeySheetDrawsOnlyRoutedToolKeys(t *testing.T) {
+	tree := sampleTree()
+	tree.Tools = append(tree.Tools, query.ToolBinding{Key: "a", Label: "audit", Scope: "project", Role: "audit", Tool: "auditor"})
+	rows := loaded(t, tree, nil).keyRows()
+	if slices.Contains(rows, [2]string{"a", "project audit"}) || !slices.Contains(rows, [2]string{"a", "actions"}) {
+		t.Fatalf("key rows = %q, want a kept as actions and the unrouted binding not drawn", rows)
+	}
+	for _, want := range [][2]string{{"e", "crew report"}, {"t", "project tasks"}} {
+		if !slices.Contains(rows, want) {
+			t.Fatalf("key rows = %q, want %q", rows, want)
+		}
 	}
 }

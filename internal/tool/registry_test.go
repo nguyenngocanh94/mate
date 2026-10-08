@@ -198,3 +198,12 @@ func (nilViewer) Info() tool.Info { return tool.Info{Name: "alpha"} }
 func (nilViewer) Capabilities() tool.Capabilities {
 	return tool.Capabilities{Viewer: capability.Cap[tool.Viewer]{Status: capability.Verified}}
 }
+
+// The stage column is mate's: a tool binding its role is refused by name
+// when the registry is built.
+func TestNewRegistryRefusesTheStageRole(t *testing.T) {
+	_, err := tool.NewRegistry(viewing("alpha", tool.Binding{Key: "x", Label: "x", Scope: tool.ScopeCrew, Role: tool.StageRole}))
+	if !errors.Is(err, tool.ErrReservedRole) || !strings.Contains(err.Error(), "alpha") || !strings.Contains(err.Error(), `"stage"`) {
+		t.Fatalf("NewRegistry = %v, want %v naming alpha and the stage role", err, tool.ErrReservedRole)
+	}
+}

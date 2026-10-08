@@ -249,7 +249,6 @@ type Model struct {
 	// each opening its tool in a tab beside the Console. nil means there is
 	// no host tab to open.
 	toolView ToolViewFunc
-	tasks    TasksFunc
 	// noHost says how to get a next pane while stage is nil; blank means
 	// the default advice.
 	noHost string
@@ -446,12 +445,6 @@ func (m Model) WithStage(fn StageFunc) Model {
 // than opening anything here.
 func (m Model) WithToolView(fn ToolViewFunc) Model {
 	m.toolView = fn
-	return m
-}
-
-// WithTasks installs the project plan tab opened by `t`.
-func (m Model) WithTasks(fn TasksFunc) Model {
-	m.tasks = fn
 	return m
 }
 

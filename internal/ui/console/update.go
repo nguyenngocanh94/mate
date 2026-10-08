@@ -30,13 +30,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.onStageDone(msg), nil
 	case toolViewDoneMsg:
 		return m.onToolViewDone(msg), nil
-	case tasksDoneMsg:
-		if msg.err != nil {
-			m.msg = errMsg(oneLine(msg.err.Error()))
-		} else {
-			m.msg = infoMsg("Tasks · " + msg.project)
-		}
-		return m, nil
 	case tea.KeyMsg:
 		return m.onKey(msg)
 	case tea.MouseMsg:

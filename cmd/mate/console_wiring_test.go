@@ -212,10 +212,11 @@ func TestConsoleActionModeTogglesTheAutoFlagAndTheLabel(t *testing.T) {
 	}
 }
 
-// roleReview is the tab the report viewer's key binding names; rolePlan
-// is a project-scoped fake tool's (planTool).
+// roleReview is the tab the report viewer's key binding names, roleTasks
+// the task tracker's; rolePlan is a project-scoped fake tool's (planTool).
 const (
 	roleReview = "review"
+	roleTasks  = "tasks"
 	rolePlan   = "plan"
 )
 
@@ -261,16 +262,16 @@ func newRecordingColumns(t *testing.T) *recordingColumns {
 	r := &recordingColumns{shown: map[string][]panerun.Command{}}
 	r.consoleColumns = &consoleColumns{
 		h: layoutCounter{n: &r.layouts, closed: &r.closedRoles, fronts: &r.fronts}, dir: dir,
-		stage: filepath.Join(dir, "stage.sock"), tasks: filepath.Join(dir, "tasks.sock"),
-		tasksCol: host.Column{Role: roleTasks},
+		stage: filepath.Join(dir, "stage.sock"),
 		tabs: map[string]toolTab{
 			roleReview: {col: host.Column{Role: roleReview}, socket: filepath.Join(dir, "review.sock")},
+			roleTasks:  {col: host.Column{Role: roleTasks}, socket: filepath.Join(dir, "tasks.sock")},
 			rolePlan:   {col: host.Column{Role: rolePlan}, socket: filepath.Join(dir, "plan.sock")},
 		},
 		herdr:    "/opt/herdr",
 		findTool: func(name string) string { return "/opt/" + name },
 	}
-	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.tabs[roleReview].socket, rolePlan: r.tabs[rolePlan].socket, roleTasks: r.tasks} {
+	for role, socket := range map[string]string{roleStage: r.stage, roleReview: r.tabs[roleReview].socket, rolePlan: r.tabs[rolePlan].socket, roleTasks: r.tabs[roleTasks].socket} {
 		ln, err := net.Listen("unix", socket)
 		if err != nil {
 			t.Fatal(err)

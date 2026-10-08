@@ -18,18 +18,15 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/tool"
 )
 
-// Column roles mate owns: the agent stage, and the tasks tab (docs/mvp.md
-// M13). A tool's tab takes the role its key binding names (toolRoles).
-const (
-	roleStage = "stage"
-	roleTasks = "tasks"
-)
+// roleStage is the column role mate owns: the agent stage (docs/mvp.md
+// M13). A tool's tab takes the role its key binding names (toolRoles); the
+// tool registry refuses a binding that names this one.
+const roleStage = tool.StageRole
 
 // paneIdle is what each column of a fixed role says while it shows
 // nothing. A tool's tab says its Viewer's Placeholder (paneIdleOf).
 var paneIdle = map[string]string{
 	roleStage: "mate · agent\r\n\r\nEnter on a Mate or Crew row in the console shows it here.",
-	roleTasks: "mate · tasks\r\n\r\nt on a project opens Beads Viewer here.",
 }
 
 // paneIdleOf is what the pane of role says while it shows nothing: a
@@ -52,7 +49,7 @@ func paneIdleOf(role string, tools tool.Registry) (string, bool) {
 // paneRoles is every role a pane can serve, for the usage line:
 // "stage|review|tasks".
 func paneRoles(tools tool.Registry) string {
-	return strings.Join(slices.Concat([]string{roleStage}, toolRoles(tools), []string{roleTasks}), "|")
+	return strings.Join(slices.Concat([]string{roleStage}, toolRoles(tools)), "|")
 }
 
 // cmdPane dispatches `mate pane serve`, the program the Console's columns

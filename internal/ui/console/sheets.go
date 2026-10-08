@@ -2,6 +2,7 @@ package console
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/names"
@@ -360,7 +361,6 @@ var keyTable = [][2]string{
 	{"m", "flip its mode"},
 	{"y", "copy"},
 	toolKeyRows,
-	{"t", "project tasks"},
 	{"l", "box: whole log"},
 	{"r", "refresh"},
 	{"q", "quit"},
@@ -375,18 +375,22 @@ var keyTable = [][2]string{
 var toolKeyRows = [2]string{"", "tool keys"}
 
 // keyRows is keyTable with the tool keys of the snapshot in their place,
-// each as "<scope> <label>": "e  crew report". A fixed row whose key a tool
-// binds is the tool's now, and is dropped.
+// each as "<scope> <label>": "e  crew report". Only the keys the Console
+// hands to a tool (toolKeys) are drawn; a binding on any other key does
+// nothing, so it is not offered. A fixed row whose key the Console hands
+// to a bound tool is the tool's now, and is dropped.
 func (m Model) keyRows() [][2]string {
 	out := make([][2]string, 0, len(keyTable)+len(m.tree.Tools))
 	for _, k := range keyTable {
 		if k == toolKeyRows {
 			for _, b := range m.tree.Tools {
-				out = append(out, [2]string{b.Key, b.Scope + " " + b.Label})
+				if slices.Contains(toolKeys, b.Key) {
+					out = append(out, [2]string{b.Key, b.Scope + " " + b.Label})
+				}
 			}
 			continue
 		}
-		if !m.toolBound(k[0]) {
+		if !slices.Contains(toolKeys, k[0]) || !m.toolBound(k[0]) {
 			out = append(out, k)
 		}
 	}

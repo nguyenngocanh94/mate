@@ -280,6 +280,33 @@ func (m Model) retryStage() (Model, tea.Cmd) {
 	return m.beginStage(m.staged.target)
 }
 
+// toolKeys are the keys the Console hands to the tool the snapshot binds to
+// them (beginToolView): t from any pane, e from the list.
+var toolKeys = []string{"e", "t"}
+
+// toolHint is the key line's hint for a tool key: the bound tool's label,
+// or nothing when no tool binds key.
+func (m Model) toolHint(key string) keyHint {
+	for _, b := range m.tree.Tools {
+		if b.Key == key {
+			return keyHint{key, b.Label}
+		}
+	}
+	return keyHint{}
+}
+
+// keyProject is the project a project key names: the box item's when the
+// box has focus, otherwise the one open or selected (modeTarget).
+func (m Model) keyProject() string {
+	if m.focus == paneBox {
+		items := m.boxItems()
+		if sel := m.boxSelection(items); sel >= 0 {
+			return items[sel].project
+		}
+	}
+	return m.modeTarget()
+}
+
 // toolBound reports whether the snapshot binds a tool to key on any row.
 func (m Model) toolBound(key string) bool {
 	for _, b := range m.tree.Tools {

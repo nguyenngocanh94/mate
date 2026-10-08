@@ -6,12 +6,22 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
+	"path/filepath"
 
 	"github.com/charmbracelet/x/term"
-	"github.com/nguyenngocanh94/mate/internal/beads"
+	"github.com/nguyenngocanh94/mate/internal/store"
+	"github.com/nguyenngocanh94/mate/internal/tool"
 )
 
+// taskTool is the tool `mate tasks`, `mate beads` and `mate task-triage`
+// stand for: they are kept for one release while manuals still name them,
+// then `mate tool` alone remains
+// (docs/plans/workspace-layout-and-tools-2026-10-08.md, PR 6).
+const taskTool tool.Name = "beads"
+
+// cmdTasks implements `mate tasks <project> [--list|--json|--init]`: the
+// task tool's data made (Data.Init), listed (its Command), or open in its
+// viewer in this terminal.
 func cmdTasks(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("tasks", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -32,67 +42,47 @@ func cmdTasks(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	t, err := beads.Open(w, fs.Arg(0), nil)
+	project := fs.Arg(0)
+	p, err := taskToolOn(w, project, *init)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	env := toolEnv(w, project, p)
+	caps := p.Capabilities()
+	ctx, cancel := context.WithTimeout(context.Background(), toolCommandTimeout)
 	defer cancel()
-	if *init {
-		if err := t.Init(ctx, stderr); err != nil {
+	switch {
+	case *init:
+		if err := caps.Data.Impl.Init(ctx, env, stderr); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintln(stdout, t.Dir())
+		_, err = fmt.Fprintln(stdout, env.DataDir)
 		return err
-	}
-	if *list || *jsonFlag {
+	case *list || *jsonFlag:
 		bdArgs := []string{"list", "--all", "--limit", "0", "--no-pager"}
 		if *jsonFlag {
 			bdArgs = append(bdArgs, "--json")
 		}
-		return t.Run(ctx, bdArgs, nil, stdout, stderr)
+		return caps.Command.Impl.Run(ctx, env, bdArgs, nil, stdout, stderr)
+	}
+	if err := caps.Data.Impl.Init(ctx, env, stderr); err != nil {
+		return err
 	}
 	// The captain decides the interactive process lifetime. Initialization is
-	// bounded; the TUI stays open until they quit it.
-	return t.Viewer(context.Background(), nil, os.Stdin, stdout, stderr)
+	// bounded; the viewer stays open until they quit it.
+	return runViewerHere(context.Background(), p, env, nil, os.Stdin, stdout, stderr)
 }
 
-// -- separates Mate flags from upstream flags, preserving every bd argument
-// (including titles, paths with spaces and multiline descriptions) literally.
+// cmdBeads is `mate beads <project> -- <bd arguments>`, which `mate tool
+// beads` replaced: it says so and runs that.
 func cmdBeads(args []string, stdout, stderr io.Writer) error {
-	sep := -1
-	for i, a := range args {
-		if a == "--" {
-			sep = i
-			break
-		}
-	}
-	if sep < 0 {
-		return newUsageError("usage: mate beads <project> [--workspace <dir>] -- <bd arguments>")
-	}
-	fs := flag.NewFlagSet("beads", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	workspace := fs.String("workspace", "", "workspace directory")
-	if err := fs.Parse(reorderArgs(fs, args[:sep])); err != nil {
-		return &usageError{err}
-	}
-	if fs.NArg() != 1 || len(args[sep+1:]) == 0 {
-		return newUsageError("usage: mate beads <project> [--workspace <dir>] -- <bd arguments>")
-	}
-	w, err := resolveWorkspace(*workspace)
-	if err != nil {
-		return err
-	}
-	t, err := beads.Open(w, fs.Arg(0), nil)
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	return t.Run(ctx, args[sep+1:], os.Stdin, stdout, stderr)
+	fmt.Fprintln(stderr, "note: mate beads is now mate tool beads")
+	return cmdTool(append([]string{string(taskTool)}, args...), stdout, stderr)
 }
 
-// Viewer automation stays non-interactive for agents.
+// cmdTaskTriage implements `mate task-triage <project>`: the task tool's
+// data made, then its viewer's robot triage, which never waits for a
+// person.
 func cmdTaskTriage(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("task-triage", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -107,11 +97,49 @@ func cmdTaskTriage(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	t, err := beads.Open(w, fs.Arg(0), nil)
+	project := fs.Arg(0)
+	p, err := taskToolOn(w, project, false)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	env := toolEnv(w, project, p)
+	ctx, cancel := context.WithTimeout(context.Background(), toolCommandTimeout)
 	defer cancel()
-	return t.Viewer(ctx, []string{"--robot-triage", "--brief"}, nil, stdout, stderr)
+	if err := p.Capabilities().Data.Impl.Init(ctx, env, stderr); err != nil {
+		return err
+	}
+	return runViewerHere(ctx, p, env, []string{"--robot-triage", "--brief"}, nil, stdout, stderr)
+}
+
+// taskToolOn is the task tool on project, refused while its data is not
+// where it should be (toolDataRefusal). starting is `--init`.
+func taskToolOn(w *store.Workspace, project string, starting bool) (tool.Profile, error) {
+	p, err := toolOnProject(w, taskTool, project)
+	if err != nil {
+		return nil, err
+	}
+	caps := p.Capabilities()
+	if !caps.Data.Verified() || !caps.Command.Verified() || !caps.Viewer.Verified() {
+		return nil, fmt.Errorf("%s has no data, command and viewer to run mate tasks with", p.Info().Title)
+	}
+	if err := toolDataRefusal(w, project, p, starting); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// runViewerHere runs p's viewer on the project in this terminal rather than
+// in a Console tab, with extra arguments after its own.
+func runViewerHere(ctx context.Context, p tool.Profile, env tool.CommandEnv, extra []string, in io.Reader, out, stderr io.Writer) error {
+	argv, err := p.Capabilities().Viewer.Impl.Argv(tool.ViewerContext{ProjectDir: env.ProjectDir}, func(name string) string {
+		if path := findTool(os.Getenv, name); filepath.IsAbs(path) {
+			return path
+		}
+		return ""
+	})
+	if err != nil {
+		return err
+	}
+	argv = append(argv, extra...)
+	return runTool(ctx, tool.Invocation{Name: argv[0], Args: argv[1:], Dir: env.ProjectDir}, in, out, stderr)
 }

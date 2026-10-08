@@ -24,17 +24,16 @@ import (
 // consoleColumns are the Console's surfaces (docs/mvp.md M13): the stage
 // column, which shows the agent of the row Enter was pressed on, and a tab
 // per tool role the tool registry binds a key to - the review tab, which
-// `e` opens on a crew's report - and the tasks tab. A tool opens in a tab
-// in the same window: a column left the editor about half the window, and
-// a separate window covered the console. Each surface runs `mate pane
-// serve` for its whole life; the Console tells it what to show over its
-// socket, and the host never re-splits a column or opens a second tab of a
-// role.
+// `e` opens on a crew's report, and the tasks tab, which `t` opens on a
+// project's tracker. A tool opens in a tab in the same window: a column
+// left the editor about half the window, and a separate window covered the
+// console. Each surface runs `mate pane serve` for its whole life; the
+// Console tells it what to show over its socket, and the host never
+// re-splits a column or opens a second tab of a role.
 type consoleColumns struct {
 	h host.Host
 	// cols is the stage column.
-	cols     []host.Column
-	tasksCol host.Column
+	cols []host.Column
 	// tabs are the tool tabs by role, one per Role a tool binding names,
 	// planned whether or not the tool is installed: a missing binary is
 	// said when its key is pressed (tool.Viewer.Argv) and on the status
@@ -42,7 +41,6 @@ type consoleColumns struct {
 	tabs  map[string]toolTab
 	dir   string
 	stage string
-	tasks string
 	herdr string
 	// findTool is a tool binary's absolute path, "" when it is not
 	// installed: the seam tool.Viewer.Argv resolves binaries through.
@@ -60,14 +58,14 @@ type toolTab struct {
 }
 
 // newConsoleColumns plans the surfaces for this Console: the stage column,
-// the tasks tab, and a tab for each role tools binds a key to.
+// and a tab for each role tools binds a key to.
 func newConsoleColumns(h host.Host, getenv func(string) string, tools tool.Registry) (*consoleColumns, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("find the mate binary: %w", err)
 	}
 	roles := toolRoles(tools)
-	sockets := []string{roleStage + ".sock", roleTasks + ".sock"}
+	sockets := []string{roleStage + ".sock"}
 	for _, role := range roles {
 		sockets = append(sockets, role+".sock")
 	}
@@ -94,8 +92,6 @@ func newConsoleColumns(h host.Host, getenv func(string) string, tools tool.Regis
 		return host.Column{Role: role, Argv: []string{exe, "pane", "serve", "--role", role, "--socket", socket, "--owner", owner}}
 	}
 	c.cols = []host.Column{column(roleStage, c.stage)}
-	c.tasks = filepath.Join(dir, roleTasks+".sock")
-	c.tasksCol = column(roleTasks, c.tasks)
 	for _, role := range roles {
 		socket := filepath.Join(dir, role+".sock")
 		c.tabs[role] = toolTab{col: column(role, socket), socket: socket}
@@ -226,7 +222,7 @@ var columnStartWait = 5 * time.Second
 func (c *consoleColumns) close() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	sockets := []string{c.stage, c.tasks}
+	sockets := []string{c.stage}
 	for _, t := range c.tabs {
 		sockets = append(sockets, t.socket)
 	}
@@ -259,9 +255,9 @@ func consoleStage(ws *store.Workspace, deps spawn.Deps, c *consoleColumns) conso
 }
 
 // consoleToolView is the Console's seam for the tool keys of the snapshot
-// (`e`: the crew's report): the tool bound to key on the target's row
-// builds its command (tool.Viewer.Argv), and that tool's tab beside the
-// Console runs it. A nil columns yields a nil ToolViewFunc.
+// (`e`: the crew's report; `t`: the project's tasks): the tool bound to
+// key on the target's row builds its command (tool.Viewer.Argv), and that
+// tool's tab beside the Console runs it. A nil columns yields a nil ToolViewFunc.
 func consoleToolView(ws *store.Workspace, c *consoleColumns, tools tool.Registry) console.ToolViewFunc {
 	if c == nil {
 		return nil
@@ -414,24 +410,6 @@ func (c *consoleColumns) showRoleTab(ctx context.Context, col host.Column, socke
 		return err
 	}
 	return c.waitSend(ctx, socket, cmd)
-}
-
-func consoleTasks(ws *store.Workspace, c *consoleColumns) console.TasksFunc {
-	if c == nil {
-		return nil
-	}
-	return func(ctx context.Context, project string) error {
-		if _, err := ws.BeadsDir(project); err != nil {
-			return err
-		}
-		exe, err := os.Executable()
-		if err != nil {
-			return err
-		}
-		return c.showRoleTab(ctx, c.tasksCol, c.tasks, panerun.Command{
-			Argv: []string{exe, "tasks", project, "--workspace", ws.Root()}, Dir: ws.Root(), Env: c.env,
-		})
-	}
 }
 
 // reviewReport is what a crew key opens its tool on: the crew's own folder

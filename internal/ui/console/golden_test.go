@@ -326,11 +326,14 @@ func unknownMate(reason string) query.MateNode {
 // reads the harnesses.
 var reportKey = query.ToolBinding{Key: "e", Label: "report", Scope: "crew", Role: "review", Tool: "viewer"}
 
+// tasksKey is the other: `t` on a project row, opening the tasks tab.
+var tasksKey = query.ToolBinding{Key: "t", Label: "tasks", Scope: "project", Role: "tasks", Tool: "tracker"}
+
 func sampleTree() query.Snapshot {
 	return query.Snapshot{
 		WorkspaceID: "ws_acme",
 		Harnesses:   testHarnesses,
-		Tools:       []query.ToolBinding{reportKey},
+		Tools:       []query.ToolBinding{reportKey, tasksKey},
 		Workspace: query.KnownField(query.WorkspaceValue{
 			Name: "acme", Root: "/Users/dev/work/acme",
 		}),

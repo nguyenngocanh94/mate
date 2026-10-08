@@ -26,10 +26,18 @@ type Registry struct {
 // it by name rather than calling a nil Viewer.
 var ErrNoViewerImpl = errors.New("tool registry: a verified Viewer has no implementation")
 
+// StageRole is the console's agent column, the role mate itself owns
+// (cmd/mate's stage). No tool's binding may take it: its key would open
+// the tool over the agent the captain is watching.
+const StageRole = "stage"
+
+// ErrReservedRole is a binding that takes a role mate owns (StageRole).
+var ErrReservedRole = errors.New("tool registry: a binding takes a role mate owns")
+
 // NewRegistry registers profiles in the order given. A duplicate name, an
 // empty or non-canonical name, a verified Viewer with no implementation, a
-// binding with no key or an unknown scope, and one key bound twice on one
-// row of the console are refused. Each binding is recorded with the name of
+// binding with no key or an unknown scope, a binding to mate's own role,
+// and one key bound twice on one row of the console are refused. Each binding is recorded with the name of
 // the tool that declares it.
 func NewRegistry(profiles ...Profile) (Registry, error) {
 	r := Registry{profiles: map[Name]Profile{}}
@@ -59,6 +67,9 @@ func NewRegistry(profiles ...Profile) (Registry, error) {
 			}
 			if b.Scope != ScopeProject && b.Scope != ScopeCrew {
 				return Registry{}, fmt.Errorf("tool registry: %s binds key %q to scope %q, not %s or %s", n, b.Key, b.Scope, ScopeProject, ScopeCrew)
+			}
+			if b.Role == StageRole {
+				return Registry{}, fmt.Errorf("%w: %s binds key %q to role %q", ErrReservedRole, n, b.Key, b.Role)
 			}
 			slot := Binding{Key: b.Key, Scope: b.Scope}
 			if other, taken := owner[slot]; taken {

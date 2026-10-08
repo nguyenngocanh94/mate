@@ -195,7 +195,6 @@ func runConsole(dir string, stdout, stderr io.Writer, split bool) error {
 		WithContext(ctx).
 		WithStage(consoleStage(ws, deps, columns)).
 		WithToolView(consoleToolView(ws, columns, tools)).
-		WithTasks(consoleTasks(ws, columns)).
 		WithNoHostHint(host.NoHostHint(os.Getenv)).
 		WithKindGlyphs(probeKindGlyphs(os.Getenv)).
 		WithHarnessIcons(probeNerdIcons(os.Getenv, execOutput)).

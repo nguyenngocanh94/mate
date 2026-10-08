@@ -6,11 +6,12 @@ package catalog
 
 import (
 	"github.com/nguyenngocanh94/mate/internal/tool"
+	"github.com/nguyenngocanh94/mate/internal/tool/beads"
 	"github.com/nguyenngocanh94/mate/internal/tool/fresh"
 )
 
 // Default is every tool this binary drives, in the order the console and
 // a Mate's recall list them.
 func Default() []tool.Profile {
-	return []tool.Profile{fresh.New()}
+	return []tool.Profile{fresh.New(), beads.New()}
 }

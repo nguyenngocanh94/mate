@@ -128,8 +128,8 @@ type CommandEnv struct {
 // passthrough command must: the tool reads the user's stdin and writes its
 // output as it goes. internal/process's Runner buffers stdout and stderr and
 // takes stdin as bytes, which fits a probe but not a passthrough, so the
-// shape here is internal/beads' Runner, which Beads' passthrough runs on
-// today.
+// shape here is the one Beads' passthrough ran on before it was a tool.
+// cmd/mate's runTool is the one that starts real processes.
 type Runner func(ctx context.Context, inv Invocation, in io.Reader, out, stderr io.Writer) error
 
 // Invocation is one process a Runner starts: no shell, args whole.

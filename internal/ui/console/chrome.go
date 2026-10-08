@@ -2,6 +2,7 @@ package console
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/nguyenngocanh94/mate/internal/query"
@@ -215,7 +216,8 @@ type keyHint struct{ key, desc string }
 // sheet that has the keyboard, as many as fit.
 func (m Model) keyLine(p framePlan) gline {
 	l := gl()
-	for i, h := range m.keyHints() {
+	hints := slices.DeleteFunc(m.keyHints(), func(h keyHint) bool { return h.key == "" })
+	for i, h := range hints {
 		next := gl()
 		if i > 0 {
 			next = next.pad(2)
@@ -255,14 +257,14 @@ func (m Model) keyHints() []keyHint {
 	}
 	switch m.focus {
 	case paneDetail:
-		return []keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"esc", "list"}, {"t", "tasks"}, {"enter", "show"}}
+		return []keyHint{{m.g.UpDown, "field"}, {"y", "copy"}, {"esc", "list"}, m.toolHint("t"), {"enter", "show"}}
 	case paneBox:
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "crew"}, {"a", "assign"}, {"t", "tasks"}, {"esc", ""}}
+		return []keyHint{{m.g.UpDown, "move"}, {"enter", "crew"}, {"a", "assign"}, m.toolHint("t"), {"esc", ""}}
 	}
 	if m.cur().kind == frameWorkspace {
-		return []keyHint{{m.g.UpDown, "move"}, {"enter", "open"}, {"t", "tasks"}, {"a", "act"}, {"n", "new"}, {"?", ""}}
+		return []keyHint{{m.g.UpDown, "move"}, {"enter", "open"}, m.toolHint("t"), {"a", "act"}, {"n", "new"}, {"?", ""}}
 	}
-	return []keyHint{{m.g.UpDown, "move"}, {"enter", "show"}, {"t", "tasks"}, {"a", "act"}, {"tab", "pane"}, {"?", ""}}
+	return []keyHint{{m.g.UpDown, "move"}, {"enter", "show"}, m.toolHint("t"), {"a", "act"}, {"tab", "pane"}, {"?", ""}}
 }
 
 // crewByID resolves a Crew row against the Project frame it belongs to.

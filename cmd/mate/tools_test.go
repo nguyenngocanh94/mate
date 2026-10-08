@@ -176,8 +176,8 @@ func TestConsoleToolViewOnAProject(t *testing.T) {
 	}
 }
 
-// A tool's pane waits with its Viewer's placeholder; mate's own roles keep
-// theirs.
+// A tool's pane waits with its Viewer's placeholder; mate's own role keeps
+// its own.
 func TestPaneIdleComesFromTheTool(t *testing.T) {
 	reg, err := tool.NewRegistry(fresh.New(), planTool{})
 	if err != nil {
@@ -187,7 +187,6 @@ func TestPaneIdleComesFromTheTool(t *testing.T) {
 		roleReview: fresh.New().Capabilities().Viewer.Impl.Placeholder(),
 		rolePlan:   "mate · plan",
 		roleStage:  paneIdle[roleStage],
-		roleTasks:  paneIdle[roleTasks],
 	} {
 		if got, ok := paneIdleOf(role, reg); !ok || got != want {
 			t.Errorf("paneIdleOf(%s) = %q, %v; want %q", role, got, ok, want)
@@ -198,5 +197,8 @@ func TestPaneIdleComesFromTheTool(t *testing.T) {
 	}
 	if got := paneRoles(tools); got != "stage|review|tasks" {
 		t.Errorf("paneRoles = %q, want today's stage|review|tasks", got)
+	}
+	if got, ok := paneIdleOf(roleTasks, tools); !ok || got != "mate · tasks\r\n\r\nt on a project opens Beads Viewer here." {
+		t.Errorf("paneIdleOf(tasks) = %q, %v; want Beads Viewer's placeholder", got, ok)
 	}
 }

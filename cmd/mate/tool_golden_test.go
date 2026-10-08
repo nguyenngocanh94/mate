@@ -88,12 +88,11 @@ func TestReviewFreshArgvGolden(t *testing.T) {
 }
 
 // TestRecallBeadsGolden pins the Beads part of `mate recall`
-// (recallTaskPlan): two active issues and one ready one, and an
-// unreadable tracker. recallTaskPlan opens its tracker with the default
-// runner, which execs `bd`, so the fake is a bd on PATH, as in
-// TestBeadsCLISeparatesMateAndUpstreamFlags. It answers only the exact
-// argv Tracker.Work sends today; any other argv fails, and the golden
-// shows it.
+// (recallTools over the binary's registry): two active issues and one
+// ready one, and an unreadable tracker. The tool runs with the real runner
+// (runTool), which execs `bd`, so the fake is a bd on PATH, as in
+// TestToolCLISeparatesMateAndUpstreamFlags. It answers only the exact argv
+// Beads' Recall sends; any other argv fails, and the golden shows it.
 func TestRecallBeadsGolden(t *testing.T) {
 	const listArgs = "list --status in_progress,blocked --limit 10 --sort priority --brief --json --readonly"
 	const readyArgs = "ready --limit 10 --exclude-type epic --brief --json --readonly"
@@ -110,10 +109,7 @@ func TestRecallBeadsGolden(t *testing.T) {
 		{"bd fails", "#!/bin/sh\necho 'database is locked' >&2\nexit 3\n"},
 	} {
 		w, _ := consoleFixture(t, "shop")
-		beadsDir, err := w.BeadsDir("shop")
-		if err != nil {
-			t.Fatal(err)
-		}
+		beadsDir := filepath.Join(w.ProjectHome("shop"), ".beads")
 		if err := os.MkdirAll(beadsDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +125,7 @@ func TestRecallBeadsGolden(t *testing.T) {
 		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 		var out strings.Builder
-		recallTaskPlan(w, "shop", &out)
+		recallTools(w, "shop", tools, &out)
 		fmt.Fprintf(&got, "== %s\n%s\n", tc.name, out.String())
 	}
 	checkToolGolden(t, "recall-beads.golden", got.String())

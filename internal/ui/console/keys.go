@@ -69,11 +69,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.keysOpen = true
 		return m.relayout(), nil
 	case "t":
-		// t opens Beads Viewer through TasksFunc until a tool binds it.
-		if m.toolBound("t") {
-			return m.beginToolView("t")
-		}
-		return m.beginTasks()
+		return m.beginToolView("t")
 	case "tab":
 		return m.onTab(), nil
 	case "shift+tab":

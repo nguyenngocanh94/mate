@@ -16,8 +16,8 @@ import (
 // The tool ratchet counts how much of the code outside internal/tool still
 // knows an outside tool - Beads (bd, bv) or the Fresh editor - by name
 // (docs/plans/workspace-layout-and-tools-2026-10-08.md, sections 5-7). It
-// may only go down: the plan's later PRs move that knowledge behind the
-// tool registry.
+// reached zero when Beads moved behind the tool registry (PR 5) and must
+// stay there: the core asks the registry instead.
 //
 // Two kinds of reference are counted, in every non-test .go file of the
 // module outside internal/tool/...:
@@ -26,9 +26,10 @@ import (
 //     carrying one as a whole path segment (".beads/metadata.json"). Never
 //     a substring: "bd" must not hit "bdd", ".beads" must not hit
 //     ".beads-old", "fresh" must not hit "refresh".
-//   - identifier: a use of an exported identifier of package
-//     internal/beads (beads.Open, beads.Runner, beads.Issue{}), under
-//     whatever name the file imports it as.
+//   - identifier: a use of an exported identifier of a tool's own package,
+//     internal/tool/<name> (beads.New, fresh.New), under whatever name the
+//     file imports it as. internal/tool/catalog is not a tool: it is the
+//     list cmd/mate builds the registry from.
 //
 // The mechanism is internal/harness/ratchet_test.go's, which is a test file
 // of another package and cannot be imported: moduleRoot, declName and
@@ -39,19 +40,28 @@ import (
 // test fails if the count rises above it. When the count falls, lower this
 // constant to the new count in the same change, so the ground gained is
 // kept.
-const toolRatchetCeiling = 5
+const toolRatchetCeiling = 0
 
 // ratchetToolNames is every spelling of a tool name a literal can carry:
 // the executables, Beads' directory, and Fresh's Homebrew formula.
 var ratchetToolNames = []string{"bd", "bv", "fresh", ".beads", "fresh-editor"}
 
-const beadsImportPath = "github.com/nguyenngocanh94/mate/internal/beads"
+// toolImportPrefix is the import path every tool's own package sits under;
+// catalogImportPath is the one package under it that is not a tool.
+const (
+	toolImportPrefix  = "github.com/nguyenngocanh94/mate/internal/tool/"
+	catalogImportPath = toolImportPrefix + "catalog"
+)
+
+// toolPackage reports whether an import path is a tool's own package.
+func toolPackage(path string) bool {
+	return strings.HasPrefix(path, toolImportPrefix) && path != catalogImportPath
+}
 
 // ratchetSkipDirs are module-relative directories never scanned, each with
 // its reason.
 var ratchetSkipDirs = []struct{ dir, reason string }{
 	{"internal/tool", "the tool registry is where tool names belong"},
-	{"internal/beads", "the Beads wrapper itself; the plan deletes it in PR 5"},
 	{"docs", "documentation, not code"},
 }
 
@@ -223,15 +233,16 @@ func scanRatchetFile(t *testing.T, root, path string) []ratchetHit {
 		hits = append(hits, ratchetHit{file: rel, line: fset.Position(pos).Line, kind: kind, what: what, decl: decl})
 	}
 
-	// beadsName is the name this file gives package internal/beads, if it
-	// imports it.
-	beadsName := ""
+	// toolNames are the names this file gives the tool packages it
+	// imports.
+	toolNames := map[string]bool{}
 	for _, imp := range f.Imports {
-		if p, _ := strconv.Unquote(imp.Path.Value); p == beadsImportPath {
-			beadsName = "beads"
+		if p, _ := strconv.Unquote(imp.Path.Value); toolPackage(p) {
+			name := p[strings.LastIndex(p, "/")+1:]
 			if imp.Name != nil {
-				beadsName = imp.Name.Name
+				name = imp.Name.Name
 			}
+			toolNames[name] = true
 		}
 	}
 	for _, d := range f.Decls {
@@ -253,7 +264,7 @@ func scanRatchetFile(t *testing.T, root, path string) []ratchetHit {
 					add(n.Pos(), "literal", strconv.Quote(name), decl)
 				}
 			case *ast.SelectorExpr:
-				if x, ok := n.X.(*ast.Ident); ok && beadsName != "" && x.Name == beadsName && n.Sel.IsExported() {
+				if x, ok := n.X.(*ast.Ident); ok && toolNames[x.Name] && n.Sel.IsExported() {
 					add(n.Pos(), "identifier", x.Name+"."+n.Sel.Name, decl)
 				}
 			}
@@ -336,23 +347,28 @@ func ratchetAllowed(h ratchetHit) int {
 	return -1
 }
 
-// TestToolRatchetCountsBeadsIdentifiers: every use of an exported name of
-// package internal/beads is counted, under whatever name the file gives
-// it; the import alone is not, and neither is another package's selector.
-func TestToolRatchetCountsBeadsIdentifiers(t *testing.T) {
+// TestToolRatchetCountsToolIdentifiers: every use of an exported name of
+// a tool's own package is counted, under whatever name the file gives it;
+// the import alone is not, and neither is another package's selector, the
+// tool contract's or the catalog's.
+func TestToolRatchetCountsToolIdentifiers(t *testing.T) {
 	root := t.TempDir()
 	src := `package x
 
 import (
 	"context"
 
-	bd "github.com/nguyenngocanh94/mate/internal/beads"
+	bd "github.com/nguyenngocanh94/mate/internal/tool/beads"
+	"github.com/nguyenngocanh94/mate/internal/tool/fresh"
+	"github.com/nguyenngocanh94/mate/internal/tool"
+	"github.com/nguyenngocanh94/mate/internal/tool/catalog"
 )
 
 var (
-	_ bd.Runner = bd.Exec
-	_           = context.Background
-	_           = bd.Issue{ID: "x"}
+	_ tool.Profile = bd.New()
+	_              = context.Background
+	_              = fresh.New
+	_              = catalog.Default
 )
 `
 	path := filepath.Join(root, "x.go")
@@ -364,9 +380,8 @@ var (
 		got = append(got, h.kind+" "+h.what)
 	}
 	want := []string{
-		"identifier bd.Runner",
-		"identifier bd.Exec",
-		"identifier bd.Issue",
+		"identifier bd.New",
+		"identifier fresh.New",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("hits:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
