@@ -35,7 +35,7 @@ var (
 )
 
 // fixtureDraft is a fixture reading that is sure of a draft.
-var fixtureDraft = screen.Observation{Composer: screen.ComposerDraft, Draft: "half typed", Evidence: "❯ half typed",
+var fixtureDraft = screen.Observation{Composer: screen.ComposerDraft, Deterministic: screen.ComposerDraft, Draft: "half typed", Evidence: "❯ half typed",
 	Dialog: screen.DialogNone, Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 1, Source: "fixture"}
 
 func jevSays(composer screen.ComposerState, dialog screen.DialogKind, conf float64) screen.Observation {
@@ -44,9 +44,9 @@ func jevSays(composer screen.ComposerState, dialog screen.DialogKind, conf float
 }
 
 func TestChainRules(t *testing.T) {
-	fixtureTrust := screen.Observation{Composer: screen.ComposerUnknown, Evidence: "", Dialog: screen.DialogTrust,
+	fixtureTrust := screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Evidence: "", Dialog: screen.DialogTrust,
 		Startup: harness.StartupScreenTrustDialog, Highlight: 1, Confidence: 1, Source: "fixture"}
-	fixtureUnrecognised := screen.Observation{Composer: screen.ComposerUnknown, Dialog: screen.DialogUnknown,
+	fixtureUnrecognised := screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Dialog: screen.DialogUnknown,
 		Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0, Source: "fixture", Reason: "nothing recognised"}
 	tests := []struct {
 		name       string
@@ -66,15 +66,33 @@ func TestChainRules(t *testing.T) {
 			wantReason: "jev: confidence 0.84 below 0.85 (composer and dialog answers); nothing recognised",
 		},
 		{
-			name: "jev calls a sure draft empty: the safer side wins", fixture: fixtureDraft,
-			jev: jevSays(screen.ComposerEmpty, screen.DialogNone, 0.99), want: fixtureDraft,
-			wantReason: "jev: composer empty, the fixture reads draft; the safer side wins",
+			name: "jev calls a draft empty: the composer stays the fixture's draft", fixture: fixtureDraft,
+			jev: jevSays(screen.ComposerEmpty, screen.DialogNone, 0.99),
+			want: screen.Observation{Composer: screen.ComposerDraft, Deterministic: screen.ComposerDraft, Draft: "half typed",
+				Evidence: "❯ half typed", Dialog: screen.DialogNone, Notice: "quota_warning",
+				Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0.99, Source: "jev"},
+			wantReason: "composer and dialog answers",
+		},
+		{
+			name: "jev calls a screen the fixture cannot read empty: the composer stays unknown", fixture: fixtureUnrecognised,
+			jev: jevSays(screen.ComposerEmpty, screen.DialogNone, 0.99),
+			want: screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Dialog: screen.DialogNone,
+				Notice: "quota_warning", Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0.99, Source: "jev"},
+			wantReason: "composer and dialog answers",
+		},
+		{
+			name: "jev calls a draft busy: the composer stays the fixture's draft", fixture: fixtureDraft,
+			jev: jevSays(screen.ComposerBusy, screen.DialogNone, 0.99),
+			want: screen.Observation{Composer: screen.ComposerDraft, Deterministic: screen.ComposerDraft, Draft: "half typed",
+				Evidence: "❯ half typed", Dialog: screen.DialogNone, Notice: "quota_warning",
+				Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0.99, Source: "jev"},
+			wantReason: "composer and dialog answers",
 		},
 		{
 			name: "jev names a dialog the fixture does not recognise: no highlight", fixture: fixtureUnrecognised,
 			jev: jevSays(screen.ComposerUnknown, screen.DialogHooksReview, 0.95),
-			want: screen.Observation{Composer: screen.ComposerUnknown, Dialog: screen.DialogHooksReview, Notice: "quota_warning",
-				Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0.95, Source: "jev"},
+			want: screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Dialog: screen.DialogHooksReview,
+				Notice: "quota_warning", Startup: harness.StartupScreenUnrecognized, Highlight: -1, Confidence: 0.95, Source: "jev"},
 			wantReason: "composer and dialog answers",
 		},
 		{
@@ -83,21 +101,21 @@ func TestChainRules(t *testing.T) {
 			wantReason: "fixture recognised trust_dialog",
 		},
 		{
-			name: "otherwise jev decides; what it cannot answer is the fixture's", fixture: screen.Observation{
-				Composer: screen.ComposerEmpty, Evidence: "›", Dialog: screen.DialogNone, Startup: harness.StartupScreenReady,
-				Highlight: -1, Confidence: 1, Source: "fixture"},
+			name: "jev's busy vetoes the fixture's empty; what it cannot answer is the fixture's", fixture: screen.Observation{
+				Composer: screen.ComposerEmpty, Deterministic: screen.ComposerEmpty, Evidence: "›", Dialog: screen.DialogNone,
+				Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 1, Source: "fixture"},
 			jev: jevSays(screen.ComposerBusy, screen.DialogNone, 0.9),
-			want: screen.Observation{Composer: screen.ComposerBusy, Evidence: "›", Dialog: screen.DialogNone, Notice: "quota_warning",
-				Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 0.9, Source: "jev"},
+			want: screen.Observation{Composer: screen.ComposerBusy, Deterministic: screen.ComposerEmpty, Evidence: "›", Dialog: screen.DialogNone,
+				Notice: "quota_warning", Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 0.9, Source: "jev"},
 			wantReason: "composer and dialog answers",
 		},
 		{
-			name: "jev's draft stands over the fixture's empty; the draft text is the fixture's", fixture: screen.Observation{
-				Composer: screen.ComposerEmpty, Evidence: "❯", Dialog: screen.DialogNone, Startup: harness.StartupScreenReady,
-				Highlight: -1, Confidence: 1, Source: "fixture"},
+			name: "jev's draft vetoes the fixture's empty; the draft text is the fixture's", fixture: screen.Observation{
+				Composer: screen.ComposerEmpty, Deterministic: screen.ComposerEmpty, Evidence: "❯", Dialog: screen.DialogNone,
+				Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 1, Source: "fixture"},
 			jev: jevSays(screen.ComposerDraft, screen.DialogNone, 0.9),
-			want: screen.Observation{Composer: screen.ComposerDraft, Evidence: "❯", Dialog: screen.DialogNone, Notice: "quota_warning",
-				Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 0.9, Source: "jev"},
+			want: screen.Observation{Composer: screen.ComposerDraft, Deterministic: screen.ComposerEmpty, Evidence: "❯", Dialog: screen.DialogNone,
+				Notice: "quota_warning", Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 0.9, Source: "jev"},
 			wantReason: "composer and dialog answers",
 		},
 	}

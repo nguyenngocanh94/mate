@@ -71,6 +71,13 @@ const (
 type Observation struct {
 	// Composer is the composer's state.
 	Composer ComposerState
+	// Deterministic is what the deterministic classifier read: the fixture
+	// observer's own Composer, whatever any other observer said. Policy that
+	// must not depend on Jev reads this field. The fixture observer sets it
+	// equal to Composer, the chain (internal/screen/chain) copies it from
+	// the fixture, and the jev observer, which has no deterministic reading,
+	// leaves it ComposerUnknown.
+	Deterministic ComposerState
 	// Draft is the text sitting in the composer when Composer is
 	// ComposerDraft, so a caller can quote it or compare it with what it
 	// typed. It is empty otherwise.
@@ -99,8 +106,9 @@ type Observation struct {
 	// when it did not.
 	Confidence float64
 	// Source names the observer that made this observation: "fixture" or
-	// "jev". The chain (internal/screen/chain) writes the source of the
-	// reading it returned.
+	// "jev". The chain (internal/screen/chain) writes "jev" when any of
+	// Jev's fields (a composer veto, Dialog, Notice) is in the reading it
+	// returned, and "fixture" otherwise.
 	Source string
 	// Reason says why Composer or Dialog is Unknown. It is empty when
 	// neither is, except from the jev observer, which always names its

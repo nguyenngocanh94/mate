@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -208,10 +209,10 @@ func summarizeLog(w io.Writer, path string) error {
 	fmt.Fprintf(w, "- Fallbacks to the fixture observer: %d", s.Fallbacks)
 	if s.Fallbacks > 0 {
 		var why []string
-		for _, k := range []string{chain.FallbackThreshold, chain.FallbackDialog, chain.FallbackError, chain.FallbackSaferSide} {
-			if s.ByFallback[k] > 0 {
-				why = append(why, fmt.Sprintf("%s %d", k, s.ByFallback[k]))
-			}
+		// Every rule the log names, the ones the chain no longer applies
+		// (an older log's safer-side) included.
+		for _, k := range slices.Sorted(maps.Keys(s.ByFallback)) {
+			why = append(why, fmt.Sprintf("%s %d", k, s.ByFallback[k]))
 		}
 		fmt.Fprintf(w, " (%s)", strings.Join(why, ", "))
 	}

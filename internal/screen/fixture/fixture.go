@@ -28,13 +28,14 @@ func (Observer) Observe(_ context.Context, profile harness.ScreenProfile, pane s
 	cls := ClassifyComposer(profile, pane)
 	startup := profile.ClassifyStartup(StripSGR(pane))
 	obs := screen.Observation{
-		Composer:  cls.State,
-		Draft:     cls.Pending,
-		Evidence:  cls.Evidence,
-		Dialog:    dialogOf(startup, cls.State),
-		Startup:   startup,
-		Highlight: highlight(profile, startup, StripSGR(pane)),
-		Source:    Source,
+		Composer:      cls.State,
+		Deterministic: cls.State,
+		Draft:         cls.Pending,
+		Evidence:      cls.Evidence,
+		Dialog:        dialogOf(startup, cls.State),
+		Startup:       startup,
+		Highlight:     highlight(profile, startup, StripSGR(pane)),
+		Source:        Source,
 	}
 	if cls.State != screen.ComposerUnknown || startup != harness.StartupScreenUnrecognized {
 		obs.Confidence = 1

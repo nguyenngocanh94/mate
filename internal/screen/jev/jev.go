@@ -5,7 +5,8 @@
 // and no-redirect, no-retry rules are that client's.
 //
 // Jev answers labels with probabilities and no text: an Observation from
-// it has no Draft, no Highlight and no Startup. It is never used alone;
+// it has no Draft, no Highlight, no Startup and no Deterministic reading
+// (ComposerUnknown). It is never used alone;
 // internal/screen/chain puts it in front of the fixture observer.
 package jev
 
@@ -60,12 +61,13 @@ func (o *Observer) Observe(ctx context.Context, _ harness.ScreenProfile, pane st
 func observation(resp Response) screen.Observation {
 	c, d, n := resp.Answers[AxisComposer], resp.Answers[AxisDialog], resp.Answers[AxisNotice]
 	obs := screen.Observation{
-		Composer:   composers[c.Choice],
-		Dialog:     dialogs[d.Choice],
-		Highlight:  -1,
-		Confidence: min(c.Confidence, d.Confidence),
-		Source:     Source,
-		Reason:     fmt.Sprintf("composer %s %.2f, dialog %s %.2f", c.Choice, c.Confidence, d.Choice, d.Confidence),
+		Composer:      composers[c.Choice],
+		Deterministic: screen.ComposerUnknown,
+		Dialog:        dialogs[d.Choice],
+		Highlight:     -1,
+		Confidence:    min(c.Confidence, d.Confidence),
+		Source:        Source,
+		Reason:        fmt.Sprintf("composer %s %.2f, dialog %s %.2f", c.Choice, c.Confidence, d.Choice, d.Confidence),
 	}
 	if n.Choice != "none" {
 		obs.Notice = n.Choice

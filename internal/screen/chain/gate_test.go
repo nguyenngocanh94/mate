@@ -44,13 +44,16 @@ var startupDialogs = map[harness.StartupScreen]bool{
 	harness.StartupScreenBypassDialog: true,
 }
 
-// The ruling's proof (threshold 0.85, the safer side wins, a dialog the
-// fixture recognises is the fixture's, below the threshold the fixture): every harness screen of the 2026-10-08 corpus,
-// answered by Jev from its cassette, goes through the chain, and the chain
-// never calls a composer empty that the fixture reads as a draft or a turn
-// in flight, and never says no dialog where the fixture recognises one.
-// The notice fixtures have no harness and so no screen profile; the chain
-// is never asked about a screen without one.
+// A regression pin on the 2026-10-08 corpus (threshold 0.85, Jev may veto
+// the composer and never enable it, a dialog the fixture recognises is the
+// fixture's, below the threshold the fixture): every harness screen,
+// answered by Jev from its cassette, goes through the chain. The chain
+// calls a composer empty only where the fixture does (Deterministic), so
+// "dangerous" - empty where the fixture reads a draft or a turn in flight -
+// is zero by construction, as is "no dialog" where the fixture recognises
+// one; the counts pin how often each rule applies. The notice fixtures
+// have no harness and so no screen profile; the chain is never asked about
+// a screen without one.
 func TestChainGateOnTheCorpus(t *testing.T) {
 	replay := jev.Replay{Dir: filepath.Join(moduleRoot, "scripts", "jeveval", "testdata", "cassette")}
 	screens, err := replay.Screens(moduleRoot)
@@ -64,7 +67,7 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	ctx := context.Background()
 	counts := map[string]int{}
 	var dangerous []string
-	chained, noHarness, jevMissedDialog := 0, 0, 0
+	chained, noHarness, jevMissedDialog, vetoed := 0, 0, 0, 0
 	for _, s := range screens {
 		kind, ok := harnessOf(reg, s.File)
 		if !ok {
@@ -95,8 +98,6 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 		switch logged.Fallback {
 		case "":
 			counts["jev"]++
-		case chain.FallbackSaferSide:
-			counts["safer-side"]++
 		default:
 			counts["fixture ("+logged.Fallback+")"]++
 			if logged.Fallback == chain.FallbackDialog && logged.Dialog == screen.DialogNone {
@@ -106,10 +107,17 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 		if obs.Composer == screen.ComposerEmpty && (det.Composer == screen.ComposerDraft || det.Composer == screen.ComposerBusy) {
 			dangerous = append(dangerous, fmt.Sprintf("%s: composer empty, fixture %s (%s)", s.File, det.Composer, obs.Reason))
 		}
+		if obs.Composer == screen.ComposerEmpty && obs.Deterministic != screen.ComposerEmpty {
+			dangerous = append(dangerous, fmt.Sprintf("%s: composer empty, deterministic %s (%s)", s.File, obs.Deterministic, obs.Reason))
+		}
+		if obs.Composer != det.Composer {
+			vetoed++
+		}
 		if obs.Dialog == screen.DialogNone && startupDialogs[det.Startup] {
 			dangerous = append(dangerous, fmt.Sprintf("%s: dialog none, fixture %s (%s)", s.File, det.Startup, obs.Reason))
 		}
-		if obs.Draft != det.Draft || obs.Highlight != det.Highlight || obs.Startup != det.Startup || obs.Evidence != det.Evidence {
+		if obs.Draft != det.Draft || obs.Highlight != det.Highlight || obs.Startup != det.Startup || obs.Evidence != det.Evidence ||
+			obs.Deterministic != det.Composer {
 			t.Errorf("%s: %+v does not carry the fixture's %+v", s.File, obs, det)
 		}
 	}
@@ -119,7 +127,7 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackDialog+")", counts["fixture ("+chain.FallbackDialog+")"])
 	t.Logf("  %-28s %3d", "  of which jev said none", jevMissedDialog)
 	t.Logf("  %-28s %3d", "fixture ("+chain.FallbackError+")", counts["fixture ("+chain.FallbackError+")"])
-	t.Logf("  %-28s %3d", "safer-side", counts["safer-side"])
+	t.Logf("  %-28s %3d", "  of which jev vetoed empty", vetoed)
 	t.Logf("  %-28s %3d", "dangerous", len(dangerous))
 	if chained != 78 || noHarness != 12 {
 		t.Fatalf("%d harness screens and %d without a harness, want the corpus's 78 and 12", chained, noHarness)

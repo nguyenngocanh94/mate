@@ -203,7 +203,7 @@ func respond(status int, body []byte) roundTrip {
 
 // One answer maps onto the Observation's vocabulary: Confidence is the
 // weaker of the two deciding answers, a notice of none is no notice, and
-// what Jev cannot answer is left unknown.
+// what Jev cannot answer (Deterministic among it) is left unknown.
 func TestObserveMapsOneAnswer(t *testing.T) {
 	data := answer(t, map[Axis]string{AxisComposer: "none", AxisDialog: "hooks_review", AxisNotice: "none"},
 		map[Axis]float64{AxisComposer: 0.91, AxisDialog: 0.86, AxisNotice: 0.5})
@@ -211,7 +211,7 @@ func TestObserveMapsOneAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := screen.Observation{Composer: screen.ComposerUnknown, Dialog: screen.DialogHooksReview, Highlight: -1,
+	want := screen.Observation{Composer: screen.ComposerUnknown, Deterministic: screen.ComposerUnknown, Dialog: screen.DialogHooksReview, Highlight: -1,
 		Confidence: 0.86, Source: "jev", Reason: "composer none 0.91, dialog hooks_review 0.86"}
 	if obs != want {
 		t.Fatalf("got %+v\nwant %+v", obs, want)

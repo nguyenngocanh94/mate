@@ -4,12 +4,17 @@
 //
 // The fixture observer reads every snapshot, Jev every new one. The
 // fixture's reading is the only source of what Jev cannot answer (Draft,
-// Highlight, Startup, Evidence), so
-// the checks that stand between an Observation and a key press - send's
-// string compare before Enter, settle's highlight confirmation - are made on
-// the fixture's reading whatever Jev said. Jev decides Composer, Dialog and
-// Notice only when it answers at or above the threshold, does not call a
-// composer empty that the fixture is sure holds text or a turn in flight,
+// Highlight, Startup, Evidence, Deterministic), so the checks that stand
+// between an Observation and a key press - send's string compare before
+// Enter, settle's highlight confirmation - are made on the fixture's
+// reading whatever Jev said.
+//
+// On the composer Jev may veto, never enable: the composer is the
+// fixture's, except that Jev, sure of itself, may call a composer the
+// fixture reads as empty a draft or a turn in flight. Jev never turns a
+// composer the fixture reads as anything else into an empty one, so an
+// Observation's Composer is ComposerEmpty only when its Deterministic is.
+// Jev decides Dialog and Notice when it answers at or above the threshold
 // and the fixture has not recognised a startup dialog on the screen.
 package chain
 
@@ -32,7 +37,6 @@ const TTL = 60 * time.Second
 const (
 	FallbackError     = "error"
 	FallbackThreshold = "below-threshold"
-	FallbackSaferSide = "safer-side"
 	FallbackDialog    = "recognised-dialog"
 )
 
@@ -86,29 +90,32 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 
 // Observe reads one snapshot through both observers and keeps, in order:
 //
-//  1. Draft, Highlight, Startup and Evidence from the fallback, always.
+//  1. Draft, Highlight, Startup, Evidence and Deterministic from the
+//     fallback, always.
 //  2. The fallback's Observation whole when the primary fails or answers
 //     below the threshold.
-//  3. The fallback's Observation whole when the primary calls the composer
-//     empty and the fallback is sure (Confidence 1) it holds a draft or a
-//     turn in flight: the safer side wins. Likewise (rule 3b) when the
-//     fallback is sure of a startup dialog it recognises (Startup names
-//     one): whatever the primary says, the dialog, its highlight and the
-//     composer it hides are the fallback's, so nothing is typed into a
-//     dialog Jev missed.
-//  4. The primary's Dialog, with Highlight -1, when the fallback recognises
-//     no startup screen: settle refuses such a screen, naming Jev's dialog.
-//  5. Otherwise the primary's Composer, Dialog, Notice and Confidence.
+//  3. The fallback's Observation whole when the fallback is sure of a
+//     startup dialog it recognises (Startup names one): whatever the
+//     primary says, the dialog, its highlight and the composer it hides
+//     are the fallback's, so nothing is typed into a dialog Jev missed.
+//  4. Otherwise the primary's Dialog, Notice and Confidence, and the
+//     fallback's Composer, except that a fallback ComposerEmpty becomes the
+//     primary's ComposerDraft or ComposerBusy when it says one (the veto:
+//     the more conservative reading wins). The primary never makes a
+//     composer empty, and never names one the fallback cannot read.
+//  5. With the primary's Dialog, Highlight -1 when it names a dialog and
+//     the fallback recognises no startup screen: settle refuses such a
+//     screen, naming Jev's dialog.
 //
 // The primary is asked once per harness and screen hash within TTL; a
 // repeat is answered from memory. After BreakerFailures failures in a row
 // it is not asked at all for BreakerCooldown (breaker.go): the fallback's
 // reading is returned whole, Reason "jev: circuit open", even for a screen
 // whose earlier answer is still in memory - a cache hit costs no request,
-// but an open circuit answers from the fixture alone. The call is synchronous, so an answer
-// always belongs to the snapshot that was hashed: a pane that changes while
-// Jev is asked is a new snapshot on the caller's next read, never this
-// answer's.
+// but an open circuit answers from the fixture alone. The call is
+// synchronous, so an answer always belongs to the snapshot that was hashed:
+// a pane that changes while Jev is asked is a new snapshot on the caller's
+// next read, never this answer's.
 func (c *Chain) Observe(ctx context.Context, profile harness.ScreenProfile, pane string) (screen.Observation, error) {
 	fix, err := c.fallback.Observe(ctx, profile, pane)
 	if err != nil {
@@ -152,19 +159,26 @@ func decide(fix, primary screen.Observation, perr error, threshold float64) (scr
 		return withReason(fix, "jev: "+perr.Error()), FallbackError
 	case primary.Confidence < threshold:
 		return withReason(fix, fmt.Sprintf("jev: confidence %.2f below %.2f (%s)", primary.Confidence, threshold, primary.Reason)), FallbackThreshold
-	case primary.Composer == screen.ComposerEmpty && fix.Confidence == 1 &&
-		(fix.Composer == screen.ComposerDraft || fix.Composer == screen.ComposerBusy):
-		return withReason(fix, fmt.Sprintf("jev: composer empty, the fixture reads %s; the safer side wins", fix.Composer)), FallbackSaferSide
 	case fix.Confidence == 1 && recognisedDialog(fix.Startup):
 		return withReason(fix, "fixture recognised "+string(fix.Startup)), FallbackDialog
 	}
 	out := fix
-	out.Composer, out.Dialog, out.Notice = primary.Composer, primary.Dialog, primary.Notice
+	out.Composer = veto(fix.Composer, primary.Composer)
+	out.Dialog, out.Notice = primary.Dialog, primary.Notice
 	out.Confidence, out.Source, out.Reason = primary.Confidence, primary.Source, primary.Reason
 	if primary.Dialog != screen.DialogNone && (fix.Startup == "" || fix.Startup == harness.StartupScreenUnrecognized) {
 		out.Highlight = -1
 	}
 	return out, ""
+}
+
+// veto is the composer the chain returns: the fixture's, unless the
+// fixture reads it empty and Jev says a draft or a turn in flight is there.
+func veto(fixture, jev screen.ComposerState) screen.ComposerState {
+	if fixture == screen.ComposerEmpty && (jev == screen.ComposerDraft || jev == screen.ComposerBusy) {
+		return jev
+	}
+	return fixture
 }
 
 // recognisedDialog reports whether a startup classification names a
