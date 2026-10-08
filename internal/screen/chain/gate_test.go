@@ -44,8 +44,8 @@ var startupDialogs = map[harness.StartupScreen]bool{
 	harness.StartupScreenBypassDialog: true,
 }
 
-// The ruling's proof (threshold 0.85, the safer side wins, below the
-// threshold the fixture): every harness screen of the 2026-10-08 corpus,
+// The ruling's proof (threshold 0.85, the safer side wins, a dialog the
+// fixture recognises is the fixture's, below the threshold the fixture): every harness screen of the 2026-10-08 corpus,
 // answered by Jev from its cassette, goes through the chain, and the chain
 // never calls a composer empty that the fixture reads as a draft or a turn
 // in flight, and never says no dialog where the fixture recognises one.
@@ -112,7 +112,7 @@ func TestChainGateOnTheCorpus(t *testing.T) {
 	}
 	t.Logf("chain(jev cassette, fixture, 0.85) on %d harness screens (%d notice fixtures have no harness):", chained, noHarness)
 	t.Logf("  %-28s %3d", "jev", counts["jev"])
-	for _, k := range []string{"fixture (" + chain.FallbackThreshold + ")", "fixture (" + chain.FallbackError + ")"} {
+	for _, k := range []string{"fixture (" + chain.FallbackThreshold + ")", "fixture (" + chain.FallbackDialog + ")", "fixture (" + chain.FallbackError + ")"} {
 		t.Logf("  %-28s %3d", k, counts[k])
 	}
 	t.Logf("  %-28s %3d", "safer-side", counts["safer-side"])

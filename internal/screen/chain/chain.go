@@ -8,8 +8,9 @@
 // the checks that stand between an Observation and a key press - send's
 // string compare before Enter, settle's highlight confirmation - are made on
 // the fixture's reading whatever Jev said. Jev decides Composer, Dialog and
-// Notice only when it answers at or above the threshold and does not call a
-// composer empty that the fixture is sure holds text or a turn in flight.
+// Notice only when it answers at or above the threshold, does not call a
+// composer empty that the fixture is sure holds text or a turn in flight,
+// and the fixture has not recognised a startup dialog on the screen.
 package chain
 
 import (
@@ -34,6 +35,7 @@ const (
 	FallbackError     = "error"
 	FallbackThreshold = "below-threshold"
 	FallbackSaferSide = "safer-side"
+	FallbackDialog    = "recognised-dialog"
 )
 
 // Option configures a Chain.
@@ -90,7 +92,11 @@ func New(primary, fallback screen.Observer, threshold float64, opts ...Option) s
 //     below the threshold.
 //  3. The fallback's Observation whole when the primary calls the composer
 //     empty and the fallback is sure (Confidence 1) it holds a draft or a
-//     turn in flight: the safer side wins.
+//     turn in flight: the safer side wins. Likewise (rule 3b) when the
+//     fallback is sure of a startup dialog it recognises (Startup names
+//     one): whatever the primary says, the dialog, its highlight and the
+//     composer it hides are the fallback's, so nothing is typed into a
+//     dialog Jev missed.
 //  4. The primary's Dialog, with Highlight -1, when the fallback recognises
 //     no startup screen: settle refuses such a screen, naming Jev's dialog.
 //  5. Otherwise the primary's Composer, Dialog, Notice and Confidence.
@@ -136,6 +142,8 @@ func decide(fix, primary screen.Observation, perr error, threshold float64) (scr
 	case primary.Composer == screen.ComposerEmpty && fix.Confidence == 1 &&
 		(fix.Composer == screen.ComposerDraft || fix.Composer == screen.ComposerBusy):
 		return withReason(fix, fmt.Sprintf("jev: composer empty, the fixture reads %s; the safer side wins", fix.Composer)), FallbackSaferSide
+	case fix.Confidence == 1 && recognisedDialog(fix.Startup):
+		return withReason(fix, "fixture recognised "+string(fix.Startup)), FallbackDialog
 	}
 	out := fix
 	out.Composer, out.Dialog, out.Notice = primary.Composer, primary.Dialog, primary.Notice
@@ -144,6 +152,12 @@ func decide(fix, primary screen.Observation, perr error, threshold float64) (scr
 		out.Highlight = -1
 	}
 	return out, ""
+}
+
+// recognisedDialog reports whether a startup classification names a
+// dialog: not the ready composer, not a screen the profile cannot name.
+func recognisedDialog(startup harness.StartupScreen) bool {
+	return startup != "" && startup != harness.StartupScreenReady && startup != harness.StartupScreenUnrecognized
 }
 
 // withReason is the fallback's Observation with why the primary's was not

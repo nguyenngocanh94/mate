@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/nguyenngocanh94/mate/internal/harness"
+	"github.com/nguyenngocanh94/mate/internal/outbox"
 	"github.com/nguyenngocanh94/mate/internal/runtime"
 	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/chain"
@@ -135,6 +136,22 @@ func TestCallSitesReadThroughTheDepsObserver(t *testing.T) {
 			Action: console.ActionReply, Target: "shop", TargetKind: "project", Crew: "k3", Input: "A"})
 		if !errors.Is(err, send.ErrAgentBusy) || observer.calls != 1 {
 			t.Fatalf("err %v after %d observations, want busy from the observer", err, observer.calls)
+		}
+	})
+	t.Run("console outbox", func(t *testing.T) {
+		f := newBoxFixture(t)
+		observer := &seesBusy{}
+		f.deps.Observer = observer
+		typedBefore := len(f.rt.SentText)
+		s := consoleOutbox(f.ws, f.deps)
+		if _, err := s.Enqueue("shop", outbox.Request{Source: store.OutboxSourceAssign, Key: "crews/k3.status@0", Text: "resolve: A"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Drain(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.rt.SentText) != typedBefore || observer.calls != 1 {
+			t.Fatalf("typed %v after %d observations, want the observer's busy to hold the line", f.rt.SentText[typedBefore:], observer.calls)
 		}
 	})
 	t.Run("console watcher", func(t *testing.T) {

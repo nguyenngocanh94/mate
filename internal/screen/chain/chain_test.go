@@ -3,6 +3,8 @@ package chain_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/nguyenngocanh94/mate/internal/harness/codex"
 	"github.com/nguyenngocanh94/mate/internal/screen"
 	"github.com/nguyenngocanh94/mate/internal/screen/chain"
+	"github.com/nguyenngocanh94/mate/internal/screen/fixture"
 )
 
 // stub answers every screen with one Observation or one error, and counts.
@@ -75,10 +78,17 @@ func TestChainRules(t *testing.T) {
 			wantReason: "composer and dialog answers",
 		},
 		{
-			name: "otherwise jev decides; what it cannot answer is the fixture's", fixture: fixtureTrust,
-			jev: jevSays(screen.ComposerUnknown, screen.DialogTrust, 0.9),
-			want: screen.Observation{Composer: screen.ComposerUnknown, Dialog: screen.DialogTrust, Notice: "quota_warning",
-				Startup: harness.StartupScreenTrustDialog, Highlight: 1, Confidence: 0.9, Source: "jev"},
+			name: "a dialog the fixture recognises is the fixture's, even where jev agrees", fixture: fixtureTrust,
+			jev: jevSays(screen.ComposerUnknown, screen.DialogTrust, 0.9), want: fixtureTrust,
+			wantReason: "fixture recognised trust_dialog",
+		},
+		{
+			name: "otherwise jev decides; what it cannot answer is the fixture's", fixture: screen.Observation{
+				Composer: screen.ComposerEmpty, Evidence: "›", Dialog: screen.DialogNone, Startup: harness.StartupScreenReady,
+				Highlight: -1, Confidence: 1, Source: "fixture"},
+			jev: jevSays(screen.ComposerBusy, screen.DialogNone, 0.9),
+			want: screen.Observation{Composer: screen.ComposerBusy, Evidence: "›", Dialog: screen.DialogNone, Notice: "quota_warning",
+				Startup: harness.StartupScreenReady, Highlight: -1, Confidence: 0.9, Source: "jev"},
 			wantReason: "composer and dialog answers",
 		},
 		{
@@ -185,5 +195,34 @@ func TestChainFailsWhenTheFixtureDoes(t *testing.T) {
 	c := chain.New(&stub{obs: jevSays(screen.ComposerEmpty, screen.DialogNone, 1)}, &stub{err: errors.New("broken")}, 0.85)
 	if _, err := c.Observe(context.Background(), claudeScreen, "a"); err == nil {
 		t.Fatal("no error")
+	}
+}
+
+// Rule 3b: on a Codex trust dialog the fixture recognises, a Jev sure there
+// is no dialog and an empty composer changes nothing. The dialog, its
+// highlight and the composer are the fixture's, so send refuses and settle
+// answers the dialog as measured.
+func TestChainKeepsADialogTheFixtureRecognises(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(moduleRoot, "internal", "harness", "codex", "testdata", "startup", "codex-0.156.1-trust-dialog.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	jev := &stub{obs: screen.Observation{Composer: screen.ComposerEmpty, Dialog: screen.DialogNone, Highlight: -1,
+		Confidence: 0.99, Source: "jev", Reason: "composer empty 0.99, dialog none 0.99"}}
+	var lines []string
+	c := chain.New(jev, fixture.New(), 0.85, chain.WithLog(func(l string) error { lines = append(lines, l); return nil }))
+	got, err := c.Observe(context.Background(), codexScreen, string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Dialog != screen.DialogTrust || got.Highlight != 0 || got.Startup != harness.StartupScreenTrustDialog ||
+		got.Composer != screen.ComposerUnknown || got.Source != "fixture" {
+		t.Fatalf("got %+v, want the fixture's trust dialog with its highlight on option 0", got)
+	}
+	if !strings.HasPrefix(got.Reason, "fixture recognised trust_dialog") {
+		t.Fatalf("reason %q", got.Reason)
+	}
+	if len(lines) != 1 || !strings.HasSuffix(lines[0], " fallback="+chain.FallbackDialog) {
+		t.Fatalf("log %q", lines)
 	}
 }
